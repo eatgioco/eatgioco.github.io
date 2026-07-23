@@ -1353,16 +1353,12 @@ window.addEventListener('load', function () {
     switchView(e.target.getAttribute('data-view'));
   });
 
-  window.__debug = [];
-  window.__debug.push('hash=' + window.location.hash);
-
   if (window.location.hash === '#pagamentos') {
     switchView('pagamentos');
   } else if (window.location.hash.indexOf('#pagamento-') === 0) {
     pendingHighlightId = window.location.hash.substring('#pagamento-'.length);
-    window.__debug.push('set pendingHighlightId=' + pendingHighlightId);
     switchView('pagamentos');
-    setTimeout(function () { pendingHighlightId = null; window.__debug.push('cleared after 5s'); }, 5000);
+    setTimeout(function () { pendingHighlightId = null; }, 5000);
   }
 
   function pad2(n) {
@@ -1801,14 +1797,11 @@ window.addEventListener('load', function () {
   }
 
   function highlightTicketIfNeeded() {
-    window.__debug.push('highlightTicketIfNeeded called, pendingHighlightId=' + pendingHighlightId);
     if (!pendingHighlightId) return;
     var el = document.querySelector('.payment-ticket[data-id="' + pendingHighlightId + '"]');
-    window.__debug.push('el found=' + !!el);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('payment-ticket-highlight');
-    window.__debug.push('class added, now=' + el.className);
     setTimeout(function () {
       el.classList.remove('payment-ticket-highlight');
     }, 2200);
