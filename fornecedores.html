@@ -1740,6 +1740,7 @@ window.addEventListener('load', function () {
     var status = p.status || 'pendente';
     var isDone = status === 'concluido';
     var isCancelled = status === 'anulado';
+    var isFornecedorOrigin = !!p.numeroReferencia;
 
     var card = document.createElement('div');
     var cardClass = 'card payment-ticket';
@@ -1798,7 +1799,9 @@ window.addEventListener('load', function () {
       html += '<button type="button" class="btn-small btn-edit-request">✏ Editar</button>';
       html += '<button type="button" class="btn-small btn-cancel-request">✕ Anular</button>';
     }
-    html += '<button type="button" class="btn-small btn-delete-request">🗑 Apagar</button>';
+    if (!isFornecedorOrigin) {
+      html += '<button type="button" class="btn-small btn-delete-request">🗑 Apagar</button>';
+    }
     html += '</div>';
 
     card.innerHTML = html;
@@ -1832,15 +1835,24 @@ window.addEventListener('load', function () {
         openEditPaymentModal(p);
       });
       card.querySelector('.btn-cancel-request').addEventListener('click', function () {
-        cancelPaymentRequest(p);
+        if (isFornecedorOrigin) {
+          if (confirm('Anular o pedido #' + p.numeroReferencia + '? Esta ação não pode ser desfeita e será enviado um email de anulação.')) {
+            cancelPaymentRequest(p);
+          }
+        } else {
+          cancelPaymentRequest(p);
+        }
       });
     }
 
-    card.querySelector('.btn-delete-request').addEventListener('click', function () {
-      if (confirm('Apagar este pedido de pagamento? Esta ação não pode ser desfeita.')) {
-        paymentRequestsRef.child(p.id).remove();
-      }
-    });
+    var deleteBtn = card.querySelector('.btn-delete-request');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', function () {
+        if (confirm('Apagar este pedido de pagamento? Esta ação não pode ser desfeita.')) {
+          paymentRequestsRef.child(p.id).remove();
+        }
+      });
+    }
 
     return card;
   }
@@ -1936,6 +1948,7 @@ window.addEventListener('load', function () {
     var groups = {};
     Object.keys(val).forEach(function (id) {
       var p = val[id];
+      if (p.origem === 'avulso') return;
       var dateParts = String(p.date || "").split("/");
       if (dateParts.length !== 3) return;
       var mm = dateParts[1];
@@ -1980,7 +1993,7 @@ window.addEventListener('load', function () {
   paymentRequestsRef.on('value', function (snapshot) {
     var val = snapshot.val() || {};
 
-    var hasMissing = Object.keys(val).some(function (id) { return !val[id].numeroReferencia; });
+    var hasMissing = Object.keys(val).some(function (id) { return val[id].origem !== 'avulso' && !val[id].numeroReferencia; });
     if (hasMissing) {
       var migrations = buildNumeroReferenciaMigrations(val);
       if (Object.keys(migrations).length > 0) {
