@@ -1319,12 +1319,11 @@ window.addEventListener('load', function () {
     render();
   });
 
-  viewTabs.addEventListener('click', function (e) {
-    if (!e.target.classList.contains('tab-btn')) return;
-    var view = e.target.getAttribute('data-view');
+  function switchView(view) {
     var buttons = viewTabs.querySelectorAll('.tab-btn');
-    buttons.forEach(function (b) { b.classList.remove('active'); });
-    e.target.classList.add('active');
+    buttons.forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-view') === view);
+    });
 
     if (view === 'pagamentos') {
       fornecedoresView.style.display = 'none';
@@ -1335,7 +1334,16 @@ window.addEventListener('load', function () {
       pagamentosView.style.display = 'none';
       btnNovo.style.display = 'inline-block';
     }
+  }
+
+  viewTabs.addEventListener('click', function (e) {
+    if (!e.target.classList.contains('tab-btn')) return;
+    switchView(e.target.getAttribute('data-view'));
   });
+
+  if (window.location.hash === '#pagamentos') {
+    switchView('pagamentos');
+  }
 
   function pad2(n) {
     return n < 10 ? "0" + n : String(n);
