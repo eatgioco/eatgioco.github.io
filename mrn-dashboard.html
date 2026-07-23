@@ -123,7 +123,7 @@
     .grid{
       grid-template-columns:1fr;
     }
-    .card-calendario, .card-pagamentos, .card-instagram{
+    .card-calendario, .card-pagamentos, .card-instagram, .card-tasks{
       grid-column:span 1;
     }
   }
@@ -404,6 +404,80 @@
     margin:20px 0 4px;
   }
 
+  .task-input-row{
+    display:flex;
+    gap:8px;
+    margin-top:14px;
+  }
+
+  .task-input-row input{
+    flex:1;
+  }
+
+  .task-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:12px;
+    max-height:240px;
+    overflow-y:auto;
+  }
+
+  .task-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    font-size:13px;
+  }
+
+  .task-item input[type="checkbox"]{
+    width:auto;
+    flex-shrink:0;
+    cursor:pointer;
+  }
+
+  .task-item span{
+    flex:1;
+    word-break:break-word;
+  }
+
+  .btn-delete-task{
+    flex-shrink:0;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:13px;
+    padding:2px 4px;
+  }
+
+  .btn-delete-task:hover{
+    color:var(--red);
+  }
+
+  .task-done-details{
+    margin-top:14px;
+  }
+
+  .task-done-details summary{
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .task-done-details .task-list{
+    margin-top:10px;
+  }
+
+  .task-done-details .task-item span{
+    text-decoration:line-through;
+    color:var(--muted);
+  }
+
   .loading-state{
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -572,11 +646,29 @@
       <p class="empty-state-inline" id="paymentsEmptyInline" style="display:none;"></p>
     </div>
 
-    <div class="card card-instagram" id="cardInstagram">
+    <a class="card card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
       <div class="card-icon">📸</div>
       <h3 class="card-title">Instagram</h3>
       <p class="card-subtitle">Crescimento e métricas — em breve</p>
       <span class="status-badge status-badge-warning">Em configuração</span>
+    </a>
+
+    <div class="card card-tasks" id="cardTasks">
+      <div class="card-icon">✅</div>
+      <h3 class="card-title">Tarefas</h3>
+
+      <div class="task-input-row">
+        <input type="text" id="taskInput" placeholder="Nova tarefa...">
+        <button type="button" class="btn-small" id="btnAddTask">+</button>
+      </div>
+
+      <div class="task-list" id="taskList"></div>
+      <p class="empty-state-inline" id="taskEmptyInline" style="display:none;">Sem tarefas pendentes ✓</p>
+
+      <details class="task-done-details" id="taskDoneDetails" style="display:none;">
+        <summary id="taskDoneSummary">Concluídas (0)</summary>
+        <div class="task-list" id="taskListDone"></div>
+      </details>
     </div>
   </div>
 </main>
@@ -624,10 +716,6 @@ window.addEventListener('load', function () {
     alert('Integração Outlook a caminho');
   });
 
-  document.getElementById('cardInstagram').addEventListener('click', function () {
-    alert('Integração Instagram a caminho');
-  });
-
   var firebaseConfig = {
     databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
   };
@@ -635,6 +723,7 @@ window.addEventListener('load', function () {
   firebase.initializeApp(firebaseConfig);
   var db = firebase.database();
   var paymentRequestsRef = db.ref('paymentRequests');
+  var tasksRef = db.ref('tasks');
 
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
@@ -918,6 +1007,75 @@ window.addEventListener('load', function () {
     render();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
+  });
+
+  var taskInput = document.getElementById('taskInput');
+  var btnAddTask = document.getElementById('btnAddTask');
+  var taskListEl = document.getElementById('taskList');
+  var taskListDoneEl = document.getElementById('taskListDone');
+  var taskEmptyEl = document.getElementById('taskEmptyInline');
+  var taskDoneDetails = document.getElementById('taskDoneDetails');
+  var taskDoneSummary = document.getElementById('taskDoneSummary');
+  var allTasks = {};
+
+  function addTask() {
+    var texto = taskInput.value.trim();
+    if (!texto) return;
+    tasksRef.push({ texto: texto, concluida: false, createdAt: Date.now() });
+    taskInput.value = '';
+  }
+
+  btnAddTask.addEventListener('click', addTask);
+  taskInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTask();
+    }
+  });
+
+  function buildTaskItemHtml(t) {
+    return '<div class="task-item" data-id="' + t.id + '">' +
+      '<input type="checkbox" class="task-check"' + (t.concluida ? ' checked' : '') + '>' +
+      '<span>' + escapeHtml(t.texto) + '</span>' +
+      '<button type="button" class="btn-delete-task" title="Apagar">🗑</button>' +
+      '</div>';
+  }
+
+  function attachTaskHandlers(container) {
+    container.querySelectorAll('.task-item').forEach(function (item) {
+      var id = item.getAttribute('data-id');
+      item.querySelector('.task-check').addEventListener('change', function (e) {
+        tasksRef.child(id).update({ concluida: e.target.checked });
+      });
+      item.querySelector('.btn-delete-task').addEventListener('click', function () {
+        tasksRef.child(id).remove();
+      });
+    });
+  }
+
+  function renderTasks() {
+    var entries = Object.keys(allTasks).map(function (id) {
+      return Object.assign({ id: id }, allTasks[id]);
+    });
+
+    var pending = entries.filter(function (t) { return !t.concluida; })
+      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    var done = entries.filter(function (t) { return t.concluida; })
+      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+
+    taskEmptyEl.style.display = pending.length ? 'none' : 'block';
+    taskListEl.innerHTML = pending.map(buildTaskItemHtml).join('');
+    attachTaskHandlers(taskListEl);
+
+    taskDoneDetails.style.display = done.length ? 'block' : 'none';
+    taskDoneSummary.textContent = 'Concluídas (' + done.length + ')';
+    taskListDoneEl.innerHTML = done.map(buildTaskItemHtml).join('');
+    attachTaskHandlers(taskListDoneEl);
+  }
+
+  tasksRef.on('value', function (snapshot) {
+    allTasks = snapshot.val() || {};
+    renderTasks();
   });
 
 });
