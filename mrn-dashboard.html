@@ -123,7 +123,7 @@
     .grid{
       grid-template-columns:1fr;
     }
-    .card-calendario, .card-pagamentos{
+    .card-calendario, .card-pagamentos, .card-instagram{
       grid-column:span 1;
     }
   }
@@ -374,6 +374,29 @@
     border-top:1px solid var(--line);
   }
 
+  a.payment-ticket{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    cursor:pointer;
+    transition:border-color .12s ease;
+  }
+
+  a.payment-ticket:hover{
+    border-color:var(--red);
+  }
+
+  .payment-ticket-link-hint{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    color:var(--red);
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    align-self:center;
+    margin-left:auto;
+  }
+
   .empty-state-inline{
     font-family:'Space Mono', monospace;
     font-size:14px;
@@ -548,6 +571,13 @@
 
       <p class="empty-state-inline" id="paymentsEmptyInline" style="display:none;"></p>
     </div>
+
+    <div class="card card-instagram" id="cardInstagram">
+      <div class="card-icon">📸</div>
+      <h3 class="card-title">Instagram</h3>
+      <p class="card-subtitle">Crescimento e métricas — em breve</p>
+      <span class="status-badge status-badge-warning">Em configuração</span>
+    </div>
   </div>
 </main>
 
@@ -592,6 +622,10 @@ window.addEventListener('load', function () {
 
   document.getElementById('cardCalendario').addEventListener('click', function () {
     alert('Integração Outlook a caminho');
+  });
+
+  document.getElementById('cardInstagram').addEventListener('click', function () {
+    alert('Integração Instagram a caminho');
   });
 
   var firebaseConfig = {
@@ -675,8 +709,12 @@ window.addEventListener('load', function () {
   }
 
   function buildTicketHtml(p) {
+    var isFornecedor = (p.origem || 'fornecedor') !== 'avulso';
     var lines = p.lines || [];
-    var html = '<div class="payment-ticket" data-id="' + p.id + '">';
+    var tag = isFornecedor ? 'a' : 'div';
+    var hrefAttr = isFornecedor ? ' href="fornecedores.html#pagamento-' + p.id + '"' : '';
+
+    var html = '<' + tag + ' class="payment-ticket" data-id="' + p.id + '"' + hrefAttr + '>';
 
     lines.forEach(function (l, idx) {
       html += '<div class="payment-line-detail">';
@@ -694,15 +732,27 @@ window.addEventListener('load', function () {
       html += '</div>';
     });
 
-    html += '<div class="payment-ticket-actions">';
-    if (currentTab === 'pendente') {
-      html += '<button type="button" class="btn-small btn-marcar-concluido">✓ Marcar como concluído</button>';
-      html += '<button type="button" class="btn-small btn-anular">✕ Anular</button>';
+    var actionButtons = '';
+    if (isFornecedor) {
+      if (currentTab === 'pendente') {
+        actionButtons += '<button type="button" class="btn-small btn-marcar-concluido">✓ Marcar como concluído</button>';
+      }
+    } else {
+      if (currentTab === 'pendente') {
+        actionButtons += '<button type="button" class="btn-small btn-marcar-concluido">✓ Marcar como concluído</button>';
+        actionButtons += '<button type="button" class="btn-small btn-anular">✕ Anular</button>';
+      }
+      actionButtons += '<button type="button" class="btn-small btn-apagar">🗑 Apagar</button>';
     }
-    html += '<button type="button" class="btn-small btn-apagar">🗑 Apagar</button>';
+
+    html += '<div class="payment-ticket-actions">';
+    html += actionButtons;
+    if (isFornecedor) {
+      html += '<span class="payment-ticket-link-hint">→ Ver em Fornecedores</span>';
+    }
     html += '</div>';
 
-    html += '</div>';
+    html += '</' + tag + '>';
     return html;
   }
 
@@ -711,7 +761,9 @@ window.addEventListener('load', function () {
     if (!card) return;
 
     card.querySelectorAll('.btn-pagar').forEach(function (btn) {
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         var line = (p.lines || [])[parseInt(btn.getAttribute('data-line'), 10)];
         if (!line || !line.iban) return;
         var text = 'IBAN: ' + line.iban + (line.montante ? ' — Montante: ' + formatMontante(line.montante) + '€' : '');
@@ -722,21 +774,27 @@ window.addEventListener('load', function () {
 
     var marcarBtn = card.querySelector('.btn-marcar-concluido');
     if (marcarBtn) {
-      marcarBtn.addEventListener('click', function () {
+      marcarBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         paymentRequestsRef.child(p.id).update({ status: 'concluido' });
       });
     }
 
     var anularBtn = card.querySelector('.btn-anular');
     if (anularBtn) {
-      anularBtn.addEventListener('click', function () {
+      anularBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         paymentRequestsRef.child(p.id).update({ status: 'anulado' });
       });
     }
 
     var apagarBtn = card.querySelector('.btn-apagar');
     if (apagarBtn) {
-      apagarBtn.addEventListener('click', function () {
+      apagarBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         if (confirm('Apagar este pagamento? Esta ação não pode ser desfeita.')) {
           paymentRequestsRef.child(p.id).remove();
         }
