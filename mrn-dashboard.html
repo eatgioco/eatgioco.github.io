@@ -269,6 +269,31 @@
     color:var(--white);
   }
 
+  .payments-subfilters{
+    display:flex;
+    gap:6px;
+    margin-top:10px;
+  }
+
+  .filter-chip{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    padding:6px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+  }
+
+  .filter-chip.active{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
   .payments-summary{
     display:flex;
     gap:28px;
@@ -618,6 +643,12 @@
         <button type="button" class="payments-tab" data-status="anulado">Anulados</button>
       </div>
 
+      <div class="payments-subfilters" id="paymentsSubfilters">
+        <button type="button" class="filter-chip active" data-origem="todos">Todos</button>
+        <button type="button" class="filter-chip" data-origem="fornecedor">Fornecedores</button>
+        <button type="button" class="filter-chip" data-origem="avulso">Outros</button>
+      </div>
+
       <p class="loading-state" id="paymentsLoading">A carregar...</p>
 
       <div class="payments-summary" id="paymentsSummary" style="display:none;">
@@ -736,8 +767,10 @@ window.addEventListener('load', function () {
   var listAvulsoEl = document.getElementById('paymentsListAvulso');
   var emptyEl = document.getElementById('paymentsEmptyInline');
   var tabsEl = document.getElementById('paymentsTabs');
+  var subfiltersEl = document.getElementById('paymentsSubfilters');
 
   var currentTab = 'pendente';
+  var currentOrigemFilter = 'todos';
   var allPaymentRequests = {};
 
   var novoPagamentoModalOverlay = document.getElementById('novoPagamentoModalOverlay');
@@ -901,6 +934,10 @@ window.addEventListener('load', function () {
     var entries = Object.keys(allPaymentRequests)
       .map(function (id) { return Object.assign({ id: id }, allPaymentRequests[id]); })
       .filter(function (p) { return (p.status || 'pendente') === currentTab; })
+      .filter(function (p) {
+        if (currentOrigemFilter === 'todos') return true;
+        return (p.origem || 'fornecedor') === currentOrigemFilter;
+      })
       .sort(function (a, b) { return b.id.localeCompare(a.id); });
 
     if (entries.length === 0) {
@@ -947,6 +984,15 @@ window.addEventListener('load', function () {
     tabsEl.querySelectorAll('.payments-tab').forEach(function (b) { b.classList.remove('active'); });
     e.target.classList.add('active');
     currentTab = status;
+    render();
+  });
+
+  subfiltersEl.addEventListener('click', function (e) {
+    if (!e.target.classList.contains('filter-chip')) return;
+    var origem = e.target.getAttribute('data-origem');
+    subfiltersEl.querySelectorAll('.filter-chip').forEach(function (b) { b.classList.remove('active'); });
+    e.target.classList.add('active');
+    currentOrigemFilter = origem;
     render();
   });
 

@@ -658,6 +658,15 @@
     background:var(--red);
   }
 
+  .ticket-ref{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--red);
+    margin-bottom:2px;
+  }
+
   .payment-ticket-cancelled{
     opacity:0.55;
     text-decoration:line-through;
@@ -864,7 +873,7 @@
 <div class="modal-overlay" id="paymentModalOverlay">
   <div class="modal">
     <div class="modal-header">
-      <h2>Pedido de Pagamento</h2>
+      <h2 id="paymentModalTitle">Pedido de Pagamento</h2>
       <button class="modal-close" id="paymentModalClose">×</button>
     </div>
 
@@ -1082,6 +1091,7 @@ window.addEventListener('load', function () {
   var btnEnviarPagamento = document.getElementById('btnEnviarPagamento');
 
   var allPaymentRequests = {};
+  var editingTicketId = null;
   var pendingHighlightId = null;
 
   function escapeHtml(str) {
@@ -1386,6 +1396,26 @@ window.addEventListener('load', function () {
     return parts[2] + "/" + parts[1] + "/" + parts[0];
   }
 
+  function ddmmyyyyToIso(ddmmyyyy) {
+    if (!ddmmyyyy) return "";
+    var parts = ddmmyyyy.split("/");
+    if (parts.length !== 3) return "";
+    return parts[2] + "-" + parts[1] + "-" + parts[0];
+  }
+
+  function nextNumeroReferencia(d) {
+    var mm = pad2(d.getMonth() + 1);
+    var aa = String(d.getFullYear()).slice(-2);
+    var count = 0;
+    Object.keys(allPaymentRequests).forEach(function (id) {
+      var nr = allPaymentRequests[id].numeroReferencia;
+      if (!nr) return;
+      var parts = String(nr).split("/");
+      if (parts.length === 3 && parts[1] === mm && parts[2] === aa) count++;
+    });
+    return (count + 1) + "/" + mm + "/" + aa;
+  }
+
   function parsePrazoDays(text) {
     if (!text) return null;
     var match = String(text).match(/(\d+)\s*dias?/i);
@@ -1571,12 +1601,38 @@ window.addEventListener('load', function () {
   }
 
   function openPaymentModal() {
+    editingTicketId = null;
+    document.getElementById('paymentModalTitle').textContent = 'Pedido de Pagamento';
+    btnEnviarPagamento.textContent = 'Enviar';
     resetPaymentLines();
+    paymentModalOverlay.classList.add('open');
+  }
+
+  function openEditPaymentModal(p) {
+    editingTicketId = p.id;
+    document.getElementById('paymentModalTitle').textContent = 'Editar Pagamento';
+    btnEnviarPagamento.textContent = 'Guardar Alterações';
+
+    paymentLines.innerHTML = "";
+    var lines = p.lines && p.lines.length ? p.lines : [{}];
+    lines.forEach(function (l) {
+      var row = createPaymentLineRow();
+      var matchId = Object.keys(allSuppliers).find(function (id) {
+        return allSuppliers[id].nome === l.fornecedor;
+      });
+      if (matchId) row.querySelector('.payment-fornecedor').value = matchId;
+      row.querySelector('.payment-montante').value = l.montante || "";
+      row.querySelector('.payment-referencia').value = l.referencia || "";
+      row.querySelector('.payment-prazo').value = ddmmyyyyToIso(l.prazo);
+      paymentLines.appendChild(row);
+    });
+
     paymentModalOverlay.classList.add('open');
   }
 
   function closePaymentModal() {
     paymentModalOverlay.classList.remove('open');
+    editingTicketId = null;
   }
 
   btnPedirPagamento.addEventListener('click', openPaymentModal);
@@ -1611,8 +1667,17 @@ window.addEventListener('load', function () {
       return;
     }
 
+    if (editingTicketId) {
+      saveEditedPayment(editingTicketId, lines);
+    } else {
+      sendNewPaymentRequest(lines);
+    }
+  });
+
+  function sendNewPaymentRequest(lines) {
     var dateStr = formatDateDDMMYYYY(new Date());
-    var subject = "Pedido Pagamento | Fornecedores | – Data: " + formatSubjectDate(new Date());
+    var numeroReferencia = nextNumeroReferencia(new Date());
+    var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
 
     var bodyLines = [];
     bodyLines.push("Boa tarde,");
@@ -1625,20 +1690,42 @@ window.addEventListener('load', function () {
     bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
     var body = bodyLines.join("\n");
 
-    paymentRequestsRef.push({ date: dateStr, status: "pendente", origem: "fornecedor", lines: lines });
+    paymentRequestsRef.push({ date: dateStr, status: "pendente", origem: "fornecedor", numeroReferencia: numeroReferencia, lines: lines });
 
     var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
     window.location.href = mailto;
 
     closePaymentModal();
-  });
+  }
+
+  function saveEditedPayment(id, lines) {
+    var existing = allPaymentRequests[id] || {};
+    var numeroReferencia = existing.numeroReferencia || "";
+
+    paymentRequestsRef.child(id).update({ lines: lines });
+
+    var subject = "Pedido de pagamento EDITADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
+    var bodyLines = [];
+    bodyLines.push("O pedido #" + numeroReferencia + " foi editado. Novos dados:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    closePaymentModal();
+  }
 
   function cancelPaymentRequest(p) {
     paymentRequestsRef.child(p.id).update({ status: 'anulado' });
 
-    var subject = "Pedido de pagamento ANULADO — " + (p.date || "");
+    var numeroReferencia = p.numeroReferencia || "";
+    var subject = "Pedido de pagamento ANULADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
     var bodyLines = [];
-    bodyLines.push("O seguinte pedido de pagamento foi anulado:");
+    bodyLines.push("O pedido #" + numeroReferencia + " foi anulado:");
     bodyLines.push("");
     bodyLines = bodyLines.concat(buildPaymentLinesBlock(p.lines || []));
     bodyLines.push("");
@@ -1668,7 +1755,10 @@ window.addEventListener('load', function () {
 
     var html = '';
     html += '<div class="card-top">';
+    html += '<div>';
+    if (p.numeroReferencia) html += '<span class="ticket-ref">#' + escapeHtml(p.numeroReferencia) + '</span>';
     html += '<h3 class="card-title">' + escapeHtml(p.date || "") + '</h3>';
+    html += '</div>';
     html += '<span class="' + badgeClass + '">' + badgeText + '</span>';
     html += '</div>';
 
@@ -1705,6 +1795,7 @@ window.addEventListener('load', function () {
     html += '<div class="card-actions">';
     if (status === 'pendente') {
       html += '<button type="button" class="btn-small btn-mark-done">✓ Marcar como concluído</button>';
+      html += '<button type="button" class="btn-small btn-edit-request">✏ Editar</button>';
       html += '<button type="button" class="btn-small btn-cancel-request">✕ Anular</button>';
     }
     html += '<button type="button" class="btn-small btn-delete-request">🗑 Apagar</button>';
@@ -1736,6 +1827,9 @@ window.addEventListener('load', function () {
     if (status === 'pendente') {
       card.querySelector('.btn-mark-done').addEventListener('click', function () {
         paymentRequestsRef.child(p.id).update({ status: 'concluido' });
+      });
+      card.querySelector('.btn-edit-request').addEventListener('click', function () {
+        openEditPaymentModal(p);
       });
       card.querySelector('.btn-cancel-request').addEventListener('click', function () {
         cancelPaymentRequest(p);
@@ -1838,8 +1932,64 @@ window.addEventListener('load', function () {
     statusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
   });
 
+  function buildNumeroReferenciaMigrations(val) {
+    var groups = {};
+    Object.keys(val).forEach(function (id) {
+      var p = val[id];
+      var dateParts = String(p.date || "").split("/");
+      if (dateParts.length !== 3) return;
+      var mm = dateParts[1];
+      var aa = dateParts[2].slice(-2);
+      var key = mm + "/" + aa;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push({ id: id, day: parseInt(dateParts[0], 10) || 0, numeroReferencia: p.numeroReferencia || "" });
+    });
+
+    var migrations = {};
+    Object.keys(groups).forEach(function (key) {
+      var parts = key.split("/");
+      var mm = parts[0], aa = parts[1];
+      var list = groups[key];
+
+      var takenNs = {};
+      list.forEach(function (item) {
+        if (item.numeroReferencia) {
+          var n = parseInt(item.numeroReferencia.split("/")[0], 10);
+          if (!isNaN(n)) takenNs[n] = true;
+        }
+      });
+
+      var missing = list.filter(function (item) { return !item.numeroReferencia; });
+      missing.sort(function (a, b) {
+        if (a.day !== b.day) return a.day - b.day;
+        return a.id.localeCompare(b.id);
+      });
+
+      var nextN = 1;
+      missing.forEach(function (item) {
+        while (takenNs[nextN]) nextN++;
+        migrations[item.id + "/numeroReferencia"] = nextN + "/" + mm + "/" + aa;
+        takenNs[nextN] = true;
+        nextN++;
+      });
+    });
+
+    return migrations;
+  }
+
   paymentRequestsRef.on('value', function (snapshot) {
-    allPaymentRequests = snapshot.val() || {};
+    var val = snapshot.val() || {};
+
+    var hasMissing = Object.keys(val).some(function (id) { return !val[id].numeroReferencia; });
+    if (hasMissing) {
+      var migrations = buildNumeroReferenciaMigrations(val);
+      if (Object.keys(migrations).length > 0) {
+        paymentRequestsRef.update(migrations);
+        return;
+      }
+    }
+
+    allPaymentRequests = val;
     renderPayments();
   });
 
