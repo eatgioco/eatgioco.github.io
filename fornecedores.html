@@ -1357,6 +1357,7 @@ window.addEventListener('load', function () {
   } else if (window.location.hash.indexOf('#pagamento-') === 0) {
     pendingHighlightId = window.location.hash.substring('#pagamento-'.length);
     switchView('pagamentos');
+    setTimeout(function () { pendingHighlightId = null; }, 5000);
   }
 
   function pad2(n) {
@@ -1805,7 +1806,6 @@ window.addEventListener('load', function () {
     setTimeout(function () {
       el.classList.remove('payment-ticket-highlight');
     }, 2200);
-    pendingHighlightId = null;
   }
 
   statusMsg.textContent = "A ligar à base de dados...";
