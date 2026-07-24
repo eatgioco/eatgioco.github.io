@@ -184,6 +184,7 @@
     display:flex;
     flex-direction:column;
     gap:10px;
+    height:100%;
     transition:transform .12s ease, box-shadow .12s ease;
     position:relative;
   }
@@ -362,9 +363,26 @@
     display:flex;
     gap:8px;
     flex-wrap:wrap;
-    margin-top:4px;
+    margin-top:auto;
     border-top:1px solid var(--line);
     padding-top:10px;
+  }
+
+  .order-email-link{
+    background:none;
+    border:none;
+    padding:0;
+    margin-top:6px;
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    align-self:flex-start;
+  }
+
+  .order-email-link:hover{
+    color:var(--black);
   }
 
   .btn-small{
@@ -830,6 +848,10 @@
           <input type="text" id="fMorada">
         </div>
         <div class="field full">
+          <label class="field-label">Plataforma de Encomenda (URL)</label>
+          <input type="text" id="fPlataformaEncomenda" placeholder="Ex: https://loja.fornecedor.pt/login">
+        </div>
+        <div class="field full">
           <label class="field-label">Notas</label>
           <textarea id="fNotas"></textarea>
         </div>
@@ -1183,9 +1205,16 @@ window.addEventListener('load', function () {
       }
 
       html += '<div class="card-actions">';
-      html += '<button type="button" class="btn-small btn-order">📦 Encomenda</button>';
+      if (s.plataformaEncomenda) {
+        html += '<button type="button" class="btn-small btn-order-online">🔗 Encomendar Online</button>';
+      } else {
+        html += '<button type="button" class="btn-small btn-order">📦 Encomenda</button>';
+      }
       if (s.iban) html += '<button type="button" class="btn-small btn-copy-iban">Copiar IBAN</button>';
       html += '</div>';
+      if (s.plataformaEncomenda) {
+        html += '<button type="button" class="order-email-link">ou encomendar por email</button>';
+      }
 
       card.innerHTML = html;
       card.addEventListener('click', function () {
@@ -1198,16 +1227,38 @@ window.addEventListener('load', function () {
         suppliersRef.child(s.id).update({ favorito: !s.favorito });
       });
 
-      var orderBtn = card.querySelector('.btn-order');
-      orderBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
+      function tryOpenOrderModal() {
         var to = (s.emailord || s.email || '').trim();
         if (!to) {
           alert('Sem email de encomendas registado');
           return;
         }
         openOrderModal(s);
-      });
+      }
+
+      var orderBtn = card.querySelector('.btn-order');
+      if (orderBtn) {
+        orderBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          tryOpenOrderModal();
+        });
+      }
+
+      var orderOnlineBtn = card.querySelector('.btn-order-online');
+      if (orderOnlineBtn) {
+        orderOnlineBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          window.open(s.plataformaEncomenda, '_blank');
+        });
+      }
+
+      var orderEmailLink = card.querySelector('.order-email-link');
+      if (orderEmailLink) {
+        orderEmailLink.addEventListener('click', function (e) {
+          e.stopPropagation();
+          tryOpenOrderModal();
+        });
+      }
 
       var copyBtn = card.querySelector('.btn-copy-iban');
       if (copyBtn) {
@@ -1280,6 +1331,7 @@ window.addEventListener('load', function () {
       document.getElementById('fValorMinimo').value = supplier.valorMinimo || "";
       document.getElementById('fCondicoesPagamento').value = supplier.condicoesPagamento || "";
       document.getElementById('fMorada').value = supplier.morada || "";
+      document.getElementById('fPlataformaEncomenda').value = supplier.plataformaEncomenda || "";
       document.getElementById('fNotas').value = supplier.notas || "";
       btnRemover.style.display = "inline-block";
     } else {
@@ -1329,6 +1381,7 @@ window.addEventListener('load', function () {
       valorMinimo: document.getElementById('fValorMinimo').value.trim(),
       condicoesPagamento: document.getElementById('fCondicoesPagamento').value.trim(),
       morada: document.getElementById('fMorada').value.trim(),
+      plataformaEncomenda: document.getElementById('fPlataformaEncomenda').value.trim(),
       notas: document.getElementById('fNotas').value.trim()
     };
 
