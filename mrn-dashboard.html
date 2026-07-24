@@ -305,27 +305,32 @@
 
   .payments-subfilters{
     display:flex;
-    gap:6px;
-    margin-top:10px;
+    gap:16px;
+    margin-top:8px;
+    justify-content:flex-end;
   }
 
   .filter-chip{
     font-family:'Space Mono', monospace;
     font-size:10px;
     font-weight:700;
-    padding:6px 10px;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
+    padding:2px 0;
+    border:none;
+    border-bottom:2px solid transparent;
+    background:none;
+    color:var(--muted);
     cursor:pointer;
     text-transform:uppercase;
     letter-spacing:0.3px;
   }
 
+  .filter-chip:hover{
+    color:var(--black);
+  }
+
   .filter-chip.active{
-    background:var(--red);
-    border-color:var(--red);
-    color:var(--white);
+    color:var(--red);
+    border-bottom-color:var(--red);
   }
 
   .payments-summary{
@@ -411,6 +416,14 @@
     font-family:'Space Mono', monospace;
     font-weight:700;
     white-space:nowrap;
+  }
+
+  .ticket-ref{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    color:var(--red);
+    font-size:11px;
+    margin-left:6px;
   }
 
   .payment-line-sub{
@@ -885,7 +898,9 @@ window.addEventListener('load', function () {
 
     lines.forEach(function (l, idx) {
       html += '<div class="payment-line-detail">';
-      html += '<div class="payment-line-top"><strong>' + escapeHtml(l.fornecedor || 'Sem descrição') + '</strong><span>' + formatEuro(parseFloat(String(l.montante).replace(',', '.')) || 0) + '</span></div>';
+      html += '<div class="payment-line-top"><strong>' + escapeHtml(l.fornecedor || 'Sem descrição');
+      if (isFornecedor && p.numeroReferencia) html += '<span class="ticket-ref">#' + escapeHtml(p.numeroReferencia) + '</span>';
+      html += '</strong><span>' + formatEuro(parseFloat(String(l.montante).replace(',', '.')) || 0) + '</span></div>';
 
       var subParts = [];
       subParts.push('Prazo: ' + escapeHtml(l.prazo || 'n/d'));

@@ -539,37 +539,47 @@
     border-bottom:none;
   }
 
-  .payment-copy-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:8px;
-    font-size:13px;
-    color:var(--muted);
-    padding:2px 0;
-  }
-
-  .btn-copy-small{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    font-weight:700;
-    padding:4px 8px;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
+  .copy-icon-btn{
+    background:none;
+    border:none;
     cursor:pointer;
-    white-space:nowrap;
-    flex-shrink:0;
+    font-size:11px;
+    padding:0;
+    margin-left:5px;
+    line-height:1;
+    opacity:0.5;
+    position:relative;
+    vertical-align:middle;
   }
 
-  .btn-copy-small:hover{
+  .copy-icon-btn:hover{
+    opacity:1;
+  }
+
+  .copy-icon-btn::after{
+    content:'Copiado ✓';
+    position:absolute;
+    bottom:100%;
+    left:50%;
+    transform:translateX(-50%) translateY(-4px);
     background:var(--black);
     color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    padding:3px 6px;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .15s ease;
   }
 
-  .btn-copy-small:disabled{
-    opacity:0.7;
-    cursor:default;
+  .copy-icon-btn.copy-icon-copied::after{
+    opacity:1;
+  }
+
+  .copy-icon-btn.copy-icon-error::after{
+    content:'Erro';
+    opacity:1;
   }
 
   .payment-ticket{
@@ -1229,6 +1239,21 @@ window.addEventListener('load', function () {
     });
   }
 
+  function copyIconFeedback(text, btnEl) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function () {
+      btnEl.classList.add('copy-icon-copied');
+      setTimeout(function () {
+        btnEl.classList.remove('copy-icon-copied');
+      }, 1500);
+    }).catch(function () {
+      btnEl.classList.add('copy-icon-error');
+      setTimeout(function () {
+        btnEl.classList.remove('copy-icon-error');
+      }, 1500);
+    });
+  }
+
   function formatMontanteForCopy(montante) {
     var n = parseFloat(String(montante).replace(',', '.'));
     return isNaN(n) ? String(montante) : n.toFixed(2);
@@ -1771,22 +1796,22 @@ window.addEventListener('load', function () {
       html += '<div class="payment-line-detail">';
       html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong></div>';
 
-      html += '<div class="payment-copy-row"><span>Montante: ' + escapeHtml(l.montante) + '€</span>';
-      if (showCopyButtons) html += '<button type="button" class="btn-copy-small btn-copy-montante" data-line="' + idx + '">📋 Copiar Montante</button>';
-      html += '</div>';
+      html += '<div class="card-row"><span>Montante: ' + escapeHtml(l.montante) + '€';
+      if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-montante" data-line="' + idx + '" title="Copiar montante">📋</button>';
+      html += '</span></div>';
 
       html += '<div class="card-row"><span>Prazo: ' + escapeHtml(l.prazo || 'n/d') + '</span></div>';
 
       if (l.iban) {
-        html += '<div class="payment-copy-row"><span>IBAN: ' + escapeHtml(l.iban) + '</span>';
-        if (showCopyButtons) html += '<button type="button" class="btn-copy-small btn-copy-iban-line" data-line="' + idx + '">📋 Copiar IBAN</button>';
-        html += '</div>';
+        html += '<div class="card-row"><span>IBAN: ' + escapeHtml(l.iban);
+        if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-iban-line" data-line="' + idx + '" title="Copiar IBAN">📋</button>';
+        html += '</span></div>';
       }
 
       if (l.referencia) {
-        html += '<div class="payment-copy-row"><span>Referência: ' + escapeHtml(l.referencia) + '</span>';
-        if (showCopyButtons) html += '<button type="button" class="btn-copy-small btn-copy-ref" data-line="' + idx + '">📋 Copiar Referência</button>';
-        html += '</div>';
+        html += '<div class="card-row"><span>Referência: ' + escapeHtml(l.referencia);
+        if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-ref" data-line="' + idx + '" title="Copiar referência">📋</button>';
+        html += '</span></div>';
       }
 
       html += '</div>';
@@ -1810,19 +1835,19 @@ window.addEventListener('load', function () {
       card.querySelectorAll('.btn-copy-montante').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyToClipboard(formatMontanteForCopy(l.montante), btn);
+          copyIconFeedback(formatMontanteForCopy(l.montante), btn);
         });
       });
       card.querySelectorAll('.btn-copy-iban-line').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyToClipboard(l.iban, btn);
+          copyIconFeedback(l.iban, btn);
         });
       });
       card.querySelectorAll('.btn-copy-ref').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyToClipboard(l.referencia, btn);
+          copyIconFeedback(l.referencia, btn);
         });
       });
     }
