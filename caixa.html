@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIOCO · Caixa</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:680px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:680px;
+    margin:0 auto;
+    padding:20px 16px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--red);
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+  }
+
+  /* ---------- Summary ---------- */
+  .summary-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:20px;
+  }
+
+  .summary-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:14px;
+  }
+
+  .summary-card.pending-active{
+    border-color:var(--amber);
+  }
+
+  .summary-label{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 6px;
+  }
+
+  .summary-value{
+    font-family:'Space Mono', monospace;
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+    line-height:1.1;
+  }
+
+  .summary-value.positive{ color:var(--green); }
+  .summary-value.negative{ color:var(--red); }
+
+  .summary-sub{
+    font-size:11px;
+    color:var(--muted);
+    margin:4px 0 0;
+  }
+
+  /* ---------- Form ---------- */
+  .form-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+    margin-top:20px;
+  }
+
+  .form-title{
+    margin:0 0 12px;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .tipo-toggle{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:12px;
+  }
+
+  .tipo-btn{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    padding:16px 8px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    min-height:56px;
+  }
+
+  .tipo-btn.saida.active{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  .tipo-btn.entrada.active{
+    background:var(--green);
+    border-color:var(--green);
+    color:var(--white);
+  }
+
+  .field{
+    margin-bottom:12px;
+  }
+
+  .field-label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select{
+    width:100%;
+    padding:14px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    color:var(--black);
+  }
+
+  .field input[type="number"]{
+    font-family:'Space Mono', monospace;
+    font-size:22px;
+    font-weight:700;
+  }
+
+  .field input:focus,
+  .field select:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+
+  .btn-registar{
+    width:100%;
+    padding:16px;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--black);
+    color:var(--white);
+    border:2px solid var(--black);
+    cursor:pointer;
+    min-height:56px;
+  }
+
+  .btn-registar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+  }
+
+  .btn-registar:not(:disabled):active{
+    transform:translateY(1px);
+  }
+
+  /* ---------- Filter tabs ---------- */
+  .filter-tabs{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:8px;
+    margin-top:24px;
+  }
+
+  .filter-tab{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:10px 6px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+  }
+
+  .filter-tab.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  /* ---------- List ---------- */
+  .list{
+    margin-top:16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .mov-row{
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:14px;
+  }
+
+  .mov-row.aberto{
+    border-color:var(--amber);
+  }
+
+  .mov-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .mov-tipo-hora{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .mov-tipo-tag{
+    font-weight:700;
+    font-size:11px;
+  }
+
+  .mov-tipo-tag.saida{ color:var(--red); }
+  .mov-tipo-tag.entrada{ color:var(--green); }
+
+  .mov-valor{
+    font-family:'Space Mono', monospace;
+    font-size:18px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .mov-valor.saida{ color:var(--red); }
+  .mov-valor.entrada{ color:var(--green); }
+
+  .mov-motivo{
+    margin:8px 0 4px;
+    font-size:14px;
+  }
+
+  .mov-meta{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-top:8px;
+  }
+
+  .mov-pessoa{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .badge-pending{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--amber);
+    color:var(--white);
+    padding:3px 8px;
+    white-space:nowrap;
+  }
+
+  .btn-acertar{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:8px 12px;
+    border:2px solid var(--amber);
+    background:var(--white);
+    color:var(--amber);
+    cursor:pointer;
+    margin-top:8px;
+    width:100%;
+  }
+
+  .acertar-form{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+  }
+
+  .acertar-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:8px;
+  }
+
+  .acertar-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .btn-guardar{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:10px;
+    border:2px solid var(--black);
+    background:var(--black);
+    color:var(--white);
+    cursor:pointer;
+  }
+
+  .btn-cancelar{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:10px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  .gasto-real{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .gasto-real strong{
+    color:var(--black);
+  }
+
+  .notas-txt{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:32px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">GIOCO · Caixa</h1>
+  <p class="page-subtitle">Movimentos de dinheiro</p>
+
+  <div class="summary-row">
+    <div class="summary-card">
+      <p class="summary-label">Saldo hoje</p>
+      <p class="summary-value" id="saldoHojeValue">0,00 €</p>
+    </div>
+    <div class="summary-card" id="pendingCard">
+      <p class="summary-label">Por acertar</p>
+      <p class="summary-value" id="pendingCount">0</p>
+      <p class="summary-sub" id="pendingTotal">0,00 €</p>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <p class="form-title">Registar movimento</p>
+    <form id="movForm">
+      <div class="tipo-toggle">
+        <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
+        <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="valorInput">Valor (€)</label>
+        <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="motivoInput">Motivo</label>
+        <input type="text" id="motivoInput" placeholder="ex: compra rúcula Pingo Doce">
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="pessoaSelect">Pessoa</label>
+        <select id="pessoaSelect">
+          <option value="Manel">Manel</option>
+          <option value="Alfredo">Alfredo</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn-registar" id="registarBtn" disabled>Registar</button>
+    </form>
+  </div>
+
+  <div class="filter-tabs">
+    <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
+    <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
+    <button type="button" class="filter-tab" data-filter="tudo">Tudo</button>
+  </div>
+
+  <div class="list" id="movList">
+    <div class="empty-state">A carregar movimentos…</div>
+  </div>
+</main>
+
+<script>
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var movRef = db.ref('caixaMovimentos');
+
+  var allMovs = {};
+  var activeFilter = 'hoje';
+  var acertarOpenId = null;
+  var formState = { tipo: null };
+
+  var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
+  var tipoEntradaBtn = document.getElementById('tipoEntradaBtn');
+  var valorInput = document.getElementById('valorInput');
+  var motivoInput = document.getElementById('motivoInput');
+  var pessoaSelect = document.getElementById('pessoaSelect');
+  var registarBtn = document.getElementById('registarBtn');
+  var movForm = document.getElementById('movForm');
+  var movListEl = document.getElementById('movList');
+  var saldoHojeValueEl = document.getElementById('saldoHojeValue');
+  var pendingCountEl = document.getElementById('pendingCount');
+  var pendingTotalEl = document.getElementById('pendingTotal');
+  var pendingCardEl = document.getElementById('pendingCard');
+
+  function formatEUR(n){
+    return (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function formatHora(iso){
+    var d = new Date(iso);
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    return hh + ':' + mm;
+  }
+
+  function formatDataHora(iso){
+    var d = new Date(iso);
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mo = String(d.getMonth() + 1).padStart(2, '0');
+    return dd + '/' + mo + ' ' + formatHora(iso);
+  }
+
+  function isToday(iso){
+    var d = new Date(iso);
+    var now = new Date();
+    return d.getFullYear() === now.getFullYear() &&
+           d.getMonth() === now.getMonth() &&
+           d.getDate() === now.getDate();
+  }
+
+  function isWithinLast7Days(iso){
+    var d = new Date(iso);
+    var now = new Date();
+    var diffMs = now - d;
+    return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+  }
+
+  function validateForm(){
+    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoInput.value.trim().length > 0;
+    registarBtn.disabled = !valid;
+  }
+
+  function selectTipo(tipo){
+    formState.tipo = tipo;
+    tipoSaidaBtn.classList.toggle('active', tipo === 'saida');
+    tipoEntradaBtn.classList.toggle('active', tipo === 'entrada');
+    validateForm();
+  }
+
+  tipoSaidaBtn.addEventListener('click', function(){ selectTipo('saida'); valorInput.focus(); });
+  tipoEntradaBtn.addEventListener('click', function(){ selectTipo('entrada'); valorInput.focus(); });
+  valorInput.addEventListener('input', validateForm);
+  motivoInput.addEventListener('input', validateForm);
+
+  movForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    if (registarBtn.disabled) return;
+
+    var tipo = formState.tipo;
+    var valor = parseFloat(valorInput.value);
+    var motivo = motivoInput.value.trim();
+    var pessoa = pessoaSelect.value;
+
+    var novoMov = {
+      dataHora: new Date().toISOString(),
+      tipo: tipo,
+      valor: valor,
+      motivo: motivo,
+      pessoa: pessoa,
+      estado: tipo === 'entrada' ? 'acertado' : 'aberto',
+      valorDevolvido: null,
+      notas: null
+    };
+
+    registarBtn.disabled = true;
+    registarBtn.textContent = 'A registar…';
+
+    movRef.push(novoMov).then(function(){
+      valorInput.value = '';
+      motivoInput.value = '';
+      selectTipo(null);
+      tipoSaidaBtn.classList.remove('active');
+      tipoEntradaBtn.classList.remove('active');
+      registarBtn.textContent = 'Registar';
+      validateForm();
+    }).catch(function(err){
+      registarBtn.textContent = 'Registar';
+      validateForm();
+      alert('Erro ao registar movimento: ' + err.message);
+    });
+  });
+
+  document.querySelectorAll('.filter-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      activeFilter = btn.getAttribute('data-filter');
+      document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderList();
+    });
+  });
+
+  function openAcertar(id){
+    acertarOpenId = id;
+    renderList();
+  }
+
+  function cancelAcertar(){
+    acertarOpenId = null;
+    renderList();
+  }
+  window.cancelAcertar = cancelAcertar;
+  window.openAcertar = openAcertar;
+
+  function saveAcertar(id){
+    var devolvidoInput = document.getElementById('devolvido_' + id);
+    var notasInput = document.getElementById('notas_' + id);
+    var devolvido = parseFloat(devolvidoInput.value);
+    if (isNaN(devolvido) || devolvido < 0){
+      alert('Indica um valor devolvido válido.');
+      return;
+    }
+    var notas = notasInput.value.trim();
+
+    movRef.child(id).update({
+      estado: 'acertado',
+      valorDevolvido: devolvido,
+      notas: notas || null
+    }).then(function(){
+      acertarOpenId = null;
+    }).catch(function(err){
+      alert('Erro ao acertar movimento: ' + err.message);
+    });
+  }
+  window.saveAcertar = saveAcertar;
+
+  function renderSummary(){
+    var entradasHoje = 0;
+    var saidasHoje = 0;
+    var pendingCount = 0;
+    var pendingTotal = 0;
+
+    Object.keys(allMovs).forEach(function(id){
+      var m = allMovs[id];
+      if (m.estado === 'aberto'){
+        pendingCount++;
+        pendingTotal += m.valor;
+      }
+      if (isToday(m.dataHora)){
+        if (m.tipo === 'entrada'){
+          entradasHoje += m.valor;
+        } else {
+          if (m.estado === 'acertado'){
+            saidasHoje += (m.valor - (m.valorDevolvido || 0));
+          } else {
+            saidasHoje += m.valor;
+          }
+        }
+      }
+    });
+
+    var saldo = entradasHoje - saidasHoje;
+    saldoHojeValueEl.textContent = formatEUR(Math.abs(saldo));
+    saldoHojeValueEl.classList.remove('positive', 'negative');
+    if (saldo > 0){
+      saldoHojeValueEl.textContent = '+' + saldoHojeValueEl.textContent;
+      saldoHojeValueEl.classList.add('positive');
+    } else if (saldo < 0){
+      saldoHojeValueEl.textContent = '−' + saldoHojeValueEl.textContent;
+      saldoHojeValueEl.classList.add('negative');
+    }
+
+    pendingCountEl.textContent = pendingCount;
+    pendingTotalEl.textContent = pendingCount > 0 ? formatEUR(pendingTotal) + ' envolvidos' : 'tudo acertado';
+    pendingCardEl.classList.toggle('pending-active', pendingCount > 0);
+  }
+
+  function renderList(){
+    var ids = Object.keys(allMovs).filter(function(id){
+      var m = allMovs[id];
+      if (activeFilter === 'hoje') return isToday(m.dataHora);
+      if (activeFilter === '7dias') return isWithinLast7Days(m.dataHora);
+      return true;
+    });
+
+    ids.sort(function(a, b){
+      return new Date(allMovs[b].dataHora) - new Date(allMovs[a].dataHora);
+    });
+
+    if (ids.length === 0){
+      movListEl.innerHTML = '<div class="empty-state">Sem movimentos neste período.</div>';
+      return;
+    }
+
+    var html = '';
+    ids.forEach(function(id){
+      var m = allMovs[id];
+      var isAberto = m.estado === 'aberto';
+      var tipoLabel = m.tipo === 'saida' ? 'SAÍDA' : 'ENTRADA';
+      var sinal = m.tipo === 'saida' ? '−' : '+';
+      var horaLabel = activeFilter === 'hoje' ? formatHora(m.dataHora) : formatDataHora(m.dataHora);
+
+      html += '<div class="mov-row' + (isAberto ? ' aberto' : '') + '">';
+      html += '  <div class="mov-top">';
+      html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
+      html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
+      html += '  </div>';
+      html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
+      html += '  <div class="mov-meta">';
+      html += '    <span class="mov-pessoa">' + escapeHtml(m.pessoa) + '</span>';
+      if (isAberto){
+        html += '    <span class="badge-pending">Por acertar</span>';
+      }
+      html += '  </div>';
+
+      if (m.estado === 'acertado' && m.tipo === 'saida' && m.valorDevolvido !== null && m.valorDevolvido !== undefined){
+        var gastoReal = m.valor - m.valorDevolvido;
+        html += '  <p class="gasto-real">Devolvido ' + formatEUR(m.valorDevolvido) + ' · Gasto real: <strong>' + formatEUR(gastoReal) + '</strong></p>';
+      }
+      if (m.notas){
+        html += '  <p class="notas-txt">' + escapeHtml(m.notas) + '</p>';
+      }
+
+      if (isAberto){
+        if (acertarOpenId === id){
+          html += '  <div class="acertar-form">';
+          html += '    <div class="acertar-row">';
+          html += '      <div class="field" style="margin-bottom:0;"><label class="field-label">Devolvido (€)</label><input type="number" inputmode="decimal" step="0.01" min="0" id="devolvido_' + id + '"></div>';
+          html += '      <div class="field" style="margin-bottom:0;"><label class="field-label">Notas</label><input type="text" id="notas_' + id + '"></div>';
+          html += '    </div>';
+          html += '    <div class="acertar-actions">';
+          html += '      <button type="button" class="btn-cancelar" onclick="cancelAcertar()">Cancelar</button>';
+          html += '      <button type="button" class="btn-guardar" onclick="saveAcertar(\'' + id + '\')">Guardar</button>';
+          html += '    </div>';
+          html += '  </div>';
+        } else {
+          html += '  <button type="button" class="btn-acertar" onclick="openAcertar(\'' + id + '\')">✓ Acertar</button>';
+        }
+      }
+
+      html += '</div>';
+    });
+
+    movListEl.innerHTML = html;
+  }
+
+  function escapeHtml(str){
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  movRef.on('value', function(snapshot){
+    allMovs = snapshot.val() || {};
+    renderSummary();
+    renderList();
+  });
+</script>
+
+</body>
+</html>
