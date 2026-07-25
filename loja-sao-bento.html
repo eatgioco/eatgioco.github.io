@@ -22,6 +22,7 @@
     --muted:#6b6660;
     --green:#1E7A46;
     --amber:#B8860B;
+    --blue:#1D5C8A;
   }
 
   *{box-sizing:border-box;}
@@ -523,6 +524,153 @@
     color:var(--muted);
     font-size:13px;
   }
+
+  /* ---------- Pedidos & Sugestões ---------- */
+  .pedidos-counter{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    color:var(--red);
+    margin:-2px 0 16px;
+  }
+
+  .pedidos-counter.zero{
+    color:var(--green);
+  }
+
+  textarea{
+    width:100%;
+    padding:14px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--black);
+    resize:vertical;
+  }
+
+  textarea:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+
+  .pedido-note{
+    margin:10px 0 0;
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .pedidos-filter-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:20px;
+  }
+
+  .pedidos-filter-chip{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+  }
+
+  .pedidos-filter-chip.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .pedido-card{
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:14px;
+    margin-top:10px;
+  }
+
+  .pedido-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .pedido-badge{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--white);
+    padding:3px 8px;
+    white-space:nowrap;
+  }
+
+  .pedido-badge-novo{ background:var(--red); }
+  .pedido-badge-analise{ background:var(--amber); }
+  .pedido-badge-aprovado{ background:var(--blue); }
+  .pedido-badge-feito{ background:var(--green); }
+  .pedido-badge-naoavancar{ background:var(--muted); }
+
+  .pedido-data{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .pedido-desc{
+    margin:10px 0 6px;
+    font-size:14px;
+  }
+
+  .pedido-meta{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .pedido-resposta{
+    margin-top:8px;
+    padding:8px 10px;
+    background:var(--bg);
+    border-left:3px solid var(--black);
+    font-size:12px;
+  }
+
+  .pedido-edit{
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .pedido-edit select,
+  .pedido-edit input[type="text"]{
+    width:100%;
+    padding:10px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+  }
+
+  .btn-guardar-pedido{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:10px;
+    border:2px solid var(--black);
+    background:var(--black);
+    color:var(--white);
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -661,6 +809,52 @@
     </div>
 
     <div id="tempList"></div>
+  </div>
+
+  <div class="section" id="pedidos-section">
+    <p class="section-title">Pedidos &amp; Sugestões</p>
+    <p class="pedidos-counter" id="pedidosCounter">0 por responder</p>
+
+    <div class="form-card">
+      <div class="field">
+        <label class="field-label" for="pedido-descricao">Descrição</label>
+        <textarea id="pedido-descricao" rows="3" placeholder="ex: seria útil mais uma barra de apoio atrás do balcão"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="pedido-zona">Zona</label>
+        <select id="pedido-zona">
+          <option value="Sala">Sala</option>
+          <option value="Cozinha">Cozinha</option>
+          <option value="Bar/Balcão">Bar/Balcão</option>
+          <option value="Casa de banho">Casa de banho</option>
+          <option value="Arrumo">Arrumo</option>
+          <option value="Pátio">Pátio</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="pedido-pessoa">Pessoa</label>
+        <select id="pedido-pessoa">
+          <option value="Manel">Manel</option>
+          <option value="Alfredo">Alfredo</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn-registar" id="pedidoSubmitBtn">Enviar pedido</button>
+      <p class="pedido-note">Para avarias ou urgências, liga diretamente — esta caixa é para melhorias e sugestões.</p>
+    </div>
+
+    <div class="pedidos-filter-row" id="pedidosFilterRow">
+      <button type="button" class="pedidos-filter-chip active" data-filter="todos">Todos</button>
+      <button type="button" class="pedidos-filter-chip" data-filter="novo">Por responder</button>
+      <button type="button" class="pedidos-filter-chip" data-filter="curso">Em curso</button>
+      <button type="button" class="pedidos-filter-chip" data-filter="fechados">Fechados</button>
+    </div>
+
+    <div id="pedidosList"></div>
   </div>
 </main>
 
@@ -1130,6 +1324,161 @@
   tempRef.on('value', function(snapshot){
     temps = snapshot.val() || {};
     renderTemps();
+  });
+
+  /* ---------- Pedidos & Sugestões ---------- */
+  var pedidosRef = db.ref('lojaPedidos');
+  var pedidos = {};
+  var pedidosFilterAtual = 'todos';
+
+  var ESTADO_LABELS = {
+    'novo': 'Novo',
+    'em análise': 'Em análise',
+    'aprovado': 'Aprovado',
+    'feito': 'Feito',
+    'não avançar': 'Não avançar'
+  };
+
+  var ESTADO_BADGE_CLASS = {
+    'novo': 'pedido-badge-novo',
+    'em análise': 'pedido-badge-analise',
+    'aprovado': 'pedido-badge-aprovado',
+    'feito': 'pedido-badge-feito',
+    'não avançar': 'pedido-badge-naoavancar'
+  };
+
+  function pedidoMatchesFilter(p, filtro){
+    if (filtro === 'todos') return true;
+    if (filtro === 'novo') return p.estado === 'novo';
+    if (filtro === 'curso') return p.estado === 'em análise' || p.estado === 'aprovado';
+    if (filtro === 'fechados') return p.estado === 'feito' || p.estado === 'não avançar';
+    return true;
+  }
+
+  document.getElementById('pedidoSubmitBtn').addEventListener('click', function(){
+    var descricao = document.getElementById('pedido-descricao').value.trim();
+    var zona = document.getElementById('pedido-zona').value;
+    var pessoa = document.getElementById('pedido-pessoa').value;
+
+    if (!descricao){
+      alert('Escreve uma descrição para o pedido.');
+      return;
+    }
+
+    var btn = document.getElementById('pedidoSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'A enviar…';
+
+    pedidosRef.push({
+      dataHora: new Date().toISOString(),
+      descricao: descricao,
+      zona: zona,
+      pessoa: pessoa,
+      estado: 'novo',
+      resposta: null,
+      respondidoEm: null
+    }).then(function(){
+      document.getElementById('pedido-descricao').value = '';
+      btn.disabled = false;
+      btn.textContent = 'Enviar pedido';
+    }).catch(function(err){
+      btn.disabled = false;
+      btn.textContent = 'Enviar pedido';
+      alert('Erro ao enviar: ' + err.message);
+    });
+  });
+
+  document.getElementById('pedidosFilterRow').addEventListener('click', function(e){
+    var btn = e.target.closest('.pedidos-filter-chip');
+    if (!btn) return;
+    pedidosFilterAtual = btn.getAttribute('data-filter');
+    document.querySelectorAll('.pedidos-filter-chip').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    renderPedidos();
+  });
+
+  function savePedido(id){
+    var estadoSel = document.getElementById('pedido-estado-' + id);
+    var respostaInput = document.getElementById('pedido-resposta-' + id);
+    var novoEstado = estadoSel.value;
+    var novaResposta = respostaInput.value.trim();
+
+    var updates = {
+      estado: novoEstado,
+      respondidoEm: new Date().toISOString()
+    };
+    if (novaResposta){
+      updates.resposta = novaResposta;
+    }
+
+    pedidosRef.child(id).update(updates).catch(function(err){
+      alert('Erro ao guardar: ' + err.message);
+    });
+  }
+  window.savePedido = savePedido;
+
+  function renderPedidos(){
+    var novosCount = 0;
+    Object.keys(pedidos).forEach(function(id){
+      if (pedidos[id].estado === 'novo') novosCount++;
+    });
+
+    var counterEl = document.getElementById('pedidosCounter');
+    if (novosCount === 0){
+      counterEl.textContent = '0 por responder ✓';
+      counterEl.classList.add('zero');
+    } else {
+      counterEl.textContent = novosCount + (novosCount === 1 ? ' pedido por responder' : ' pedidos por responder');
+      counterEl.classList.remove('zero');
+    }
+
+    var ids = Object.keys(pedidos).filter(function(id){
+      return pedidoMatchesFilter(pedidos[id], pedidosFilterAtual);
+    });
+
+    ids.sort(function(a, b){
+      return new Date(pedidos[b].dataHora) - new Date(pedidos[a].dataHora);
+    });
+
+    var listEl = document.getElementById('pedidosList');
+
+    if (ids.length === 0){
+      listEl.innerHTML = '<p class="empty-state">Sem pedidos neste filtro.</p>';
+      return;
+    }
+
+    var html = '';
+    ids.forEach(function(id){
+      var p = pedidos[id];
+      var estado = p.estado || 'novo';
+      html += '<div class="pedido-card">';
+      html += '  <div class="pedido-top">';
+      html += '    <span class="pedido-badge ' + (ESTADO_BADGE_CLASS[estado] || 'pedido-badge-novo') + '">' + (ESTADO_LABELS[estado] || estado) + '</span>';
+      html += '    <span class="pedido-data">' + formatDataHoraFull(p.dataHora) + '</span>';
+      html += '  </div>';
+      html += '  <p class="pedido-desc">' + escapeHtml(p.descricao) + '</p>';
+      html += '  <div class="pedido-meta"><span>Zona: ' + escapeHtml(p.zona) + '</span><span>' + escapeHtml(p.pessoa) + '</span></div>';
+      if (p.resposta){
+        html += '  <div class="pedido-resposta">Resposta: ' + escapeHtml(p.resposta) + '</div>';
+      }
+      html += '  <div class="pedido-edit">';
+      html += '    <select id="pedido-estado-' + id + '">';
+      Object.keys(ESTADO_LABELS).forEach(function(key){
+        html += '<option value="' + key + '"' + (key === estado ? ' selected' : '') + '>' + ESTADO_LABELS[key] + '</option>';
+      });
+      html += '    </select>';
+      html += '    <input type="text" id="pedido-resposta-' + id + '" placeholder="resposta (opcional)" value="' + escapeHtml(p.resposta || '') + '">';
+      html += '    <button type="button" class="btn-guardar-pedido" onclick="savePedido(\'' + id + '\')">Guardar</button>';
+      html += '  </div>';
+      html += '</div>';
+    });
+
+    listEl.innerHTML = html;
+  }
+
+  pedidosRef.on('value', function(snapshot){
+    pedidos = snapshot.val() || {};
+    renderPedidos();
   });
 </script>
 

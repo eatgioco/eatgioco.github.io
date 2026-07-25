@@ -22,6 +22,7 @@
     --muted:#6b6660;
     --amber:#B8860B;
     --green:#1E7A46;
+    --blue:#1D5C8A;
   }
 
   *{box-sizing:border-box;}
@@ -652,6 +653,119 @@
   @media (max-width: 520px){
     .form-grid{grid-template-columns:1fr;}
   }
+
+  /* ---------- Pedidos da Loja ---------- */
+  .card-pedidos{
+    cursor:default;
+    margin-top:20px;
+  }
+
+  .card-pedidos:hover{
+    transform:none;
+    box-shadow:none;
+  }
+
+  .status-badge-danger{
+    background:var(--red);
+  }
+
+  .pedido-badge{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--white);
+    padding:3px 8px;
+    white-space:nowrap;
+  }
+
+  .pedido-badge-novo{ background:var(--red); }
+  .pedido-badge-analise{ background:var(--amber); }
+  .pedido-badge-aprovado{ background:var(--blue); }
+  .pedido-badge-feito{ background:var(--green); }
+  .pedido-badge-naoavancar{ background:var(--muted); }
+
+  .pedido-ticket{
+    border:1px solid var(--line);
+    padding:12px;
+  }
+
+  .pedido-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .pedido-data{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .pedido-desc{
+    margin:8px 0 6px;
+    font-size:13px;
+  }
+
+  .pedido-meta{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .pedido-resposta{
+    margin-top:8px;
+    padding:6px 8px;
+    background:var(--bg);
+    border-left:3px solid var(--black);
+    font-size:12px;
+  }
+
+  .pedido-edit-row{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+
+  .pedido-edit-row select{
+    flex:1;
+    min-width:110px;
+    font-size:12px;
+    padding:6px;
+    font-family:'Inter', sans-serif;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+  }
+
+  .pedido-edit-row input[type="text"]{
+    flex:2;
+    min-width:120px;
+    font-size:12px;
+    padding:6px;
+  }
+
+  .link-view-loja{
+    display:inline-block;
+    margin-top:14px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+    text-decoration:none;
+    letter-spacing:0.3px;
+  }
+
+  .link-view-loja:hover{
+    color:var(--red);
+  }
 </style>
 </head>
 <body>
@@ -759,6 +873,29 @@
         <div class="task-list" id="taskListDone"></div>
       </details>
     </div>
+  </div>
+
+  <div class="card card-pedidos" id="cardPedidos">
+    <div class="card-header-row">
+      <div>
+        <div class="card-icon">📝</div>
+        <h3 class="card-title">Pedidos da Loja</h3>
+      </div>
+      <span class="status-badge status-badge-danger" id="pedidosNovosBadge" style="display:none;">0 novos</span>
+    </div>
+
+    <div class="payments-tabs" id="pedidosTabs">
+      <button type="button" class="payments-tab active" data-filter="novo">Por responder</button>
+      <button type="button" class="payments-tab" data-filter="curso">Em curso</button>
+      <button type="button" class="payments-tab" data-filter="todos">Todos</button>
+    </div>
+
+    <p class="loading-state" id="pedidosLoading">A carregar...</p>
+
+    <div class="payments-list" id="pedidosList" style="display:none;"></div>
+    <p class="empty-state-inline" id="pedidosEmptyInline" style="display:none;">Sem pedidos por responder ✓</p>
+
+    <a href="loja-sao-bento.html" class="link-view-loja">→ Ver na página da loja</a>
   </div>
 </main>
 
@@ -1182,6 +1319,154 @@ window.addEventListener('load', function () {
   tasksRef.on('value', function (snapshot) {
     allTasks = snapshot.val() || {};
     renderTasks();
+  });
+
+  /* ---------- Pedidos da Loja ---------- */
+  var pedidosRef = db.ref('lojaPedidos');
+  var allPedidos = {};
+  var pedidosCurrentFilter = 'novo';
+
+  var pedidosTabsEl = document.getElementById('pedidosTabs');
+  var pedidosLoadingEl = document.getElementById('pedidosLoading');
+  var pedidosListEl = document.getElementById('pedidosList');
+  var pedidosEmptyEl = document.getElementById('pedidosEmptyInline');
+  var pedidosNovosBadgeEl = document.getElementById('pedidosNovosBadge');
+
+  var PEDIDO_ESTADO_LABELS = {
+    'novo': 'Novo',
+    'em análise': 'Em análise',
+    'aprovado': 'Aprovado',
+    'feito': 'Feito',
+    'não avançar': 'Não avançar'
+  };
+
+  var PEDIDO_ESTADO_BADGE_CLASS = {
+    'novo': 'pedido-badge-novo',
+    'em análise': 'pedido-badge-analise',
+    'aprovado': 'pedido-badge-aprovado',
+    'feito': 'pedido-badge-feito',
+    'não avançar': 'pedido-badge-naoavancar'
+  };
+
+  function pedidoMatchesFilterDash(p, filtro){
+    if (filtro === 'todos') return true;
+    if (filtro === 'novo') return p.estado === 'novo';
+    if (filtro === 'curso') return p.estado === 'em análise' || p.estado === 'aprovado';
+    return true;
+  }
+
+  function formatPedidoData(iso){
+    var d = new Date(iso);
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function truncateText(str, maxLen){
+    if (!str) return '';
+    return str.length > maxLen ? str.slice(0, maxLen).trim() + '…' : str;
+  }
+
+  function buildPedidoTicketHtml(p){
+    var estado = p.estado || 'novo';
+    var html = '<div class="pedido-ticket" data-id="' + p.id + '">';
+    html += '  <div class="pedido-top">';
+    html += '    <span class="pedido-badge ' + (PEDIDO_ESTADO_BADGE_CLASS[estado] || 'pedido-badge-novo') + '">' + (PEDIDO_ESTADO_LABELS[estado] || estado) + '</span>';
+    html += '    <span class="pedido-data">' + formatPedidoData(p.dataHora) + '</span>';
+    html += '  </div>';
+    html += '  <p class="pedido-desc">' + escapeHtml(truncateText(p.descricao, 140)) + '</p>';
+    html += '  <div class="pedido-meta"><span>' + escapeHtml(p.zona || '') + '</span><span>' + escapeHtml(p.pessoa || '') + '</span></div>';
+    if (p.resposta){
+      html += '  <div class="pedido-resposta">Resposta: ' + escapeHtml(p.resposta) + '</div>';
+    }
+    html += '  <div class="pedido-edit-row">';
+    html += '    <select class="pedido-estado-select">';
+    Object.keys(PEDIDO_ESTADO_LABELS).forEach(function(key){
+      html += '<option value="' + key + '"' + (key === estado ? ' selected' : '') + '>' + PEDIDO_ESTADO_LABELS[key] + '</option>';
+    });
+    html += '    </select>';
+    html += '    <input type="text" class="pedido-resposta-input" placeholder="resposta" value="' + escapeHtml(p.resposta || '') + '">';
+    html += '    <button type="button" class="btn-small btn-guardar-pedido">Guardar</button>';
+    html += '  </div>';
+    html += '</div>';
+    return html;
+  }
+
+  function attachPedidoHandlers(p){
+    var card = pedidosListEl.querySelector('.pedido-ticket[data-id="' + p.id + '"]');
+    if (!card) return;
+    var btn = card.querySelector('.btn-guardar-pedido');
+    btn.addEventListener('click', function(){
+      var novoEstado = card.querySelector('.pedido-estado-select').value;
+      var novaResposta = card.querySelector('.pedido-resposta-input').value.trim();
+      var updates = { estado: novoEstado, respondidoEm: new Date().toISOString() };
+      if (novaResposta) updates.resposta = novaResposta;
+      btn.disabled = true;
+      btn.textContent = 'A guardar…';
+      pedidosRef.child(p.id).update(updates).catch(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Guardar';
+        alert('Erro ao guardar: ' + err.message);
+      });
+    });
+  }
+
+  var pedidoEmptyMessages = {
+    novo: 'Sem pedidos por responder ✓',
+    curso: 'Sem pedidos em curso.',
+    todos: 'Sem pedidos registados.'
+  };
+
+  function renderPedidosDash(){
+    var entries = Object.keys(allPedidos).map(function(id){
+      return Object.assign({ id: id }, allPedidos[id]);
+    });
+
+    var novosCount = entries.filter(function(p){ return (p.estado || 'novo') === 'novo'; }).length;
+    if (novosCount > 0){
+      pedidosNovosBadgeEl.textContent = novosCount + (novosCount === 1 ? ' novo' : ' novos');
+      pedidosNovosBadgeEl.style.display = 'inline-block';
+    } else {
+      pedidosNovosBadgeEl.style.display = 'none';
+    }
+
+    var estadoOrder = { 'novo': 0, 'em análise': 1, 'aprovado': 2, 'feito': 3, 'não avançar': 3 };
+
+    var filtered = entries
+      .filter(function(p){ return pedidoMatchesFilterDash(p, pedidosCurrentFilter); })
+      .sort(function(a, b){
+        var oa = estadoOrder[a.estado || 'novo'] != null ? estadoOrder[a.estado || 'novo'] : 4;
+        var ob = estadoOrder[b.estado || 'novo'] != null ? estadoOrder[b.estado || 'novo'] : 4;
+        if (oa !== ob) return oa - ob;
+        return new Date(b.dataHora) - new Date(a.dataHora);
+      });
+
+    if (filtered.length === 0){
+      pedidosListEl.style.display = 'none';
+      pedidosEmptyEl.textContent = pedidoEmptyMessages[pedidosCurrentFilter] || 'Sem pedidos.';
+      pedidosEmptyEl.style.display = 'block';
+      return;
+    }
+
+    pedidosEmptyEl.style.display = 'none';
+    pedidosListEl.style.display = 'flex';
+    pedidosListEl.innerHTML = filtered.map(buildPedidoTicketHtml).join('');
+    filtered.forEach(attachPedidoHandlers);
+  }
+
+  pedidosTabsEl.addEventListener('click', function(e){
+    if (!e.target.classList.contains('payments-tab')) return;
+    var filtro = e.target.getAttribute('data-filter');
+    pedidosTabsEl.querySelectorAll('.payments-tab').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    pedidosCurrentFilter = filtro;
+    renderPedidosDash();
+  });
+
+  pedidosRef.on('value', function(snapshot){
+    allPedidos = snapshot.val() || {};
+    pedidosLoadingEl.style.display = 'none';
+    renderPedidosDash();
+  }, function(error){
+    pedidosLoadingEl.textContent = 'Erro de ligação à base de dados.';
   });
 
 });
