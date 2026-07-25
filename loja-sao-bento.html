@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIOCO · São Bento 154</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:680px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:680px;
+    margin:0 auto;
+    padding:20px 16px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--red);
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+  }
+
+  .section{
+    margin-top:28px;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  /* ---------- Floor plan ---------- */
+  .plan-wrap{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:12px;
+  }
+
+  .plan-wrap svg{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+
+  .equip-num-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:var(--red);
+    color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    flex-shrink:0;
+  }
+
+  .equip-list{
+    margin-top:12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .equip-list-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:10px 12px;
+    text-align:left;
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    width:100%;
+  }
+
+  .equip-list-item:active{
+    border-color:var(--red);
+  }
+
+  .equip-list-text{
+    font-size:13px;
+    line-height:1.4;
+  }
+
+  .equip-list-zone{
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  /* ---------- Checklists ---------- */
+  .checklist-buttons{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .checklist-btn{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    padding:16px 8px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    min-height:64px;
+    line-height:1.4;
+  }
+
+  .checklist-btn.done{
+    background:var(--green);
+    border-color:var(--green);
+    color:var(--white);
+    font-size:12px;
+  }
+
+  .checklist-btn.active-open{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .checklist-panel{
+    margin-top:12px;
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+  }
+
+  .checklist-item-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 4px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .checklist-item-row:last-child{
+    border-bottom:none;
+  }
+
+  .checklist-item-row input[type="checkbox"]{
+    width:24px;
+    height:24px;
+    flex-shrink:0;
+    accent-color:var(--red);
+  }
+
+  .checklist-item-text{
+    font-size:14px;
+    flex:1;
+  }
+
+  .checklist-item-text.checked{
+    text-decoration:line-through;
+    color:var(--muted);
+  }
+
+  .checklist-meta-row{
+    margin-top:14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .btn-concluir{
+    width:100%;
+    padding:16px;
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--black);
+    color:var(--white);
+    border:2px solid var(--black);
+    cursor:pointer;
+    min-height:52px;
+  }
+
+  .checklist-done-header{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--green);
+    font-weight:700;
+    margin:0 0 12px;
+  }
+
+  .link-btn{
+    background:none;
+    border:none;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    padding:6px 0;
+  }
+
+  .template-edit-box{
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+  }
+
+  .template-item-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 0;
+  }
+
+  .template-item-text{
+    flex:1;
+    font-size:13px;
+  }
+
+  .template-item-btn{
+    background:var(--white);
+    border:1px solid var(--line);
+    font-size:12px;
+    width:26px;
+    height:26px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .template-add-row{
+    display:flex;
+    gap:6px;
+    margin-top:10px;
+  }
+
+  .template-add-row input{
+    flex:1;
+    padding:10px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+  }
+
+  .template-add-row button{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    padding:0 14px;
+    border:2px solid var(--black);
+    background:var(--black);
+    color:var(--white);
+    cursor:pointer;
+  }
+
+  /* ---------- Temperature form ---------- */
+  .form-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+  }
+
+  .field{
+    margin-bottom:12px;
+  }
+
+  .field-label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select{
+    width:100%;
+    padding:14px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    color:var(--black);
+  }
+
+  .field input[type="number"]{
+    font-family:'Space Mono', monospace;
+    font-size:22px;
+    font-weight:700;
+  }
+
+  .field input[type="file"]{
+    width:100%;
+    font-size:13px;
+    padding:10px 0;
+  }
+
+  .field input:focus,
+  .field select:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+
+  .btn-registar{
+    width:100%;
+    padding:16px;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--black);
+    color:var(--white);
+    border:2px solid var(--black);
+    cursor:pointer;
+    min-height:56px;
+  }
+
+  .btn-registar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+  }
+
+  /* ---------- Temperature list ---------- */
+  .equip-temp-card{
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:14px;
+    margin-top:10px;
+    transition:border-color .3s ease;
+  }
+
+  .equip-temp-card.highlight{
+    border-color:var(--red);
+  }
+
+  .equip-temp-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .equip-temp-name{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .equip-temp-zone{
+    font-size:11px;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+  }
+
+  .equip-temp-empty{
+    margin:8px 0 0;
+    font-size:12px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .temp-row{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+
+  .temp-row-main{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .temp-row-datahora{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .temp-row-valor{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+  }
+
+  .temp-row-valor.out-of-range{
+    color:var(--red);
+  }
+
+  .temp-row-meta{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .temp-row-notas{
+    font-style:italic;
+  }
+
+  .temp-thumb{
+    margin-top:8px;
+    width:64px;
+    height:64px;
+    object-fit:cover;
+    border:2px solid var(--line);
+    cursor:pointer;
+  }
+
+  /* ---------- Lightbox ---------- */
+  .lightbox-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.9);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+
+  .lightbox-overlay img{
+    max-width:100%;
+    max-height:100%;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:20px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">GIOCO · São Bento 154</h1>
+  <p class="page-subtitle">Loja</p>
+
+  <div class="section">
+    <p class="section-title">Planta</p>
+    <div class="plan-wrap">
+      <svg viewBox="0 0 320 700" xmlns="http://www.w3.org/2000/svg">
+        <text x="160" y="14" text-anchor="middle" font-family="'Space Mono', monospace" font-size="9" letter-spacing="1.5" fill="#6b6660">RUA DE SÃO BENTO</text>
+        <line x1="20" y1="24" x2="300" y2="24" stroke="#141414" stroke-width="3"/>
+
+        <!-- 01 SALA -->
+        <rect x="20" y="30" width="280" height="210" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="30" y="52" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#141414">01. SALA</text>
+        <text x="30" y="67" font-family="'Space Mono', monospace" font-size="10" fill="#6b6660">44,50 m²</text>
+        <text x="30" y="84" font-family="Inter, sans-serif" font-size="8.5" fill="#6b6660">High Table · Prep · Bar · P.O.S. · Delivery</text>
+
+        <!-- equip dots in SALA (6, 7) -->
+        <g class="equip-dot" onclick="openTempForm('placafria')" style="cursor:pointer;">
+          <circle cx="110" cy="150" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="110" y="154" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">6</text>
+        </g>
+        <g class="equip-dot" onclick="openTempForm('gelo')" style="cursor:pointer;">
+          <circle cx="170" cy="150" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="170" y="154" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">7</text>
+        </g>
+        <text x="140" y="180" text-anchor="middle" font-family="Inter, sans-serif" font-size="8" fill="#6b6660">zona bar</text>
+
+        <!-- 02 COZINHA -->
+        <rect x="20" y="248" width="280" height="140" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="30" y="270" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#141414">02. COZINHA</text>
+        <text x="30" y="285" font-family="'Space Mono', monospace" font-size="10" fill="#6b6660">19,50 m²</text>
+
+        <!-- equip dots in COZINHA (1-5) -->
+        <g class="equip-dot" onclick="openTempForm('edenox')" style="cursor:pointer;">
+          <circle cx="60" cy="330" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="60" y="334" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">1</text>
+        </g>
+        <g class="equip-dot" onclick="openTempForm('amitek941')" style="cursor:pointer;">
+          <circle cx="105" cy="360" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="105" y="364" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">2</text>
+        </g>
+        <g class="equip-dot" onclick="openTempForm('amitek943t')" style="cursor:pointer;">
+          <circle cx="160" cy="330" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="160" y="334" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">3</text>
+        </g>
+        <g class="equip-dot" onclick="openTempForm('mll40')" style="cursor:pointer;">
+          <circle cx="215" cy="360" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="215" y="364" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">4</text>
+        </g>
+        <g class="equip-dot" onclick="openTempForm('mll50')" style="cursor:pointer;">
+          <circle cx="260" cy="330" r="11" fill="#D91124" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="260" y="334" text-anchor="middle" font-family="'Space Mono', monospace" font-size="10" font-weight="700" fill="#FFFFFF">5</text>
+        </g>
+
+        <!-- 03A HALL I.S. + 03B I.S. -->
+        <rect x="20" y="396" width="135" height="55" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="27" y="416" font-family="'Space Mono', monospace" font-size="9" font-weight="700" fill="#141414">03.A HALL I.S.</text>
+        <text x="27" y="430" font-family="'Space Mono', monospace" font-size="9" fill="#6b6660">2,50 m²</text>
+
+        <rect x="165" y="396" width="135" height="55" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="172" y="416" font-family="'Space Mono', monospace" font-size="9" font-weight="700" fill="#141414">03.B I.S.</text>
+        <text x="172" y="430" font-family="'Space Mono', monospace" font-size="9" fill="#6b6660">2,00 m²</text>
+
+        <!-- 04 ARRUMO -->
+        <rect x="20" y="459" width="280" height="55" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="30" y="482" font-family="'Space Mono', monospace" font-size="11" font-weight="700" fill="#141414">04. ARRUMO</text>
+        <text x="30" y="496" font-family="'Space Mono', monospace" font-size="9" fill="#6b6660">2,15 m²</text>
+
+        <!-- 05 CIRC -->
+        <rect x="20" y="522" width="280" height="32" fill="none" stroke="#141414" stroke-width="1.5"/>
+        <text x="160" y="542" text-anchor="middle" font-family="'Space Mono', monospace" font-size="9" fill="#6b6660">05. CIRC. — 1,10 m²</text>
+
+        <!-- 05 PATEO -->
+        <rect x="20" y="562" width="280" height="90" fill="none" stroke="#141414" stroke-width="1.5" stroke-dasharray="5,4"/>
+        <text x="30" y="586" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#141414">05. PÁTEO</text>
+        <text x="30" y="600" font-family="'Space Mono', monospace" font-size="10" fill="#6b6660">5,64 m²</text>
+      </svg>
+    </div>
+
+    <div class="equip-list" id="equipList"></div>
+  </div>
+
+  <div class="section">
+    <p class="section-title">Checklists</p>
+    <div class="checklist-buttons" id="checklistButtons"></div>
+    <div id="checklistPanelWrap"></div>
+  </div>
+
+  <div class="section" id="temp-section">
+    <p class="section-title">Registo de temperaturas (HACCP)</p>
+    <div class="form-card">
+      <form id="tempForm">
+        <div class="field">
+          <label class="field-label" for="temp-equipamento">Equipamento</label>
+          <select id="temp-equipamento"></select>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="temp-valor">Temperatura (°C)</label>
+          <input type="number" id="temp-valor" inputmode="decimal" step="0.1" placeholder="0.0">
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="temp-pessoa">Pessoa</label>
+          <select id="temp-pessoa">
+            <option value="Manel">Manel</option>
+            <option value="Alfredo">Alfredo</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="temp-notas">Notas (opcional)</label>
+          <input type="text" id="temp-notas" placeholder="observações">
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="temp-foto">Foto</label>
+          <input type="file" id="temp-foto" accept="image/*" capture="environment">
+        </div>
+
+        <button type="submit" class="btn-registar" id="tempSubmitBtn">Registar temperatura</button>
+      </form>
+    </div>
+
+    <div id="tempList"></div>
+  </div>
+</main>
+
+<div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox()">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var templatesRef = db.ref('lojaChecklistTemplates');
+  var registosRef = db.ref('lojaChecklistRegistos');
+  var tempRef = db.ref('lojaTemperaturas');
+
+  var EQUIPAMENTOS = [
+    { id:'edenox',     nome:'Bancada Fria EDENOX MPS-250HC',        zona:'Cozinha',      tipo:'refrigeracao', num:1 },
+    { id:'amitek941',  nome:'Bancada Fria AMITEK AK941',            zona:'Cozinha',      tipo:'refrigeracao', num:2 },
+    { id:'amitek943t', nome:'Bancada Fria AMITEK AK943T',           zona:'Cozinha',      tipo:'refrigeracao', num:3 },
+    { id:'mll40',      nome:'MLL ECO 40',                           zona:'Cozinha',      tipo:'congelacao',   num:4 },
+    { id:'mll50',      nome:'MLL ECO 50',                           zona:'Cozinha',      tipo:'congelacao',   num:5 },
+    { id:'placafria',  nome:'Placa Fria Drop-in 3GN',                zona:'Sala (Bar)',   tipo:'refrigeracao', num:6 },
+    { id:'gelo',       nome:'Máquina de Gelo EURFRIGOR ECP25',      zona:'Sala (Bar)',   tipo:'outro',         num:7 }
+  ];
+
+  var ABERTURA_DEFAULT = [
+    'Ligar equipamentos de frio e verificar funcionamento',
+    'Verificar e registar temperaturas das câmaras/bancadas',
+    'Repor vitrine com produtos do dia',
+    'Confirmar fundo de caixa (troco)',
+    'Limpar e preparar bancadas de trabalho',
+    'Ligar máquina de café e forno',
+    'Verificar stock de sacos e embalagens',
+    'Abrir loja — ligar luzes e música'
+  ];
+
+  var FECHO_DEFAULT = [
+    'Desligar equipamentos não essenciais',
+    'Arrumar câmaras e etiquetar sobras',
+    'Retirar lixo e substituir sacos',
+    'Limpar bancadas e superfícies',
+    'Limpar chão e casa de banho',
+    'Fecho de caixa no POS',
+    'Repor vitrine para o dia seguinte',
+    'Fechar portas e ativar alarme'
+  ];
+
+  var templates = { abertura: [], fecho: [] };
+  var registos = {};
+  var temps = {};
+
+  var checklistOpenTipo = null;
+  var checklistItemsState = null;
+  var checklistEditMode = false;
+
+  function escapeHtml(str){
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function todayStr(){
+    var d = new Date();
+    var yyyy = d.getFullYear();
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return yyyy + '-' + mm + '-' + dd;
+  }
+
+  function formatHora(iso){
+    var d = new Date(iso);
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    return hh + ':' + mm;
+  }
+
+  function formatDataHoraFull(iso){
+    var d = new Date(iso);
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mo = String(d.getMonth() + 1).padStart(2, '0');
+    return dd + '/' + mo + ' ' + formatHora(iso);
+  }
+
+  function isOutOfRange(equipId, temp){
+    var eq = EQUIPAMENTOS.filter(function(e){ return e.id === equipId; })[0];
+    if (!eq) return false;
+    if (eq.tipo === 'refrigeracao') return temp > 5;
+    if (eq.tipo === 'congelacao') return temp > -18;
+    return false;
+  }
+
+  /* ---------- Equipment list + floor plan click-through ---------- */
+  function renderEquipList(){
+    var html = '';
+    EQUIPAMENTOS.forEach(function(eq){
+      html += '<button type="button" class="equip-list-item" onclick="openTempForm(\'' + eq.id + '\')">';
+      html += '  <span class="equip-num-badge">' + eq.num + '</span>';
+      html += '  <span class="equip-list-text"><strong>' + escapeHtml(eq.nome) + '</strong><br><span class="equip-list-zone">' + escapeHtml(eq.zona) + '</span></span>';
+      html += '</button>';
+    });
+    document.getElementById('equipList').innerHTML = html;
+  }
+
+  function populateEquipSelect(){
+    var sel = document.getElementById('temp-equipamento');
+    var html = '';
+    EQUIPAMENTOS.forEach(function(eq){
+      html += '<option value="' + eq.id + '">' + eq.num + '. ' + escapeHtml(eq.nome) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  function openTempForm(id){
+    var sel = document.getElementById('temp-equipamento');
+    sel.value = id;
+    document.getElementById('temp-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('temp-valor').focus();
+    var card = document.getElementById('equipcard_' + id);
+    if (card){
+      card.classList.add('highlight');
+      setTimeout(function(){ card.classList.remove('highlight'); }, 1500);
+    }
+  }
+  window.openTempForm = openTempForm;
+
+  /* ---------- Checklists ---------- */
+  function getTodayRegisto(tipo){
+    var today = todayStr();
+    var found = null;
+    Object.keys(registos).forEach(function(key){
+      var r = registos[key];
+      if (r.data === today && r.tipo === tipo){
+        if (!found || new Date(r.concluidoEm) > new Date(found.concluidoEm)){
+          found = r;
+        }
+      }
+    });
+    return found;
+  }
+
+  function openChecklist(tipo){
+    var todayRegisto = getTodayRegisto(tipo);
+    checklistOpenTipo = tipo;
+    checklistEditMode = false;
+    if (todayRegisto){
+      checklistItemsState = null;
+    } else {
+      checklistItemsState = (templates[tipo] || []).map(function(t){ return { texto: t, feito: false }; });
+    }
+    renderChecklists();
+  }
+  window.openChecklist = openChecklist;
+
+  function closeChecklist(){
+    checklistOpenTipo = null;
+    checklistItemsState = null;
+    checklistEditMode = false;
+    renderChecklists();
+  }
+  window.closeChecklist = closeChecklist;
+
+  function toggleChecklistItem(idx){
+    if (!checklistItemsState) return;
+    checklistItemsState[idx].feito = !checklistItemsState[idx].feito;
+    renderChecklists();
+  }
+  window.toggleChecklistItem = toggleChecklistItem;
+
+  function toggleEditMode(){
+    checklistEditMode = !checklistEditMode;
+    renderChecklists();
+  }
+  window.toggleEditMode = toggleEditMode;
+
+  function addTemplateItem(tipo){
+    var input = document.getElementById('newitem_' + tipo);
+    var txt = input.value.trim();
+    if (!txt) return;
+    var arr = (templates[tipo] || []).slice();
+    arr.push(txt);
+    templatesRef.child(tipo).set(arr);
+    input.value = '';
+  }
+  window.addTemplateItem = addTemplateItem;
+
+  function removeTemplateItem(tipo, idx){
+    var arr = (templates[tipo] || []).slice();
+    arr.splice(idx, 1);
+    templatesRef.child(tipo).set(arr);
+  }
+  window.removeTemplateItem = removeTemplateItem;
+
+  function moveTemplateItem(tipo, idx, dir){
+    var arr = (templates[tipo] || []).slice();
+    var newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= arr.length) return;
+    var tmp = arr[idx];
+    arr[idx] = arr[newIdx];
+    arr[newIdx] = tmp;
+    templatesRef.child(tipo).set(arr);
+  }
+  window.moveTemplateItem = moveTemplateItem;
+
+  function submitChecklist(){
+    if (!checklistItemsState || !checklistOpenTipo) return;
+    var pessoa = document.getElementById('checklistPessoaSelect').value;
+    var registo = {
+      data: todayStr(),
+      tipo: checklistOpenTipo,
+      itens: checklistItemsState,
+      pessoa: pessoa,
+      concluidoEm: new Date().toISOString()
+    };
+    registosRef.push(registo).then(function(){
+      closeChecklist();
+    }).catch(function(err){
+      alert('Erro ao concluir checklist: ' + err.message);
+    });
+  }
+  window.submitChecklist = submitChecklist;
+
+  function renderChecklistButtons(){
+    var html = '';
+    ['abertura', 'fecho'].forEach(function(tipo){
+      var todayRegisto = getTodayRegisto(tipo);
+      var label = tipo === 'abertura' ? '☀ Abertura' : '🌙 Fecho';
+      var cls = 'checklist-btn';
+      var content = label;
+      if (todayRegisto){
+        cls += ' done';
+        content = '✓ ' + label + '<br>' + formatHora(todayRegisto.concluidoEm) + ' · ' + escapeHtml(todayRegisto.pessoa);
+      } else if (checklistOpenTipo === tipo){
+        cls += ' active-open';
+      }
+      html += '<button type="button" class="' + cls + '" onclick="openChecklist(\'' + tipo + '\')">' + content + '</button>';
+    });
+    document.getElementById('checklistButtons').innerHTML = html;
+  }
+
+  function renderChecklistPanel(){
+    var wrap = document.getElementById('checklistPanelWrap');
+    if (!checklistOpenTipo){
+      wrap.innerHTML = '';
+      return;
+    }
+
+    var tipo = checklistOpenTipo;
+    var todayRegisto = getTodayRegisto(tipo);
+    var html = '<div class="checklist-panel">';
+
+    if (todayRegisto){
+      html += '<p class="checklist-done-header">✓ Concluída às ' + formatHora(todayRegisto.concluidoEm) + ' por ' + escapeHtml(todayRegisto.pessoa) + '</p>';
+      todayRegisto.itens.forEach(function(item){
+        html += '<div class="checklist-item-row">';
+        html += '  <input type="checkbox" disabled ' + (item.feito ? 'checked' : '') + '>';
+        html += '  <span class="checklist-item-text' + (item.feito ? ' checked' : '') + '">' + escapeHtml(item.texto) + '</span>';
+        html += '</div>';
+      });
+      html += '<button type="button" class="link-btn" onclick="closeChecklist()">Fechar</button>';
+    } else {
+      (checklistItemsState || []).forEach(function(item, idx){
+        html += '<div class="checklist-item-row">';
+        html += '  <input type="checkbox" ' + (item.feito ? 'checked' : '') + ' onchange="toggleChecklistItem(' + idx + ')">';
+        html += '  <span class="checklist-item-text' + (item.feito ? ' checked' : '') + '">' + escapeHtml(item.texto) + '</span>';
+        html += '</div>';
+      });
+
+      html += '<div class="checklist-meta-row">';
+      html += '  <div class="field" style="margin-bottom:0;">';
+      html += '    <label class="field-label" for="checklistPessoaSelect">Pessoa</label>';
+      html += '    <select id="checklistPessoaSelect"><option value="Manel">Manel</option><option value="Alfredo">Alfredo</option><option value="Outro">Outro</option></select>';
+      html += '  </div>';
+      html += '  <button type="button" class="btn-concluir" onclick="submitChecklist()">Concluir checklist</button>';
+      html += '  <button type="button" class="link-btn" onclick="toggleEditMode()">' + (checklistEditMode ? '✕ Fechar edição' : '✎ Editar itens') + '</button>';
+      html += '  <button type="button" class="link-btn" onclick="closeChecklist()">Cancelar</button>';
+      html += '</div>';
+
+      if (checklistEditMode){
+        html += '<div class="template-edit-box">';
+        (templates[tipo] || []).forEach(function(txt, idx){
+          html += '<div class="template-item-row">';
+          html += '  <span class="template-item-text">' + escapeHtml(txt) + '</span>';
+          html += '  <button type="button" class="template-item-btn" onclick="moveTemplateItem(\'' + tipo + '\',' + idx + ',-1)">▲</button>';
+          html += '  <button type="button" class="template-item-btn" onclick="moveTemplateItem(\'' + tipo + '\',' + idx + ',1)">▼</button>';
+          html += '  <button type="button" class="template-item-btn" onclick="removeTemplateItem(\'' + tipo + '\',' + idx + ')">✕</button>';
+          html += '</div>';
+        });
+        html += '<div class="template-add-row">';
+        html += '  <input type="text" id="newitem_' + tipo + '" placeholder="novo item">';
+        html += '  <button type="button" onclick="addTemplateItem(\'' + tipo + '\')">+</button>';
+        html += '</div>';
+        html += '</div>';
+      }
+    }
+
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  function renderChecklists(){
+    renderChecklistButtons();
+    renderChecklistPanel();
+  }
+
+  /* ---------- Temperatures ---------- */
+  function compressImage(file, maxSize, quality){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        var img = new Image();
+        img.onload = function(){
+          var w = img.width;
+          var h = img.height;
+          if (w > h){
+            if (w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; }
+          } else {
+            if (h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('tempForm').addEventListener('submit', function(e){
+    e.preventDefault();
+
+    var equipamento = document.getElementById('temp-equipamento').value;
+    var temperatura = parseFloat(document.getElementById('temp-valor').value);
+    var pessoa = document.getElementById('temp-pessoa').value;
+    var notas = document.getElementById('temp-notas').value.trim();
+    var fileInput = document.getElementById('temp-foto');
+    var file = fileInput.files[0];
+
+    if (!equipamento || isNaN(temperatura)){
+      alert('Preenche o equipamento e a temperatura.');
+      return;
+    }
+
+    var submitBtn = document.getElementById('tempSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'A guardar…';
+
+    function saveRecord(fotoDataUrl){
+      var record = {
+        dataHora: new Date().toISOString(),
+        equipamento: equipamento,
+        temperatura: temperatura,
+        pessoa: pessoa,
+        foto: fotoDataUrl || null,
+        notas: notas || null
+      };
+      tempRef.push(record).then(function(){
+        document.getElementById('temp-valor').value = '';
+        document.getElementById('temp-notas').value = '';
+        fileInput.value = '';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Registar temperatura';
+      }).catch(function(err){
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Registar temperatura';
+        alert('Erro ao guardar: ' + err.message);
+      });
+    }
+
+    if (file){
+      compressImage(file, 800, 0.6).then(saveRecord).catch(function(err){
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Registar temperatura';
+        alert('Erro ao processar a foto: ' + err.message);
+      });
+    } else {
+      saveRecord(null);
+    }
+  });
+
+  function renderTemps(){
+    var byEquip = {};
+    EQUIPAMENTOS.forEach(function(eq){ byEquip[eq.id] = []; });
+    Object.keys(temps).forEach(function(key){
+      var t = temps[key];
+      if (!byEquip[t.equipamento]) byEquip[t.equipamento] = [];
+      var withKey = {};
+      for (var k in t){ withKey[k] = t[k]; }
+      withKey._key = key;
+      byEquip[t.equipamento].push(withKey);
+    });
+
+    var html = '';
+    EQUIPAMENTOS.forEach(function(eq){
+      var list = (byEquip[eq.id] || []).slice().sort(function(a, b){
+        return new Date(b.dataHora) - new Date(a.dataHora);
+      });
+      var shown = list.slice(0, 6);
+
+      html += '<div class="equip-temp-card" id="equipcard_' + eq.id + '">';
+      html += '  <div class="equip-temp-header"><span class="equip-temp-name"><span class="equip-num-badge">' + eq.num + '</span>' + escapeHtml(eq.nome) + '</span><span class="equip-temp-zone">' + escapeHtml(eq.zona) + '</span></div>';
+
+      if (shown.length === 0){
+        html += '  <p class="equip-temp-empty">Sem registos ainda.</p>';
+      } else {
+        shown.forEach(function(r){
+          var outOfRange = isOutOfRange(eq.id, r.temperatura);
+          html += '  <div class="temp-row">';
+          html += '    <div class="temp-row-main">';
+          html += '      <span class="temp-row-datahora">' + formatDataHoraFull(r.dataHora) + '</span>';
+          html += '      <span class="temp-row-valor' + (outOfRange ? ' out-of-range' : '') + '">' + r.temperatura.toFixed(1) + ' °C' + (outOfRange ? ' ⚠' : '') + '</span>';
+          html += '    </div>';
+          html += '    <div class="temp-row-meta"><span>' + escapeHtml(r.pessoa) + '</span>' + (r.notas ? '<span class="temp-row-notas">' + escapeHtml(r.notas) + '</span>' : '') + '</div>';
+          if (r.foto){
+            html += '    <img class="temp-thumb" src="' + r.foto + '" onclick="openLightbox(this.src)">';
+          }
+          html += '  </div>';
+        });
+      }
+
+      html += '</div>';
+    });
+
+    document.getElementById('tempList').innerHTML = html;
+  }
+
+  function openLightbox(src){
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightboxOverlay').style.display = 'flex';
+  }
+  window.openLightbox = openLightbox;
+
+  function closeLightbox(){
+    document.getElementById('lightboxOverlay').style.display = 'none';
+    document.getElementById('lightboxImg').src = '';
+  }
+  window.closeLightbox = closeLightbox;
+
+  /* ---------- Init ---------- */
+  renderEquipList();
+  populateEquipSelect();
+
+  templatesRef.on('value', function(snapshot){
+    var val = snapshot.val();
+    if (!val){
+      templatesRef.set({ abertura: ABERTURA_DEFAULT, fecho: FECHO_DEFAULT });
+      return;
+    }
+    templates = val;
+    renderChecklists();
+  });
+
+  registosRef.on('value', function(snapshot){
+    registos = snapshot.val() || {};
+    renderChecklists();
+  });
+
+  tempRef.on('value', function(snapshot){
+    temps = snapshot.val() || {};
+    renderTemps();
+  });
+</script>
+
+</body>
+</html>
