@@ -501,6 +501,47 @@
     cursor:pointer;
   }
 
+  .btn-ver-foto{
+    margin-top:8px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 12px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+  }
+
+  .btn-ver-foto:hover{
+    border-color:var(--black);
+  }
+
+  .btn-ver-foto:disabled{
+    opacity:0.6;
+    cursor:default;
+  }
+
+  .btn-ver-mais,
+  .btn-ver-antigos{
+    width:100%;
+    margin-top:14px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    padding:12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+  }
+
+  .btn-ver-mais:hover,
+  .btn-ver-antigos:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
   /* ---------- Lightbox ---------- */
   .lightbox-overlay{
     display:none;
@@ -671,6 +712,95 @@
     color:var(--white);
     cursor:pointer;
   }
+
+  /* ---------- Modal (shared pattern with fornecedores.html / equipa.html) ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{
+    display:flex;
+  }
+
+  .modal{
+    background:var(--bg);
+    border:3px solid var(--black);
+    max-width:480px;
+    width:100%;
+    padding:28px;
+    cursor:default;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  .modal-header h2{
+    margin:0;
+    font-size:20px;
+  }
+
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    line-height:1;
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+
+  .btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:9px 14px;
+    cursor:pointer;
+    letter-spacing:0.3px;
+    white-space:nowrap;
+  }
+
+  .btn:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn:disabled{
+    opacity:0.6;
+    cursor:default;
+  }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  .btn-primary:hover{
+    background:var(--black);
+    border-color:var(--black);
+  }
 </style>
 </head>
 <body>
@@ -787,10 +917,8 @@
 
         <div class="field">
           <label class="field-label" for="temp-pessoa">Pessoa</label>
-          <select id="temp-pessoa">
-            <option value="Manel">Manel</option>
-            <option value="Alfredo">Alfredo</option>
-            <option value="Outro">Outro</option>
+          <select id="temp-pessoa" disabled>
+            <option>A carregar...</option>
           </select>
         </div>
 
@@ -807,6 +935,8 @@
         <button type="submit" class="btn-registar" id="tempSubmitBtn">Registar temperatura</button>
       </form>
     </div>
+
+    <button type="button" class="btn-ver-mais" id="btnAbrirExport" style="margin-top:14px;">📄 Exportar registos</button>
 
     <div id="tempList"></div>
   </div>
@@ -836,10 +966,8 @@
 
       <div class="field">
         <label class="field-label" for="pedido-pessoa">Pessoa</label>
-        <select id="pedido-pessoa">
-          <option value="Manel">Manel</option>
-          <option value="Alfredo">Alfredo</option>
-          <option value="Outro">Outro</option>
+        <select id="pedido-pessoa" disabled>
+          <option>A carregar...</option>
         </select>
       </div>
 
@@ -862,6 +990,31 @@
   <img id="lightboxImg" src="">
 </div>
 
+<!-- Modal Exportar registos -->
+<div class="modal-overlay" id="exportModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Exportar registos</h2>
+      <button class="modal-close" id="exportModalClose">×</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="exportDe">De</label>
+      <input type="date" id="exportDe">
+    </div>
+    <div class="field">
+      <label class="field-label" for="exportAte">Até</label>
+      <input type="date" id="exportAte">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="exportModalCancel">Cancelar</button>
+      <button type="button" class="btn" id="btnExportarCsv">CSV</button>
+      <button type="button" class="btn btn-primary" id="btnExportarHtml">HTML imprimível</button>
+    </div>
+  </div>
+</div>
+
 <script>
   var firebaseConfig = {
     databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
@@ -871,6 +1024,54 @@
   var templatesRef = db.ref('lojaChecklistTemplates');
   var registosRef = db.ref('lojaChecklistRegistos');
   var tempRef = db.ref('lojaTemperaturas');
+  var fotosRef = db.ref('lojaTemperaturasFotos');
+  var pessoasRef = db.ref('pessoas');
+
+  var pessoasAtivas = [];
+  var pessoasCarregadas = false;
+
+  function carregarPessoas(onUpdate){
+    pessoasRef.on('value', function(snapshot){
+      var val = snapshot.val() || {};
+      pessoasAtivas = Object.keys(val)
+        .map(function(id){ return Object.assign({ id: id }, val[id]); })
+        .filter(function(p){ return p.ativo !== false; })
+        .sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); });
+      pessoasCarregadas = true;
+      onUpdate();
+    });
+  }
+
+  function buildPessoaOptionsHtml(){
+    if (!pessoasCarregadas){
+      return '<option>A carregar...</option>';
+    }
+    var html = '';
+    pessoasAtivas.forEach(function(p){
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro">Outro</option>';
+    return html;
+  }
+
+  function popularSelectPessoas(selectEl){
+    if (!pessoasCarregadas){
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    selectEl.disabled = false;
+    selectEl.innerHTML = buildPessoaOptionsHtml();
+  }
+
+  function resolvePessoaSelecao(selectEl){
+    var val = selectEl.value;
+    var found = pessoasAtivas.filter(function(p){ return p.id === val; })[0];
+    return {
+      pessoaId: found ? found.id : null,
+      pessoaNome: found ? found.nome : 'Outro'
+    };
+  }
 
   var EQUIPAMENTOS = [
     { id:'edenox',     nome:'Bancada Fria EDENOX MPS-250HC',        zona:'Cozinha',      tipo:'refrigeracao', num:1 },
@@ -1065,12 +1266,13 @@
 
   function submitChecklist(){
     if (!checklistItemsState || !checklistOpenTipo) return;
-    var pessoa = document.getElementById('checklistPessoaSelect').value;
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('checklistPessoaSelect'));
     var registo = {
       data: todayStr(),
       tipo: checklistOpenTipo,
       itens: checklistItemsState,
-      pessoa: pessoa,
+      pessoa: pessoaSelecao.pessoaNome,
+      pessoaId: pessoaSelecao.pessoaId,
       concluidoEm: new Date().toISOString()
     };
     registosRef.push(registo).then(function(){
@@ -1130,7 +1332,7 @@
       html += '<div class="checklist-meta-row">';
       html += '  <div class="field" style="margin-bottom:0;">';
       html += '    <label class="field-label" for="checklistPessoaSelect">Pessoa</label>';
-      html += '    <select id="checklistPessoaSelect"><option value="Manel">Manel</option><option value="Alfredo">Alfredo</option><option value="Outro">Outro</option></select>';
+      html += '    <select id="checklistPessoaSelect"' + (pessoasCarregadas ? '' : ' disabled') + '>' + buildPessoaOptionsHtml() + '</select>';
       html += '  </div>';
       html += '  <button type="button" class="btn-concluir" onclick="submitChecklist()">Concluir checklist</button>';
       html += '  <button type="button" class="link-btn" onclick="toggleEditMode()">' + (checklistEditMode ? '✕ Fechar edição' : '✎ Editar itens') + '</button>';
@@ -1197,7 +1399,7 @@
 
     var equipamento = document.getElementById('temp-equipamento').value;
     var temperatura = parseFloat(document.getElementById('temp-valor').value);
-    var pessoa = document.getElementById('temp-pessoa').value;
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('temp-pessoa'));
     var notas = document.getElementById('temp-notas').value.trim();
     var fileInput = document.getElementById('temp-foto');
     var file = fileInput.files[0];
@@ -1216,11 +1418,19 @@
         dataHora: new Date().toISOString(),
         equipamento: equipamento,
         temperatura: temperatura,
-        pessoa: pessoa,
-        foto: fotoDataUrl || null,
+        pessoa: pessoaSelecao.pessoaNome,
+        pessoaId: pessoaSelecao.pessoaId,
+        temFoto: !!fotoDataUrl,
         notas: notas || null
       };
-      tempRef.push(record).then(function(){
+
+      var newRef = tempRef.push();
+      var writes = [ newRef.set(record) ];
+      if (fotoDataUrl){
+        writes.push(fotosRef.child(newRef.key).set(fotoDataUrl));
+      }
+
+      Promise.all(writes).then(function(){
         document.getElementById('temp-valor').value = '';
         document.getElementById('temp-notas').value = '';
         fileInput.value = '';
@@ -1244,9 +1454,19 @@
     }
   });
 
+  var temposMostrarTodos = false;
+
+  function isWithinLastNDays(iso, n){
+    var d = new Date(iso);
+    var now = new Date();
+    var diffMs = now - d;
+    return diffMs >= 0 && diffMs <= n * 24 * 60 * 60 * 1000;
+  }
+
   function renderTemps(){
     var byEquip = {};
     EQUIPAMENTOS.forEach(function(eq){ byEquip[eq.id] = []; });
+    var hasOlder = false;
     Object.keys(temps).forEach(function(key){
       var t = temps[key];
       if (!byEquip[t.equipamento]) byEquip[t.equipamento] = [];
@@ -1254,6 +1474,7 @@
       for (var k in t){ withKey[k] = t[k]; }
       withKey._key = key;
       byEquip[t.equipamento].push(withKey);
+      if (!isWithinLastNDays(t.dataHora, 30)) hasOlder = true;
     });
 
     var html = '';
@@ -1261,13 +1482,13 @@
       var list = (byEquip[eq.id] || []).slice().sort(function(a, b){
         return new Date(b.dataHora) - new Date(a.dataHora);
       });
-      var shown = list.slice(0, 6);
+      var shown = temposMostrarTodos ? list : list.filter(function(r){ return isWithinLastNDays(r.dataHora, 30); });
 
       html += '<div class="equip-temp-card" id="equipcard_' + eq.id + '">';
       html += '  <div class="equip-temp-header"><span class="equip-temp-name"><span class="equip-num-badge">' + eq.num + '</span>' + escapeHtml(eq.nome) + '</span><span class="equip-temp-zone">' + escapeHtml(eq.zona) + '</span></div>';
 
       if (shown.length === 0){
-        html += '  <p class="equip-temp-empty">Sem registos ainda.</p>';
+        html += '  <p class="equip-temp-empty">' + (temposMostrarTodos ? 'Sem registos ainda.' : 'Sem registos nos últimos 30 dias.') + '</p>';
       } else {
         shown.forEach(function(r){
           var outOfRange = isOutOfRange(eq.id, r.temperatura);
@@ -1279,6 +1500,8 @@
           html += '    <div class="temp-row-meta"><span>' + escapeHtml(r.pessoa) + '</span>' + (r.notas ? '<span class="temp-row-notas">' + escapeHtml(r.notas) + '</span>' : '') + '</div>';
           if (r.foto){
             html += '    <img class="temp-thumb" src="' + r.foto + '" onclick="openLightbox(this.src)">';
+          } else if (r.temFoto){
+            html += '    <button type="button" class="btn-ver-foto" onclick="verFotoTemp(\'' + r._key + '\', this)">📷 Ver foto</button>';
           }
           html += '  </div>';
         });
@@ -1287,8 +1510,39 @@
       html += '</div>';
     });
 
+    if (!temposMostrarTodos && hasOlder){
+      html += '<button type="button" class="btn-ver-antigos" onclick="mostrarTodosTemps()">Ver mais antigos</button>';
+    }
+
     document.getElementById('tempList').innerHTML = html;
   }
+
+  function mostrarTodosTemps(){
+    temposMostrarTodos = true;
+    renderTemps();
+  }
+  window.mostrarTodosTemps = mostrarTodosTemps;
+
+  function verFotoTemp(key, btnEl){
+    var original = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'A carregar...';
+    fotosRef.child(key).once('value').then(function(snapshot){
+      var val = snapshot.val();
+      btnEl.disabled = false;
+      btnEl.textContent = original;
+      if (val){
+        openLightbox(val);
+      } else {
+        alert('Foto não encontrada.');
+      }
+    }).catch(function(err){
+      btnEl.disabled = false;
+      btnEl.textContent = original;
+      alert('Erro ao carregar a foto: ' + err.message);
+    });
+  }
+  window.verFotoTemp = verFotoTemp;
 
   function openLightbox(src){
     document.getElementById('lightboxImg').src = src;
@@ -1305,6 +1559,12 @@
   /* ---------- Init ---------- */
   renderEquipList();
   populateEquipSelect();
+
+  carregarPessoas(function(){
+    popularSelectPessoas(document.getElementById('temp-pessoa'));
+    popularSelectPessoas(document.getElementById('pedido-pessoa'));
+    renderChecklists();
+  });
 
   templatesRef.on('value', function(snapshot){
     var val = snapshot.val();
@@ -1358,7 +1618,7 @@
   document.getElementById('pedidoSubmitBtn').addEventListener('click', function(){
     var descricao = document.getElementById('pedido-descricao').value.trim();
     var zona = document.getElementById('pedido-zona').value;
-    var pessoa = document.getElementById('pedido-pessoa').value;
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('pedido-pessoa'));
 
     if (!descricao){
       alert('Escreve uma descrição para o pedido.');
@@ -1373,7 +1633,8 @@
       dataHora: new Date().toISOString(),
       descricao: descricao,
       zona: zona,
-      pessoa: pessoa,
+      pessoa: pessoaSelecao.pessoaNome,
+      pessoaId: pessoaSelecao.pessoaId,
       estado: 'novo',
       resposta: null,
       respondidoEm: null
@@ -1479,6 +1740,191 @@
   pedidosRef.on('value', function(snapshot){
     pedidos = snapshot.val() || {};
     renderPedidos();
+  });
+
+  /* ---------- Exportação de registos de temperatura ---------- */
+  function toDateInputStr(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function formatDataCurta(isoDateStr){
+    var parts = isoDateStr.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+
+  function equipamentoNome(id){
+    var eq = EQUIPAMENTOS.filter(function(e){ return e.id === id; })[0];
+    return eq ? eq.nome : id;
+  }
+
+  function getRegistosNoIntervalo(deStr, ateStr){
+    var deDate = new Date(deStr + 'T00:00:00');
+    var ateDate = new Date(ateStr + 'T23:59:59');
+    var out = [];
+    Object.keys(temps).forEach(function(key){
+      var t = temps[key];
+      var d = new Date(t.dataHora);
+      if (d >= deDate && d <= ateDate){
+        out.push(Object.assign({ _key: key }, t));
+      }
+    });
+    out.sort(function(a, b){ return new Date(a.dataHora) - new Date(b.dataHora); });
+    return out;
+  }
+
+  function downloadFile(filename, content, mime){
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function csvEscape(val){
+    if (val === null || val === undefined) return '';
+    var s = String(val);
+    if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1){
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  document.getElementById('btnAbrirExport').addEventListener('click', function(){
+    var hoje = new Date();
+    var tresMesesAtras = new Date();
+    tresMesesAtras.setMonth(tresMesesAtras.getMonth() - 3);
+    document.getElementById('exportDe').value = toDateInputStr(tresMesesAtras);
+    document.getElementById('exportAte').value = toDateInputStr(hoje);
+    document.getElementById('exportModalOverlay').classList.add('open');
+  });
+
+  function closeExportModal(){
+    document.getElementById('exportModalOverlay').classList.remove('open');
+  }
+  document.getElementById('exportModalClose').addEventListener('click', closeExportModal);
+  document.getElementById('exportModalCancel').addEventListener('click', closeExportModal);
+  document.getElementById('exportModalOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('exportModalOverlay')) closeExportModal();
+  });
+
+  document.getElementById('btnExportarCsv').addEventListener('click', function(){
+    var de = document.getElementById('exportDe').value;
+    var ate = document.getElementById('exportAte').value;
+    if (!de || !ate){
+      alert('Indica o intervalo de datas.');
+      return;
+    }
+
+    var registos = getRegistosNoIntervalo(de, ate);
+    if (registos.length === 0){
+      alert('Sem registos nesse intervalo.');
+      return;
+    }
+
+    var linhas = ['Data,Hora,Equipamento,Temperatura (C),Pessoa,Notas'];
+    registos.forEach(function(r){
+      var d = new Date(r.dataHora);
+      var dataStr = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+      linhas.push([
+        csvEscape(dataStr),
+        csvEscape(formatHora(r.dataHora)),
+        csvEscape(equipamentoNome(r.equipamento)),
+        csvEscape(r.temperatura),
+        csvEscape(r.pessoa),
+        csvEscape(r.notas || '')
+      ].join(','));
+    });
+
+    var csvContent = '﻿' + linhas.join('\r\n');
+    downloadFile('GIOCO_Temperaturas_' + de + '_a_' + ate + '.csv', csvContent, 'text/csv;charset=utf-8');
+    closeExportModal();
+  });
+
+  function buildExportHtml(registos, fotos, de, ate){
+    var deFmt = formatDataCurta(de);
+    var ateFmt = formatDataCurta(ate);
+
+    var rows = '';
+    registos.forEach(function(r, idx){
+      var d = new Date(r.dataHora);
+      var dataStr = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+      var outOfRange = isOutOfRange(r.equipamento, r.temperatura);
+      var fotoHtml = fotos[idx] ? '<img src="' + fotos[idx] + '" style="max-width:150px;max-height:150px;display:block;">' : '';
+      rows += '<tr' + (outOfRange ? ' style="background:#fdeaea;"' : '') + '>';
+      rows += '<td>' + dataStr + '</td>';
+      rows += '<td>' + formatHora(r.dataHora) + '</td>';
+      rows += '<td>' + escapeHtml(equipamentoNome(r.equipamento)) + '</td>';
+      rows += '<td' + (outOfRange ? ' style="color:#D91124;font-weight:bold;"' : '') + '>' + r.temperatura.toFixed(1) + ' °C' + (outOfRange ? ' ⚠' : '') + '</td>';
+      rows += '<td>' + escapeHtml(r.pessoa) + '</td>';
+      rows += '<td>' + escapeHtml(r.notas || '') + '</td>';
+      rows += '<td>' + fotoHtml + '</td>';
+      rows += '</tr>';
+    });
+
+    return '<!DOCTYPE html><html lang="pt-PT"><head><meta charset="UTF-8"><title>GIOCO - Registo de Temperaturas</title>' +
+      '<style>' +
+      'body{font-family:Arial, sans-serif;color:#141414;margin:24px;}' +
+      'h1{font-size:18px;margin:0 0 4px;}' +
+      'p.sub{font-size:12px;color:#6b6660;margin:0 0 20px;}' +
+      'table{width:100%;border-collapse:collapse;font-size:12px;}' +
+      'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top;}' +
+      'th{background:#141414;color:#fff;}' +
+      '@media print{ body{margin:0;} }' +
+      '</style></head><body>' +
+      '<h1>GIOCO — Registo de Temperaturas | Rua de São Bento 154, Lisboa</h1>' +
+      '<p class="sub">Período: ' + deFmt + ' a ' + ateFmt + ' — ' + registos.length + ' registos</p>' +
+      '<table><thead><tr><th>Data</th><th>Hora</th><th>Equipamento</th><th>Temperatura</th><th>Pessoa</th><th>Notas</th><th>Foto</th></tr></thead><tbody>' +
+      rows +
+      '</tbody></table></body></html>';
+  }
+
+  document.getElementById('btnExportarHtml').addEventListener('click', function(){
+    var de = document.getElementById('exportDe').value;
+    var ate = document.getElementById('exportAte').value;
+    if (!de || !ate){
+      alert('Indica o intervalo de datas.');
+      return;
+    }
+
+    var registos = getRegistosNoIntervalo(de, ate);
+    if (registos.length === 0){
+      alert('Sem registos nesse intervalo.');
+      return;
+    }
+
+    var comFoto = registos.filter(function(r){ return r.foto || r.temFoto; });
+    if (comFoto.length > 25){
+      if (!confirm('Este intervalo tem ' + comFoto.length + ' registos com fotografia. O ficheiro pode ficar grande e demorar a gerar. Continuar?')){
+        return;
+      }
+    }
+
+    var btnHtml = document.getElementById('btnExportarHtml');
+    var originalText = btnHtml.textContent;
+    btnHtml.disabled = true;
+    btnHtml.textContent = 'A gerar…';
+
+    var fotoPromises = registos.map(function(r){
+      if (r.foto) return Promise.resolve(r.foto);
+      if (r.temFoto) return fotosRef.child(r._key).once('value').then(function(snap){ return snap.val(); });
+      return Promise.resolve(null);
+    });
+
+    Promise.all(fotoPromises).then(function(fotos){
+      var htmlDoc = buildExportHtml(registos, fotos, de, ate);
+      downloadFile('GIOCO_Temperaturas_' + de + '_a_' + ate + '.html', htmlDoc, 'text/html;charset=utf-8');
+      btnHtml.disabled = false;
+      btnHtml.textContent = originalText;
+      closeExportModal();
+    }).catch(function(err){
+      btnHtml.disabled = false;
+      btnHtml.textContent = originalText;
+      alert('Erro ao gerar exportação: ' + err.message);
+    });
   });
 </script>
 

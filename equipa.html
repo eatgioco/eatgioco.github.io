@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIOCO · Equipa</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+    --blue:#1D5C8A;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:680px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:680px;
+    margin:0 auto;
+    padding:20px 16px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--red);
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+  }
+
+  .section{
+    margin-top:28px;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:20px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .btn-registar{
+    width:100%;
+    padding:16px;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--black);
+    color:var(--white);
+    border:2px solid var(--black);
+    cursor:pointer;
+    min-height:56px;
+  }
+
+  /* ---------- Pessoas ---------- */
+  .pessoas-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .pessoa-card{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:12px;
+  }
+
+  .pessoa-color-dot{
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    flex-shrink:0;
+    border:1px solid rgba(0,0,0,0.15);
+  }
+
+  .pessoa-info{
+    flex:1;
+    min-width:0;
+  }
+
+  .pessoa-nome{
+    font-weight:700;
+    font-size:14px;
+  }
+
+  .pessoa-funcao{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .pessoa-contacts{
+    display:flex;
+    gap:14px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+
+  .pessoa-contacts a{
+    font-size:12px;
+    color:var(--black);
+    text-decoration:none;
+    border-bottom:1px solid var(--line);
+  }
+
+  .pessoa-contacts a:hover{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .btn-editar-pessoa{
+    background:none;
+    border:2px solid var(--line);
+    width:34px;
+    height:34px;
+    cursor:pointer;
+    font-size:14px;
+    flex-shrink:0;
+  }
+
+  .btn-editar-pessoa:hover{
+    border-color:var(--black);
+  }
+
+  .inactive-details{
+    margin-top:16px;
+  }
+
+  .inactive-details summary{
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  /* ---------- Turnos ---------- */
+  .week-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-top:12px;
+  }
+
+  .week-nav-btn{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:14px;
+    padding:10px 14px;
+    border:2px solid var(--black);
+    background:var(--white);
+    cursor:pointer;
+  }
+
+  .week-label{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    text-align:center;
+    flex:1;
+  }
+
+  .btn-hoje{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    cursor:pointer;
+    margin-top:8px;
+    width:100%;
+  }
+
+  .dia-block{
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:12px;
+    margin-top:10px;
+  }
+
+  .dia-block.today{
+    border-color:var(--red);
+  }
+
+  .dia-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .dia-nome-data{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .dia-nome{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .dia-block.today .dia-nome{
+    color:var(--red);
+  }
+
+  .dia-data{
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .btn-add-turno{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .turnos-list{
+    margin-top:10px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .turno-chip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    padding:8px 10px;
+    border-left:4px solid var(--muted);
+    background:var(--bg);
+    cursor:pointer;
+  }
+
+  .turno-cor-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+
+  .turno-nome{
+    font-weight:600;
+    font-size:13px;
+  }
+
+  .turno-horario{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    margin-left:auto;
+  }
+
+  .turno-notas{
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+    width:100%;
+    margin-top:2px;
+  }
+
+  .dia-empty{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+    font-style:italic;
+  }
+
+  /* ---------- Modal (shared pattern with fornecedores.html / mrn-dashboard.html) ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{
+    display:flex;
+  }
+
+  .modal{
+    background:var(--bg);
+    border:3px solid var(--black);
+    max-width:480px;
+    width:100%;
+    padding:28px;
+    cursor:default;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  .modal-header h2{
+    margin:0;
+    font-size:20px;
+  }
+
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    line-height:1;
+  }
+
+  .field{
+    margin-bottom:14px;
+  }
+
+  .field-label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input,
+  .field select{
+    width:100%;
+    padding:14px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    color:var(--black);
+  }
+
+  .field input:focus,
+  .field select:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+
+  .field input[type="color"]{
+    padding:6px;
+    height:48px;
+    cursor:pointer;
+  }
+
+  .field-checkbox{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    margin-bottom:18px;
+  }
+
+  .field-checkbox input{
+    width:20px;
+    height:20px;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+
+  @media (max-width:420px){
+    .form-grid{
+      grid-template-columns:1fr;
+    }
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+
+  .btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:9px 14px;
+    cursor:pointer;
+    letter-spacing:0.3px;
+    white-space:nowrap;
+  }
+
+  .btn:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  .btn-primary:hover{
+    background:var(--black);
+    border-color:var(--black);
+  }
+
+  .btn-mr-auto{
+    margin-right:auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">GIOCO · Equipa</h1>
+  <p class="page-subtitle">Turnos e Pessoas</p>
+
+  <div class="section">
+    <p class="section-title">Pessoas</p>
+    <div class="pessoas-list" id="pessoasList"></div>
+    <button type="button" class="btn-registar" id="btnNovaPessoa" style="margin-top:14px;">+ Nova pessoa</button>
+
+    <details class="inactive-details" id="inativosDetails" style="display:none;">
+      <summary id="inativosSummary">Pessoas inativas (0)</summary>
+      <div class="pessoas-list" id="pessoasInativasList" style="margin-top:10px;"></div>
+    </details>
+  </div>
+
+  <div class="section">
+    <p class="section-title">Turnos</p>
+    <div class="week-nav">
+      <button type="button" class="week-nav-btn" id="prevWeekBtn">←</button>
+      <span class="week-label" id="weekLabel"></span>
+      <button type="button" class="week-nav-btn" id="nextWeekBtn">→</button>
+    </div>
+    <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
+
+    <div id="diasList"></div>
+  </div>
+</main>
+
+<!-- Modal Pessoa -->
+<div class="modal-overlay" id="pessoaModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pessoaModalTitle">Nova pessoa</h2>
+      <button class="modal-close" id="pessoaModalClose">×</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Nome *</label>
+      <input type="text" id="pessoaNome">
+    </div>
+    <div class="field">
+      <label class="field-label">Função</label>
+      <input type="text" id="pessoaFuncao">
+    </div>
+    <div class="field">
+      <label class="field-label">Telefone</label>
+      <input type="tel" id="pessoaTelefone">
+    </div>
+    <div class="field">
+      <label class="field-label">Email</label>
+      <input type="email" id="pessoaEmail">
+    </div>
+    <div class="field">
+      <label class="field-label">Cor</label>
+      <input type="color" id="pessoaCor" value="#D91124">
+    </div>
+    <label class="field-checkbox">
+      <input type="checkbox" id="pessoaAtivo" checked>
+      Ativo
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-mr-auto" id="btnDesativarPessoa" style="display:none;">Desativar</button>
+      <button type="button" class="btn" id="pessoaModalCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarPessoa">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Turno -->
+<div class="modal-overlay" id="turnoModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="turnoModalTitle">Novo turno</h2>
+      <button class="modal-close" id="turnoModalClose">×</button>
+    </div>
+
+    <p class="field-label" id="turnoModalData" style="margin-bottom:16px;"></p>
+
+    <div class="field">
+      <label class="field-label">Pessoa *</label>
+      <select id="turnoPessoa"></select>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label">Início *</label>
+        <input type="time" id="turnoInicio">
+      </div>
+      <div class="field">
+        <label class="field-label">Fim *</label>
+        <input type="time" id="turnoFim">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Notas</label>
+      <input type="text" id="turnoNotas">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-mr-auto" id="btnApagarTurno" style="display:none;">🗑 Remover</button>
+      <button type="button" class="btn" id="turnoModalCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarTurno">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var pessoasRef = db.ref('pessoas');
+  var turnosRef = db.ref('turnos');
+
+  var pessoas = {};
+  var pessoasCarregadas = false;
+  var turnos = {};
+  var weekOffset = 0;
+
+  var editingPessoaId = null;
+  var editingTurnoId = null;
+  var turnoModalDataStr = null;
+
+  var DIA_NOMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+  function escapeHtml(str){
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function pad2(n){
+    return n < 10 ? '0' + n : String(n);
+  }
+
+  /* ---------- Pessoas ---------- */
+  function pessoasAtivasArray(){
+    return Object.keys(pessoas)
+      .map(function(id){ return Object.assign({ id: id }, pessoas[id]); })
+      .filter(function(p){ return p.ativo !== false; })
+      .sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); });
+  }
+
+  function pessoasInativasArray(){
+    return Object.keys(pessoas)
+      .map(function(id){ return Object.assign({ id: id }, pessoas[id]); })
+      .filter(function(p){ return p.ativo === false; })
+      .sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); });
+  }
+
+  function renderPessoaCard(p){
+    var html = '<div class="pessoa-card">';
+    html += '  <span class="pessoa-color-dot" style="background:' + (p.cor || '#999') + '"></span>';
+    html += '  <div class="pessoa-info">';
+    html += '    <div class="pessoa-nome">' + escapeHtml(p.nome) + '</div>';
+    if (p.funcao) html += '    <div class="pessoa-funcao">' + escapeHtml(p.funcao) + '</div>';
+    html += '    <div class="pessoa-contacts">';
+    if (p.telefone) html += '<a href="tel:' + escapeHtml(p.telefone) + '">📞 ' + escapeHtml(p.telefone) + '</a>';
+    if (p.email) html += '<a href="mailto:' + escapeHtml(p.email) + '">✉️ ' + escapeHtml(p.email) + '</a>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '  <button type="button" class="btn-editar-pessoa" onclick="editPessoa(\'' + p.id + '\')">✎</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderPessoas(){
+    var ativas = pessoasAtivasArray();
+    var inativas = pessoasInativasArray();
+
+    document.getElementById('pessoasList').innerHTML = ativas.length
+      ? ativas.map(renderPessoaCard).join('')
+      : '<p class="empty-state">Sem pessoas ativas.</p>';
+
+    var inativosDetails = document.getElementById('inativosDetails');
+    if (inativas.length){
+      inativosDetails.style.display = 'block';
+      document.getElementById('inativosSummary').textContent = 'Pessoas inativas (' + inativas.length + ')';
+      document.getElementById('pessoasInativasList').innerHTML = inativas.map(renderPessoaCard).join('');
+    } else {
+      inativosDetails.style.display = 'none';
+    }
+  }
+
+  function openPessoaModal(id){
+    editingPessoaId = id || null;
+    var p = id ? Object.assign({ id: id }, pessoas[id]) : null;
+    document.getElementById('pessoaModalTitle').textContent = p ? 'Editar pessoa' : 'Nova pessoa';
+    document.getElementById('pessoaNome').value = p ? (p.nome || '') : '';
+    document.getElementById('pessoaFuncao').value = p ? (p.funcao || '') : '';
+    document.getElementById('pessoaTelefone').value = p ? (p.telefone || '') : '';
+    document.getElementById('pessoaEmail').value = p ? (p.email || '') : '';
+    document.getElementById('pessoaCor').value = (p && p.cor) ? p.cor : '#D91124';
+    document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
+    document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
+    document.getElementById('pessoaModalOverlay').classList.add('open');
+  }
+  window.editPessoa = function(id){ openPessoaModal(id); };
+
+  function closePessoaModal(){
+    document.getElementById('pessoaModalOverlay').classList.remove('open');
+    editingPessoaId = null;
+  }
+
+  document.getElementById('btnNovaPessoa').addEventListener('click', function(){ openPessoaModal(null); });
+  document.getElementById('pessoaModalClose').addEventListener('click', closePessoaModal);
+  document.getElementById('pessoaModalCancel').addEventListener('click', closePessoaModal);
+  document.getElementById('pessoaModalOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('pessoaModalOverlay')) closePessoaModal();
+  });
+
+  document.getElementById('btnGuardarPessoa').addEventListener('click', function(){
+    var nome = document.getElementById('pessoaNome').value.trim();
+    if (!nome){
+      alert('Indica o nome.');
+      return;
+    }
+
+    var dados = {
+      nome: nome,
+      funcao: document.getElementById('pessoaFuncao').value.trim(),
+      telefone: document.getElementById('pessoaTelefone').value.trim(),
+      email: document.getElementById('pessoaEmail').value.trim(),
+      cor: document.getElementById('pessoaCor').value,
+      ativo: document.getElementById('pessoaAtivo').checked
+    };
+
+    var promise = editingPessoaId
+      ? pessoasRef.child(editingPessoaId).update(dados)
+      : pessoasRef.push(dados);
+
+    promise.then(closePessoaModal).catch(function(err){
+      alert('Erro ao guardar pessoa: ' + err.message);
+    });
+  });
+
+  document.getElementById('btnDesativarPessoa').addEventListener('click', function(){
+    if (!editingPessoaId) return;
+    if (!confirm('Desativar esta pessoa? Deixa de aparecer nos dropdowns, mas os registos antigos mantêm-se.')) return;
+    pessoasRef.child(editingPessoaId).update({ ativo: false }).then(closePessoaModal).catch(function(err){
+      alert('Erro ao desativar: ' + err.message);
+    });
+  });
+
+  pessoasRef.on('value', function(snapshot){
+    var val = snapshot.val();
+    if (!val){
+      pessoasRef.push({ nome: 'Manel', funcao: 'Fundador', telefone: '', email: '', cor: '#D91124', ativo: true });
+      pessoasRef.push({ nome: 'Alfredo', funcao: 'Head of Operations', telefone: '', email: '', cor: '#1D5C8A', ativo: true });
+      return;
+    }
+    pessoas = val;
+    pessoasCarregadas = true;
+    renderPessoas();
+    renderDias();
+  });
+
+  /* ---------- Turnos ---------- */
+  function toDateStr(d){
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function getMonday(d){
+    var date = new Date(d);
+    var day = date.getDay();
+    var diff = (day === 0 ? -6 : 1) - day;
+    date.setDate(date.getDate() + diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  function getWeekStart(){
+    var monday = getMonday(new Date());
+    monday.setDate(monday.getDate() + weekOffset * 7);
+    return monday;
+  }
+
+  function formatWeekLabel(monday){
+    var sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    var fmt = function(d){ return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); };
+    return fmt(monday) + ' – ' + fmt(sunday);
+  }
+
+  function formatDataLonga(dStr){
+    var parts = dStr.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return DIA_NOMES[d.getDay()] + ', ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+
+  document.getElementById('prevWeekBtn').addEventListener('click', function(){ weekOffset--; renderDias(); });
+  document.getElementById('nextWeekBtn').addEventListener('click', function(){ weekOffset++; renderDias(); });
+  document.getElementById('btnHoje').addEventListener('click', function(){ weekOffset = 0; renderDias(); });
+
+  function renderDias(){
+    var monday = getWeekStart();
+    document.getElementById('weekLabel').textContent = formatWeekLabel(monday);
+
+    var todayStr = toDateStr(new Date());
+    var html = '';
+
+    for (var i = 0; i < 7; i++){
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      var dStr = toDateStr(d);
+      var isToday = dStr === todayStr;
+      var diaNome = DIA_NOMES[d.getDay()];
+      var diaData = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+
+      var turnosDoDia = Object.keys(turnos)
+        .map(function(id){ return Object.assign({ id: id }, turnos[id]); })
+        .filter(function(t){ return t.data === dStr; })
+        .sort(function(a, b){ return (a.inicio || '').localeCompare(b.inicio || ''); });
+
+      html += '<div class="dia-block' + (isToday ? ' today' : '') + '">';
+      html += '  <div class="dia-header">';
+      html += '    <div class="dia-nome-data"><span class="dia-nome">' + diaNome + '</span><span class="dia-data">' + diaData + '</span></div>';
+      html += '    <button type="button" class="btn-add-turno" onclick="openTurnoModal(\'' + dStr + '\')">+ Turno</button>';
+      html += '  </div>';
+
+      if (turnosDoDia.length){
+        html += '  <div class="turnos-list">';
+        turnosDoDia.forEach(function(t){
+          var pessoaAtual = pessoas[t.pessoaId];
+          var cor = pessoaAtual ? pessoaAtual.cor : '#999';
+          var nome = pessoaAtual ? pessoaAtual.nome : (t.pessoaNome || 'Pessoa removida');
+          html += '<div class="turno-chip" style="border-left-color:' + cor + '" onclick="openTurnoModal(null,\'' + t.id + '\')">';
+          html += '  <span class="turno-cor-dot" style="background:' + cor + '"></span>';
+          html += '  <span class="turno-nome">' + escapeHtml(nome) + '</span>';
+          html += '  <span class="turno-horario">' + escapeHtml(t.inicio) + '–' + escapeHtml(t.fim) + '</span>';
+          if (t.notas) html += '<span class="turno-notas">' + escapeHtml(t.notas) + '</span>';
+          html += '</div>';
+        });
+        html += '  </div>';
+      } else {
+        html += '  <p class="dia-empty">Sem turnos.</p>';
+      }
+
+      html += '</div>';
+    }
+
+    document.getElementById('diasList').innerHTML = html;
+  }
+
+  function populateTurnoPessoaSelect(selectedId){
+    var sel = document.getElementById('turnoPessoa');
+    if (!pessoasCarregadas){
+      sel.disabled = true;
+      sel.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    var ativas = pessoasAtivasArray();
+    if (ativas.length === 0){
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">Sem pessoas ativas</option>';
+      return;
+    }
+    sel.disabled = false;
+    var html = '';
+    ativas.forEach(function(p){
+      html += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + escapeHtml(p.nome) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  function openTurnoModal(dataStr, turnoId){
+    editingTurnoId = turnoId || null;
+    var t = turnoId ? Object.assign({ id: turnoId }, turnos[turnoId]) : null;
+    turnoModalDataStr = t ? t.data : dataStr;
+
+    document.getElementById('turnoModalTitle').textContent = t ? 'Editar turno' : 'Novo turno';
+    document.getElementById('turnoModalData').textContent = formatDataLonga(turnoModalDataStr);
+    populateTurnoPessoaSelect(t ? t.pessoaId : null);
+    document.getElementById('turnoInicio').value = t ? (t.inicio || '') : '';
+    document.getElementById('turnoFim').value = t ? (t.fim || '') : '';
+    document.getElementById('turnoNotas').value = t ? (t.notas || '') : '';
+    document.getElementById('btnApagarTurno').style.display = t ? 'inline-block' : 'none';
+    document.getElementById('turnoModalOverlay').classList.add('open');
+  }
+  window.openTurnoModal = openTurnoModal;
+
+  function closeTurnoModal(){
+    document.getElementById('turnoModalOverlay').classList.remove('open');
+    editingTurnoId = null;
+    turnoModalDataStr = null;
+  }
+
+  document.getElementById('turnoModalClose').addEventListener('click', closeTurnoModal);
+  document.getElementById('turnoModalCancel').addEventListener('click', closeTurnoModal);
+  document.getElementById('turnoModalOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('turnoModalOverlay')) closeTurnoModal();
+  });
+
+  document.getElementById('btnGuardarTurno').addEventListener('click', function(){
+    var pessoaId = document.getElementById('turnoPessoa').value;
+    var inicio = document.getElementById('turnoInicio').value;
+    var fim = document.getElementById('turnoFim').value;
+    var notas = document.getElementById('turnoNotas').value.trim();
+
+    if (!pessoaId || !inicio || !fim){
+      alert('Indica pessoa, início e fim.');
+      return;
+    }
+
+    var pessoaObj = pessoas[pessoaId];
+    var dados = {
+      data: turnoModalDataStr,
+      pessoaId: pessoaId,
+      pessoaNome: pessoaObj ? pessoaObj.nome : 'Pessoa removida',
+      inicio: inicio,
+      fim: fim,
+      notas: notas || null
+    };
+
+    var promise = editingTurnoId
+      ? turnosRef.child(editingTurnoId).update(dados)
+      : turnosRef.push(dados);
+
+    promise.then(closeTurnoModal).catch(function(err){
+      alert('Erro ao guardar turno: ' + err.message);
+    });
+  });
+
+  document.getElementById('btnApagarTurno').addEventListener('click', function(){
+    if (!editingTurnoId) return;
+    if (!confirm('Remover este turno?')) return;
+    turnosRef.child(editingTurnoId).remove().then(closeTurnoModal).catch(function(err){
+      alert('Erro ao remover: ' + err.message);
+    });
+  });
+
+  turnosRef.on('value', function(snapshot){
+    turnos = snapshot.val() || {};
+    renderDias();
+  });
+
+  renderDias();
+</script>
+
+</body>
+</html>

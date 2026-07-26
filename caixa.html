@@ -482,10 +482,8 @@
 
       <div class="field">
         <label class="field-label" for="pessoaSelect">Pessoa</label>
-        <select id="pessoaSelect">
-          <option value="Manel">Manel</option>
-          <option value="Alfredo">Alfredo</option>
-          <option value="Outro">Outro</option>
+        <select id="pessoaSelect" disabled>
+          <option>A carregar...</option>
         </select>
       </div>
 
@@ -511,6 +509,46 @@
   firebase.initializeApp(firebaseConfig);
   var db = firebase.database();
   var movRef = db.ref('caixaMovimentos');
+  var pessoasRef = db.ref('pessoas');
+
+  var pessoasAtivas = [];
+  var pessoasCarregadas = false;
+
+  function carregarPessoas(onUpdate){
+    pessoasRef.on('value', function(snapshot){
+      var val = snapshot.val() || {};
+      pessoasAtivas = Object.keys(val)
+        .map(function(id){ return Object.assign({ id: id }, val[id]); })
+        .filter(function(p){ return p.ativo !== false; })
+        .sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); });
+      pessoasCarregadas = true;
+      onUpdate();
+    });
+  }
+
+  function popularSelectPessoas(selectEl){
+    if (!pessoasCarregadas){
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    selectEl.disabled = false;
+    var html = '';
+    pessoasAtivas.forEach(function(p){
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro">Outro</option>';
+    selectEl.innerHTML = html;
+  }
+
+  function resolvePessoaSelecao(selectEl){
+    var val = selectEl.value;
+    var found = pessoasAtivas.filter(function(p){ return p.id === val; })[0];
+    return {
+      pessoaId: found ? found.id : null,
+      pessoaNome: found ? found.nome : 'Outro'
+    };
+  }
 
   var allMovs = {};
   var activeFilter = 'hoje';
@@ -587,14 +625,15 @@
     var tipo = formState.tipo;
     var valor = parseFloat(valorInput.value);
     var motivo = motivoInput.value.trim();
-    var pessoa = pessoaSelect.value;
+    var pessoaSelecao = resolvePessoaSelecao(pessoaSelect);
 
     var novoMov = {
       dataHora: new Date().toISOString(),
       tipo: tipo,
       valor: valor,
       motivo: motivo,
-      pessoa: pessoa,
+      pessoa: pessoaSelecao.pessoaNome,
+      pessoaId: pessoaSelecao.pessoaId,
       estado: tipo === 'entrada' ? 'acertado' : 'aberto',
       valorDevolvido: null,
       notas: null
@@ -784,6 +823,10 @@
     allMovs = snapshot.val() || {};
     renderSummary();
     renderList();
+  });
+
+  carregarPessoas(function(){
+    popularSelectPessoas(pessoaSelect);
   });
 </script>
 
