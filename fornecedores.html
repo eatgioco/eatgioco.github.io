@@ -654,6 +654,70 @@
     justify-content:flex-end;
   }
 
+  .ingredient-count{
+    font-weight:400;
+    color:var(--muted);
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .ingredient-accordion{
+    border-top:2px solid var(--black);
+    margin-top:4px;
+  }
+
+  .ingredient-accordion-item{
+    border-bottom:1px solid var(--line);
+  }
+
+  .ingredient-accordion-item summary{
+    cursor:pointer;
+    padding:10px 2px;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    list-style:none;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .ingredient-accordion-item summary::-webkit-details-marker{
+    display:none;
+  }
+
+  .ingredient-accordion-item summary::before{
+    content:"▸";
+    margin-right:8px;
+    color:var(--red);
+  }
+
+  .ingredient-accordion-item[open] summary::before{
+    content:"▾";
+  }
+
+  .ingredient-list{
+    padding:2px 2px 12px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .ingredient-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+  }
+
+  .ingredient-row input[type="checkbox"]{
+    width:auto;
+  }
+
+  .ingredient-row.hidden-by-search{
+    display:none;
+  }
+
   .card-title-row{
     display:flex;
     align-items:center;
@@ -823,6 +887,11 @@
           <label class="field-label">Produtos</label>
           <textarea id="fProdutos"></textarea>
         </div>
+        <div class="field full" id="ingredientesSection" style="display:none;">
+          <label class="field-label">Produtos encomendados a este fornecedor</label>
+          <input type="text" id="ingredienteSearch" placeholder="Pesquisar ingrediente...">
+          <div class="ingredient-accordion" id="ingredienteAccordion"></div>
+        </div>
         <div class="field">
           <label class="field-label">IBAN</label>
           <input type="text" id="fIban">
@@ -943,6 +1012,104 @@ window.addEventListener('load', function () {
   var suppliersRef = db.ref('suppliers');
   var paymentRequestsRef = db.ref('paymentRequests');
   var pessoasRef = db.ref('pessoas');
+  var ingredientesRef = db.ref('ingredientes');
+
+  var CATEGORIAS = {
+    CH: "Queijos & Laticínios",
+    MT: "Carnes & Enchidos",
+    PR: "Conservas",
+    VG: "Vegetais & Hortícolas",
+    FI: "Peixe",
+    GR: "Mercearia",
+    BR: "Bases (preparados)",
+    SA: "Molhos & Preparados internos",
+    WT: "Águas",
+    BE: "Cerveja (pressão)",
+    DR: "Sidra & Vinho (pressão)",
+    WI: "Vinhos",
+    SD: "Refrigerantes",
+    SP: "Licores & Spirits",
+    CF: "Café"
+  };
+
+  var allIngredientes = {};
+  var currentEditingSupplierNome = null;
+  var ingredienteOpenState = {};
+  var ingredienteSearchInput = document.getElementById('ingredienteSearch');
+  var ingredienteAccordion = document.getElementById('ingredienteAccordion');
+  var ingredientesSection = document.getElementById('ingredientesSection');
+
+  function renderIngredienteAccordion() {
+    if (!ingredienteAccordion) return;
+    var search = (ingredienteSearchInput.value || '').trim().toLowerCase();
+
+    ingredienteAccordion.querySelectorAll('.ingredient-accordion-item').forEach(function (det) {
+      ingredienteOpenState[det.getAttribute('data-cat')] = det.open;
+    });
+
+    var grupos = {};
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id];
+      var cat = ing.categoria || null;
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(Object.assign({ id: id }, ing));
+    });
+
+    var catKeys = Object.keys(grupos).filter(function (c) { return c !== 'null'; });
+    catKeys.sort(function (a, b) {
+      return (CATEGORIAS[a] || a).localeCompare(CATEGORIAS[b] || b);
+    });
+    if (grupos['null']) catKeys.push('null');
+
+    var html = '';
+    catKeys.forEach(function (catKey) {
+      var label = catKey === 'null' ? 'Sem categoria' : (CATEGORIAS[catKey] || catKey);
+      var items = grupos[catKey].slice().sort(function (a, b) {
+        return (a.nome || '').localeCompare(b.nome || '');
+      });
+      var hasAssociado = items.some(function (i) { return i.fornecedor === currentEditingSupplierNome; });
+      var isOpen = ingredienteOpenState.hasOwnProperty(catKey) ? ingredienteOpenState[catKey] : hasAssociado;
+
+      html += '<details class="ingredient-accordion-item" data-cat="' + escapeHtml(catKey) + '"' + (isOpen ? ' open' : '') + '>';
+      html += '<summary>' + escapeHtml(label) + '</summary>';
+      html += '<div class="ingredient-list">';
+      items.forEach(function (ing) {
+        var visible = !search || (ing.nome || '').toLowerCase().indexOf(search) !== -1;
+        var checked = ing.fornecedor === currentEditingSupplierNome;
+        html += '<label class="ingredient-row' + (visible ? '' : ' hidden-by-search') + '">';
+        html += '<input type="checkbox" class="ingredienteCheckbox" data-id="' + ing.id + '"' + (checked ? ' checked' : '') + '>';
+        html += '<span>' + escapeHtml(ing.nome) + '</span>';
+        html += '</label>';
+      });
+      html += '</div></details>';
+    });
+
+    ingredienteAccordion.innerHTML = html;
+
+    ingredienteAccordion.querySelectorAll('.ingredienteCheckbox').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = cb.getAttribute('data-id');
+        ingredientesRef.child(id).update({ fornecedor: cb.checked ? currentEditingSupplierNome : null });
+      });
+    });
+  }
+
+  if (ingredienteSearchInput) {
+    ingredienteSearchInput.addEventListener('input', function () {
+      ingredienteAccordion.querySelectorAll('.ingredient-row').forEach(function (row) {
+        var nome = row.querySelector('span').textContent.toLowerCase();
+        var search = ingredienteSearchInput.value.trim().toLowerCase();
+        row.classList.toggle('hidden-by-search', !!search && nome.indexOf(search) === -1);
+      });
+    });
+  }
+
+  ingredientesRef.on('value', function (snapshot) {
+    allIngredientes = snapshot.val() || {};
+    if (ingredientesSection && ingredientesSection.style.display !== 'none') {
+      renderIngredienteAccordion();
+    }
+  });
 
   var pessoasAtivas = [];
   var pessoasCarregadas = false;
@@ -1386,16 +1553,24 @@ window.addEventListener('load', function () {
       document.getElementById('fPlataformaEncomenda').value = supplier.plataformaEncomenda || "";
       document.getElementById('fNotas').value = supplier.notas || "";
       btnRemover.style.display = "inline-block";
+      currentEditingSupplierNome = supplier.nome || "";
+      ingredienteOpenState = {};
+      ingredientesSection.style.display = "flex";
+      ingredienteSearchInput.value = "";
+      renderIngredienteAccordion();
     } else {
       modalTitle.textContent = "Novo Fornecedor";
       document.getElementById('supplierId').value = "";
       btnRemover.style.display = "none";
+      currentEditingSupplierNome = null;
+      ingredientesSection.style.display = "none";
     }
     modalOverlay.classList.add('open');
   }
 
   function closeModal() {
     modalOverlay.classList.remove('open');
+    currentEditingSupplierNome = null;
   }
 
   btnNovo.addEventListener('click', function () {

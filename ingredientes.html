@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIOCO — Ingredientes</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono,button,.field-label{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    padding:32px 24px 16px;
+    border-bottom:3px solid var(--black);
+    background:var(--bg);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+
+  .header-inner{
+    max-width:1000px;
+    margin:0 auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+
+  .header-left{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--black);
+    text-decoration:none;
+    border:2px solid var(--black);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+
+  .brand .tag{
+    color:var(--red);
+    font-size:12px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  h1{
+    margin:0;
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  main{
+    max-width:1000px;
+    margin:0 auto;
+    padding:24px;
+  }
+
+  .summary{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+
+  .summary-tile{
+    border:2px solid var(--black);
+    background:var(--white);
+    padding:14px 18px;
+    min-width:160px;
+  }
+
+  .summary-tile .num{
+    font-family:'Space Mono', monospace;
+    font-size:26px;
+    font-weight:700;
+    line-height:1;
+  }
+
+  .summary-tile .lbl{
+    margin-top:6px;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .summary-tile.warn .num{
+    color:var(--red);
+  }
+
+  .controls{
+    margin-bottom:18px;
+  }
+
+  .search-input{
+    width:100%;
+    padding:12px 16px;
+    border:2px solid var(--black);
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--black);
+  }
+
+  .search-input:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .status-msg{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:14px;
+  }
+
+  .accordion{
+    border-top:2px solid var(--black);
+  }
+
+  .accordion-item{
+    border-bottom:1px solid var(--line);
+  }
+
+  .accordion-item.section-hidden{
+    display:none;
+  }
+
+  .accordion-item summary{
+    cursor:pointer;
+    padding:14px 4px;
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    list-style:none;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .accordion-item summary::-webkit-details-marker{
+    display:none;
+  }
+
+  .accordion-item summary::before{
+    content:"▸";
+    margin-right:10px;
+    color:var(--red);
+  }
+
+  .accordion-item[open] summary::before{
+    content:"▾";
+  }
+
+  .accordion-item .count{
+    font-weight:400;
+    color:var(--muted);
+  }
+
+  .ingredient-table{
+    padding:0 4px 16px 24px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .ingredient-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .ingredient-row.hidden-by-search{
+    display:none;
+  }
+
+  .ingredient-nome{
+    flex:1 1 220px;
+    font-size:14px;
+  }
+
+  .ingredient-row select{
+    flex:0 0 200px;
+    padding:8px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--black);
+  }
+
+  .ingredient-row select.no-fornecedor{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .ingredient-row .unidade-input{
+    flex:0 0 90px;
+    padding:8px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--black);
+  }
+
+  select:focus, .unidade-input:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+  }
+
+  @media (max-width: 600px){
+    .ingredient-row select, .ingredient-row .unidade-input{
+      flex:1 1 45%;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <a href="index.html" class="home-link">🏠 Home</a>
+      <div class="brand">
+        <span class="tag">GIOCO · Focaccia · Lisboa</span>
+        <h1>Ingredientes</h1>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="summary" id="summary"></div>
+
+  <div class="controls">
+    <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar ingrediente por nome...">
+  </div>
+
+  <div class="status-msg" id="statusMsg">A ligar à base de dados...</div>
+
+  <div class="accordion" id="accordion"></div>
+  <div class="empty-state" id="emptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var ingredientesRef = db.ref('ingredientes');
+  var suppliersRef = db.ref('suppliers');
+
+  var CATEGORIAS = {
+    CH: "Queijos & Laticínios",
+    MT: "Carnes & Enchidos",
+    PR: "Conservas",
+    VG: "Vegetais & Hortícolas",
+    FI: "Peixe",
+    GR: "Mercearia",
+    BR: "Bases (preparados)",
+    SA: "Molhos & Preparados internos",
+    WT: "Águas",
+    BE: "Cerveja (pressão)",
+    DR: "Sidra & Vinho (pressão)",
+    WI: "Vinhos",
+    SD: "Refrigerantes",
+    SP: "Licores & Spirits",
+    CF: "Café"
+  };
+
+  var allIngredientes = {};
+  var allSuppliers = {};
+  var currentSearch = "";
+  var openState = {};
+
+  var accordion = document.getElementById('accordion');
+  var emptyState = document.getElementById('emptyState');
+  var summary = document.getElementById('summary');
+  var statusMsg = document.getElementById('statusMsg');
+  var searchInput = document.getElementById('searchInput');
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderSummary() {
+    var ids = Object.keys(allIngredientes);
+    var total = ids.length;
+    var semFornecedor = ids.filter(function (id) { return !allIngredientes[id].fornecedor; }).length;
+
+    var html = '';
+    html += '<div class="summary-tile"><div class="num">' + total + '</div><div class="lbl">Total de ingredientes</div></div>';
+    html += '<div class="summary-tile' + (semFornecedor > 0 ? ' warn' : '') + '"><div class="num">' + semFornecedor + '</div><div class="lbl">Sem fornecedor atribuído</div></div>';
+    summary.innerHTML = html;
+  }
+
+  function fornecedorOptionsHtml(selecionado) {
+    var html = '<option value=""' + (!selecionado ? ' selected' : '') + '>— Sem fornecedor —</option>';
+    var nomes = Object.keys(allSuppliers).map(function (id) { return allSuppliers[id].nome; }).filter(Boolean);
+    nomes.sort(function (a, b) { return a.localeCompare(b); });
+    nomes.forEach(function (nome) {
+      html += '<option value="' + escapeHtml(nome) + '"' + (nome === selecionado ? ' selected' : '') + '>' + escapeHtml(nome) + '</option>';
+    });
+    return html;
+  }
+
+  function render() {
+    renderSummary();
+
+    accordion.querySelectorAll('.accordion-item').forEach(function (det) {
+      openState[det.getAttribute('data-cat')] = det.open;
+    });
+
+    var grupos = {};
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id];
+      var cat = ing.categoria || null;
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(Object.assign({ id: id }, ing));
+    });
+
+    if (Object.keys(grupos).length === 0) {
+      accordion.innerHTML = "";
+      emptyState.style.display = "block";
+      return;
+    }
+    emptyState.style.display = "none";
+
+    var catKeys = Object.keys(grupos).filter(function (c) { return c !== 'null'; });
+    catKeys.sort(function (a, b) {
+      return (CATEGORIAS[a] || a).localeCompare(CATEGORIAS[b] || b);
+    });
+    if (grupos['null']) catKeys.push('null');
+
+    var html = '';
+    catKeys.forEach(function (catKey) {
+      var label = catKey === 'null' ? 'Sem categoria' : (CATEGORIAS[catKey] || catKey);
+      var items = grupos[catKey].slice().sort(function (a, b) {
+        return (a.nome || '').localeCompare(b.nome || '');
+      });
+
+      var anyVisible = !currentSearch || items.some(function (i) { return (i.nome || '').toLowerCase().indexOf(currentSearch) !== -1; });
+      var isOpen = openState.hasOwnProperty(catKey) ? openState[catKey] : false;
+
+      html += '<details class="accordion-item' + (anyVisible ? '' : ' section-hidden') + '" data-cat="' + escapeHtml(catKey) + '"' + (isOpen ? ' open' : '') + '>';
+      html += '<summary>' + escapeHtml(label) + ' <span class="count">(' + items.length + ')</span></summary>';
+      html += '<div class="ingredient-table">';
+      items.forEach(function (ing) {
+        var visible = !currentSearch || (ing.nome || '').toLowerCase().indexOf(currentSearch) !== -1;
+        html += '<div class="ingredient-row' + (visible ? '' : ' hidden-by-search') + '" data-id="' + ing.id + '">';
+        html += '<div class="ingredient-nome">' + escapeHtml(ing.nome) + '</div>';
+        html += '<select class="fornecedorSelect' + (!ing.fornecedor ? ' no-fornecedor' : '') + '" data-id="' + ing.id + '">' + fornecedorOptionsHtml(ing.fornecedor) + '</select>';
+        html += '<input type="text" class="unidade-input" data-id="' + ing.id + '" placeholder="unidade" value="' + escapeHtml(ing.unidade || '') + '">';
+        html += '</div>';
+      });
+      html += '</div></details>';
+    });
+
+    accordion.innerHTML = html;
+
+    accordion.querySelectorAll('.fornecedorSelect').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var id = sel.getAttribute('data-id');
+        var novoFornecedor = sel.value || null;
+        ingredientesRef.child(id).update({ fornecedor: novoFornecedor });
+      });
+    });
+
+    accordion.querySelectorAll('.unidade-input').forEach(function (inp) {
+      inp.addEventListener('blur', function () {
+        var id = inp.getAttribute('data-id');
+        ingredientesRef.child(id).update({ unidade: inp.value.trim() || null });
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', function () {
+    currentSearch = searchInput.value.trim().toLowerCase();
+    render();
+  });
+
+  suppliersRef.on('value', function (snapshot) {
+    allSuppliers = snapshot.val() || {};
+    render();
+  });
+
+  ingredientesRef.on('value', function (snapshot) {
+    allIngredientes = snapshot.val() || {};
+    statusMsg.textContent = "";
+    render();
+  }, function (error) {
+    statusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
+  });
+
+});
+</script>
+
+</body>
+</html>
