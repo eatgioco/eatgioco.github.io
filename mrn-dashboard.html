@@ -766,6 +766,230 @@
   .link-view-loja:hover{
     color:var(--red);
   }
+
+  /* ---------- Notificações ---------- */
+  .notif-wrap{
+    position:relative;
+    margin-left:auto;
+  }
+
+  .notif-bell{
+    position:relative;
+    background:none;
+    border:2px solid var(--white);
+    color:var(--white);
+    font-size:16px;
+    line-height:1;
+    padding:6px 10px;
+    cursor:pointer;
+  }
+
+  .notif-bell:hover{
+    background:var(--white);
+  }
+
+  .notif-badge{
+    position:absolute;
+    top:-8px;
+    right:-8px;
+    min-width:19px;
+    height:19px;
+    padding:0 5px;
+    border-radius:10px;
+    background:var(--red);
+    border:2px solid var(--white);
+    color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .notif-panel{
+    display:none;
+    position:absolute;
+    top:calc(100% + 10px);
+    right:0;
+    width:330px;
+    max-width:calc(100vw - 32px);
+    background:var(--white);
+    border:2px solid var(--black);
+    color:var(--black);
+    z-index:200;
+    box-shadow:4px 4px 0 rgba(20,20,20,0.15);
+  }
+
+  .notif-panel.open{
+    display:block;
+  }
+
+  .notif-panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:12px 14px;
+    border-bottom:2px solid var(--black);
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .notif-clear{
+    background:none;
+    border:none;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+  }
+
+  .notif-clear:hover{
+    color:var(--red);
+  }
+
+  .notif-list{
+    max-height:360px;
+    overflow-y:auto;
+  }
+
+  .notif-item{
+    display:flex;
+    gap:10px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    text-align:left;
+    width:100%;
+    background:none;
+    border-left:none;
+    border-right:none;
+    border-top:none;
+    font-family:'Inter', sans-serif;
+  }
+
+  .notif-item:hover{
+    background:var(--bg);
+  }
+
+  .notif-item:last-child{
+    border-bottom:none;
+  }
+
+  .notif-icon{
+    font-size:16px;
+    line-height:1.2;
+    flex-shrink:0;
+  }
+
+  .notif-body{
+    flex:1;
+    min-width:0;
+  }
+
+  .notif-titulo{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .notif-desc{
+    display:block;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+    word-break:break-word;
+  }
+
+  .notif-tempo{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+
+  .notif-empty{
+    padding:22px 14px;
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Armazenamento ---------- */
+  .card-storage{
+    cursor:default;
+    margin-top:20px;
+    border-color:var(--line);
+  }
+
+  .card-storage:hover{
+    transform:none;
+    box-shadow:none;
+  }
+
+  .storage-row{
+    margin-top:14px;
+  }
+
+  .storage-row-top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+    font-size:12px;
+  }
+
+  .storage-label{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .storage-value{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .storage-bar{
+    margin-top:6px;
+    height:8px;
+    background:var(--line);
+    overflow:hidden;
+  }
+
+  .storage-bar-fill{
+    height:100%;
+    width:0;
+    background:var(--green);
+    transition:width .3s ease;
+  }
+
+  .storage-bar-fill.warn{ background:var(--amber); }
+  .storage-bar-fill.danger{ background:var(--red); }
+
+  .storage-note{
+    margin:14px 0 0;
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+    line-height:1.5;
+  }
+
+  .storage-inactive{
+    font-size:11px;
+    color:var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -774,6 +998,21 @@
   <div class="header-inner">
     <a href="index.html" class="home-link">🏠 Home</a>
     <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+
+    <div class="notif-wrap">
+      <button type="button" class="notif-bell" id="notifBell" aria-label="Notificações">
+        🔔
+        <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+      </button>
+
+      <div class="notif-panel" id="notifPanel">
+        <div class="notif-panel-header">
+          <span>Notificações</span>
+          <button type="button" class="notif-clear" id="notifClearAll">Limpar todas</button>
+        </div>
+        <div class="notif-list" id="notifList"></div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -897,6 +1136,29 @@
 
     <a href="loja-sao-bento.html" class="link-view-loja">→ Ver na página da loja</a>
   </div>
+
+  <div class="card card-storage" id="cardStorage">
+    <div class="card-icon">💾</div>
+    <h3 class="card-title">Armazenamento</h3>
+
+    <div class="storage-row">
+      <div class="storage-row-top">
+        <span class="storage-label">Realtime Database</span>
+        <span class="storage-value" id="storageRtdbValue">a calcular…</span>
+      </div>
+      <div class="storage-bar"><div class="storage-bar-fill" id="storageRtdbBar"></div></div>
+    </div>
+
+    <div class="storage-row">
+      <div class="storage-row-top">
+        <span class="storage-label">Storage (fotos)</span>
+        <span class="storage-value" id="storageFilesValue">—</span>
+      </div>
+      <div class="storage-bar"><div class="storage-bar-fill" id="storageFilesBar"></div></div>
+    </div>
+
+    <p class="storage-note" id="storageNote">Valores aproximados, estimados a partir da contagem e tamanho médio dos registos — não são a leitura exata da consola Firebase.</p>
+  </div>
 </main>
 
 <!-- Modal Novo Pagamento -->
@@ -967,6 +1229,12 @@ window.addEventListener('load', function () {
   var currentTab = 'pendente';
   var currentOrigemFilter = 'todos';
   var allPaymentRequests = {};
+
+  // Flags de carregamento partilhadas com a central de notificações,
+  // declaradas aqui para não serem repostas por declarações posteriores.
+  var pagamentosCarregados = false;
+  var pedidosCarregados = false;
+  var notificacoesCarregadas = false;
 
   var novoPagamentoModalOverlay = document.getElementById('novoPagamentoModalOverlay');
   var novoPagamentoModalClose = document.getElementById('novoPagamentoModalClose');
@@ -1050,6 +1318,8 @@ window.addEventListener('load', function () {
       html += '</div>';
       html += '</div>';
     });
+
+    html += '<div class="payment-line-sub" style="margin-top:6px;"><span>Criado por: ' + escapeHtml(p.criadoPor || '—') + '</span></div>';
 
     var actionButtons = '';
     if (isFornecedor) {
@@ -1247,7 +1517,9 @@ window.addEventListener('load', function () {
   paymentRequestsRef.on('value', function (snapshot) {
     allPaymentRequests = snapshot.val() || {};
     loadingEl.style.display = 'none';
+    pagamentosCarregados = true;
     render();
+    gerarNotificacoes();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
   });
@@ -1464,10 +1736,287 @@ window.addEventListener('load', function () {
   pedidosRef.on('value', function(snapshot){
     allPedidos = snapshot.val() || {};
     pedidosLoadingEl.style.display = 'none';
+    pedidosCarregados = true;
     renderPedidosDash();
+    gerarNotificacoes();
   }, function(error){
     pedidosLoadingEl.textContent = 'Erro de ligação à base de dados.';
   });
+
+  /* ---------- Central de Notificações ---------- */
+  var notificacoesRef = db.ref('notificacoes');
+  var allNotificacoes = {};
+
+  // Só gera notificações para registos recentes, para uma primeira execução
+  // não inundar o sino com todo o histórico já existente.
+  var JANELA_NOTIFICACAO_MS = 30 * 24 * 60 * 60 * 1000;
+
+  var notifBell = document.getElementById('notifBell');
+  var notifPanel = document.getElementById('notifPanel');
+  var notifBadge = document.getElementById('notifBadge');
+  var notifList = document.getElementById('notifList');
+
+  var NOTIF_ICONES = {
+    pagamento: '💰',
+    pedidoLoja: '📝',
+    outro: '🔔'
+  };
+
+  var NOTIF_ALVOS = {
+    pagamentos: 'cardPagamentos',
+    pedidosLoja: 'cardPedidos'
+  };
+
+  function ddmmyyyyToDate(str){
+    if (!str) return null;
+    var parts = String(str).split('/');
+    if (parts.length !== 3) return null;
+    var d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function tempoRelativo(ms){
+    var diff = Date.now() - ms;
+    if (diff < 0) diff = 0;
+    var min = Math.floor(diff / 60000);
+    if (min < 1) return 'agora mesmo';
+    if (min < 60) return 'há ' + min + 'min';
+    var horas = Math.floor(min / 60);
+    if (horas < 24) return 'há ' + horas + 'h';
+    var dias = Math.floor(horas / 24);
+    if (dias === 1) return 'ontem';
+    if (dias < 30) return 'há ' + dias + ' dias';
+    var meses = Math.floor(dias / 30);
+    return meses === 1 ? 'há 1 mês' : 'há ' + meses + ' meses';
+  }
+
+  function gerarNotificacoes(){
+    if (!notificacoesCarregadas) return;
+    var updates = {};
+    var agora = Date.now();
+
+    if (pagamentosCarregados){
+      Object.keys(allPaymentRequests).forEach(function(id){
+        var p = allPaymentRequests[id];
+        if ((p.origem || 'fornecedor') !== 'fornecedor') return;
+        var chave = 'pagamento_' + id;
+        if (allNotificacoes[chave]) return;
+
+        var d = ddmmyyyyToDate(p.date);
+        var criadoEm = d ? d.getTime() : agora;
+        if (agora - criadoEm > JANELA_NOTIFICACAO_MS) return;
+
+        var primeira = (p.lines || [])[0] || {};
+        var descricao = (primeira.fornecedor || 'Sem descrição') + ' — ' + (primeira.montante || '0') + '€';
+
+        updates[chave] = {
+          tipo: 'pagamento',
+          titulo: 'Novo pedido de pagamento',
+          descricao: descricao,
+          link: 'pagamentos',
+          criadoEm: criadoEm,
+          lida: false
+        };
+      });
+    }
+
+    if (pedidosCarregados){
+      Object.keys(allPedidos).forEach(function(id){
+        var pedido = allPedidos[id];
+        if ((pedido.estado || 'novo') !== 'novo') return;
+        var chave = 'pedidoLoja_' + id;
+        if (allNotificacoes[chave]) return;
+
+        var criadoEm = pedido.dataHora ? new Date(pedido.dataHora).getTime() : agora;
+        if (isNaN(criadoEm)) criadoEm = agora;
+        if (agora - criadoEm > JANELA_NOTIFICACAO_MS) return;
+
+        updates[chave] = {
+          tipo: 'pedidoLoja',
+          titulo: 'Novo pedido da loja',
+          descricao: truncateText(pedido.descricao || '', 70),
+          link: 'pedidosLoja',
+          criadoEm: criadoEm,
+          lida: false
+        };
+      });
+    }
+
+    if (Object.keys(updates).length > 0){
+      notificacoesRef.update(updates);
+    }
+  }
+
+  function notificacoesNaoLidas(){
+    return Object.keys(allNotificacoes)
+      .map(function(id){ return Object.assign({ id: id }, allNotificacoes[id]); })
+      .filter(function(n){ return !n.lida; })
+      .sort(function(a, b){ return (b.criadoEm || 0) - (a.criadoEm || 0); });
+  }
+
+  function marcarLidasPorTipo(tipo){
+    var updates = {};
+    Object.keys(allNotificacoes).forEach(function(id){
+      var n = allNotificacoes[id];
+      if (!n.lida && n.tipo === tipo) updates[id + '/lida'] = true;
+    });
+    if (Object.keys(updates).length > 0) notificacoesRef.update(updates);
+  }
+
+  function renderNotificacoes(){
+    var naoLidas = notificacoesNaoLidas();
+
+    if (naoLidas.length > 0){
+      notifBadge.textContent = naoLidas.length > 99 ? '99+' : naoLidas.length;
+      notifBadge.style.display = 'flex';
+    } else {
+      notifBadge.style.display = 'none';
+    }
+
+    if (naoLidas.length === 0){
+      notifList.innerHTML = '<p class="notif-empty">Sem notificações novas ✓</p>';
+      return;
+    }
+
+    notifList.innerHTML = naoLidas.map(function(n){
+      var icone = NOTIF_ICONES[n.tipo] || NOTIF_ICONES.outro;
+      return '<button type="button" class="notif-item" data-link="' + escapeHtml(n.link || '') + '" data-tipo="' + escapeHtml(n.tipo || '') + '">' +
+        '<span class="notif-icon">' + icone + '</span>' +
+        '<span class="notif-body">' +
+        '<span class="notif-titulo">' + escapeHtml(n.titulo || '') + '</span>' +
+        '<span class="notif-desc">' + escapeHtml(n.descricao || '') + '</span>' +
+        '<span class="notif-tempo">' + tempoRelativo(n.criadoEm || Date.now()) + '</span>' +
+        '</span>' +
+        '</button>';
+    }).join('');
+
+    notifList.querySelectorAll('.notif-item').forEach(function(item){
+      item.addEventListener('click', function(){
+        var link = item.getAttribute('data-link');
+        var tipo = item.getAttribute('data-tipo');
+        var alvoId = NOTIF_ALVOS[link];
+        notifPanel.classList.remove('open');
+        if (alvoId){
+          var alvo = document.getElementById(alvoId);
+          if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        marcarLidasPorTipo(tipo);
+      });
+    });
+  }
+
+  notifBell.addEventListener('click', function(e){
+    e.stopPropagation();
+    notifPanel.classList.toggle('open');
+  });
+
+  notifPanel.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  document.addEventListener('click', function(){
+    notifPanel.classList.remove('open');
+  });
+
+  document.getElementById('notifClearAll').addEventListener('click', function(){
+    var updates = {};
+    Object.keys(allNotificacoes).forEach(function(id){
+      if (!allNotificacoes[id].lida) updates[id + '/lida'] = true;
+    });
+    if (Object.keys(updates).length > 0) notificacoesRef.update(updates);
+    notifPanel.classList.remove('open');
+  });
+
+  // Marcar como lidas ao interagir com a secção correspondente
+  document.getElementById('cardPagamentos').addEventListener('click', function(){
+    marcarLidasPorTipo('pagamento');
+  });
+
+  document.getElementById('cardPedidos').addEventListener('click', function(){
+    marcarLidasPorTipo('pedidoLoja');
+  });
+
+  notificacoesRef.on('value', function(snapshot){
+    allNotificacoes = snapshot.val() || {};
+    notificacoesCarregadas = true;
+    renderNotificacoes();
+    gerarNotificacoes();
+  });
+
+  /* ---------- Indicador de armazenamento ---------- */
+  var DB_URL = firebaseConfig.databaseURL;
+  var LIMITE_RTDB = 1024 * 1024 * 1024;   // 1 GB (plano gratuito)
+  var LIMITE_STORAGE = 5 * 1024 * 1024 * 1024; // 5 GB (plano gratuito)
+
+  // Tamanhos médios por registo (bytes), aferidos a partir dos dados reais.
+  var TAMANHO_MEDIO = {
+    suppliers: 400,
+    paymentRequests: 500,
+    caixaMovimentos: 200,
+    lojaChecklistRegistos: 700,
+    lojaTemperaturas: 220,
+    lojaTemperaturasFotos: 8000,
+    lojaPedidos: 300,
+    pessoas: 160,
+    turnos: 150,
+    notificacoes: 200,
+    tasks: 120
+  };
+
+  function formatBytes(n){
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  }
+
+  function aplicarBarra(barEl, pct){
+    barEl.classList.remove('warn', 'danger');
+    if (pct >= 80) barEl.classList.add('danger');
+    else if (pct >= 50) barEl.classList.add('warn');
+    barEl.style.width = Math.min(100, Math.max(pct, pct > 0 ? 1 : 0)) + '%';
+  }
+
+  function formatPct(pct){
+    if (pct > 0 && pct < 0.1) return '<0,1%';
+    return pct.toFixed(1).replace('.', ',') + '%';
+  }
+
+  function calcularArmazenamento(){
+    var refs = Object.keys(TAMANHO_MEDIO);
+
+    // shallow=true devolve apenas as chaves — conta os registos sem
+    // descarregar os dados (nomeadamente as fotos em base64).
+    var pedidos = refs.map(function(ref){
+      return fetch(DB_URL + '/' + ref + '.json?shallow=true')
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(val){
+          var n = val && typeof val === 'object' ? Object.keys(val).length : 0;
+          return { ref: ref, count: n, bytes: n * TAMANHO_MEDIO[ref] };
+        })
+        .catch(function(){ return { ref: ref, count: 0, bytes: 0 }; });
+    });
+
+    Promise.all(pedidos).then(function(resultados){
+      var totalRtdb = resultados.reduce(function(acc, r){ return acc + r.bytes; }, 0);
+      var fotos = resultados.filter(function(r){ return r.ref === 'lojaTemperaturasFotos'; })[0];
+      var numFotos = fotos ? fotos.count : 0;
+
+      var pctRtdb = (totalRtdb / LIMITE_RTDB) * 100;
+      document.getElementById('storageRtdbValue').textContent =
+        formatBytes(totalRtdb) + ' / 1 GB · ' + formatPct(pctRtdb);
+      aplicarBarra(document.getElementById('storageRtdbBar'), pctRtdb);
+
+      // O Firebase Storage ainda não está ativado (requer plano Blaze),
+      // por isso as fotos vivem no Realtime Database e contam acima.
+      document.getElementById('storageFilesValue').textContent = 'não configurado';
+      document.getElementById('storageFilesBar').style.width = '0';
+      document.getElementById('storageNote').innerHTML =
+        'Valores aproximados, estimados a partir da contagem de registos × tamanho médio — não são a leitura exata da consola Firebase.<br>' +
+        '<span class="storage-inactive">Firebase Storage ainda não ativado (requer plano Blaze): as ' + numFotos +
+        ' foto(s) de temperatura estão no Realtime Database e já contam na barra acima.</span>';
+    });
+  }
+
+  calcularArmazenamento();
 
 });
 </script>

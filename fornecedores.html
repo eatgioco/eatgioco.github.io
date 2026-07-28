@@ -913,6 +913,15 @@
     <div id="paymentLines"></div>
     <button type="button" class="btn" id="btnAddPaymentLine">+ Adicionar linha</button>
 
+    <div class="field" style="margin-top:18px;">
+      <label class="field-label" for="paymentCriadoPor">Criado por</label>
+      <select id="paymentCriadoPor" disabled>
+        <option>A carregar...</option>
+      </select>
+    </div>
+
+    <p id="paymentEnviadoAviso" style="display:none; margin:16px 0 0; padding:12px 14px; border:2px solid var(--green, #1E7A46); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
+
     <div class="modal-actions">
       <button type="button" class="btn" id="paymentModalCancel">Cancelar</button>
       <div class="modal-actions-right">
@@ -933,6 +942,49 @@ window.addEventListener('load', function () {
   var db = firebase.database();
   var suppliersRef = db.ref('suppliers');
   var paymentRequestsRef = db.ref('paymentRequests');
+  var pessoasRef = db.ref('pessoas');
+
+  var pessoasAtivas = [];
+  var pessoasCarregadas = false;
+
+  function carregarPessoas(onUpdate){
+    pessoasRef.on('value', function (snapshot) {
+      var val = snapshot.val() || {};
+      pessoasAtivas = Object.keys(val)
+        .map(function (id) { return Object.assign({ id: id }, val[id]); })
+        .filter(function (p) { return p.ativo !== false; })
+        .sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+      pessoasCarregadas = true;
+      onUpdate();
+    });
+  }
+
+  function popularSelectPessoas(selectEl){
+    if (!selectEl) return;
+    var previous = selectEl.value;
+    if (!pessoasCarregadas){
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    selectEl.disabled = false;
+    var html = '';
+    pessoasAtivas.forEach(function (p) {
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro">Outro</option>';
+    selectEl.innerHTML = html;
+    if (previous) selectEl.value = previous;
+  }
+
+  function resolvePessoaSelecao(selectEl){
+    var val = selectEl ? selectEl.value : null;
+    var found = pessoasAtivas.filter(function (p) { return p.id === val; })[0];
+    return {
+      criadoPorId: found ? found.id : null,
+      criadoPor: found ? found.nome : 'Outro'
+    };
+  }
 
   var seedData = {
     s01: {
@@ -1678,10 +1730,21 @@ window.addEventListener('load', function () {
     return lines;
   }
 
+  function resetAvisoEnvio() {
+    var aviso = document.getElementById('paymentEnviadoAviso');
+    aviso.style.display = 'none';
+    aviso.textContent = '';
+    btnEnviarPagamento.style.display = '';
+    btnAddPaymentLine.style.display = '';
+    paymentModalCancel.textContent = 'Cancelar';
+  }
+
   function openPaymentModal() {
     editingTicketId = null;
     document.getElementById('paymentModalTitle').textContent = 'Pedido de Pagamento';
     btnEnviarPagamento.textContent = 'Enviar';
+    resetAvisoEnvio();
+    document.getElementById('paymentCriadoPor').parentElement.style.display = '';
     resetPaymentLines();
     paymentModalOverlay.classList.add('open');
   }
@@ -1690,6 +1753,8 @@ window.addEventListener('load', function () {
     editingTicketId = p.id;
     document.getElementById('paymentModalTitle').textContent = 'Editar Pagamento';
     btnEnviarPagamento.textContent = 'Guardar Alterações';
+    resetAvisoEnvio();
+    document.getElementById('paymentCriadoPor').parentElement.style.display = 'none';
 
     paymentLines.innerHTML = "";
     var lines = p.lines && p.lines.length ? p.lines : [{}];
@@ -1755,6 +1820,7 @@ window.addEventListener('load', function () {
   function sendNewPaymentRequest(lines) {
     var dateStr = formatDateDDMMYYYY(new Date());
     var numeroReferencia = nextNumeroReferencia(new Date());
+    var autor = resolvePessoaSelecao(document.getElementById('paymentCriadoPor'));
     var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
 
     var bodyLines = [];
@@ -1764,16 +1830,35 @@ window.addEventListener('load', function () {
     bodyLines.push("");
     bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
     bodyLines.push("");
+    bodyLines.push("Pedido criado por: " + autor.criadoPor);
+    bodyLines.push("");
     bodyLines.push("Obrigado,");
     bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
     var body = bodyLines.join("\n");
 
-    paymentRequestsRef.push({ date: dateStr, status: "pendente", origem: "fornecedor", numeroReferencia: numeroReferencia, lines: lines });
+    paymentRequestsRef.push({
+      date: dateStr,
+      status: "pendente",
+      origem: "fornecedor",
+      numeroReferencia: numeroReferencia,
+      criadoPor: autor.criadoPor,
+      criadoPorId: autor.criadoPorId,
+      lines: lines
+    });
 
     var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
     window.location.href = mailto;
 
-    closePaymentModal();
+    mostrarAvisoEnvio();
+  }
+
+  function mostrarAvisoEnvio() {
+    var aviso = document.getElementById('paymentEnviadoAviso');
+    aviso.textContent = '✅ Pedido criado. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado — ou avisa o Manel diretamente.';
+    aviso.style.display = 'block';
+    if (btnEnviarPagamento) btnEnviarPagamento.style.display = 'none';
+    if (btnAddPaymentLine) btnAddPaymentLine.style.display = 'none';
+    if (paymentModalCancel) paymentModalCancel.textContent = 'Fechar';
   }
 
   function saveEditedPayment(id, lines) {
@@ -1840,6 +1925,8 @@ window.addEventListener('load', function () {
     html += '</div>';
     html += '<span class="' + badgeClass + '">' + badgeText + '</span>';
     html += '</div>';
+
+    html += '<div class="card-row" style="font-size:12px; color:var(--muted); margin-bottom:6px;">Criado por: ' + escapeHtml(p.criadoPor || '—') + '</div>';
 
     var showCopyButtons = status === 'pendente';
 
@@ -2082,6 +2169,10 @@ window.addEventListener('load', function () {
 
     allPaymentRequests = val;
     renderPayments();
+  });
+
+  carregarPessoas(function () {
+    popularSelectPessoas(document.getElementById('paymentCriadoPor'));
   });
 
 });
