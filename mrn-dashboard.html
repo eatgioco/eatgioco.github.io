@@ -855,6 +855,43 @@
     color:var(--red);
   }
 
+  .notif-filters{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    padding:10px 14px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .notif-filter-chip{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    padding:5px 9px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+  }
+
+  .notif-filter-chip.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .notif-modulo{
+    display:inline-block;
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    color:var(--red);
+    margin-top:3px;
+  }
+
   .notif-list{
     max-height:360px;
     overflow-y:auto;
@@ -1009,6 +1046,13 @@
         <div class="notif-panel-header">
           <span>Notificações</span>
           <button type="button" class="notif-clear" id="notifClearAll">Limpar todas</button>
+        </div>
+        <div class="notif-filters" id="notifFilters">
+          <button type="button" class="notif-filter-chip active" data-filtro="todas">Todas</button>
+          <button type="button" class="notif-filter-chip" data-filtro="pagamentos">Pagamentos</button>
+          <button type="button" class="notif-filter-chip" data-filtro="loja">Loja</button>
+          <button type="button" class="notif-filter-chip" data-filtro="caixa">Caixa</button>
+          <button type="button" class="notif-filter-chip" data-filtro="equipa">Equipa</button>
         </div>
         <div class="notif-list" id="notifList"></div>
       </div>
@@ -1519,7 +1563,7 @@ window.addEventListener('load', function () {
     loadingEl.style.display = 'none';
     pagamentosCarregados = true;
     render();
-    gerarNotificacoes();
+    agendarNotificacoes();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
   });
@@ -1738,7 +1782,7 @@ window.addEventListener('load', function () {
     pedidosLoadingEl.style.display = 'none';
     pedidosCarregados = true;
     renderPedidosDash();
-    gerarNotificacoes();
+    agendarNotificacoes();
   }, function(error){
     pedidosLoadingEl.textContent = 'Erro de ligação à base de dados.';
   });
@@ -1748,18 +1792,76 @@ window.addEventListener('load', function () {
   var allNotificacoes = {};
 
   // Só gera notificações para registos recentes, para uma primeira execução
-  // não inundar o sino com todo o histórico já existente.
+  // não inundar o sino com todo o histórico já existente. Não se aplica a
+  // 'turno'/'pessoa', cujos registos de origem não guardam data de criação.
   var JANELA_NOTIFICACAO_MS = 30 * 24 * 60 * 60 * 1000;
 
   var notifBell = document.getElementById('notifBell');
   var notifPanel = document.getElementById('notifPanel');
   var notifBadge = document.getElementById('notifBadge');
   var notifList = document.getElementById('notifList');
+  var notifFiltersEl = document.getElementById('notifFilters');
+  var notifFiltroAtual = 'todas';
 
-  var NOTIF_ICONES = {
-    pagamento: '💰',
-    pedidoLoja: '📝',
-    outro: '🔔'
+  // Refs extra, carregadas só para alimentar notificações (sem UI própria
+  // no dashboard, que já vive em caixa.html / loja-sao-bento.html / equipa.html).
+  var caixaRef = db.ref('caixaMovimentos');
+  var tempsRef = db.ref('lojaTemperaturas');
+  var checklistsRef = db.ref('lojaChecklistRegistos');
+  var turnosRef = db.ref('turnos');
+  var pessoasNotifRef = db.ref('pessoas');
+
+  var allCaixaMovs = {};
+  var allTemps = {};
+  var allChecklists = {};
+  var allTurnos = {};
+  var allPessoasNotif = {};
+
+  var caixaCarregada = false;
+  var tempsCarregadas = false;
+  var checklistsCarregados = false;
+  var turnosCarregados = false;
+  var pessoasNotifCarregadas = false;
+
+  var EQUIP_TIPO = {
+    edenox: 'refrigeracao',
+    amitek941: 'refrigeracao',
+    amitek943t: 'refrigeracao',
+    mll40: 'congelacao',
+    mll50: 'congelacao',
+    placafria: 'refrigeracao',
+    gelo: 'outro'
+  };
+
+  var EQUIP_NOME = {
+    edenox: 'Bancada Fria EDENOX MPS-250HC',
+    amitek941: 'Bancada Fria AMITEK AK941',
+    amitek943t: 'Bancada Fria AMITEK AK943T',
+    mll40: 'MLL ECO 40',
+    mll50: 'MLL ECO 50',
+    placafria: 'Placa Fria Drop-in 3GN',
+    gelo: 'Máquina de Gelo EURFRIGOR ECP25'
+  };
+
+  function isTemperaturaForaIntervalo(equipId, temp){
+    var tipo = EQUIP_TIPO[equipId];
+    if (tipo === 'refrigeracao') return temp > 5;
+    if (tipo === 'congelacao') return temp > -18;
+    return false;
+  }
+
+  // tipo -> ícone, categoria (para o filtro), etiqueta do módulo, e alvo do clique.
+  // Alvo pode ser um id de secção nesta própria página (scroll) ou uma outra
+  // página do site (navegação).
+  var NOTIF_META = {
+    pagamento:                { icone: '💰', categoria: 'pagamentos', modulo: 'Pagamentos',        link: 'pagamentos' },
+    pedidoLoja:                { icone: '📝', categoria: 'loja',       modulo: 'Loja · Pedido',      link: 'pedidosLoja' },
+    caixaMovimento:            { icone: '💶', categoria: 'caixa',      modulo: 'Caixa',              link: 'caixa.html' },
+    temperaturaForaIntervalo:  { icone: '🌡️', categoria: 'loja',       modulo: 'Loja · Temperatura', link: 'loja-sao-bento.html' },
+    checklistConcluida:        { icone: '✅', categoria: 'loja',       modulo: 'Loja · Checklist',   link: 'loja-sao-bento.html' },
+    turno:                     { icone: '🗓️', categoria: 'equipa',     modulo: 'Equipa · Turno',     link: 'equipa.html' },
+    pessoa:                    { icone: '👤', categoria: 'equipa',     modulo: 'Equipa · Pessoa',    link: 'equipa.html' },
+    outro:                     { icone: '🔔', categoria: 'todas',      modulo: '',                   link: null }
   };
 
   var NOTIF_ALVOS = {
@@ -1790,6 +1892,43 @@ window.addEventListener('load', function () {
     return meses === 1 ? 'há 1 mês' : 'há ' + meses + ' meses';
   }
 
+  function snapshotTurno(t){
+    return [t.pessoaNome, t.data, t.inicio, t.fim, t.notas || ''].join('|');
+  }
+
+  // Grava cada chave com o seu próprio .set(), escalonado no tempo, em vez
+  // de um único update() com várias chaves. Um update() multi-chave contra
+  // esta ref revelou-se instável no SDK do Firebase — a promise ficava
+  // pendurada para sempre (nem resolve nem rejeita) ao reequilibrar a
+  // árvore interna com várias inserções/remoções simultâneas. A escrita
+  // chegava a completar-se no servidor mesmo assim, mas encadear o próximo
+  // passo no .then() dessa promise (que nunca resolvia) travava toda a
+  // sequência a partir da segunda chave. Por isso cada escrita é agendada
+  // de forma independente, sem depender da promise anterior resolver.
+  function escreverEmLotes(ref, updates){
+    Object.keys(updates).forEach(function(k, idx){
+      setTimeout(function(){
+        ref.child(k).set(updates[k]).catch(function(err){
+          console.error('Erro ao gravar notificação (' + k + '): ' + err.message);
+        });
+      }, idx * 120);
+    });
+  }
+
+  // Várias refs carregam quase ao mesmo tempo no arranque da página; sem
+  // agrupar, cada uma dispararia a sua própria escrita em 'notificacoes' em
+  // rajada, o que se revelou instável no SDK do Firebase. Uma única
+  // passagem, adiada até tudo assentar, resolve isso.
+  var notifRegenTimer = null;
+  function agendarNotificacoes(){
+    if (notifRegenTimer) return;
+    notifRegenTimer = setTimeout(function(){
+      notifRegenTimer = null;
+      gerarNotificacoes();
+      limparNotificacoesOrfas();
+    }, 400);
+  }
+
   function gerarNotificacoes(){
     if (!notificacoesCarregadas) return;
     var updates = {};
@@ -1799,6 +1938,7 @@ window.addEventListener('load', function () {
       Object.keys(allPaymentRequests).forEach(function(id){
         var p = allPaymentRequests[id];
         if ((p.origem || 'fornecedor') !== 'fornecedor') return;
+        if ((p.status || 'pendente') !== 'pendente') return;
         var chave = 'pagamento_' + id;
         if (allNotificacoes[chave]) return;
 
@@ -1814,6 +1954,7 @@ window.addEventListener('load', function () {
           titulo: 'Novo pedido de pagamento',
           descricao: descricao,
           link: 'pagamentos',
+          origemId: id,
           criadoEm: criadoEm,
           lida: false
         };
@@ -1836,15 +1977,157 @@ window.addEventListener('load', function () {
           titulo: 'Novo pedido da loja',
           descricao: truncateText(pedido.descricao || '', 70),
           link: 'pedidosLoja',
+          origemId: id,
           criadoEm: criadoEm,
           lida: false
         };
       });
     }
 
-    if (Object.keys(updates).length > 0){
-      notificacoesRef.update(updates);
+    if (caixaCarregada){
+      Object.keys(allCaixaMovs).forEach(function(id){
+        var m = allCaixaMovs[id];
+        var chave = 'caixaMovimento_' + id;
+        if (allNotificacoes[chave]) return;
+
+        var criadoEm = m.dataHora ? new Date(m.dataHora).getTime() : agora;
+        if (isNaN(criadoEm)) criadoEm = agora;
+        if (agora - criadoEm > JANELA_NOTIFICACAO_MS) return;
+
+        var sinal = m.tipo === 'entrada' ? '+' : '−';
+        var valorFmt = sinal + (Math.round((m.valor || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+        var porAcertar = m.estado === 'aberto';
+
+        updates[chave] = {
+          tipo: 'caixaMovimento',
+          titulo: porAcertar ? 'Novo movimento de caixa (por acertar)' : 'Novo movimento de caixa',
+          descricao: valorFmt + ' — ' + truncateText(m.motivo || '', 50),
+          link: 'caixa.html',
+          origemId: id,
+          criadoEm: criadoEm,
+          lida: false
+        };
+      });
     }
+
+    if (tempsCarregadas){
+      Object.keys(allTemps).forEach(function(id){
+        var t = allTemps[id];
+        if (!isTemperaturaForaIntervalo(t.equipamento, t.temperatura)) return;
+        var chave = 'temperaturaForaIntervalo_' + id;
+        if (allNotificacoes[chave]) return;
+
+        var criadoEm = t.dataHora ? new Date(t.dataHora).getTime() : agora;
+        if (isNaN(criadoEm)) criadoEm = agora;
+        if (agora - criadoEm > JANELA_NOTIFICACAO_MS) return;
+
+        var nomeEquip = EQUIP_NOME[t.equipamento] || t.equipamento;
+
+        updates[chave] = {
+          tipo: 'temperaturaForaIntervalo',
+          titulo: '⚠ Temperatura fora do intervalo',
+          descricao: nomeEquip + ' — ' + t.temperatura.toFixed(1) + ' °C',
+          link: 'loja-sao-bento.html',
+          origemId: id,
+          criadoEm: criadoEm,
+          lida: false
+        };
+      });
+    }
+
+    if (checklistsCarregados){
+      Object.keys(allChecklists).forEach(function(id){
+        var c = allChecklists[id];
+        var chave = 'checklistConcluida_' + id;
+        if (allNotificacoes[chave]) return;
+
+        var criadoEm = c.concluidoEm ? new Date(c.concluidoEm).getTime() : agora;
+        if (isNaN(criadoEm)) criadoEm = agora;
+        if (agora - criadoEm > JANELA_NOTIFICACAO_MS) return;
+
+        var nomeTipo = c.tipo === 'fecho' ? 'Fecho' : 'Abertura';
+
+        updates[chave] = {
+          tipo: 'checklistConcluida',
+          titulo: 'Checklist de ' + nomeTipo.toLowerCase() + ' concluída',
+          descricao: nomeTipo + ' — ' + (c.pessoa || 'Alguém'),
+          link: 'loja-sao-bento.html',
+          origemId: id,
+          criadoEm: criadoEm,
+          lida: false
+        };
+      });
+    }
+
+    if (turnosCarregados){
+      Object.keys(allTurnos).forEach(function(id){
+        var t = allTurnos[id];
+        var chave = 'turno_' + id;
+        var snap = snapshotTurno(t);
+        var existente = allNotificacoes[chave];
+        if (existente && existente.origemSnapshot === snap) return;
+
+        updates[chave] = {
+          tipo: 'turno',
+          titulo: existente ? 'Turno alterado' : 'Novo turno',
+          descricao: (t.pessoaNome || '') + ' — ' + (t.data || '') + ' ' + (t.inicio || '') + '–' + (t.fim || ''),
+          link: 'equipa.html',
+          origemId: id,
+          origemSnapshot: snap,
+          criadoEm: Date.now(),
+          lida: false
+        };
+      });
+    }
+
+    if (pessoasNotifCarregadas){
+      Object.keys(allPessoasNotif).forEach(function(id){
+        var pessoa = allPessoasNotif[id];
+        var chave = 'pessoa_' + id;
+        if (allNotificacoes[chave]) return;
+
+        updates[chave] = {
+          tipo: 'pessoa',
+          titulo: 'Nova pessoa na equipa',
+          descricao: (pessoa.nome || '') + (pessoa.funcao ? ' — ' + pessoa.funcao : ''),
+          link: 'equipa.html',
+          origemId: id,
+          criadoEm: Date.now(),
+          lida: false
+        };
+      });
+    }
+
+    escreverEmLotes(notificacoesRef, updates);
+  }
+
+  // BUG 1 — remove notificações cujo registo de origem já não justifica o
+  // aviso: pagamento que deixou de estar pendente (ou foi apagado), pedido
+  // da loja que deixou de estar "novo". Corre sempre que qualquer uma das
+  // duas fontes muda, e também ao carregar (limpeza retroativa).
+  function limparNotificacoesOrfas(){
+    if (!notificacoesCarregadas) return;
+    var updates = {};
+
+    Object.keys(allNotificacoes).forEach(function(id){
+      var n = allNotificacoes[id];
+
+      if (n.tipo === 'pagamento' && pagamentosCarregados){
+        var origemIdP = n.origemId || id.replace(/^pagamento_/, '');
+        var origemP = allPaymentRequests[origemIdP];
+        var validoP = !!origemP && (origemP.origem || 'fornecedor') === 'fornecedor' && (origemP.status || 'pendente') === 'pendente';
+        if (!validoP) updates[id] = null;
+      }
+
+      if (n.tipo === 'pedidoLoja' && pedidosCarregados){
+        var origemIdL = n.origemId || id.replace(/^pedidoLoja_/, '');
+        var origemL = allPedidos[origemIdL];
+        var validoL = !!origemL && (origemL.estado || 'novo') === 'novo';
+        if (!validoL) updates[id] = null;
+      }
+    });
+
+    escreverEmLotes(notificacoesRef, updates);
   }
 
   function notificacoesNaoLidas(){
@@ -1854,13 +2137,8 @@ window.addEventListener('load', function () {
       .sort(function(a, b){ return (b.criadoEm || 0) - (a.criadoEm || 0); });
   }
 
-  function marcarLidasPorTipo(tipo){
-    var updates = {};
-    Object.keys(allNotificacoes).forEach(function(id){
-      var n = allNotificacoes[id];
-      if (!n.lida && n.tipo === tipo) updates[id + '/lida'] = true;
-    });
-    if (Object.keys(updates).length > 0) notificacoesRef.update(updates);
+  function marcarNotificacaoLida(id){
+    notificacoesRef.child(id).update({ lida: true });
   }
 
   function renderNotificacoes(){
@@ -1873,34 +2151,40 @@ window.addEventListener('load', function () {
       notifBadge.style.display = 'none';
     }
 
-    if (naoLidas.length === 0){
-      notifList.innerHTML = '<p class="notif-empty">Sem notificações novas ✓</p>';
+    var filtradas = notifFiltroAtual === 'todas'
+      ? naoLidas
+      : naoLidas.filter(function(n){ return (NOTIF_META[n.tipo] || NOTIF_META.outro).categoria === notifFiltroAtual; });
+
+    if (filtradas.length === 0){
+      notifList.innerHTML = '<p class="notif-empty">' + (naoLidas.length === 0 ? 'Sem notificações novas ✓' : 'Sem notificações neste filtro.') + '</p>';
       return;
     }
 
-    notifList.innerHTML = naoLidas.map(function(n){
-      var icone = NOTIF_ICONES[n.tipo] || NOTIF_ICONES.outro;
-      return '<button type="button" class="notif-item" data-link="' + escapeHtml(n.link || '') + '" data-tipo="' + escapeHtml(n.tipo || '') + '">' +
-        '<span class="notif-icon">' + icone + '</span>' +
+    notifList.innerHTML = filtradas.map(function(n){
+      var meta = NOTIF_META[n.tipo] || NOTIF_META.outro;
+      return '<button type="button" class="notif-item" data-id="' + escapeHtml(n.id) + '" data-link="' + escapeHtml(n.link || meta.link || '') + '">' +
+        '<span class="notif-icon">' + meta.icone + '</span>' +
         '<span class="notif-body">' +
         '<span class="notif-titulo">' + escapeHtml(n.titulo || '') + '</span>' +
         '<span class="notif-desc">' + escapeHtml(n.descricao || '') + '</span>' +
-        '<span class="notif-tempo">' + tempoRelativo(n.criadoEm || Date.now()) + '</span>' +
+        '<span class="notif-tempo">' + tempoRelativo(n.criadoEm || Date.now()) + (meta.modulo ? ' · ' + meta.modulo : '') + '</span>' +
         '</span>' +
         '</button>';
     }).join('');
 
     notifList.querySelectorAll('.notif-item').forEach(function(item){
       item.addEventListener('click', function(){
+        var id = item.getAttribute('data-id');
         var link = item.getAttribute('data-link');
-        var tipo = item.getAttribute('data-tipo');
         var alvoId = NOTIF_ALVOS[link];
         notifPanel.classList.remove('open');
         if (alvoId){
           var alvo = document.getElementById(alvoId);
           if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (link){
+          window.location.href = link;
         }
-        marcarLidasPorTipo(tipo);
+        marcarNotificacaoLida(id);
       });
     });
   }
@@ -1916,29 +2200,58 @@ window.addEventListener('load', function () {
     notifPanel.classList.remove('open');
   });
 
+  notifFiltersEl.addEventListener('click', function(e){
+    if (!e.target.classList.contains('notif-filter-chip')) return;
+    notifFiltroAtual = e.target.getAttribute('data-filtro');
+    notifFiltersEl.querySelectorAll('.notif-filter-chip').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    renderNotificacoes();
+  });
+
   document.getElementById('notifClearAll').addEventListener('click', function(){
     var updates = {};
     Object.keys(allNotificacoes).forEach(function(id){
       if (!allNotificacoes[id].lida) updates[id + '/lida'] = true;
     });
-    if (Object.keys(updates).length > 0) notificacoesRef.update(updates);
+    escreverEmLotes(notificacoesRef, updates);
     notifPanel.classList.remove('open');
-  });
-
-  // Marcar como lidas ao interagir com a secção correspondente
-  document.getElementById('cardPagamentos').addEventListener('click', function(){
-    marcarLidasPorTipo('pagamento');
-  });
-
-  document.getElementById('cardPedidos').addEventListener('click', function(){
-    marcarLidasPorTipo('pedidoLoja');
   });
 
   notificacoesRef.on('value', function(snapshot){
     allNotificacoes = snapshot.val() || {};
     notificacoesCarregadas = true;
     renderNotificacoes();
-    gerarNotificacoes();
+    agendarNotificacoes();
+  });
+
+  caixaRef.on('value', function(snapshot){
+    allCaixaMovs = snapshot.val() || {};
+    caixaCarregada = true;
+    agendarNotificacoes();
+  });
+
+  tempsRef.on('value', function(snapshot){
+    allTemps = snapshot.val() || {};
+    tempsCarregadas = true;
+    agendarNotificacoes();
+  });
+
+  checklistsRef.on('value', function(snapshot){
+    allChecklists = snapshot.val() || {};
+    checklistsCarregados = true;
+    agendarNotificacoes();
+  });
+
+  turnosRef.on('value', function(snapshot){
+    allTurnos = snapshot.val() || {};
+    turnosCarregados = true;
+    agendarNotificacoes();
+  });
+
+  pessoasNotifRef.on('value', function(snapshot){
+    allPessoasNotif = snapshot.val() || {};
+    pessoasNotifCarregadas = true;
+    agendarNotificacoes();
   });
 
   /* ---------- Indicador de armazenamento ---------- */
