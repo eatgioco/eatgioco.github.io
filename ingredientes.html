@@ -7,7 +7,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -36,10 +36,11 @@
     font-family:'Space Mono', monospace;
   }
 
+  /* Header */
   header{
-    padding:32px 24px 16px;
-    border-bottom:3px solid var(--black);
-    background:var(--bg);
+    padding:20px 28px;
+    background:var(--white);
+    border-bottom:1px solid var(--line);
     position:sticky;
     top:0;
     z-index:10;
@@ -50,7 +51,7 @@
     margin:0 auto;
     display:flex;
     justify-content:space-between;
-    align-items:flex-end;
+    align-items:center;
     flex-wrap:wrap;
     gap:16px;
   }
@@ -59,59 +60,112 @@
     display:flex;
     align-items:center;
     gap:16px;
-    flex-wrap:wrap;
   }
 
   .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:36px;
+    height:36px;
+    border-radius:8px;
+    border:1px solid var(--line);
     color:var(--black);
     text-decoration:none;
-    border:2px solid var(--black);
-    padding:6px 10px;
-    white-space:nowrap;
+    font-size:16px;
+    background:var(--white);
+    transition:background .12s ease, border-color .12s ease;
   }
 
   .home-link:hover{
-    background:var(--black);
-    color:var(--white);
+    background:var(--bg);
+    border-color:var(--black);
   }
 
-  .brand{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-
-  .brand .tag{
-    color:var(--red);
-    font-size:12px;
-    letter-spacing:2px;
+  .brand-eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1.5px;
     text-transform:uppercase;
+    color:var(--red);
+    margin:0 0 2px;
   }
 
   h1{
     margin:0;
-    font-size:28px;
+    font-size:22px;
     font-weight:700;
-    letter-spacing:-0.5px;
+    letter-spacing:-0.3px;
   }
 
-  .controls{
+  /* Layout */
+  .page{
     max-width:1200px;
-    margin:20px auto 0;
-    padding:0 24px;
+    margin:0 auto;
+    padding:28px;
+  }
+
+  /* Stats */
+  .stats-bar{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:14px;
+    margin-bottom:24px;
+  }
+
+  .stat-card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+
+  .stat-value{
+    font-family:'Space Mono', monospace;
+    font-size:26px;
+    font-weight:700;
+    line-height:1.1;
+  }
+
+  .stat-card.accent .stat-value{
+    color:var(--red);
+  }
+
+  .stat-label{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* Toolbar */
+  .toolbar{
     display:flex;
     gap:12px;
-    flex-wrap:wrap;
     align-items:center;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+
+  .search-wrap{
+    position:relative;
+    flex:1 1 260px;
+  }
+
+  .search-icon{
+    position:absolute;
+    left:14px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:14px;
+    color:var(--muted);
+    pointer-events:none;
   }
 
   .search-input{
-    flex:1 1 260px;
-    padding:12px 16px;
-    border:2px solid var(--black);
+    width:100%;
+    padding:11px 14px 11px 38px;
+    border:1px solid var(--line);
+    border-radius:8px;
     background:var(--white);
     font-family:'Inter', sans-serif;
     font-size:14px;
@@ -125,51 +179,81 @@
 
   .view-toggle{
     display:flex;
-    gap:8px;
-  }
-
-  .filters{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    width:100%;
-  }
-
-  .filter-btn{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    padding:10px 14px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
     background:var(--white);
-    color:var(--black);
-    cursor:pointer;
-    text-transform:uppercase;
-    letter-spacing:0.5px;
-    white-space:nowrap;
   }
 
-  .filter-btn.active{
+  .view-toggle button{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    font-weight:500;
+    padding:10px 16px;
+    border:none;
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+    transition:background .12s ease, color .12s ease;
+  }
+
+  .view-toggle button + button{
+    border-left:1px solid var(--line);
+  }
+
+  .view-toggle button.active{
     background:var(--black);
     color:var(--white);
   }
 
+  /* Category tabs */
+  .cat-tabs{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:22px;
+  }
+
+  .cat-tab{
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:500;
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background .12s ease, color .12s ease, border-color .12s ease;
+  }
+
+  .cat-tab:hover{
+    border-color:var(--black);
+    color:var(--black);
+  }
+
+  .cat-tab.active{
+    background:var(--black);
+    border-color:var(--black);
+    color:var(--white);
+  }
+
+  .cat-tab .count{
+    opacity:0.6;
+    margin-left:2px;
+  }
+
   .status-msg{
-    max-width:1200px;
-    margin:0 auto;
-    padding:0 24px;
     font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
+    margin-bottom:14px;
   }
 
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:24px;
-  }
-
+  /* Groups */
   .group{
-    margin-bottom:26px;
+    margin-bottom:28px;
   }
 
   .group.group-hidden{
@@ -182,22 +266,30 @@
     font-weight:400;
     color:var(--muted);
     letter-spacing:0.5px;
+    text-transform:uppercase;
     padding-bottom:8px;
-    margin-bottom:14px;
+    margin-bottom:12px;
     border-bottom:1px solid var(--line);
   }
 
   /* List mode */
   .ingredient-list{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 1px 2px rgba(20,20,20,0.04);
   }
 
   .ingredient-list-row{
-    font-size:13px;
-    padding:12px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:13.5px;
+    padding:13px 18px;
     border-bottom:1px solid var(--line);
     cursor:pointer;
+    transition:background .1s ease;
   }
 
   .ingredient-list-row:last-child{
@@ -206,6 +298,17 @@
 
   .ingredient-list-row:hover{
     background:var(--bg);
+  }
+
+  .ingredient-list-row .chevron{
+    color:var(--line);
+    font-size:14px;
+    transition:transform .12s ease, color .12s ease;
+  }
+
+  .ingredient-list-row:hover .chevron{
+    color:var(--red);
+    transform:translateX(2px);
   }
 
   .ingredient-list-row.row-hidden{
@@ -221,17 +324,20 @@
 
   .ingredient-card{
     background:var(--white);
-    border:2px solid var(--black);
-    padding:14px 16px;
-    font-size:14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    font-size:13.5px;
     font-weight:600;
     cursor:pointer;
-    transition:transform .12s ease, box-shadow .12s ease;
+    box-shadow:0 1px 2px rgba(20,20,20,0.04);
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
   }
 
   .ingredient-card:hover{
-    transform:translate(-2px,-2px);
-    box-shadow:4px 4px 0 var(--red);
+    transform:translateY(-2px);
+    box-shadow:0 6px 16px rgba(20,20,20,0.1);
+    border-color:var(--black);
   }
 
   .ingredient-card.row-hidden{
@@ -250,7 +356,7 @@
     display:none;
     position:fixed;
     inset:0;
-    background:rgba(20,20,20,0.6);
+    background:rgba(20,20,20,0.55);
     z-index:100;
     align-items:flex-start;
     justify-content:center;
@@ -263,11 +369,13 @@
   }
 
   .modal{
-    background:var(--bg);
-    border:3px solid var(--black);
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:14px;
     max-width:560px;
     width:100%;
     padding:28px;
+    box-shadow:0 20px 50px rgba(20,20,20,0.25);
   }
 
   .modal-header{
@@ -279,16 +387,26 @@
 
   .modal-header h2{
     margin:0;
-    font-size:20px;
+    font-size:19px;
   }
 
   .modal-close{
     background:none;
     border:none;
-    font-size:22px;
+    font-size:20px;
     cursor:pointer;
     font-family:'Space Mono', monospace;
     line-height:1;
+    color:var(--muted);
+    width:32px;
+    height:32px;
+    border-radius:8px;
+    transition:background .12s ease, color .12s ease;
+  }
+
+  .modal-close:hover{
+    background:var(--bg);
+    color:var(--black);
   }
 
   .form-grid{
@@ -318,7 +436,8 @@
     font-family:'Inter', sans-serif;
     font-size:14px;
     padding:10px 12px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:8px;
     background:var(--white);
     color:var(--black);
     width:100%;
@@ -338,21 +457,21 @@
   }
 
   .btn{
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    border:2px solid var(--black);
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    border:1px solid var(--line);
+    border-radius:8px;
     background:var(--white);
     color:var(--black);
-    padding:12px 20px;
+    padding:11px 20px;
     cursor:pointer;
     transition:all .15s ease;
-    letter-spacing:0.5px;
   }
 
   .btn:hover{
-    background:var(--black);
-    color:var(--white);
+    background:var(--bg);
+    border-color:var(--black);
   }
 
   .btn-primary{
@@ -362,8 +481,8 @@
   }
 
   .btn-primary:hover{
-    background:var(--black);
-    border-color:var(--black);
+    background:#b30d1d;
+    border-color:#b30d1d;
   }
 </style>
 </head>
@@ -372,30 +491,36 @@
 <header>
   <div class="header-inner">
     <div class="header-left">
-      <a href="index.html" class="home-link">🏠 Home</a>
-      <div class="brand">
-        <span class="tag">GIOCO · Focaccia · Lisboa</span>
+      <a href="index.html" class="home-link" title="Home">🏠</a>
+      <div>
+        <p class="brand-eyebrow">GIOCO OS</p>
         <h1>Ingredientes</h1>
       </div>
     </div>
     <div class="view-toggle">
-      <button type="button" class="filter-btn active" id="btnViewList">☰ Lista</button>
-      <button type="button" class="filter-btn" id="btnViewCards">▦ Cartões</button>
+      <button type="button" id="btnViewList" class="active">☰ Lista</button>
+      <button type="button" id="btnViewCards">▦ Cartões</button>
     </div>
   </div>
 </header>
 
-<div class="controls">
-  <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar ingrediente...">
-  <div class="filters" id="catFilters"></div>
-</div>
+<div class="page">
+  <div class="stats-bar" id="statsBar"></div>
 
-<div class="status-msg" id="statusMsg">A ligar à base de dados...</div>
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar ingrediente...">
+    </div>
+  </div>
 
-<main>
+  <div class="cat-tabs" id="catFilters"></div>
+
+  <div class="status-msg" id="statusMsg">A ligar à base de dados...</div>
+
   <div id="content"></div>
   <div class="empty-state" id="emptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
-</main>
+</div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay">
@@ -466,6 +591,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var currentSearch = "";
   var currentView = "list";
 
+  var statsBar = document.getElementById('statsBar');
   var catFilters = document.getElementById('catFilters');
   var content = document.getElementById('content');
   var emptyState = document.getElementById('emptyState');
@@ -503,23 +629,37 @@ document.addEventListener('DOMContentLoaded', function () {
     return catKeys;
   }
 
+  function renderStats() {
+    var ids = Object.keys(allIngredientes);
+    var total = ids.length;
+    var semFornecedor = ids.filter(function (id) { return !allIngredientes[id].fornecedor; }).length;
+    var grupos = groupByCategoria();
+    var numCategorias = sortedCatKeys(grupos).length;
+
+    var html = '';
+    html += '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">Total de ingredientes</div></div>';
+    html += '<div class="stat-card accent"><div class="stat-value">' + semFornecedor + '</div><div class="stat-label">Sem fornecedor atribuído</div></div>';
+    html += '<div class="stat-card"><div class="stat-value">' + numCategorias + '</div><div class="stat-label">Categorias</div></div>';
+    statsBar.innerHTML = html;
+  }
+
   function renderFilters() {
     var grupos = groupByCategoria();
     var catKeys = sortedCatKeys(grupos);
     var total = Object.keys(allIngredientes).length;
 
     var html = '';
-    html += '<button type="button" class="filter-btn' + (currentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">Todas (' + total + ')</button>';
+    html += '<button type="button" class="cat-tab' + (currentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">Todas <span class="count">(' + total + ')</span></button>';
 
     catKeys.forEach(function (catKey) {
       var label = catKey === 'null' ? 'Sem categoria' : (CATEGORIAS[catKey] || catKey);
       var count = grupos[catKey].length;
-      html += '<button type="button" class="filter-btn' + (currentCategoria === catKey ? ' active' : '') + '" data-cat="' + escapeHtml(catKey) + '">' + escapeHtml(label) + ' (' + count + ')</button>';
+      html += '<button type="button" class="cat-tab' + (currentCategoria === catKey ? ' active' : '') + '" data-cat="' + escapeHtml(catKey) + '">' + escapeHtml(label) + ' <span class="count">(' + count + ')</span></button>';
     });
 
     catFilters.innerHTML = html;
 
-    catFilters.querySelectorAll('.filter-btn').forEach(function (btn) {
+    catFilters.querySelectorAll('.cat-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
         currentCategoria = btn.getAttribute('data-cat');
         renderFilters();
@@ -529,8 +669,11 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function ingredientNode(ing) {
-    var cls = currentView === 'cards' ? 'ingredient-card' : 'ingredient-list-row';
-    return '<div class="' + cls + '" data-id="' + escapeHtml(ing.id) + '" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' + escapeHtml(ing.nome) + '</div>';
+    if (currentView === 'cards') {
+      return '<div class="ingredient-card" data-id="' + escapeHtml(ing.id) + '" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' + escapeHtml(ing.nome) + '</div>';
+    }
+    return '<div class="ingredient-list-row" data-id="' + escapeHtml(ing.id) + '" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' +
+      '<span>' + escapeHtml(ing.nome) + '</span><span class="chevron">›</span></div>';
   }
 
   function wrapItems(items) {
@@ -621,6 +764,7 @@ document.addEventListener('DOMContentLoaded', function () {
   ingredientesRef.on('value', function (snapshot) {
     allIngredientes = snapshot.val() || {};
     statusMsg.textContent = "";
+    renderStats();
     renderFilters();
     renderContent();
   }, function (error) {
