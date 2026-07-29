@@ -476,8 +476,15 @@
       </div>
 
       <div class="field">
-        <label class="field-label" for="motivoInput">Motivo</label>
-        <input type="text" id="motivoInput" placeholder="ex: compra rúcula Pingo Doce">
+        <label class="field-label" for="motivoSelect">Motivo</label>
+        <select id="motivoSelect" disabled>
+          <option value="">Escolhe primeiro Saída ou Entrada</option>
+        </select>
+      </div>
+
+      <div class="field" id="motivoDetalheField" style="display:none;">
+        <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
+        <input type="text" id="motivoDetalheInput" placeholder="">
       </div>
 
       <div class="field">
@@ -550,6 +557,19 @@
     };
   }
 
+  var MOTIVO_OPTIONS = {
+    saida: [
+      { value: 'compra', label: 'Compra', detailLabel: 'O quê?', detailPlaceholder: 'ex: rúcula Pingo Doce' },
+      { value: 'pagamento', label: 'Pagamento a fornecedor', detailLabel: 'A quem?', detailPlaceholder: 'ex: fornecedor café' },
+      { value: 'deposito', label: 'Depósito bancário', semAcerto: true },
+      { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
+    ],
+    entrada: [
+      { value: 'reforco', label: 'Reforço de caixa', detailLabel: 'De onde?', detailPlaceholder: 'ex: levantamento ATM' },
+      { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
+    ]
+  };
+
   var allMovs = {};
   var activeFilter = 'hoje';
   var acertarOpenId = null;
@@ -558,7 +578,10 @@
   var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
   var tipoEntradaBtn = document.getElementById('tipoEntradaBtn');
   var valorInput = document.getElementById('valorInput');
-  var motivoInput = document.getElementById('motivoInput');
+  var motivoSelect = document.getElementById('motivoSelect');
+  var motivoDetalheField = document.getElementById('motivoDetalheField');
+  var motivoDetalheLabel = document.getElementById('motivoDetalheLabel');
+  var motivoDetalheInput = document.getElementById('motivoDetalheInput');
   var pessoaSelect = document.getElementById('pessoaSelect');
   var registarBtn = document.getElementById('registarBtn');
   var movForm = document.getElementById('movForm');
@@ -601,8 +624,40 @@
     return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
   }
 
+  function currentMotivoOpcao(){
+    var lista = MOTIVO_OPTIONS[formState.tipo] || [];
+    return lista.filter(function(o){ return o.value === motivoSelect.value; })[0] || null;
+  }
+
+  function populateMotivoSelect(tipo){
+    var lista = MOTIVO_OPTIONS[tipo] || [];
+    var html = '<option value="">Seleciona um motivo...</option>';
+    lista.forEach(function(o){
+      html += '<option value="' + o.value + '">' + escapeHtml(o.label) + '</option>';
+    });
+    motivoSelect.innerHTML = html;
+    motivoSelect.disabled = lista.length === 0;
+    motivoDetalheField.style.display = 'none';
+    motivoDetalheInput.value = '';
+  }
+
+  function onMotivoChange(){
+    var opcao = currentMotivoOpcao();
+    if (opcao && opcao.detailLabel){
+      motivoDetalheField.style.display = 'block';
+      motivoDetalheLabel.textContent = opcao.detailLabel;
+      motivoDetalheInput.placeholder = opcao.detailPlaceholder || '';
+    } else {
+      motivoDetalheField.style.display = 'none';
+      motivoDetalheInput.value = '';
+    }
+    validateForm();
+  }
+
   function validateForm(){
-    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoInput.value.trim().length > 0;
+    var opcao = currentMotivoOpcao();
+    var motivoValido = !!opcao && (!opcao.detailLabel || motivoDetalheInput.value.trim().length > 0);
+    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido;
     registarBtn.disabled = !valid;
   }
 
@@ -610,13 +665,15 @@
     formState.tipo = tipo;
     tipoSaidaBtn.classList.toggle('active', tipo === 'saida');
     tipoEntradaBtn.classList.toggle('active', tipo === 'entrada');
+    populateMotivoSelect(tipo);
     validateForm();
   }
 
   tipoSaidaBtn.addEventListener('click', function(){ selectTipo('saida'); valorInput.focus(); });
   tipoEntradaBtn.addEventListener('click', function(){ selectTipo('entrada'); valorInput.focus(); });
   valorInput.addEventListener('input', validateForm);
-  motivoInput.addEventListener('input', validateForm);
+  motivoSelect.addEventListener('change', onMotivoChange);
+  motivoDetalheInput.addEventListener('input', validateForm);
 
   movForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -624,7 +681,10 @@
 
     var tipo = formState.tipo;
     var valor = parseFloat(valorInput.value);
-    var motivo = motivoInput.value.trim();
+    var opcao = currentMotivoOpcao();
+    var detalhe = motivoDetalheInput.value.trim();
+    var motivo = opcao.detailLabel ? (opcao.label + ': ' + detalhe) : opcao.label;
+    var semAcerto = !!opcao.semAcerto;
     var pessoaSelecao = resolvePessoaSelecao(pessoaSelect);
 
     var novoMov = {
@@ -634,8 +694,8 @@
       motivo: motivo,
       pessoa: pessoaSelecao.pessoaNome,
       pessoaId: pessoaSelecao.pessoaId,
-      estado: tipo === 'entrada' ? 'acertado' : 'aberto',
-      valorDevolvido: null,
+      estado: (tipo === 'entrada' || semAcerto) ? 'acertado' : 'aberto',
+      valorDevolvido: semAcerto ? 0 : null,
       notas: null
     };
 
@@ -644,7 +704,6 @@
 
     movRef.push(novoMov).then(function(){
       valorInput.value = '';
-      motivoInput.value = '';
       selectTipo(null);
       tipoSaidaBtn.classList.remove('active');
       tipoEntradaBtn.classList.remove('active');
