@@ -339,6 +339,7 @@
 
   .modal-actions{
     display:flex;
+    flex-wrap:wrap;
     justify-content:space-between;
     align-items:center;
     margin-top:22px;
@@ -347,6 +348,8 @@
 
   .modal-actions-right{
     display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
     gap:10px;
   }
 
@@ -918,6 +921,10 @@
           <input type="text" id="fPlataformaEncomenda" placeholder="Ex: https://loja.fornecedor.pt/login">
         </div>
         <div class="field full">
+          <label class="field-label">WhatsApp de Encomenda (nº ou link de grupo)</label>
+          <input type="text" id="fWhatsappEncomenda" placeholder="Ex: +351 912 345 678 ou https://chat.whatsapp.com/AbC123">
+        </div>
+        <div class="field full">
           <label class="field-label">Notas</label>
           <textarea id="fNotas"></textarea>
         </div>
@@ -961,6 +968,7 @@
       <button type="button" class="btn" id="orderModalCancel">Cancelar</button>
       <div class="modal-actions-right">
         <button type="button" class="btn" id="btnPreview">Pré-visualizar</button>
+        <button type="button" class="btn" id="btnEnviarWhatsapp">💬 Enviar WhatsApp</button>
         <button type="button" class="btn btn-primary" id="btnEnviarEmail">Enviar Email</button>
       </div>
     </div>
@@ -1317,6 +1325,7 @@ window.addEventListener('load', function () {
   var previewBody = document.getElementById('previewBody');
   var btnPreview = document.getElementById('btnPreview');
   var btnEnviarEmail = document.getElementById('btnEnviarEmail');
+  var btnEnviarWhatsapp = document.getElementById('btnEnviarWhatsapp');
   var currentOrderSupplier = null;
 
   var viewTabs = document.getElementById('viewTabs');
@@ -1404,11 +1413,15 @@ window.addEventListener('load', function () {
       if (s.telefone) html += '<div class="card-row"><strong>Tel</strong><span>' + escapeHtml(s.telefone) + '</span></div>';
       if (s.email) html += '<div class="card-row"><strong>Email</strong><span>' + escapeHtml(s.email) + '</span></div>';
       if (s.emailord) html += '<div class="card-row"><strong>Email enc.</strong><span>' + escapeHtml(s.emailord) + '</span></div>';
+      if (s.whatsappEncomenda) html += '<div class="card-row"><strong>WhatsApp enc.</strong><span>' + escapeHtml(s.whatsappEncomenda) + '</span></div>';
       if (s.iban) html += '<div class="card-row"><strong>IBAN</strong><span>' + escapeHtml(s.iban) + '</span></div>';
       if (s.banco) html += '<div class="card-row"><strong>Banco</strong><span>' + escapeHtml(s.banco) + '</span></div>';
       if (s.produtos) html += '<div class="card-products">' + escapeHtml(s.produtos) + '</div>';
       if (s.notas) html += '<div class="card-row" style="font-style:italic;">' + escapeHtml(s.notas) + '</div>';
-      if (s.lastOrder && s.lastOrder.date) html += '<div class="card-row"><strong>Últ. encomenda</strong><span>' + escapeHtml(s.lastOrder.date) + '</span></div>';
+      if (s.lastOrder && s.lastOrder.date) {
+        var ultima = s.lastOrder.date + (s.lastOrder.via ? ' · ' + s.lastOrder.via : '');
+        html += '<div class="card-row"><strong>Últ. encomenda</strong><span>' + escapeHtml(ultima) + '</span></div>';
+      }
 
       if (s.prazoEntrega || s.valorMinimo || s.condicoesPagamento || s.morada) {
         html += '<div class="card-conditions">';
@@ -1420,15 +1433,22 @@ window.addEventListener('load', function () {
         html += '</div>';
       }
 
+      var temWhatsapp = !!parseWhatsappTarget(s.whatsappEncomenda);
+      var temEmailEnc = !!(s.emailord || s.email || '').trim();
+
       html += '<div class="card-actions">';
       if (s.plataformaEncomenda) {
         html += '<button type="button" class="btn-small btn-order-online">🔗 Encomendar Online</button>';
-      } else {
+      }
+      if (temWhatsapp) {
+        html += '<button type="button" class="btn-small btn-order-whatsapp">💬 WhatsApp</button>';
+      }
+      if (!s.plataformaEncomenda && !temWhatsapp) {
         html += '<button type="button" class="btn-small btn-order">📦 Encomenda</button>';
       }
       if (s.iban) html += '<button type="button" class="btn-small btn-copy-iban">Copiar IBAN</button>';
       html += '</div>';
-      if (s.plataformaEncomenda) {
+      if ((s.plataformaEncomenda || temWhatsapp) && temEmailEnc) {
         html += '<button type="button" class="order-email-link">ou encomendar por email</button>';
       }
 
@@ -1449,7 +1469,7 @@ window.addEventListener('load', function () {
           alert('Sem email de encomendas registado');
           return;
         }
-        openOrderModal(s);
+        openOrderModal(s, 'email');
       }
 
       var orderBtn = card.querySelector('.btn-order');
@@ -1457,6 +1477,14 @@ window.addEventListener('load', function () {
         orderBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           tryOpenOrderModal();
+        });
+      }
+
+      var orderWhatsappBtn = card.querySelector('.btn-order-whatsapp');
+      if (orderWhatsappBtn) {
+        orderWhatsappBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          openOrderModal(s, 'whatsapp');
         });
       }
 
@@ -1548,6 +1576,7 @@ window.addEventListener('load', function () {
       document.getElementById('fCondicoesPagamento').value = supplier.condicoesPagamento || "";
       document.getElementById('fMorada').value = supplier.morada || "";
       document.getElementById('fPlataformaEncomenda').value = supplier.plataformaEncomenda || "";
+      document.getElementById('fWhatsappEncomenda').value = supplier.whatsappEncomenda || "";
       document.getElementById('fNotas').value = supplier.notas || "";
       btnRemover.style.display = "inline-block";
       currentEditingSupplierNome = supplier.nome || "";
@@ -1606,6 +1635,7 @@ window.addEventListener('load', function () {
       condicoesPagamento: document.getElementById('fCondicoesPagamento').value.trim(),
       morada: document.getElementById('fMorada').value.trim(),
       plataformaEncomenda: document.getElementById('fPlataformaEncomenda').value.trim(),
+      whatsappEncomenda: document.getElementById('fWhatsappEncomenda').value.trim(),
       notas: document.getElementById('fNotas').value.trim()
     };
 
@@ -1732,6 +1762,45 @@ window.addEventListener('load', function () {
     return toISODate(d);
   }
 
+  // Aceita nº de telefone (com ou sem indicativo) ou link de grupo WhatsApp.
+  // Devolve null se o campo estiver vazio ou não for reconhecível.
+  function parseWhatsappTarget(raw) {
+    var value = (raw || "").trim();
+    if (!value) return null;
+
+    if (/chat\.whatsapp\.com/i.test(value)) {
+      var url = /^https?:\/\//i.test(value) ? value : "https://" + value.replace(/^\/+/, "");
+      return { type: 'grupo', url: url };
+    }
+
+    var digits = value.replace(/\D/g, "").replace(/^00/, "");
+    if (digits.length === 9) digits = "351" + digits; // número nacional sem indicativo
+    if (digits.length < 10) return null;
+    return { type: 'numero', numero: digits };
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(function () {});
+      return;
+    }
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (err) {}
+    document.body.removeChild(ta);
+  }
+
+  function registarUltimaEncomenda(supplier, order, via) {
+    var itemsSummary = order.lines.map(function (l) { return l.qtd + "x " + l.produto; }).join(", ");
+    suppliersRef.child(supplier.id).update({
+      lastOrder: { date: order.dateStr, items: itemsSummary, via: via }
+    });
+  }
+
   function createOrderLineRow() {
     var row = document.createElement('div');
     row.className = 'order-line';
@@ -1786,12 +1855,22 @@ window.addEventListener('load', function () {
     return { subject: subject, body: bodyLines.join("\n"), dateStr: dateStr, lines: lines };
   }
 
-  function openOrderModal(supplier) {
+  function openOrderModal(supplier, canal) {
     currentOrderSupplier = supplier;
     orderSupplierName.textContent = supplier.nome;
     resetOrderLines();
     orderNotas.value = "";
     orderPreview.style.display = "none";
+
+    var temWhatsapp = !!parseWhatsappTarget(supplier.whatsappEncomenda);
+    var temEmail = !!(supplier.emailord || supplier.email || "").trim();
+    var principal = (canal === 'whatsapp' && temWhatsapp) ? 'whatsapp' : (temEmail ? 'email' : 'whatsapp');
+
+    btnEnviarWhatsapp.style.display = temWhatsapp ? "inline-block" : "none";
+    btnEnviarEmail.style.display = temEmail ? "inline-block" : "none";
+    btnEnviarWhatsapp.classList.toggle('btn-primary', principal === 'whatsapp');
+    btnEnviarEmail.classList.toggle('btn-primary', principal === 'email');
+
     orderModalOverlay.classList.add('open');
   }
 
@@ -1829,8 +1908,44 @@ window.addEventListener('load', function () {
     var mailto = "mailto:" + to + "?subject=" + encodeURIComponent(email.subject) + "&body=" + encodeURIComponent(email.body);
     window.location.href = mailto;
 
-    var itemsSummary = email.lines.map(function (l) { return l.qtd + "x " + l.produto; }).join(", ");
-    suppliersRef.child(supplier.id).update({ lastOrder: { date: email.dateStr, items: itemsSummary } });
+    registarUltimaEncomenda(supplier, email, 'Email');
+
+    closeOrderModal();
+  });
+
+  btnEnviarWhatsapp.addEventListener('click', function () {
+    if (!currentOrderSupplier) return;
+    var supplier = currentOrderSupplier;
+
+    var target = parseWhatsappTarget(supplier.whatsappEncomenda);
+    if (!target) {
+      alert('Sem WhatsApp de encomendas registado');
+      return;
+    }
+
+    var order = buildOrderEmail();
+    if (order.lines.length === 0) {
+      alert('Adicione pelo menos uma linha com quantidade e produto.');
+      return;
+    }
+
+    var text = "*" + order.subject + "*\n\n" + order.body;
+
+    if (target.type === 'grupo') {
+      // Os links de convite de grupo não aceitam mensagem pré-preenchida:
+      // copiamos o texto e abrimos o grupo para colar.
+      copyTextToClipboard(text);
+      previewSubject.textContent = order.subject;
+      previewBody.textContent = order.body;
+      orderPreview.style.display = "block";
+      window.open(target.url, '_blank');
+      registarUltimaEncomenda(supplier, order, 'WhatsApp');
+      alert('Os grupos de WhatsApp não aceitam mensagem pré-preenchida.\n\nA mensagem foi copiada — cole no grupo e envie. Fica também aqui na pré-visualização.');
+      return;
+    }
+
+    window.open('https://wa.me/' + target.numero + '?text=' + encodeURIComponent(text), '_blank');
+    registarUltimaEncomenda(supplier, order, 'WhatsApp');
 
     closeOrderModal();
   });
