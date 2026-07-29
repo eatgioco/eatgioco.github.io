@@ -250,6 +250,131 @@
     color:var(--muted);
     font-family:'Space Mono', monospace;
   }
+
+  .ingredient-list-row, .ingredient-card{
+    cursor:pointer;
+  }
+
+  /* Modal */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{
+    display:flex;
+  }
+
+  .modal{
+    background:var(--bg);
+    border:3px solid var(--black);
+    max-width:560px;
+    width:100%;
+    padding:28px;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  .modal-header h2{
+    margin:0;
+    font-size:20px;
+  }
+
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    line-height:1;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .field.full{
+    grid-column:1 / -1;
+  }
+
+  .field-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .field input, .field select{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    width:100%;
+  }
+
+  .field input:focus, .field select:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:22px;
+    gap:12px;
+  }
+
+  .btn{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:12px 20px;
+    cursor:pointer;
+    transition:all .15s ease;
+    letter-spacing:0.5px;
+  }
+
+  .btn:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  .btn-primary:hover{
+    background:var(--black);
+    border-color:var(--black);
+  }
 </style>
 </head>
 <body>
@@ -281,6 +406,41 @@
 
     <div id="content"></div>
     <div class="empty-state" id="emptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Editar Ingrediente</h2>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <form id="ingredientForm">
+      <input type="hidden" id="fId">
+      <div class="form-grid">
+        <div class="field full">
+          <label class="field-label">Nome</label>
+          <input type="text" id="fNome" required>
+        </div>
+        <div class="field">
+          <label class="field-label">Categoria</label>
+          <select id="fCategoria"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">Unidade</label>
+          <input type="text" id="fUnidade" placeholder="ex: kg, un, lt">
+        </div>
+        <div class="field">
+          <label class="field-label">Código Legado</label>
+          <input type="text" id="fCodLegado">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btnCancelar">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -383,10 +543,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function ingredientNode(ing) {
-    if (currentView === 'cards') {
-      return '<div class="ingredient-card" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' + escapeHtml(ing.nome) + '</div>';
-    }
-    return '<div class="ingredient-list-row" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' + escapeHtml(ing.nome) + '</div>';
+    var cls = currentView === 'cards' ? 'ingredient-card' : 'ingredient-list-row';
+    return '<div class="' + cls + '" data-id="' + escapeHtml(ing.id) + '" data-nome="' + escapeHtml((ing.nome || '').toLowerCase()) + '">' + escapeHtml(ing.nome) + '</div>';
   }
 
   function wrapItems(items) {
@@ -431,6 +589,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     content.innerHTML = html;
     applySearchFilter();
+
+    content.querySelectorAll('.ingredient-list-row, .ingredient-card').forEach(function (el) {
+      el.addEventListener('click', function () {
+        openModal(el.getAttribute('data-id'));
+      });
+    });
   }
 
   function applySearchFilter() {
@@ -475,6 +639,54 @@ document.addEventListener('DOMContentLoaded', function () {
     renderContent();
   }, function (error) {
     statusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
+  });
+
+  // Modal de edição
+  var modalOverlay = document.getElementById('modalOverlay');
+  var modalClose = document.getElementById('modalClose');
+  var btnCancelar = document.getElementById('btnCancelar');
+  var ingredientForm = document.getElementById('ingredientForm');
+  var fCategoria = document.getElementById('fCategoria');
+
+  var catOptionsHtml = '<option value="">Sem categoria</option>' + Object.keys(CATEGORIAS).map(function (key) {
+    return '<option value="' + escapeHtml(key) + '">' + escapeHtml(CATEGORIAS[key]) + '</option>';
+  }).join('');
+  fCategoria.innerHTML = catOptionsHtml;
+
+  function openModal(id) {
+    var ing = allIngredientes[id];
+    if (!ing) return;
+    document.getElementById('fId').value = id;
+    document.getElementById('fNome').value = ing.nome || "";
+    fCategoria.value = ing.categoria || "";
+    document.getElementById('fUnidade').value = ing.unidade || "";
+    document.getElementById('fCodLegado').value = ing.codLegado || "";
+    modalOverlay.classList.add('open');
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('open');
+  }
+
+  modalClose.addEventListener('click', closeModal);
+  btnCancelar.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', function (e) {
+    if (e.target === modalOverlay) closeModal();
+  });
+
+  ingredientForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var id = document.getElementById('fId').value;
+    if (!id) return;
+    var data = {
+      nome: document.getElementById('fNome').value.trim(),
+      categoria: fCategoria.value || null,
+      unidade: document.getElementById('fUnidade').value.trim() || null,
+      codLegado: document.getElementById('fCodLegado').value.trim() || null
+    };
+    if (!data.nome) return;
+    ingredientesRef.child(id).update(data);
+    closeModal();
   });
 
 });
