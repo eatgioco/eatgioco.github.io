@@ -37,124 +37,81 @@
   }
 
   header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
+    padding:32px 24px 16px;
+    border-bottom:3px solid var(--black);
+    background:var(--bg);
+    position:sticky;
+    top:0;
+    z-index:10;
   }
 
   .header-inner{
-    max-width:1400px;
+    max-width:1200px;
     margin:0 auto;
     display:flex;
-    align-items:center;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
     gap:16px;
   }
 
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
+  .header-left{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
   }
 
   .home-link{
     font-family:'Space Mono', monospace;
     font-size:12px;
     font-weight:700;
-    color:var(--white);
+    color:var(--black);
     text-decoration:none;
-    border:2px solid var(--white);
+    border:2px solid var(--black);
     padding:6px 10px;
     white-space:nowrap;
   }
 
   .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .page-title{
-    font-family:'Space Mono', monospace;
-    font-size:14px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
-  }
-
-  .layout{
-    max-width:1400px;
-    margin:0 auto;
-    display:flex;
-    align-items:flex-start;
-    min-height:calc(100vh - 73px);
-  }
-
-  /* Sidebar */
-  .sidebar{
-    width:190px;
-    flex:0 0 190px;
-    background:var(--white);
-    border-right:1px solid #e0ddd4;
-    min-height:calc(100vh - 73px);
-    padding:20px 0;
-  }
-
-  .sidebar-title{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    color:#888;
-    letter-spacing:0.5px;
-    padding:0 14px 10px;
-  }
-
-  .cat-item{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:6px;
-    font-size:13px;
-    padding:8px 14px;
-    color:#333;
-    cursor:pointer;
-    background:transparent;
-    border:none;
-    width:100%;
-    text-align:left;
-    font-family:'Inter', sans-serif;
-  }
-
-  .cat-item:hover{
-    background:#f2ede4;
-  }
-
-  .cat-item.active{
-    background:var(--red);
+    background:var(--black);
     color:var(--white);
   }
 
-  .cat-item.active:hover{
-    background:var(--red);
-  }
-
-  /* Panel */
-  .panel{
-    flex:1 1 auto;
-    padding:24px 28px;
-    min-width:0;
-  }
-
-  .toolbar{
+  .brand{
     display:flex;
-    gap:14px;
-    align-items:center;
-    margin-bottom:20px;
+    flex-direction:column;
+    gap:4px;
+  }
+
+  .brand .tag{
+    color:var(--red);
+    font-size:12px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  h1{
+    margin:0;
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .controls{
+    max-width:1200px;
+    margin:20px auto 0;
+    padding:0 24px;
+    display:flex;
+    gap:12px;
     flex-wrap:wrap;
+    align-items:center;
   }
 
   .search-input{
     flex:1 1 260px;
-    padding:10px 14px;
-    border:1px solid #ccc;
+    padding:12px 16px;
+    border:2px solid var(--black);
     background:var(--white);
     font-family:'Inter', sans-serif;
     font-size:14px;
@@ -168,34 +125,51 @@
 
   .view-toggle{
     display:flex;
-    border:1px solid #ccc;
-    overflow:hidden;
+    gap:8px;
   }
 
-  .view-toggle button{
-    font-family:'Inter', sans-serif;
-    font-size:13px;
-    padding:10px 16px;
-    border:none;
+  .filters{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    width:100%;
+  }
+
+  .filter-btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    padding:10px 14px;
+    border:2px solid var(--black);
     background:var(--white);
-    color:#666;
+    color:var(--black);
     cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    white-space:nowrap;
   }
 
-  .view-toggle button.active{
+  .filter-btn.active{
     background:var(--black);
     color:var(--white);
   }
 
   .status-msg{
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 24px;
     font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
-    margin-bottom:14px;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:24px;
   }
 
   .group{
-    margin-bottom:22px;
+    margin-bottom:26px;
   }
 
   .group.group-hidden{
@@ -206,18 +180,32 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:400;
-    color:#b0a99a;
+    color:var(--muted);
     letter-spacing:0.5px;
-    padding-bottom:6px;
-    margin-bottom:10px;
-    border-bottom:1px solid #e3ddd0;
+    padding-bottom:8px;
+    margin-bottom:14px;
+    border-bottom:1px solid var(--line);
   }
 
   /* List mode */
+  .ingredient-list{
+    background:var(--white);
+    border:2px solid var(--black);
+  }
+
   .ingredient-list-row{
     font-size:13px;
-    padding:5px 0;
-    border-bottom:1px solid #eee;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+
+  .ingredient-list-row:last-child{
+    border-bottom:none;
+  }
+
+  .ingredient-list-row:hover{
+    background:var(--bg);
   }
 
   .ingredient-list-row.row-hidden{
@@ -227,17 +215,23 @@
   /* Card mode */
   .ingredient-cards{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
-    gap:10px;
+    grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+    gap:12px;
   }
 
   .ingredient-card{
     background:var(--white);
-    border:1px solid #e0ddd4;
-    border-radius:6px;
-    padding:10px;
-    font-size:13px;
-    font-weight:500;
+    border:2px solid var(--black);
+    padding:14px 16px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+
+  .ingredient-card:hover{
+    transform:translate(-2px,-2px);
+    box-shadow:4px 4px 0 var(--red);
   }
 
   .ingredient-card.row-hidden{
@@ -249,10 +243,6 @@
     padding:60px 20px;
     color:var(--muted);
     font-family:'Space Mono', monospace;
-  }
-
-  .ingredient-list-row, .ingredient-card{
-    cursor:pointer;
   }
 
   /* Modal */
@@ -381,33 +371,31 @@
 
 <header>
   <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark">● GIOCO®</span>
-    <span class="page-title">Ingredientes</span>
+    <div class="header-left">
+      <a href="index.html" class="home-link">🏠 Home</a>
+      <div class="brand">
+        <span class="tag">GIOCO · Focaccia · Lisboa</span>
+        <h1>Ingredientes</h1>
+      </div>
+    </div>
+    <div class="view-toggle">
+      <button type="button" class="filter-btn active" id="btnViewList">☰ Lista</button>
+      <button type="button" class="filter-btn" id="btnViewCards">▦ Cartões</button>
+    </div>
   </div>
 </header>
 
-<div class="layout">
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-title">CATEGORIAS</div>
-    <div id="catList"></div>
-  </div>
-
-  <div class="panel">
-    <div class="toolbar">
-      <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar ingrediente...">
-      <div class="view-toggle">
-        <button type="button" id="btnViewList" class="active">☰ Lista</button>
-        <button type="button" id="btnViewCards">▦ Cartões</button>
-      </div>
-    </div>
-
-    <div class="status-msg" id="statusMsg">A ligar à base de dados...</div>
-
-    <div id="content"></div>
-    <div class="empty-state" id="emptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
-  </div>
+<div class="controls">
+  <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar ingrediente...">
+  <div class="filters" id="catFilters"></div>
 </div>
+
+<div class="status-msg" id="statusMsg">A ligar à base de dados...</div>
+
+<main>
+  <div id="content"></div>
+  <div class="empty-state" id="emptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
+</main>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay">
@@ -478,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var currentSearch = "";
   var currentView = "list";
 
-  var sidebar = document.getElementById('catList');
+  var catFilters = document.getElementById('catFilters');
   var content = document.getElementById('content');
   var emptyState = document.getElementById('emptyState');
   var statusMsg = document.getElementById('statusMsg');
@@ -515,28 +503,26 @@ document.addEventListener('DOMContentLoaded', function () {
     return catKeys;
   }
 
-  function renderSidebar() {
+  function renderFilters() {
     var grupos = groupByCategoria();
     var catKeys = sortedCatKeys(grupos);
     var total = Object.keys(allIngredientes).length;
 
     var html = '';
-    html += '<button type="button" class="cat-item' + (currentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">' +
-      '<span>Todas</span><span>(' + total + ')</span></button>';
+    html += '<button type="button" class="filter-btn' + (currentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">Todas (' + total + ')</button>';
 
     catKeys.forEach(function (catKey) {
       var label = catKey === 'null' ? 'Sem categoria' : (CATEGORIAS[catKey] || catKey);
       var count = grupos[catKey].length;
-      html += '<button type="button" class="cat-item' + (currentCategoria === catKey ? ' active' : '') + '" data-cat="' + escapeHtml(catKey) + '">' +
-        '<span>' + escapeHtml(label) + '</span><span>(' + count + ')</span></button>';
+      html += '<button type="button" class="filter-btn' + (currentCategoria === catKey ? ' active' : '') + '" data-cat="' + escapeHtml(catKey) + '">' + escapeHtml(label) + ' (' + count + ')</button>';
     });
 
-    sidebar.innerHTML = html;
+    catFilters.innerHTML = html;
 
-    sidebar.querySelectorAll('.cat-item').forEach(function (btn) {
+    catFilters.querySelectorAll('.filter-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         currentCategoria = btn.getAttribute('data-cat');
-        renderSidebar();
+        renderFilters();
         renderContent();
       });
     });
@@ -551,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (currentView === 'cards') {
       return '<div class="ingredient-cards">' + items.map(ingredientNode).join('') + '</div>';
     }
-    return items.map(ingredientNode).join('');
+    return '<div class="ingredient-list">' + items.map(ingredientNode).join('') + '</div>';
   }
 
   function renderContent() {
@@ -635,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
   ingredientesRef.on('value', function (snapshot) {
     allIngredientes = snapshot.val() || {};
     statusMsg.textContent = "";
-    renderSidebar();
+    renderFilters();
     renderContent();
   }, function (error) {
     statusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
