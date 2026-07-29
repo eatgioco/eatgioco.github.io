@@ -12,7 +12,11 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 - Fundo: `#F5F2EC` | Vermelho: `#D91124` | Preto: `#141414`
 - Fontes: Space Mono (títulos/labels) + Inter (texto corrido)
 - Header vermelho com `● GIOCO®`, botão `🏠 Home` em todas as páginas internas
-- Mobile-first nas páginas usadas pelo staff (caixa, loja, equipa)
+- **Desktop-only. Nunca fazer páginas mobile-first ou responsivas.** Todas as páginas
+  usam o mesmo layout normal: `header-inner` e `main` com `max-width:1200px`,
+  `main` com `padding:40px 24px 80px`, e `<meta name="viewport" content="width=1200">`.
+  Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
+  No telemóvel a página aparece reduzida (zoom out), não reorganizada.
 
 ## Ficheiros do repositório
 

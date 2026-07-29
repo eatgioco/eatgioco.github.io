@@ -2,7 +2,7 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=1200">
 <title>GIOCO · São Bento 154</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,7 +46,7 @@
   }
 
   .header-inner{
-    max-width:680px;
+    max-width:1200px;
     margin:0 auto;
     display:flex;
     align-items:center;
@@ -77,29 +77,37 @@
   }
 
   main{
-    max-width:680px;
+    max-width:1200px;
     margin:0 auto;
-    padding:20px 16px 80px;
+    padding:40px 24px 80px;
   }
 
   .page-title{
     margin:0;
-    font-size:26px;
+    font-size:30px;
     font-weight:700;
     letter-spacing:-0.5px;
   }
 
   .page-subtitle{
-    margin:6px 0 0;
+    margin:8px 0 0;
     font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:12px;
     color:var(--red);
-    letter-spacing:1.5px;
+    letter-spacing:2px;
     text-transform:uppercase;
   }
 
   .section{
-    margin-top:28px;
+    margin-top:40px;
+  }
+
+  /* Two-column work areas (form/plan on the left, data on the right) */
+  .split-grid{
+    display:grid;
+    grid-template-columns:380px minmax(0,1fr);
+    gap:28px;
+    align-items:start;
   }
 
   .section-title{
@@ -140,9 +148,9 @@
   }
 
   .equip-list{
-    margin-top:12px;
-    display:flex;
-    flex-direction:column;
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+    align-content:start;
     gap:8px;
   }
 
@@ -159,6 +167,7 @@
     width:100%;
   }
 
+  .equip-list-item:hover,
   .equip-list-item:active{
     border-color:var(--red);
   }
@@ -175,21 +184,21 @@
 
   /* ---------- Checklists ---------- */
   .checklist-buttons{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
   }
 
   .checklist-btn{
     font-family:'Space Mono', monospace;
     font-size:14px;
     font-weight:700;
-    padding:16px 8px;
+    padding:14px 28px;
+    min-width:240px;
     border:2px solid var(--black);
     background:var(--white);
     color:var(--black);
     cursor:pointer;
-    min-height:64px;
     line-height:1.4;
   }
 
@@ -206,27 +215,37 @@
   }
 
   .checklist-panel{
-    margin-top:12px;
+    margin-top:16px;
     background:var(--white);
     border:2px solid var(--black);
-    padding:16px;
+    padding:20px 24px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    column-gap:36px;
+  }
+
+  .checklist-panel > .checklist-done-header,
+  .checklist-panel > .checklist-meta-row,
+  .checklist-panel > .template-edit-box,
+  .checklist-panel > .link-btn{
+    grid-column:1 / -1;
+  }
+
+  .checklist-panel > .link-btn{
+    justify-self:start;
   }
 
   .checklist-item-row{
     display:flex;
     align-items:center;
     gap:12px;
-    padding:12px 4px;
+    padding:10px 4px;
     border-bottom:1px solid var(--line);
   }
 
-  .checklist-item-row:last-child{
-    border-bottom:none;
-  }
-
   .checklist-item-row input[type="checkbox"]{
-    width:24px;
-    height:24px;
+    width:18px;
+    height:18px;
     flex-shrink:0;
     accent-color:var(--red);
   }
@@ -242,17 +261,23 @@
   }
 
   .checklist-meta-row{
-    margin-top:14px;
+    margin-top:20px;
+    padding-top:16px;
+    border-top:2px solid var(--line);
     display:flex;
-    flex-direction:column;
-    gap:10px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:14px;
+  }
+
+  .checklist-meta-row .field{
+    width:260px;
   }
 
   .btn-concluir{
-    width:100%;
-    padding:16px;
+    padding:11px 24px;
     font-family:'Space Mono', monospace;
-    font-size:14px;
+    font-size:13px;
     font-weight:700;
     letter-spacing:0.5px;
     text-transform:uppercase;
@@ -260,7 +285,11 @@
     color:var(--white);
     border:2px solid var(--black);
     cursor:pointer;
-    min-height:52px;
+  }
+
+  .btn-concluir:hover{
+    background:var(--green);
+    border-color:var(--green);
   }
 
   .checklist-done-header{
@@ -360,17 +389,17 @@
   .field input[type="number"],
   .field select{
     width:100%;
-    padding:14px 12px;
+    padding:10px 12px;
     border:2px solid var(--line);
     background:var(--bg);
     font-family:'Inter', sans-serif;
-    font-size:16px;
+    font-size:14px;
     color:var(--black);
   }
 
   .field input[type="number"]{
     font-family:'Space Mono', monospace;
-    font-size:22px;
+    font-size:18px;
     font-weight:700;
   }
 
@@ -388,9 +417,9 @@
 
   .btn-registar{
     width:100%;
-    padding:16px;
+    padding:12px;
     font-family:'Space Mono', monospace;
-    font-size:15px;
+    font-size:13px;
     font-weight:700;
     letter-spacing:1px;
     text-transform:uppercase;
@@ -398,7 +427,11 @@
     color:var(--white);
     border:2px solid var(--black);
     cursor:pointer;
-    min-height:56px;
+  }
+
+  .btn-registar:not(:disabled):hover{
+    background:var(--red);
+    border-color:var(--red);
   }
 
   .btn-registar:disabled{
@@ -524,7 +557,6 @@
 
   .btn-ver-mais,
   .btn-ver-antigos{
-    width:100%;
     margin-top:14px;
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -581,7 +613,7 @@
 
   textarea{
     width:100%;
-    padding:14px 12px;
+    padding:10px 12px;
     border:2px solid var(--line);
     background:var(--bg);
     font-family:'Inter', sans-serif;
@@ -606,7 +638,6 @@
     display:flex;
     flex-wrap:wrap;
     gap:8px;
-    margin-top:20px;
   }
 
   .pedidos-filter-chip{
@@ -818,6 +849,7 @@
 
   <div class="section">
     <p class="section-title">Planta</p>
+    <div class="split-grid">
     <div class="plan-wrap">
       <svg viewBox="0 0 320 700" xmlns="http://www.w3.org/2000/svg">
         <text x="160" y="14" text-anchor="middle" font-family="'Space Mono', monospace" font-size="9" letter-spacing="1.5" fill="#6b6660">RUA DE SÃO BENTO</text>
@@ -892,7 +924,8 @@
       </svg>
     </div>
 
-    <div class="equip-list" id="equipList"></div>
+      <div class="equip-list" id="equipList"></div>
+    </div>
   </div>
 
   <div class="section">
@@ -903,6 +936,8 @@
 
   <div class="section" id="temp-section">
     <p class="section-title">Registo de temperaturas (HACCP)</p>
+    <div class="split-grid">
+    <div>
     <div class="form-card">
       <form id="tempForm">
         <div class="field">
@@ -937,14 +972,17 @@
     </div>
 
     <button type="button" class="btn-ver-mais" id="btnAbrirExport" style="margin-top:14px;">📄 Exportar registos</button>
+    </div>
 
     <div id="tempList"></div>
+    </div>
   </div>
 
   <div class="section" id="pedidos-section">
     <p class="section-title">Pedidos &amp; Sugestões</p>
     <p class="pedidos-counter" id="pedidosCounter">0 por responder</p>
 
+    <div class="split-grid">
     <div class="form-card">
       <div class="field">
         <label class="field-label" for="pedido-descricao">Descrição</label>
@@ -975,14 +1013,17 @@
       <p class="pedido-note">Para avarias ou urgências, liga diretamente — esta caixa é para melhorias e sugestões.</p>
     </div>
 
-    <div class="pedidos-filter-row" id="pedidosFilterRow">
-      <button type="button" class="pedidos-filter-chip active" data-filter="todos">Todos</button>
-      <button type="button" class="pedidos-filter-chip" data-filter="novo">Por responder</button>
-      <button type="button" class="pedidos-filter-chip" data-filter="curso">Em curso</button>
-      <button type="button" class="pedidos-filter-chip" data-filter="fechados">Fechados</button>
-    </div>
+    <div>
+      <div class="pedidos-filter-row" id="pedidosFilterRow">
+        <button type="button" class="pedidos-filter-chip active" data-filter="todos">Todos</button>
+        <button type="button" class="pedidos-filter-chip" data-filter="novo">Por responder</button>
+        <button type="button" class="pedidos-filter-chip" data-filter="curso">Em curso</button>
+        <button type="button" class="pedidos-filter-chip" data-filter="fechados">Fechados</button>
+      </div>
 
-    <div id="pedidosList"></div>
+      <div id="pedidosList"></div>
+    </div>
+    </div>
   </div>
 </main>
 
