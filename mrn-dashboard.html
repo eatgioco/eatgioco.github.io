@@ -1242,8 +1242,25 @@
     line-height:1;
   }
 
+  .tes-breakdown{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    margin-top:12px;
+  }
+
+  .tes-breakdown-line{
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .tes-breakdown-line strong{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+  }
+
   .tes-bigtotal-sub{
-    margin-top:8px;
+    margin-top:10px;
     font-size:12px;
     color:var(--muted);
   }
@@ -1842,6 +1859,10 @@
   <div class="tes-block">
     <p class="tes-block-title" id="tesTotalTitle">Total a pagar</p>
     <div class="tes-bigtotal" id="tesTotalValor">0.00€</div>
+    <div class="tes-breakdown">
+      <span class="tes-breakdown-line">Variáveis: <strong id="tesTotalVariaveis">0.00€</strong></span>
+      <span class="tes-breakdown-line">Fixos: <strong id="tesTotalFixos">0.00€</strong></span>
+    </div>
     <p class="tes-bigtotal-sub" id="tesTotalSub">—</p>
   </div>
 
@@ -2497,6 +2518,9 @@ window.addEventListener('load', function () {
 
       out.push({
         tipo: 'fixo',
+        // 'tipo' aqui é a origem (pedido vs compromisso); 'tipoCusto' é a
+        // natureza do custo (fixo vs variável), que vem do registo.
+        tipoCusto: tipoDe(c),
         id: id,
         nome: c.nome || id,
         categoria: c.categoria || 'Outros',
@@ -2535,13 +2559,25 @@ window.addEventListener('load', function () {
     return Math.min(Math.floor((dia - 1) / 7), 4);
   }
 
+  // Os pedidos de pagamento contam sempre como variáveis: não há ligação
+  // entre uma linha de pedido e um compromisso fixo, e por natureza são
+  // compras pontuais a fornecedores.
+  function ehVariavel(item){
+    return item.tipo === 'pedido' || item.tipoCusto === 'variavel';
+  }
+
   function renderTesTotal(itens){
     var total = itens.reduce(function(acc, i){ return acc + i.montante; }, 0);
     var nPedidos = itens.filter(function(i){ return i.tipo === 'pedido'; }).length;
     var nFixos = itens.filter(function(i){ return i.tipo === 'fixo'; }).length;
 
+    var variaveis = itens.reduce(function(acc, i){ return acc + (ehVariavel(i) ? i.montante : 0); }, 0);
+    var fixos = itens.reduce(function(acc, i){ return acc + (ehVariavel(i) ? 0 : i.montante); }, 0);
+
     tesTotalTitle.textContent = 'Total a pagar em ' + MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
     tesTotalValor.textContent = formatEuro(total);
+    document.getElementById('tesTotalVariaveis').textContent = formatEuro(variaveis);
+    document.getElementById('tesTotalFixos').textContent = formatEuro(fixos);
     tesTotalSub.textContent = nPedidos + ' ' + (nPedidos === 1 ? 'pedido pendente' : 'pedidos pendentes') +
       ' · ' + nFixos + ' ' + (nFixos === 1 ? 'compromisso fixo' : 'compromissos fixos');
   }
