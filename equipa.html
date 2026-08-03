@@ -378,6 +378,7 @@
 
   td.celula{
     cursor:pointer;
+    position:relative;
   }
 
   td.celula:hover{
@@ -405,6 +406,41 @@
     overflow:hidden;
     text-overflow:ellipsis;
     border:1px solid rgba(0,0,0,0.15);
+  }
+
+  /* Chip previsto pelo padrão, ainda sem confirmação manual */
+  .p-chip-previsto{
+    background:transparent;
+    border:1px dashed currentColor;
+    opacity:0.75;
+    font-style:italic;
+  }
+
+  .btn-revert-padrao{
+    position:absolute;
+    top:3px;
+    right:3px;
+    width:16px;
+    height:16px;
+    line-height:14px;
+    padding:0;
+    font-size:11px;
+    text-align:center;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+    opacity:0;
+    transition:opacity .15s;
+  }
+
+  td.celula:hover .btn-revert-padrao{
+    opacity:1;
+  }
+
+  .btn-revert-padrao:hover{
+    border-color:var(--red);
+    color:var(--red);
   }
 
   .celula-vazia{
@@ -667,6 +703,147 @@
   .btn-mr-auto{
     margin-right:auto;
   }
+
+  /* ---------- Padrão semanal (dentro do modal de pessoa) ---------- */
+  .padrao-grid-wrap{
+    overflow-x:auto;
+    margin-top:4px;
+  }
+
+  .padrao-table{
+    width:100%;
+    min-width:280px;
+    border-collapse:collapse;
+  }
+
+  .padrao-table th,
+  .padrao-table td{
+    text-align:center;
+    padding:5px 2px;
+    border:1px solid var(--line);
+  }
+
+  .padrao-table th{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:10px;
+    background:var(--bg);
+    text-transform:uppercase;
+  }
+
+  .padrao-turno-label{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:10px;
+    background:var(--bg);
+    white-space:nowrap;
+  }
+
+  .padrao-table input[type="checkbox"]{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+  }
+
+  .padrao-hint{
+    margin:6px 0 0;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  /* ---------- Mini-calendário mensal ---------- */
+  .cal-modal{
+    max-width:360px;
+  }
+
+  .cal-nav{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-bottom:14px;
+  }
+
+  .cal-month-label{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:14px;
+    min-width:150px;
+    text-align:center;
+    text-transform:capitalize;
+  }
+
+  .cal-weekdays{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:3px;
+    margin-bottom:4px;
+  }
+
+  .cal-weekdays span{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    text-align:center;
+    text-transform:uppercase;
+  }
+
+  .cal-days{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:3px;
+  }
+
+  .cal-day{
+    aspect-ratio:1;
+    border:1px solid var(--line);
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--black);
+    cursor:pointer;
+    padding:0;
+  }
+
+  .cal-day:hover{
+    background:var(--bg);
+    border-color:var(--black);
+  }
+
+  .cal-day-out{
+    color:#c4bfb3;
+    background:var(--bg);
+  }
+
+  .cal-day-semana{
+    background:#EDE8DD;
+  }
+
+  .cal-day-today{
+    border:2px solid var(--red);
+    font-weight:700;
+  }
+
+  .cal-day-semana.cal-day-today{
+    background:#EFDFDD;
+  }
+
+  .btn-vista-mensal{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:9px 16px;
+    border:2px solid var(--black);
+    background:var(--white);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .btn-vista-mensal:hover{
+    background:var(--black);
+    color:var(--white);
+  }
 </style>
 </head>
 <body>
@@ -700,6 +877,7 @@
       <span class="week-label" id="weekLabel"></span>
       <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
       <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
+      <button type="button" class="btn-vista-mensal" id="btnVistaMensal">📅 Vista mensal</button>
     </div>
 
     <div class="grelha-wrap">
@@ -752,11 +930,36 @@
       Ativo
     </label>
 
+    <div class="field">
+      <label class="field-label">Padrão semanal</label>
+      <div class="padrao-grid-wrap" id="padraoGridWrap"></div>
+      <p class="padrao-hint">Deixa tudo por marcar para uma pessoa sem horário fixo (variável). Confirmações já feitas na grelha não mudam ao alterar o padrão.</p>
+    </div>
+
     <div class="modal-actions">
       <button type="button" class="btn btn-mr-auto" id="btnDesativarPessoa" style="display:none;">Desativar</button>
       <button type="button" class="btn" id="pessoaModalCancel">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btnGuardarPessoa">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal Vista mensal -->
+<div class="modal-overlay" id="calModalOverlay">
+  <div class="modal cal-modal">
+    <div class="modal-header">
+      <h2>Vista mensal</h2>
+      <button class="modal-close" id="calModalClose">×</button>
+    </div>
+
+    <div class="cal-nav">
+      <button type="button" class="week-nav-btn" id="calPrevMonth" title="Mês anterior" aria-label="Mês anterior">‹</button>
+      <span class="cal-month-label" id="calModalLabel"></span>
+      <button type="button" class="week-nav-btn" id="calNextMonth" title="Mês seguinte" aria-label="Mês seguinte">›</button>
+    </div>
+
+    <div class="cal-weekdays" id="calWeekdays"></div>
+    <div class="cal-days" id="calGrid"></div>
   </div>
 </div>
 
@@ -789,19 +992,30 @@
   var db = firebase.database();
   var pessoasRef = db.ref('pessoas');
   var turnosRef = db.ref('turnos');
+  var padroesRef = db.ref('padroes');
 
   var pessoas = {};
   var pessoasCarregadas = false;
   var turnos = {};
+  var padroes = {};
   var weekOffset = 0;
 
   var editingPessoaId = null;
   var turnoModalData = null;
   var turnoModalTurnoId = null;
 
+  var calViewYear = null;
+  var calViewMonth = null;
+
   var DIA_NOMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   var DIA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   var MES_NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  /* Chaves dos dias tal como guardadas em 'padroes/{pessoaId}', por ordem de segunda a domingo */
+  var DIA_KEYS_UI = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+  var DIA_LABELS_UI = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  /* Mesmas chaves, mas indexadas por Date.getDay() (0 = domingo) */
+  var DIA_KEYS_BY_GETDAY = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
 
   /* Turnos fixos, por ordem cronológica */
   var TURNOS = [
@@ -872,6 +1086,39 @@
     }
   }
 
+  /* ---------- Padrão semanal (dentro do modal de pessoa) ---------- */
+  function buildPadraoTableHtml(pad){
+    pad = pad || {};
+    var html = '<table class="padrao-table"><thead><tr><th></th>';
+    DIA_LABELS_UI.forEach(function(l){ html += '<th>' + l + '</th>'; });
+    html += '</tr></thead><tbody>';
+    TURNOS.forEach(function(t){
+      html += '<tr><td class="padrao-turno-label" title="' + t.horario + '">' + t.id.toUpperCase() + '</td>';
+      DIA_KEYS_UI.forEach(function(diaKey){
+        var checked = pad[diaKey] && pad[diaKey].indexOf(t.id) !== -1;
+        html += '<td><input type="checkbox" data-dia="' + diaKey + '" data-turno="' + t.id + '"' + (checked ? ' checked' : '') + '></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function lerPadraoDoFormulario(){
+    var pad = {};
+    DIA_KEYS_UI.forEach(function(diaKey){ pad[diaKey] = []; });
+    var checks = document.querySelectorAll('#padraoGridWrap input[type="checkbox"]');
+    Array.prototype.forEach.call(checks, function(c){
+      if (c.checked) pad[c.getAttribute('data-dia')].push(c.getAttribute('data-turno'));
+    });
+    return pad;
+  }
+
+  function salvarPadrao(pessoaId, pad){
+    var temAlgum = Object.keys(pad).some(function(k){ return pad[k].length; });
+    return temAlgum ? padroesRef.child(pessoaId).set(pad) : padroesRef.child(pessoaId).remove();
+  }
+
   function openPessoaModal(id){
     editingPessoaId = id || null;
     var p = id ? Object.assign({ id: id }, pessoas[id]) : null;
@@ -883,6 +1130,7 @@
     document.getElementById('pessoaCor').value = (p && p.cor) ? p.cor : '#D91124';
     document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
     document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
+    document.getElementById('padraoGridWrap').innerHTML = buildPadraoTableHtml(id ? padroes[id] : null);
     document.getElementById('pessoaModalOverlay').classList.add('open');
   }
   window.editPessoa = function(id){ openPessoaModal(id); };
@@ -914,12 +1162,21 @@
       cor: document.getElementById('pessoaCor').value,
       ativo: document.getElementById('pessoaAtivo').checked
     };
+    var pad = lerPadraoDoFormulario();
 
-    var promise = editingPessoaId
-      ? pessoasRef.child(editingPessoaId).update(dados)
-      : pessoasRef.push(dados);
+    var pessoaId = editingPessoaId;
+    var promise;
+    if (pessoaId){
+      promise = pessoasRef.child(pessoaId).update(dados);
+    } else {
+      var novaRef = pessoasRef.push();
+      pessoaId = novaRef.key;
+      promise = novaRef.set(dados);
+    }
 
-    promise.then(closePessoaModal).catch(function(err){
+    promise.then(function(){
+      return salvarPadrao(pessoaId, pad);
+    }).then(closePessoaModal).catch(function(err){
       alert('Erro ao guardar pessoa: ' + err.message);
     });
   });
@@ -942,6 +1199,11 @@
     pessoas = val;
     pessoasCarregadas = true;
     renderPessoas();
+    renderGrelha();
+  });
+
+  padroesRef.on('value', function(snapshot){
+    padroes = snapshot.val() || {};
     renderGrelha();
   });
 
@@ -972,9 +1234,13 @@
     return fmt(monday) + ' – ' + fmt(sunday);
   }
 
-  function formatDataLonga(dStr){
+  function parseDataStr(dStr){
     var parts = dStr.split('-');
-    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }
+
+  function formatDataLonga(dStr){
+    var d = parseDataStr(dStr);
     return DIA_NOMES[d.getDay()] + ', ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
   }
 
@@ -1003,6 +1269,26 @@
 
   function pessoasDoTurno(dStr, turnoId){
     return normalizaPessoas(turnos[chaveTurno(dStr, turnoId)]);
+  }
+
+  /* Pessoas previstas pelo padrão semanal para esta data+turno (só pessoas ativas) */
+  function pessoasDoPadrao(dStr, turnoId){
+    var diaKey = DIA_KEYS_BY_GETDAY[parseDataStr(dStr).getDay()];
+    var out = [];
+    pessoasAtivasArray().forEach(function(p){
+      var pad = padroes[p.id];
+      if (pad && Array.isArray(pad[diaKey]) && pad[diaKey].indexOf(turnoId) !== -1){
+        out.push({ pessoaId: p.id, nome: p.nome, cor: p.cor });
+      }
+    });
+    return out;
+  }
+
+  /* Resolve o efetivo de uma célula: confirmação manual tem sempre prioridade sobre o padrão */
+  function efetivoDoTurno(dStr, turnoId){
+    var key = chaveTurno(dStr, turnoId);
+    if (turnos[key]) return { pessoas: normalizaPessoas(turnos[key]), confirmado: true };
+    return { pessoas: pessoasDoPadrao(dStr, turnoId), confirmado: false };
   }
 
   /* Nome/cor actuais da pessoa; cai para o snapshot guardado se já não existir */
@@ -1078,18 +1364,28 @@
       dias.forEach(function(d){
         var dStr = toDateStr(d);
         var isToday = dStr === todayStr;
-        var lista = pessoasDoTurno(dStr, t.id);
+        var efet = efetivoDoTurno(dStr, t.id);
+        var lista = efet.pessoas;
 
         html += '<td class="celula' + (isToday ? ' hoje' : '') + '" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
+        if (efet.confirmado){
+          html += '<button type="button" class="btn-revert-padrao" title="Reverter ao padrão" onclick="revertParaPadrao(\'' + dStr + '\',\'' + t.id + '\',event)">↺</button>';
+        }
         html += '<div class="celula-inner">';
         if (lista.length){
           var curto = lista.length >= 4;
           lista.forEach(function(entrada){
             var info = dadosPessoa(entrada);
             var label = curto ? iniciais(info.nome) : primeiroNome(info.nome);
-            html += '<span class="p-chip" title="' + escapeHtml(info.nome) + '"';
-            html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
-            html += escapeHtml(label) + '</span>';
+            if (efet.confirmado){
+              html += '<span class="p-chip" title="' + escapeHtml(info.nome) + '"';
+              html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
+              html += escapeHtml(label) + '</span>';
+            } else {
+              html += '<span class="p-chip p-chip-previsto" title="' + escapeHtml(info.nome) + ' (previsto pelo padrão)"';
+              html += ' style="color:' + info.cor + ';border-color:' + info.cor + '">';
+              html += escapeHtml(label) + '</span>';
+            }
           });
         } else {
           html += '<span class="celula-vazia">+</span>';
@@ -1137,31 +1433,41 @@
   }
 
   function renderResumos(dias){
-    /* Semana visível: 21 células */
+    /* Semana visível: 21 células, sempre pelo efetivo (padrão + confirmações) */
     var semana = {};
     dias.forEach(function(d){
       var dStr = toDateStr(d);
       TURNOS.forEach(function(t){
-        pessoasDoTurno(dStr, t.id).forEach(function(entrada){ acumula(semana, entrada, t.horas); });
+        efetivoDoTurno(dStr, t.id).pessoas.forEach(function(entrada){ acumula(semana, entrada, t.horas); });
       });
     });
     renderResumoTabela(semana, 'resumoSemana');
 
-    /* Mês corrente: todos os registos cuja data cai no mês */
+    /* Mês corrente: percorre todos os dias do mês x 3 turnos, resolvendo o efetivo de cada célula */
     var hoje = new Date();
-    var mesStr = hoje.getFullYear() + '-' + pad2(hoje.getMonth() + 1);
-    document.getElementById('mesLabel').textContent = MES_NOMES[hoje.getMonth()];
+    var ano = hoje.getFullYear();
+    var mesIdx = hoje.getMonth();
+    document.getElementById('mesLabel').textContent = MES_NOMES[mesIdx];
 
+    var diasNoMes = new Date(ano, mesIdx + 1, 0).getDate();
     var mes = {};
-    Object.keys(turnos).forEach(function(k){
-      var reg = turnos[k];
-      if (!reg || !reg.data || String(reg.data).slice(0, 7) !== mesStr) return;
-      var def = turnoDef(reg.turno);
-      if (!def) return;
-      normalizaPessoas(reg).forEach(function(entrada){ acumula(mes, entrada, def.horas); });
-    });
+    for (var dia = 1; dia <= diasNoMes; dia++){
+      var dStr = toDateStr(new Date(ano, mesIdx, dia));
+      TURNOS.forEach(function(t){
+        efetivoDoTurno(dStr, t.id).pessoas.forEach(function(entrada){ acumula(mes, entrada, t.horas); });
+      });
+    }
     renderResumoTabela(mes, 'resumoMes');
   }
+
+  function revertParaPadrao(dStr, turnoId, ev){
+    if (ev) ev.stopPropagation();
+    if (!confirm('Reverter esta célula ao padrão? A confirmação manual é apagada.')) return;
+    turnosRef.child(chaveTurno(dStr, turnoId)).remove().catch(function(err){
+      alert('Erro ao reverter: ' + err.message);
+    });
+  }
+  window.revertParaPadrao = revertParaPadrao;
 
   /* ---------- Modal de atribuição ---------- */
   function openTurnoModal(dStr, turnoId){
@@ -1177,7 +1483,7 @@
       el.innerHTML = '<p class="empty-state">A carregar…</p>';
     } else {
       var atribuidos = {};
-      pessoasDoTurno(dStr, turnoId).forEach(function(entrada){ atribuidos[entrada.pessoaId] = entrada; });
+      efetivoDoTurno(dStr, turnoId).pessoas.forEach(function(entrada){ atribuidos[entrada.pessoaId] = entrada; });
 
       var lista = pessoasAtivasArray();
       /* Inclui quem está atribuído mas já não está activo, para não o perder ao guardar */
@@ -1225,19 +1531,81 @@
       arr.push({ pessoaId: c.value, nome: p.nome || 'Pessoa removida', cor: p.cor || '#999999' });
     });
 
+    /* Grava sempre como confirmação explícita (mesmo array vazio), para travar a célula contra o padrão */
     var key = chaveTurno(turnoModalData, turnoModalTurnoId);
-    var promise = arr.length
-      ? turnosRef.child(key).set({ data: turnoModalData, turno: turnoModalTurnoId, pessoas: arr })
-      : turnosRef.child(key).remove();
-
-    promise.then(closeTurnoModal).catch(function(err){
-      alert('Erro ao guardar turno: ' + err.message);
-    });
+    turnosRef.child(key).set({ data: turnoModalData, turno: turnoModalTurnoId, pessoas: arr })
+      .then(closeTurnoModal).catch(function(err){
+        alert('Erro ao guardar turno: ' + err.message);
+      });
   });
 
   turnosRef.on('value', function(snapshot){
     turnos = snapshot.val() || {};
     renderGrelha();
+  });
+
+  /* ---------- Mini-calendário mensal (só navegação, sem dados de turnos) ---------- */
+  document.getElementById('calWeekdays').innerHTML = DIA_LABELS_UI.map(function(l){ return '<span>' + l + '</span>'; }).join('');
+
+  function renderCalModal(){
+    document.getElementById('calModalLabel').textContent = MES_NOMES[calViewMonth] + ' ' + calViewYear;
+
+    var first = new Date(calViewYear, calViewMonth, 1);
+    var offsetInicio = first.getDay() === 0 ? 6 : first.getDay() - 1; /* dias antes do 1º para chegar a segunda */
+    var gridStart = new Date(calViewYear, calViewMonth, 1 - offsetInicio);
+
+    var todayStr = toDateStr(new Date());
+    var semanaAtualMonday = toDateStr(getWeekStart());
+
+    var html = '';
+    for (var i = 0; i < 42; i++){
+      var d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      var dStr = toDateStr(d);
+      var cls = 'cal-day';
+      if (d.getMonth() !== calViewMonth) cls += ' cal-day-out';
+      if (toDateStr(getMonday(d)) === semanaAtualMonday) cls += ' cal-day-semana';
+      if (dStr === todayStr) cls += ' cal-day-today';
+      html += '<button type="button" class="' + cls + '" onclick="irParaDia(\'' + dStr + '\')">' + d.getDate() + '</button>';
+    }
+    document.getElementById('calGrid').innerHTML = html;
+  }
+
+  function openCalModal(){
+    var monday = getWeekStart();
+    calViewYear = monday.getFullYear();
+    calViewMonth = monday.getMonth();
+    renderCalModal();
+    document.getElementById('calModalOverlay').classList.add('open');
+  }
+
+  function closeCalModal(){
+    document.getElementById('calModalOverlay').classList.remove('open');
+  }
+
+  function irParaDia(dStr){
+    var targetMonday = getMonday(parseDataStr(dStr));
+    var todayMonday = getMonday(new Date());
+    weekOffset = Math.round((targetMonday - todayMonday) / (7 * 86400000));
+    closeCalModal();
+    renderGrelha();
+  }
+  window.irParaDia = irParaDia;
+
+  document.getElementById('btnVistaMensal').addEventListener('click', openCalModal);
+  document.getElementById('calModalClose').addEventListener('click', closeCalModal);
+  document.getElementById('calModalOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('calModalOverlay')) closeCalModal();
+  });
+  document.getElementById('calPrevMonth').addEventListener('click', function(){
+    calViewMonth--;
+    if (calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+    renderCalModal();
+  });
+  document.getElementById('calNextMonth').addEventListener('click', function(){
+    calViewMonth++;
+    if (calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+    renderCalModal();
   });
 
   renderGrelha();
