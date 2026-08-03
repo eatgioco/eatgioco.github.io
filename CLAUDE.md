@@ -17,6 +17,10 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   `main` com `padding:40px 24px 80px`, e `<meta name="viewport" content="width=1200">`.
   Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
+- **Excepção: `equipa.html`.** A grelha de turnos tem de ser usável ao telemóvel, por isso
+  usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Mesmo assim
+  não tem `@media` — adapta-se só com `overflow-x:auto` + coluna sticky e grelhas
+  `minmax(min(Xpx,100%),1fr)`.
 
 ## Ficheiros do repositório
 

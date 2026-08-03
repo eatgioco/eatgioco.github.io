@@ -2,7 +2,8 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1200">
+<!-- Excepção ao padrão desktop-only do OS: a grelha de turnos tem de ser usável ao balcão/telemóvel -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Equipa</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -139,7 +140,7 @@
   /* ---------- Pessoas ---------- */
   .pessoas-list{
     display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns:repeat(auto-fill, minmax(min(340px, 100%), 1fr));
     gap:12px;
   }
 
@@ -228,6 +229,7 @@
     align-items:center;
     gap:10px;
     margin-top:12px;
+    flex-wrap:wrap;
   }
 
   .week-nav-btn{
@@ -249,7 +251,7 @@
     font-family:'Space Mono', monospace;
     font-size:13px;
     font-weight:700;
-    min-width:260px;
+    min-width:170px;
     text-align:center;
   }
 
@@ -268,128 +270,258 @@
     color:var(--white);
   }
 
-  #diasList{
+  /* ---------- Grelha semanal ---------- */
+  .grelha-wrap{
     margin-top:14px;
-  }
-
-  .dia-block{
+    border:3px solid var(--black);
     background:var(--white);
-    border:2px solid var(--line);
-    padding:14px 18px;
-    margin-top:10px;
-    display:grid;
-    grid-template-columns:170px minmax(0,1fr) auto;
-    column-gap:20px;
-    align-items:center;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
   }
 
-  .dia-block.today{
-    border-color:var(--red);
+  .grelha{
+    border-collapse:separate;
+    border-spacing:0;
+    table-layout:fixed;
+    width:100%;
+    min-width:860px;
   }
 
-  .dia-header{
-    display:contents;
+  .grelha th,
+  .grelha td{
+    padding:0;
+    vertical-align:top;
+    border-right:2px solid var(--line);
+    border-bottom:2px solid var(--line);
   }
 
-  .dia-nome-data{
-    grid-column:1;
-    grid-row:1;
-    display:flex;
-    flex-direction:column;
+  .grelha tr > *:last-child{
+    border-right:none;
   }
 
-  .btn-add-turno{
-    grid-column:3;
-    grid-row:1;
+  .grelha tbody tr:last-child > *{
+    border-bottom:none;
   }
 
-  .dia-nome{
+  .col-label{
+    width:112px;
+  }
+
+  .grelha thead th{
+    background:var(--bg);
     font-family:'Space Mono', monospace;
-    font-size:13px;
+    font-size:11px;
     font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    text-align:center;
+    padding:10px 6px;
+    vertical-align:middle;
   }
 
-  .dia-block.today .dia-nome{
+  .col-sticky{
+    position:sticky;
+    left:0;
+    z-index:2;
+    background:var(--bg);
+    border-right:3px solid var(--black);
+  }
+
+  .grelha thead .col-sticky{
+    z-index:3;
+  }
+
+  .dia-abrev{
+    display:block;
+    font-size:12px;
+  }
+
+  .dia-num{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:0;
+    margin-top:3px;
+  }
+
+  .grelha th.hoje{
+    color:var(--red);
+    box-shadow:inset 0 -3px 0 var(--red);
+  }
+
+  .grelha th.hoje .dia-num{
     color:var(--red);
   }
 
-  .dia-data{
-    font-size:11px;
-    color:var(--muted);
+  .grelha td.hoje{
+    background:rgba(217,17,36,0.05);
   }
 
-  .btn-add-turno{
+  td.turno-label{
+    padding:12px 8px;
+  }
+
+  .turno-horario{
+    display:block;
     font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:12px;
     font-weight:700;
-    padding:8px 14px;
-    border:2px solid var(--black);
-    background:var(--white);
-    cursor:pointer;
     white-space:nowrap;
   }
 
-  .btn-add-turno:hover{
-    background:var(--black);
-    color:var(--white);
+  .turno-duracao{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:3px;
   }
 
-  .turnos-list{
-    grid-column:2;
-    grid-row:1;
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-  }
-
-  .turno-chip{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    flex-wrap:wrap;
-    padding:8px 12px;
-    border-left:4px solid var(--muted);
-    background:var(--bg);
+  td.celula{
     cursor:pointer;
   }
 
-  .turno-chip:hover{
-    background:var(--line);
+  td.celula:hover{
+    background:#EDE8DD;
   }
 
-  .turno-cor-dot{
+  td.celula.hoje:hover{
+    background:#EFDFDD;
+  }
+
+  .celula-inner{
+    min-height:64px;
+    padding:6px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+
+  .p-chip{
+    font-size:11px;
+    font-weight:600;
+    line-height:1.35;
+    padding:3px 6px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    border:1px solid rgba(0,0,0,0.15);
+  }
+
+  .celula-vazia{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    color:#c4bfb3;
+    text-align:center;
+    line-height:52px;
+  }
+
+  td.celula:hover .celula-vazia{
+    color:var(--red);
+  }
+
+  /* ---------- Resumo de horas ---------- */
+  .resumo-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    gap:18px;
+    margin-top:26px;
+  }
+
+  .resumo-card{
+    background:var(--white);
+    border:3px solid var(--black);
+    padding:18px 20px;
+  }
+
+  .resumo-card h3{
+    margin:0 0 12px;
+    font-size:12px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+
+  .resumo-table{
+    width:100%;
+    border-collapse:collapse;
+  }
+
+  .resumo-table td{
+    padding:7px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+
+  .resumo-nome{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .resumo-dot{
     width:10px;
     height:10px;
     border-radius:50%;
     flex-shrink:0;
+    border:1px solid rgba(0,0,0,0.15);
   }
 
-  .turno-nome{
-    font-weight:600;
-    font-size:13px;
-  }
-
-  .turno-horario{
+  .resumo-horas{
+    text-align:right;
     font-family:'Space Mono', monospace;
-    font-size:12px;
-    color:var(--muted);
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
   }
 
-  .turno-notas{
+  .resumo-table tr.resumo-total td{
+    border-bottom:none;
+    border-top:2px solid var(--black);
+    padding-top:9px;
+    font-weight:700;
+  }
+
+  /* ---------- Modal de atribuição ---------- */
+  .turno-modal-horario{
+    margin:0 0 16px;
+    font-family:'Space Mono', monospace;
+    font-size:18px;
+    font-weight:700;
+  }
+
+  .check-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    max-height:320px;
+    overflow-y:auto;
+  }
+
+  .check-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 10px;
+    border:2px solid var(--line);
+    background:var(--white);
+    font-size:14px;
+    cursor:pointer;
+  }
+
+  .check-item:hover{
+    border-color:var(--black);
+  }
+
+  .check-item input{
+    width:18px;
+    height:18px;
+    flex-shrink:0;
+  }
+
+  .check-item-inativo{
     font-size:11px;
     color:var(--muted);
-    font-style:italic;
-    width:100%;
-    margin-top:2px;
-  }
-
-  .dia-empty{
-    grid-column:2;
-    grid-row:1;
-    font-size:12px;
-    color:var(--muted);
-    margin:0;
-    font-style:italic;
+    margin-left:auto;
+    font-family:'Space Mono', monospace;
   }
 
   /* ---------- Modal (shared pattern with fornecedores.html / mrn-dashboard.html) ---------- */
@@ -564,13 +696,26 @@
   <div class="section">
     <p class="section-title">Turnos</p>
     <div class="week-nav">
-      <button type="button" class="week-nav-btn" id="prevWeekBtn">←</button>
+      <button type="button" class="week-nav-btn" id="prevWeekBtn" title="Semana anterior" aria-label="Semana anterior">←</button>
       <span class="week-label" id="weekLabel"></span>
-      <button type="button" class="week-nav-btn" id="nextWeekBtn">→</button>
+      <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
       <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
     </div>
 
-    <div id="diasList"></div>
+    <div class="grelha-wrap">
+      <table class="grelha" id="grelhaTurnos"></table>
+    </div>
+
+    <div class="resumo-grid">
+      <div class="resumo-card">
+        <h3 class="mono">Esta semana</h3>
+        <div id="resumoSemana"></div>
+      </div>
+      <div class="resumo-card">
+        <h3 class="mono">Este mês · <span id="mesLabel"></span></h3>
+        <div id="resumoMes"></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -619,35 +764,17 @@
 <div class="modal-overlay" id="turnoModalOverlay">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="turnoModalTitle">Novo turno</h2>
+      <h2 id="turnoModalTitle">Turno</h2>
       <button class="modal-close" id="turnoModalClose">×</button>
     </div>
 
-    <p class="field-label" id="turnoModalData" style="margin-bottom:16px;"></p>
+    <p class="field-label" id="turnoModalData" style="margin-bottom:6px;"></p>
+    <p class="turno-modal-horario" id="turnoModalHorario"></p>
 
-    <div class="field">
-      <label class="field-label">Pessoa *</label>
-      <select id="turnoPessoa"></select>
-    </div>
-
-    <div class="form-grid">
-      <div class="field">
-        <label class="field-label">Início *</label>
-        <input type="time" id="turnoInicio">
-      </div>
-      <div class="field">
-        <label class="field-label">Fim *</label>
-        <input type="time" id="turnoFim">
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="field-label">Notas</label>
-      <input type="text" id="turnoNotas">
-    </div>
+    <label class="field-label">Quem trabalha</label>
+    <div class="check-list" id="turnoPessoasList"></div>
 
     <div class="modal-actions">
-      <button type="button" class="btn btn-mr-auto" id="btnApagarTurno" style="display:none;">🗑 Remover</button>
       <button type="button" class="btn" id="turnoModalCancel">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btnGuardarTurno">Guardar</button>
     </div>
@@ -669,10 +796,19 @@
   var weekOffset = 0;
 
   var editingPessoaId = null;
-  var editingTurnoId = null;
-  var turnoModalDataStr = null;
+  var turnoModalData = null;
+  var turnoModalTurnoId = null;
 
   var DIA_NOMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  var DIA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  var MES_NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  /* Turnos fixos, por ordem cronológica */
+  var TURNOS = [
+    { id:'t1', horario:'11:00–16:00', horas:5 },
+    { id:'t3', horario:'16:00–17:30', horas:1.5 },
+    { id:'t2', horario:'17:30–23:00', horas:5.5 }
+  ];
 
   function escapeHtml(str){
     if (!str) return '';
@@ -806,7 +942,7 @@
     pessoas = val;
     pessoasCarregadas = true;
     renderPessoas();
-    renderDias();
+    renderGrelha();
   });
 
   /* ---------- Turnos ---------- */
@@ -842,101 +978,234 @@
     return DIA_NOMES[d.getDay()] + ', ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
   }
 
-  document.getElementById('prevWeekBtn').addEventListener('click', function(){ weekOffset--; renderDias(); });
-  document.getElementById('nextWeekBtn').addEventListener('click', function(){ weekOffset++; renderDias(); });
-  document.getElementById('btnHoje').addEventListener('click', function(){ weekOffset = 0; renderDias(); });
+  document.getElementById('prevWeekBtn').addEventListener('click', function(){ weekOffset--; renderGrelha(); });
+  document.getElementById('nextWeekBtn').addEventListener('click', function(){ weekOffset++; renderGrelha(); });
+  document.getElementById('btnHoje').addEventListener('click', function(){ weekOffset = 0; renderGrelha(); });
 
-  function renderDias(){
+  function turnoDef(turnoId){
+    for (var i = 0; i < TURNOS.length; i++){
+      if (TURNOS[i].id === turnoId) return TURNOS[i];
+    }
+    return null;
+  }
+
+  function chaveTurno(dStr, turnoId){
+    return dStr + '_' + turnoId;
+  }
+
+  /* Firebase pode devolver o array como array ou como objecto indexado */
+  function normalizaPessoas(registo){
+    if (!registo || !registo.pessoas) return [];
+    var raw = registo.pessoas;
+    var arr = Array.isArray(raw) ? raw : Object.keys(raw).map(function(k){ return raw[k]; });
+    return arr.filter(function(p){ return p && p.pessoaId; });
+  }
+
+  function pessoasDoTurno(dStr, turnoId){
+    return normalizaPessoas(turnos[chaveTurno(dStr, turnoId)]);
+  }
+
+  /* Nome/cor actuais da pessoa; cai para o snapshot guardado se já não existir */
+  function dadosPessoa(entrada){
+    var live = pessoas[entrada.pessoaId];
+    return {
+      nome: live ? (live.nome || '—') : (entrada.nome || 'Pessoa removida'),
+      cor: (live ? live.cor : entrada.cor) || '#999999'
+    };
+  }
+
+  function primeiroNome(nome){
+    return String(nome || '').trim().split(/\s+/)[0] || '—';
+  }
+
+  function iniciais(nome){
+    var partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return '—';
+    var out = partes[0].charAt(0);
+    if (partes.length > 1) out += partes[partes.length - 1].charAt(0);
+    return out.toUpperCase();
+  }
+
+  /* Texto preto ou branco consoante a luminância da cor da pessoa */
+  function textoContraste(hex){
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if (h.length !== 6) return '#FFFFFF';
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return (0.299*r + 0.587*g + 0.114*b) > 150 ? '#141414' : '#FFFFFF';
+  }
+
+  function fmtHoras(h){
+    var min = Math.round(h * 60);
+    var hh = Math.floor(min / 60);
+    var mm = min % 60;
+    return hh + 'h' + (mm ? pad2(mm) : '');
+  }
+
+  function renderGrelha(){
     var monday = getWeekStart();
     document.getElementById('weekLabel').textContent = formatWeekLabel(monday);
 
     var todayStr = toDateStr(new Date());
-    var html = '';
-
+    var dias = [];
     for (var i = 0; i < 7; i++){
       var d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      var dStr = toDateStr(d);
-      var isToday = dStr === todayStr;
-      var diaNome = DIA_NOMES[d.getDay()];
-      var diaData = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
-
-      var turnosDoDia = Object.keys(turnos)
-        .map(function(id){ return Object.assign({ id: id }, turnos[id]); })
-        .filter(function(t){ return t.data === dStr; })
-        .sort(function(a, b){ return (a.inicio || '').localeCompare(b.inicio || ''); });
-
-      html += '<div class="dia-block' + (isToday ? ' today' : '') + '">';
-      html += '  <div class="dia-header">';
-      html += '    <div class="dia-nome-data"><span class="dia-nome">' + diaNome + '</span><span class="dia-data">' + diaData + '</span></div>';
-      html += '    <button type="button" class="btn-add-turno" onclick="openTurnoModal(\'' + dStr + '\')">+ Turno</button>';
-      html += '  </div>';
-
-      if (turnosDoDia.length){
-        html += '  <div class="turnos-list">';
-        turnosDoDia.forEach(function(t){
-          var pessoaAtual = pessoas[t.pessoaId];
-          var cor = pessoaAtual ? pessoaAtual.cor : '#999';
-          var nome = pessoaAtual ? pessoaAtual.nome : (t.pessoaNome || 'Pessoa removida');
-          html += '<div class="turno-chip" style="border-left-color:' + cor + '" onclick="openTurnoModal(null,\'' + t.id + '\')">';
-          html += '  <span class="turno-cor-dot" style="background:' + cor + '"></span>';
-          html += '  <span class="turno-nome">' + escapeHtml(nome) + '</span>';
-          html += '  <span class="turno-horario">' + escapeHtml(t.inicio) + '–' + escapeHtml(t.fim) + '</span>';
-          if (t.notas) html += '<span class="turno-notas">' + escapeHtml(t.notas) + '</span>';
-          html += '</div>';
-        });
-        html += '  </div>';
-      } else {
-        html += '  <p class="dia-empty">Sem turnos.</p>';
-      }
-
-      html += '</div>';
+      dias.push(d);
     }
 
-    document.getElementById('diasList').innerHTML = html;
-  }
+    var html = '<colgroup><col class="col-label">';
+    for (i = 0; i < 7; i++) html += '<col>';
+    html += '</colgroup>';
 
-  function populateTurnoPessoaSelect(selectedId){
-    var sel = document.getElementById('turnoPessoa');
-    if (!pessoasCarregadas){
-      sel.disabled = true;
-      sel.innerHTML = '<option>A carregar...</option>';
-      return;
-    }
-    var ativas = pessoasAtivasArray();
-    if (ativas.length === 0){
-      sel.disabled = true;
-      sel.innerHTML = '<option value="">Sem pessoas ativas</option>';
-      return;
-    }
-    sel.disabled = false;
-    var html = '';
-    ativas.forEach(function(p){
-      html += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + escapeHtml(p.nome) + '</option>';
+    html += '<thead><tr><th class="col-sticky">Turno</th>';
+    dias.forEach(function(d){
+      var isToday = toDateStr(d) === todayStr;
+      html += '<th class="' + (isToday ? 'hoje' : '') + '">';
+      html += '<span class="dia-abrev">' + DIA_ABREV[d.getDay()] + '</span>';
+      html += '<span class="dia-num">' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '</span>';
+      html += '</th>';
     });
-    sel.innerHTML = html;
+    html += '</tr></thead><tbody>';
+
+    TURNOS.forEach(function(t){
+      html += '<tr>';
+      html += '<td class="col-sticky turno-label">';
+      html += '<span class="turno-horario">' + t.horario + '</span>';
+      html += '<span class="turno-duracao">' + fmtHoras(t.horas) + '</span>';
+      html += '</td>';
+
+      dias.forEach(function(d){
+        var dStr = toDateStr(d);
+        var isToday = dStr === todayStr;
+        var lista = pessoasDoTurno(dStr, t.id);
+
+        html += '<td class="celula' + (isToday ? ' hoje' : '') + '" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
+        html += '<div class="celula-inner">';
+        if (lista.length){
+          var curto = lista.length >= 4;
+          lista.forEach(function(entrada){
+            var info = dadosPessoa(entrada);
+            var label = curto ? iniciais(info.nome) : primeiroNome(info.nome);
+            html += '<span class="p-chip" title="' + escapeHtml(info.nome) + '"';
+            html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
+            html += escapeHtml(label) + '</span>';
+          });
+        } else {
+          html += '<span class="celula-vazia">+</span>';
+        }
+        html += '</div></td>';
+      });
+
+      html += '</tr>';
+    });
+    html += '</tbody>';
+
+    document.getElementById('grelhaTurnos').innerHTML = html;
+    renderResumos(dias);
   }
 
-  function openTurnoModal(dataStr, turnoId){
-    editingTurnoId = turnoId || null;
-    var t = turnoId ? Object.assign({ id: turnoId }, turnos[turnoId]) : null;
-    turnoModalDataStr = t ? t.data : dataStr;
+  /* ---------- Resumo de horas ---------- */
+  function acumula(mapa, entrada, horas){
+    var info = dadosPessoa(entrada);
+    if (!mapa[entrada.pessoaId]) mapa[entrada.pessoaId] = { nome: info.nome, cor: info.cor, horas: 0 };
+    mapa[entrada.pessoaId].horas += horas;
+  }
 
-    document.getElementById('turnoModalTitle').textContent = t ? 'Editar turno' : 'Novo turno';
-    document.getElementById('turnoModalData').textContent = formatDataLonga(turnoModalDataStr);
-    populateTurnoPessoaSelect(t ? t.pessoaId : null);
-    document.getElementById('turnoInicio').value = t ? (t.inicio || '') : '';
-    document.getElementById('turnoFim').value = t ? (t.fim || '') : '';
-    document.getElementById('turnoNotas').value = t ? (t.notas || '') : '';
-    document.getElementById('btnApagarTurno').style.display = t ? 'inline-block' : 'none';
+  function renderResumoTabela(mapa, elId){
+    var arr = Object.keys(mapa).map(function(id){ return mapa[id]; }).sort(function(a, b){
+      return (b.horas - a.horas) || a.nome.localeCompare(b.nome);
+    });
+
+    var el = document.getElementById(elId);
+    if (!arr.length){
+      el.innerHTML = '<p class="empty-state">Sem turnos atribuídos.</p>';
+      return;
+    }
+
+    var total = 0;
+    var html = '<table class="resumo-table"><tbody>';
+    arr.forEach(function(p){
+      total += p.horas;
+      html += '<tr><td><span class="resumo-nome">';
+      html += '<span class="resumo-dot" style="background:' + p.cor + '"></span>' + escapeHtml(p.nome);
+      html += '</span></td><td class="resumo-horas">' + fmtHoras(p.horas) + '</td></tr>';
+    });
+    html += '<tr class="resumo-total"><td>Total</td><td class="resumo-horas">' + fmtHoras(total) + '</td></tr>';
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function renderResumos(dias){
+    /* Semana visível: 21 células */
+    var semana = {};
+    dias.forEach(function(d){
+      var dStr = toDateStr(d);
+      TURNOS.forEach(function(t){
+        pessoasDoTurno(dStr, t.id).forEach(function(entrada){ acumula(semana, entrada, t.horas); });
+      });
+    });
+    renderResumoTabela(semana, 'resumoSemana');
+
+    /* Mês corrente: todos os registos cuja data cai no mês */
+    var hoje = new Date();
+    var mesStr = hoje.getFullYear() + '-' + pad2(hoje.getMonth() + 1);
+    document.getElementById('mesLabel').textContent = MES_NOMES[hoje.getMonth()];
+
+    var mes = {};
+    Object.keys(turnos).forEach(function(k){
+      var reg = turnos[k];
+      if (!reg || !reg.data || String(reg.data).slice(0, 7) !== mesStr) return;
+      var def = turnoDef(reg.turno);
+      if (!def) return;
+      normalizaPessoas(reg).forEach(function(entrada){ acumula(mes, entrada, def.horas); });
+    });
+    renderResumoTabela(mes, 'resumoMes');
+  }
+
+  /* ---------- Modal de atribuição ---------- */
+  function openTurnoModal(dStr, turnoId){
+    turnoModalData = dStr;
+    turnoModalTurnoId = turnoId;
+
+    var def = turnoDef(turnoId);
+    document.getElementById('turnoModalData').textContent = formatDataLonga(dStr);
+    document.getElementById('turnoModalHorario').textContent = def ? def.horario : '';
+
+    var el = document.getElementById('turnoPessoasList');
+    if (!pessoasCarregadas){
+      el.innerHTML = '<p class="empty-state">A carregar…</p>';
+    } else {
+      var atribuidos = {};
+      pessoasDoTurno(dStr, turnoId).forEach(function(entrada){ atribuidos[entrada.pessoaId] = entrada; });
+
+      var lista = pessoasAtivasArray();
+      /* Inclui quem está atribuído mas já não está activo, para não o perder ao guardar */
+      pessoasInativasArray().forEach(function(p){ if (atribuidos[p.id]) lista.push(p); });
+
+      if (!lista.length){
+        el.innerHTML = '<p class="empty-state">Sem pessoas ativas.</p>';
+      } else {
+        el.innerHTML = lista.map(function(p){
+          var out = '<label class="check-item">';
+          out += '<input type="checkbox" value="' + p.id + '"' + (atribuidos[p.id] ? ' checked' : '') + '>';
+          out += '<span class="resumo-dot" style="background:' + (p.cor || '#999999') + '"></span>';
+          out += escapeHtml(p.nome);
+          if (p.ativo === false) out += '<span class="check-item-inativo">inativo</span>';
+          out += '</label>';
+          return out;
+        }).join('');
+      }
+    }
+
     document.getElementById('turnoModalOverlay').classList.add('open');
   }
   window.openTurnoModal = openTurnoModal;
 
   function closeTurnoModal(){
     document.getElementById('turnoModalOverlay').classList.remove('open');
-    editingTurnoId = null;
-    turnoModalDataStr = null;
+    turnoModalData = null;
+    turnoModalTurnoId = null;
   }
 
   document.getElementById('turnoModalClose').addEventListener('click', closeTurnoModal);
@@ -946,49 +1215,32 @@
   });
 
   document.getElementById('btnGuardarTurno').addEventListener('click', function(){
-    var pessoaId = document.getElementById('turnoPessoa').value;
-    var inicio = document.getElementById('turnoInicio').value;
-    var fim = document.getElementById('turnoFim').value;
-    var notas = document.getElementById('turnoNotas').value.trim();
+    if (!turnoModalData || !turnoModalTurnoId) return;
 
-    if (!pessoaId || !inicio || !fim){
-      alert('Indica pessoa, início e fim.');
-      return;
-    }
+    var checks = document.querySelectorAll('#turnoPessoasList input[type="checkbox"]');
+    var arr = [];
+    Array.prototype.forEach.call(checks, function(c){
+      if (!c.checked) return;
+      var p = pessoas[c.value] || {};
+      arr.push({ pessoaId: c.value, nome: p.nome || 'Pessoa removida', cor: p.cor || '#999999' });
+    });
 
-    var pessoaObj = pessoas[pessoaId];
-    var dados = {
-      data: turnoModalDataStr,
-      pessoaId: pessoaId,
-      pessoaNome: pessoaObj ? pessoaObj.nome : 'Pessoa removida',
-      inicio: inicio,
-      fim: fim,
-      notas: notas || null
-    };
-
-    var promise = editingTurnoId
-      ? turnosRef.child(editingTurnoId).update(dados)
-      : turnosRef.push(dados);
+    var key = chaveTurno(turnoModalData, turnoModalTurnoId);
+    var promise = arr.length
+      ? turnosRef.child(key).set({ data: turnoModalData, turno: turnoModalTurnoId, pessoas: arr })
+      : turnosRef.child(key).remove();
 
     promise.then(closeTurnoModal).catch(function(err){
       alert('Erro ao guardar turno: ' + err.message);
     });
   });
 
-  document.getElementById('btnApagarTurno').addEventListener('click', function(){
-    if (!editingTurnoId) return;
-    if (!confirm('Remover este turno?')) return;
-    turnosRef.child(editingTurnoId).remove().then(closeTurnoModal).catch(function(err){
-      alert('Erro ao remover: ' + err.message);
-    });
-  });
-
   turnosRef.on('value', function(snapshot){
     turnos = snapshot.val() || {};
-    renderDias();
+    renderGrelha();
   });
 
-  renderDias();
+  renderGrelha();
 </script>
 
 </body>
