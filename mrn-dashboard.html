@@ -1160,7 +1160,7 @@
     display:none;
     max-width:1200px;
     margin:0 auto;
-    padding:0 24px 80px;
+    padding:48px 24px 80px;
   }
 
   .tesouraria.open{
@@ -1170,16 +1170,13 @@
   .tes-header{
     display:flex;
     align-items:center;
-    justify-content:space-between;
-    gap:16px;
-    padding-top:16px;
+    gap:20px;
     margin-bottom:24px;
-    border-top:3px solid var(--black);
   }
 
   .tes-header h2{
-    margin:16px 0 0;
-    font-size:28px;
+    margin:0;
+    font-size:34px;
     font-weight:700;
     letter-spacing:-0.5px;
   }
@@ -1473,6 +1470,53 @@
 
   .tes-details-body{
     margin-top:18px;
+  }
+
+  .tes-fixos-total{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    margin-bottom:22px;
+    padding-bottom:18px;
+    border-bottom:2px solid var(--black);
+  }
+
+  .tes-fixos-total-value{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:30px;
+    font-weight:700;
+    line-height:1;
+  }
+
+  .tes-fixos-total-label{
+    display:block;
+    margin-top:6px;
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .tes-fixos-total-note{
+    display:block;
+    margin-top:4px;
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .tes-comp-tipo-tag{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    color:var(--white);
+    background:var(--blue);
+    padding:2px 6px;
+    margin-left:6px;
   }
 
   .tes-cat{
@@ -1785,8 +1829,8 @@
 <!-- ============ Tesouraria (detalhe) ============ -->
 <section class="tesouraria" id="tesouraria">
   <div class="tes-header">
+    <button type="button" class="btn" id="btnFecharTesouraria">← Voltar</button>
     <h2>Tesouraria</h2>
-    <button type="button" class="btn" id="btnFecharTesouraria">✕ Fechar</button>
   </div>
 
   <div class="tes-monthnav">
@@ -1865,7 +1909,12 @@
   <details class="tes-details" id="tesCompromissosDetails">
     <summary>Compromissos fixos</summary>
     <div class="tes-details-body">
-      <div style="margin-bottom:16px;">
+      <div class="tes-fixos-total">
+        <div>
+          <span class="tes-fixos-total-value" id="tesFixosTotal">0.00€</span>
+          <span class="tes-fixos-total-label">Total mensal em custos fixos</span>
+          <span class="tes-fixos-total-note" id="tesFixosTotalNota">—</span>
+        </div>
         <button type="button" class="btn btn-primary" id="btnNovoCompromisso">+ Novo compromisso</button>
       </div>
       <div id="tesCompromissosLista"></div>
@@ -1945,6 +1994,14 @@
           <option value="anual">Anual</option>
           <option value="variavel">Variável</option>
         </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Tipo</label>
+        <select id="cfTipo">
+          <option value="fixo">Fixo</option>
+          <option value="variavel">Variável</option>
+        </select>
+        <span class="field-hint">Só os «fixo» entram no total mensal de custos fixos</span>
       </div>
       <div class="field">
         <label class="field-label">Dia</label>
@@ -2315,7 +2372,9 @@ window.addEventListener('load', function () {
 
     linhas.forEach(function(l){
       totalGeral += l.montante;
-      if (l.prazoDate && l.prazoDate < hoje){
+      // Vencido inclui o próprio dia de hoje: se o prazo é hoje, já tem
+      // de estar pago.
+      if (l.prazoDate && l.prazoDate <= hoje){
         totalVencido += l.montante;
         countVencido++;
       }
@@ -2359,7 +2418,7 @@ window.addEventListener('load', function () {
     }
 
     payLinesEl.innerHTML = filtradas.map(function(l){
-      var vencido = l.prazoDate && l.prazoDate < hoje;
+      var vencido = l.prazoDate && l.prazoDate <= hoje;
       return '<div class="pay-line' + (vencido ? ' vencido' : '') + '">' +
         '<span class="pay-line-prazo">' + (l.prazoDate ? ddmm(l.prazoDate) : '—') + '</span>' +
         '<span class="pay-line-nome">' + escapeHtml(l.fornecedor) + '</span>' +
@@ -2623,7 +2682,7 @@ window.addEventListener('load', function () {
       '<th style="text-align:right;">Valor</th><th></th>' +
       '</tr></thead><tbody>' +
       linhas.map(function(l, idx){
-        var vencido = l.prazoDate && l.prazoDate < hoje;
+        var vencido = l.prazoDate && l.prazoDate <= hoje;
         return '<tr' + (vencido ? ' class="vencido"' : '') + '>' +
           '<td class="mono"><strong>' + (l.prazoDate ? formatDateDDMMYYYY(l.prazoDate) : '—') + '</strong></td>' +
           '<td>' + escapeHtml(l.fornecedor) + '</td>' +
@@ -2670,9 +2729,21 @@ window.addEventListener('load', function () {
   document.getElementById('btnMesAnterior').addEventListener('click', function(){ mudarMes(-1); });
   document.getElementById('btnMesSeguinte').addEventListener('click', function(){ mudarMes(1); });
 
+  // A tesouraria é uma vista à parte, não um bloco que cresce por baixo:
+  // ocupa a página inteira e o dashboard fica escondido enquanto estiver
+  // aberta. O header vermelho (home + notificações) mantém-se sempre.
+  var dashboardMain = document.querySelector('main');
+
   function abrirTesouraria(){
+    dashboardMain.style.display = 'none';
     tesouraria.classList.add('open');
-    tesouraria.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function fecharTesouraria(){
+    tesouraria.classList.remove('open');
+    dashboardMain.style.display = '';
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   document.getElementById('cardPagamentos').addEventListener('click', function(e){
@@ -2680,14 +2751,49 @@ window.addEventListener('load', function () {
     abrirTesouraria();
   });
 
-  document.getElementById('btnFecharTesouraria').addEventListener('click', function(){
-    tesouraria.classList.remove('open');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+  document.getElementById('btnFecharTesouraria').addEventListener('click', fecharTesouraria);
 
   /* ---------- Compromissos fixos: lista e edição ---------- */
 
   var CATEGORIA_ORDEM = ['Pessoal', 'Espaço', 'Utilities', 'Serviços', 'Estado', 'Outros'];
+
+  // Quantas vezes por ano é que cada periodicidade acontece, para converter
+  // o valor da ocorrência em equivalente mensal.
+  var OCORRENCIAS_POR_ANO = { mensal: 12, bimestral: 6, trimestral: 4, anual: 1 };
+
+  // Registos antigos não têm 'tipo'; contam como fixo, que era o default
+  // com que o nó foi semeado.
+  function tipoDe(c){
+    return (c && c.tipo) || 'fixo';
+  }
+
+  function equivalenteMensal(c){
+    var ocorrencias = OCORRENCIAS_POR_ANO[c.periodicidade];
+    if (!ocorrencias) return parseMontante(c.valor); // periodicidade desconhecida: conta como está
+    return parseMontante(c.valor) * ocorrencias / 12;
+  }
+
+  // Só os ativos e do tipo 'fixo'. Os 'variavel' continuam a contar em
+  // todo o resto (calendário, total do mês, listas) — ficam fora só desta
+  // soma, porque não são um custo fixo previsível.
+  function renderTotalCustosFixos(){
+    var incluidos = Object.keys(allCompromissos)
+      .map(function(id){ return allCompromissos[id]; })
+      .filter(function(c){ return c && c.ativo && tipoDe(c) === 'fixo'; });
+
+    var total = incluidos.reduce(function(acc, c){ return acc + equivalenteMensal(c); }, 0);
+
+    var nVariaveis = Object.keys(allCompromissos).filter(function(id){
+      var c = allCompromissos[id];
+      return c && c.ativo && tipoDe(c) === 'variavel';
+    }).length;
+
+    document.getElementById('tesFixosTotal').textContent = formatEuro(total);
+    document.getElementById('tesFixosTotalNota').textContent =
+      incluidos.length + ' ' + (incluidos.length === 1 ? 'compromisso fixo ativo' : 'compromissos fixos ativos') +
+      ', normalizados para valor mensal' +
+      (nVariaveis > 0 ? ' · ' + nVariaveis + ' ' + (nVariaveis === 1 ? 'variável excluída' : 'variáveis excluídas') : '');
+  }
 
   function descreveCompromisso(c){
     var partes = [c.periodicidade || 'mensal'];
@@ -2706,6 +2812,8 @@ window.addEventListener('load', function () {
 
   function renderCompromissos(){
     var ids = Object.keys(allCompromissos);
+
+    renderTotalCustosFixos();
 
     if (ids.length === 0){
       tesCompromissosLista.innerHTML = '<p class="tes-empty">Sem compromissos fixos registados.</p>';
@@ -2738,6 +2846,7 @@ window.addEventListener('load', function () {
         itens.map(function(c){
           return '<div class="tes-comp' + (c.ativo ? '' : ' inativo') + '">' +
             '<span class="tes-comp-nome">' + escapeHtml(c.nome || c.id) +
+            (tipoDe(c) === 'variavel' ? '<span class="tes-comp-tipo-tag">variável</span>' : '') +
             (c.ativo ? '' : '<span class="tes-comp-inativo-tag">inativo</span>') + '</span>' +
             '<span class="tes-comp-meta">' + escapeHtml(descreveCompromisso(c)) + '</span>' +
             '<span class="tes-comp-valor">' + formatEuro(parseMontante(c.valor)) + '</span>' +
@@ -2775,6 +2884,7 @@ window.addEventListener('load', function () {
     document.getElementById('cfCategoria').value = c.categoria || 'Outros';
     document.getElementById('cfValor').value = (c.valor === undefined || c.valor === null) ? '' : c.valor;
     document.getElementById('cfPeriodicidade').value = c.periodicidade || 'mensal';
+    document.getElementById('cfTipo').value = tipoDe(c);
     document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
     document.getElementById('cfNotas').value = c.notas || '';
     document.getElementById('cfAtivo').checked = !!c.ativo;
@@ -2834,6 +2944,7 @@ window.addEventListener('load', function () {
       categoria: document.getElementById('cfCategoria').value,
       valor: valorRaw === '' ? 0 : parseMontante(valorRaw),
       periodicidade: document.getElementById('cfPeriodicidade').value,
+      tipo: document.getElementById('cfTipo').value,
       dia: dia,
       meses: meses,
       ativo: document.getElementById('cfAtivo').checked
@@ -3555,6 +3666,9 @@ window.addEventListener('load', function () {
         var alvoId = NOTIF_ALVOS[link];
         notifPanel.classList.remove('open');
         if (alvoId){
+          // Os alvos vivem no dashboard, que fica escondido enquanto a
+          // tesouraria está aberta — sem isto o scroll não teria efeito.
+          fecharTesouraria();
           var alvo = document.getElementById(alvoId);
           if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else if (link){
