@@ -1005,6 +1005,615 @@
     font-size:11px;
     color:var(--muted);
   }
+
+  /* ---------- Pagamentos: totais + filtro de período ---------- */
+  .card-pagamentos{
+    cursor:pointer;
+  }
+
+  .card-pagamentos:hover{
+    transform:none;
+    box-shadow:4px 4px 0 var(--red);
+  }
+
+  .pay-totals{
+    display:flex;
+    gap:36px;
+    margin-top:18px;
+    padding:16px 0;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+
+  .pay-total{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+  }
+
+  .pay-total-value{
+    font-family:'Space Mono', monospace;
+    font-size:26px;
+    font-weight:700;
+    line-height:1.1;
+  }
+
+  .pay-total-label{
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .pay-total-vencido .pay-total-value,
+  .pay-total-vencido .pay-total-label{
+    color:var(--red);
+  }
+
+  .pay-total-periodo{
+    padding-left:36px;
+    border-left:1px solid var(--line);
+  }
+
+  .pay-total-periodo .pay-total-value{
+    color:var(--blue);
+  }
+
+  .pay-pills{
+    display:flex;
+    gap:6px;
+    margin-top:16px;
+  }
+
+  .pay-pill{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:7px 13px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+  }
+
+  .pay-pill.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .pay-lines{
+    margin-top:14px;
+    max-height:300px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .pay-line{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-left:3px solid var(--line);
+    font-size:13px;
+  }
+
+  .pay-line-prazo{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    width:46px;
+    flex-shrink:0;
+  }
+
+  .pay-line-nome{
+    flex:1;
+    min-width:0;
+    font-weight:600;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .pay-line-ref{
+    flex-shrink:0;
+    max-width:200px;
+    font-size:11px;
+    color:var(--muted);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .pay-line-valor{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .pay-line.vencido{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .pay-line.vencido .pay-line-ref{
+    color:var(--red);
+  }
+
+  .pay-card-hint{
+    margin:14px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--red);
+    letter-spacing:0.3px;
+  }
+
+  /* ---------- Secção Tesouraria ---------- */
+  .tesouraria{
+    display:none;
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 24px 80px;
+  }
+
+  .tesouraria.open{
+    display:block;
+  }
+
+  .tes-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding-top:16px;
+    margin-bottom:24px;
+    border-top:3px solid var(--black);
+  }
+
+  .tes-header h2{
+    margin:16px 0 0;
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .tes-monthnav{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    margin-bottom:22px;
+    padding:12px 0;
+    border:2px solid var(--black);
+    background:var(--white);
+  }
+
+  .tes-monthnav-label{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    min-width:220px;
+    text-align:center;
+  }
+
+  .tes-arrow{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:5px 12px;
+    cursor:pointer;
+  }
+
+  .tes-arrow:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .tes-block{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:22px;
+    margin-bottom:20px;
+  }
+
+  .tes-block-title{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+
+  .tes-bigtotal{
+    font-family:'Space Mono', monospace;
+    font-size:38px;
+    font-weight:700;
+    line-height:1;
+  }
+
+  .tes-bigtotal-sub{
+    margin-top:8px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .tes-week{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:9px;
+  }
+
+  .tes-week-label{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    width:140px;
+    flex-shrink:0;
+  }
+
+  .tes-week-track{
+    display:block;
+    flex:1;
+    height:16px;
+    background:var(--bg);
+    border:1px solid var(--line);
+  }
+
+  .tes-week-fill{
+    display:block;
+    height:100%;
+    width:0;
+    background:var(--red);
+    transition:width .3s ease;
+  }
+
+  .tes-week-value{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    width:110px;
+    flex-shrink:0;
+    text-align:right;
+  }
+
+  .tes-cal{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:4px;
+  }
+
+  .tes-cal-dow{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    text-align:center;
+    padding-bottom:4px;
+  }
+
+  .tes-cal-cell{
+    min-height:64px;
+    border:1px solid var(--line);
+    padding:5px 6px;
+    text-align:left;
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    cursor:default;
+  }
+
+  .tes-cal-cell.empty{
+    border-color:transparent;
+    background:none;
+  }
+
+  .tes-cal-cell.has-value{
+    cursor:pointer;
+  }
+
+  .tes-cal-cell.selected{
+    outline:3px solid var(--blue);
+    outline-offset:-3px;
+  }
+
+  .tes-cal-day{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+  }
+
+  .tes-cal-cell.hoje .tes-cal-day{
+    color:var(--white);
+    background:var(--black);
+    padding:1px 4px;
+  }
+
+  .tes-cal-amount{
+    display:block;
+    margin-top:6px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    word-break:break-all;
+  }
+
+  .tes-cal-cell.dark .tes-cal-day,
+  .tes-cal-cell.dark .tes-cal-amount{
+    color:var(--white);
+  }
+
+  .tes-cal-cell.dark.hoje .tes-cal-day{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .tes-daydetail{
+    margin-top:18px;
+    padding-top:16px;
+    border-top:2px solid var(--black);
+  }
+
+  .tes-daydetail-title{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:10px;
+  }
+
+  .tes-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+
+  .tes-table th{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    text-align:left;
+    padding:6px 10px;
+    border-bottom:2px solid var(--black);
+  }
+
+  .tes-table td{
+    padding:9px 10px;
+    border-bottom:1px solid var(--line);
+    vertical-align:middle;
+  }
+
+  .tes-table .num{
+    text-align:right;
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .tes-table .mono{
+    font-size:12px;
+    white-space:nowrap;
+  }
+
+  .tes-table tr.vencido td{
+    color:var(--red);
+  }
+
+  .tes-table tr.vencido td:first-child{
+    border-left:3px solid var(--red);
+  }
+
+  .tes-tag{
+    display:inline-block;
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    padding:2px 6px;
+    color:var(--white);
+    background:var(--muted);
+  }
+
+  .tes-tag-pedido{ background:var(--blue); }
+  .tes-tag-fixo{ background:var(--amber); }
+
+  .tes-details{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:22px;
+    margin-bottom:20px;
+  }
+
+  .tes-details > summary{
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--muted);
+    list-style:none;
+  }
+
+  .tes-details > summary::-webkit-details-marker{
+    display:none;
+  }
+
+  .tes-details > summary::before{
+    content:'▸ ';
+    color:var(--red);
+  }
+
+  .tes-details[open] > summary::before{
+    content:'▾ ';
+  }
+
+  .tes-details-body{
+    margin-top:18px;
+  }
+
+  .tes-cat{
+    margin-bottom:20px;
+  }
+
+  .tes-cat-title{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--red);
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:8px;
+  }
+
+  .tes-comp{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:8px 0;
+    font-size:13px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .tes-comp:last-child{
+    border-bottom:none;
+  }
+
+  .tes-comp-nome{
+    flex:1;
+    min-width:0;
+    font-weight:600;
+  }
+
+  .tes-comp.inativo .tes-comp-nome{
+    color:var(--muted);
+    font-weight:400;
+  }
+
+  .tes-comp-meta{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    width:230px;
+    flex-shrink:0;
+  }
+
+  .tes-comp-valor{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    width:100px;
+    flex-shrink:0;
+    text-align:right;
+  }
+
+  .tes-comp-inativo-tag{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    color:var(--white);
+    background:var(--muted);
+    padding:2px 6px;
+    margin-left:6px;
+  }
+
+  .tes-empty{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    color:var(--muted);
+    margin:8px 0;
+  }
+
+  .modal-wide{
+    max-width:560px;
+  }
+
+  select{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    width:100%;
+  }
+
+  select:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .meses-grid{
+    display:grid;
+    grid-template-columns:repeat(6, 1fr);
+    gap:6px;
+  }
+
+  .mes-check{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    border:2px solid var(--black);
+    padding:5px 2px;
+    cursor:pointer;
+    background:var(--white);
+  }
+
+  .mes-check input{
+    width:auto;
+    margin:0;
+    cursor:pointer;
+  }
+
+  .field-hint{
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .check-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .check-row input{
+    width:auto;
+  }
+
+  .check-row label{
+    font-size:13px;
+  }
 </style>
 </head>
 <body>
@@ -1077,44 +1686,34 @@
         <button type="button" class="btn" id="btnNovoPagamento">+ Novo Pagamento</button>
       </div>
 
-      <div class="payments-tabs" id="paymentsTabs">
-        <button type="button" class="payments-tab active" data-status="pendente">Pendentes</button>
-        <button type="button" class="payments-tab" data-status="concluido">Concluídos</button>
-        <button type="button" class="payments-tab" data-status="anulado">Anulados</button>
-      </div>
-
-      <div class="payments-subfilters" id="paymentsSubfilters">
-        <button type="button" class="filter-chip active" data-origem="todos">Todos</button>
-        <button type="button" class="filter-chip" data-origem="fornecedor">Fornecedores</button>
-        <button type="button" class="filter-chip" data-origem="avulso">Outros</button>
-      </div>
-
       <p class="loading-state" id="paymentsLoading">A carregar...</p>
 
-      <div class="payments-summary" id="paymentsSummary" style="display:none;">
-        <div class="summary-stat">
-          <span class="summary-value" id="summaryCount">0</span>
-          <span class="summary-label">Pedidos</span>
+      <div class="pay-totals" id="payTotals" style="display:none;">
+        <div class="pay-total">
+          <span class="pay-total-value" id="payTotalGeral">0.00€</span>
+          <span class="pay-total-label">Total pendente</span>
         </div>
-        <div class="summary-stat">
-          <span class="summary-value" id="summaryTotal">0.00€</span>
-          <span class="summary-label">Total</span>
+        <div class="pay-total pay-total-vencido" id="payTotalVencidoWrap" style="display:none;">
+          <span class="pay-total-value" id="payTotalVencido">0.00€</span>
+          <span class="pay-total-label" id="payTotalVencidoLabel">Vencido</span>
+        </div>
+        <div class="pay-total pay-total-periodo" id="payTotalPeriodoWrap" style="display:none;">
+          <span class="pay-total-value" id="payTotalPeriodo">0.00€</span>
+          <span class="pay-total-label" id="payTotalPeriodoLabel">No período</span>
         </div>
       </div>
 
-      <div id="paymentsBody" style="display:none;">
-        <div class="payments-subsection" id="subsectionFornecedores" style="display:none;">
-          <div class="payments-subsection-title">Fornecedores</div>
-          <div class="payments-list" id="paymentsListFornecedor"></div>
-        </div>
-
-        <div class="payments-subsection" id="subsectionAvulso" style="display:none;">
-          <div class="payments-subsection-title">Outros</div>
-          <div class="payments-list" id="paymentsListAvulso"></div>
-        </div>
+      <div class="pay-pills" id="payPills">
+        <button type="button" class="pay-pill" data-periodo="semana">Semana</button>
+        <button type="button" class="pay-pill" data-periodo="quinzena">Quinzena</button>
+        <button type="button" class="pay-pill" data-periodo="mes">Mês</button>
+        <button type="button" class="pay-pill active" data-periodo="tudo">Tudo</button>
       </div>
+
+      <div class="pay-lines" id="payLines"></div>
 
       <p class="empty-state-inline" id="paymentsEmptyInline" style="display:none;"></p>
+      <p class="pay-card-hint">→ Abrir tesouraria</p>
     </div>
 
     <div class="card card-tasks" id="cardTasks">
@@ -1183,6 +1782,97 @@
   </div>
 </main>
 
+<!-- ============ Tesouraria (detalhe) ============ -->
+<section class="tesouraria" id="tesouraria">
+  <div class="tes-header">
+    <h2>Tesouraria</h2>
+    <button type="button" class="btn" id="btnFecharTesouraria">✕ Fechar</button>
+  </div>
+
+  <div class="tes-monthnav">
+    <button type="button" class="tes-arrow" id="btnMesAnterior">◀</button>
+    <span class="tes-monthnav-label" id="tesMesLabel">—</span>
+    <button type="button" class="tes-arrow" id="btnMesSeguinte">▶</button>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title" id="tesTotalTitle">Total a pagar</p>
+    <div class="tes-bigtotal" id="tesTotalValor">0.00€</div>
+    <p class="tes-bigtotal-sub" id="tesTotalSub">—</p>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title">Por semana</p>
+    <div id="tesSemanas"></div>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title">Calendário</p>
+    <div class="tes-cal" id="tesCalendario"></div>
+    <div class="tes-daydetail" id="tesDiaDetalhe" style="display:none;">
+      <div class="tes-daydetail-title" id="tesDiaTitulo">—</div>
+      <div id="tesDiaLista"></div>
+    </div>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title">Pagamentos pendentes — todos os prazos</p>
+    <div id="tesPendentes"></div>
+  </div>
+
+  <details class="tes-details" id="tesPedidosDetails">
+    <summary>Pedidos de pagamento — gestão</summary>
+    <div class="tes-details-body">
+      <div class="payments-tabs" id="paymentsTabs">
+        <button type="button" class="payments-tab active" data-status="pendente">Pendentes</button>
+        <button type="button" class="payments-tab" data-status="concluido">Concluídos</button>
+        <button type="button" class="payments-tab" data-status="anulado">Anulados</button>
+      </div>
+
+      <div class="payments-subfilters" id="paymentsSubfilters">
+        <button type="button" class="filter-chip active" data-origem="todos">Todos</button>
+        <button type="button" class="filter-chip" data-origem="fornecedor">Fornecedores</button>
+        <button type="button" class="filter-chip" data-origem="avulso">Outros</button>
+      </div>
+
+      <div class="payments-summary" id="paymentsSummary" style="display:none;">
+        <div class="summary-stat">
+          <span class="summary-value" id="summaryCount">0</span>
+          <span class="summary-label">Pedidos</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-value" id="summaryTotal">0.00€</span>
+          <span class="summary-label">Total</span>
+        </div>
+      </div>
+
+      <div id="paymentsBody" style="display:none;">
+        <div class="payments-subsection" id="subsectionFornecedores" style="display:none;">
+          <div class="payments-subsection-title">Fornecedores</div>
+          <div class="payments-list" id="paymentsListFornecedor"></div>
+        </div>
+
+        <div class="payments-subsection" id="subsectionAvulso" style="display:none;">
+          <div class="payments-subsection-title">Outros</div>
+          <div class="payments-list" id="paymentsListAvulso"></div>
+        </div>
+      </div>
+
+      <p class="empty-state-inline" id="paymentsTicketsEmpty" style="display:none;"></p>
+    </div>
+  </details>
+
+  <details class="tes-details" id="tesCompromissosDetails">
+    <summary>Compromissos fixos</summary>
+    <div class="tes-details-body">
+      <div style="margin-bottom:16px;">
+        <button type="button" class="btn btn-primary" id="btnNovoCompromisso">+ Novo compromisso</button>
+      </div>
+      <div id="tesCompromissosLista"></div>
+    </div>
+  </details>
+</section>
+
 <!-- Modal Novo Pagamento -->
 <div class="modal-overlay" id="novoPagamentoModalOverlay">
   <div class="modal">
@@ -1219,6 +1909,72 @@
   </div>
 </div>
 
+<!-- Modal Compromisso Fixo -->
+<div class="modal-overlay" id="compromissoModalOverlay">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="compromissoModalTitulo">Compromisso fixo</h2>
+      <button class="modal-close" id="compromissoModalClose">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field full">
+        <label class="field-label">Nome *</label>
+        <input type="text" id="cfNome">
+      </div>
+      <div class="field">
+        <label class="field-label">Categoria</label>
+        <select id="cfCategoria">
+          <option value="Pessoal">Pessoal</option>
+          <option value="Espaço">Espaço</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Serviços">Serviços</option>
+          <option value="Estado">Estado</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Valor (€)</label>
+        <input type="number" id="cfValor" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label class="field-label">Periodicidade</label>
+        <select id="cfPeriodicidade">
+          <option value="mensal">Mensal</option>
+          <option value="bimestral">Bimestral</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="anual">Anual</option>
+          <option value="variavel">Variável</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Dia</label>
+        <input type="text" id="cfDia" placeholder="1-31 ou «ultimo»">
+        <span class="field-hint">Vazio = dia por confirmar</span>
+      </div>
+      <div class="field full">
+        <label class="field-label">Meses ativos</label>
+        <div class="meses-grid" id="cfMesesGrid"></div>
+        <span class="field-hint">Nenhum selecionado = todos os meses</span>
+      </div>
+      <div class="field full">
+        <div class="check-row">
+          <input type="checkbox" id="cfAtivo">
+          <label for="cfAtivo">Ativo (conta para os totais e para o calendário)</label>
+        </div>
+      </div>
+      <div class="field full">
+        <label class="field-label">Notas</label>
+        <input type="text" id="cfNotas">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btnApagarCompromisso" style="margin-right:auto;">🗑 Apagar</button>
+      <button type="button" class="btn" id="compromissoCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarCompromisso">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
 
@@ -1234,6 +1990,7 @@ window.addEventListener('load', function () {
   var db = firebase.database();
   var paymentRequestsRef = db.ref('paymentRequests');
   var tasksRef = db.ref('tasks');
+  var compromissosRef = db.ref('compromissosFixos');
 
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
@@ -1244,13 +2001,14 @@ window.addEventListener('load', function () {
   var subsectionAvulsoEl = document.getElementById('subsectionAvulso');
   var listFornecedorEl = document.getElementById('paymentsListFornecedor');
   var listAvulsoEl = document.getElementById('paymentsListAvulso');
-  var emptyEl = document.getElementById('paymentsEmptyInline');
+  var emptyEl = document.getElementById('paymentsTicketsEmpty');
   var tabsEl = document.getElementById('paymentsTabs');
   var subfiltersEl = document.getElementById('paymentsSubfilters');
 
   var currentTab = 'pendente';
   var currentOrigemFilter = 'todos';
   var allPaymentRequests = {};
+  var allCompromissos = {};
 
   // Flags de carregamento partilhadas com a central de notificações,
   // declaradas aqui para não serem repostas por declarações posteriores.
@@ -1467,6 +2225,644 @@ window.addEventListener('load', function () {
     avulsoEntries.forEach(function (p) { attachTicketHandlers(listAvulsoEl, p); });
   }
 
+  /* ================================================================
+     Pagamentos — linhas planas, totais e filtro de período (cartão)
+     ================================================================ */
+
+  var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var DOW_PT = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var PERIODO_DIAS = { semana: 7, quinzena: 15, mes: 30 };
+  var PERIODO_LABEL = { semana: 'Até 7 dias', quinzena: 'Até 15 dias', mes: 'Até 30 dias' };
+
+  var payTotalsEl = document.getElementById('payTotals');
+  var payTotalGeralEl = document.getElementById('payTotalGeral');
+  var payTotalVencidoWrap = document.getElementById('payTotalVencidoWrap');
+  var payTotalVencidoEl = document.getElementById('payTotalVencido');
+  var payTotalVencidoLabel = document.getElementById('payTotalVencidoLabel');
+  var payTotalPeriodoWrap = document.getElementById('payTotalPeriodoWrap');
+  var payTotalPeriodoEl = document.getElementById('payTotalPeriodo');
+  var payTotalPeriodoLabel = document.getElementById('payTotalPeriodoLabel');
+  var payPillsEl = document.getElementById('payPills');
+  var payLinesEl = document.getElementById('payLines');
+  var payEmptyEl = document.getElementById('paymentsEmptyInline');
+
+  var periodoAtual = 'tudo';
+
+  function hojeMeiaNoite(){
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function parseMontante(m){
+    var n = parseFloat(String(m == null ? '' : m).replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Desdobra os pedidos pendentes num array plano de linhas individuais,
+  // ordenado por prazo ascendente. Linhas sem prazo legível ficam no fim.
+  function linhasPendentes(){
+    var out = [];
+    Object.keys(allPaymentRequests).forEach(function(id){
+      var p = allPaymentRequests[id];
+      if ((p.status || 'pendente') !== 'pendente') return;
+      (p.lines || []).forEach(function(l, idx){
+        out.push({
+          ticketId: id,
+          lineIdx: idx,
+          ticketNumero: p.numeroReferencia || '',
+          origem: p.origem || 'fornecedor',
+          fornecedor: l.fornecedor || 'Sem descrição',
+          montante: parseMontante(l.montante),
+          prazo: l.prazo || '',
+          prazoDate: ddmmyyyyToDate(l.prazo),
+          referencia: l.referencia || '',
+          iban: l.iban || ''
+        });
+      });
+    });
+    out.sort(function(a, b){
+      if (!a.prazoDate && !b.prazoDate) return 0;
+      if (!a.prazoDate) return 1;
+      if (!b.prazoDate) return -1;
+      return a.prazoDate - b.prazoDate;
+    });
+    return out;
+  }
+
+  function ddmm(d){
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+  }
+
+  // Horizonte do filtro: tudo o que vence até hoje+N dias, inclusive o que
+  // já está vencido — um pagamento em atraso continua a ser um pagamento
+  // desta semana.
+  function dentroDoPeriodo(linha, periodo){
+    if (periodo === 'tudo') return true;
+    if (!linha.prazoDate) return false;
+    var limite = hojeMeiaNoite();
+    limite.setDate(limite.getDate() + PERIODO_DIAS[periodo]);
+    return linha.prazoDate <= limite;
+  }
+
+  function renderPagamentosCard(){
+    var linhas = linhasPendentes();
+    var hoje = hojeMeiaNoite();
+
+    var totalGeral = 0;
+    var totalVencido = 0;
+    var countVencido = 0;
+
+    linhas.forEach(function(l){
+      totalGeral += l.montante;
+      if (l.prazoDate && l.prazoDate < hoje){
+        totalVencido += l.montante;
+        countVencido++;
+      }
+    });
+
+    if (linhas.length === 0){
+      payTotalsEl.style.display = 'none';
+      payLinesEl.innerHTML = '';
+      payEmptyEl.textContent = 'Sem pagamentos pendentes ✓';
+      payEmptyEl.style.display = 'block';
+      return;
+    }
+
+    payEmptyEl.style.display = 'none';
+    payTotalsEl.style.display = 'flex';
+
+    payTotalGeralEl.textContent = formatEuro(totalGeral);
+
+    if (countVencido > 0){
+      payTotalVencidoEl.textContent = formatEuro(totalVencido);
+      payTotalVencidoLabel.textContent = countVencido === 1 ? '1 vencido' : countVencido + ' vencidos';
+      payTotalVencidoWrap.style.display = 'flex';
+    } else {
+      payTotalVencidoWrap.style.display = 'none';
+    }
+
+    var filtradas = linhas.filter(function(l){ return dentroDoPeriodo(l, periodoAtual); });
+
+    if (periodoAtual === 'tudo'){
+      payTotalPeriodoWrap.style.display = 'none';
+    } else {
+      var totalPeriodo = filtradas.reduce(function(acc, l){ return acc + l.montante; }, 0);
+      payTotalPeriodoEl.textContent = formatEuro(totalPeriodo);
+      payTotalPeriodoLabel.textContent = PERIODO_LABEL[periodoAtual];
+      payTotalPeriodoWrap.style.display = 'flex';
+    }
+
+    if (filtradas.length === 0){
+      payLinesEl.innerHTML = '<p class="tes-empty">Nada a pagar neste período ✓</p>';
+      return;
+    }
+
+    payLinesEl.innerHTML = filtradas.map(function(l){
+      var vencido = l.prazoDate && l.prazoDate < hoje;
+      return '<div class="pay-line' + (vencido ? ' vencido' : '') + '">' +
+        '<span class="pay-line-prazo">' + (l.prazoDate ? ddmm(l.prazoDate) : '—') + '</span>' +
+        '<span class="pay-line-nome">' + escapeHtml(l.fornecedor) + '</span>' +
+        (l.referencia ? '<span class="pay-line-ref">' + escapeHtml(l.referencia) + '</span>' : '') +
+        '<span class="pay-line-valor">' + formatEuro(l.montante) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  payPillsEl.addEventListener('click', function(e){
+    var btn = e.target.closest('.pay-pill');
+    if (!btn) return;
+    e.stopPropagation();
+    periodoAtual = btn.getAttribute('data-periodo');
+    payPillsEl.querySelectorAll('.pay-pill').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    renderPagamentosCard();
+  });
+
+  /* ================================================================
+     Tesouraria — secção detalhada
+     ================================================================ */
+
+  var tesouraria = document.getElementById('tesouraria');
+  var tesMesLabel = document.getElementById('tesMesLabel');
+  var tesTotalTitle = document.getElementById('tesTotalTitle');
+  var tesTotalValor = document.getElementById('tesTotalValor');
+  var tesTotalSub = document.getElementById('tesTotalSub');
+  var tesSemanasEl = document.getElementById('tesSemanas');
+  var tesCalendarioEl = document.getElementById('tesCalendario');
+  var tesDiaDetalhe = document.getElementById('tesDiaDetalhe');
+  var tesDiaTitulo = document.getElementById('tesDiaTitulo');
+  var tesDiaLista = document.getElementById('tesDiaLista');
+  var tesPendentesEl = document.getElementById('tesPendentes');
+  var tesCompromissosLista = document.getElementById('tesCompromissosLista');
+
+  var mesAtivo = new Date().getMonth() + 1;
+  var anoAtivo = new Date().getFullYear();
+  var diaSelecionado = null;
+
+  function diasNoMes(ano, mes){
+    return new Date(ano, mes, 0).getDate();
+  }
+
+  // Firebase devolve arrays contíguos como array, mas com buracos devolve
+  // um objeto indexado — daí normalizar sempre antes de usar.
+  function mesesArray(m){
+    if (!m) return [];
+    var vals = Array.isArray(m) ? m : Object.keys(m).map(function(k){ return m[k]; });
+    return vals.map(Number).filter(function(n){ return !isNaN(n); });
+  }
+
+  // Gera as ocorrências dos compromissos fixos ativos que caem no mês
+  // pedido. 'meses' vazio = todos os meses; 'dia' em falta = por confirmar,
+  // não gera ocorrência.
+  function ocorrenciasCompromissos(ano, mes){
+    var out = [];
+    Object.keys(allCompromissos).forEach(function(id){
+      var c = allCompromissos[id];
+      if (!c || !c.ativo) return;
+
+      var meses = mesesArray(c.meses);
+      if (meses.length && meses.indexOf(mes) === -1) return;
+
+      if (c.dia === undefined || c.dia === null || c.dia === '') return;
+
+      var nd = diasNoMes(ano, mes);
+      var dia;
+      if (c.dia === 'ultimo'){
+        dia = nd;
+      } else {
+        dia = parseInt(c.dia, 10);
+        if (isNaN(dia)) return;
+        dia = Math.max(1, Math.min(dia, nd));
+      }
+
+      out.push({
+        tipo: 'fixo',
+        id: id,
+        nome: c.nome || id,
+        categoria: c.categoria || 'Outros',
+        montante: parseMontante(c.valor),
+        dia: dia
+      });
+    });
+    return out;
+  }
+
+  // Pedidos pendentes + compromissos fixos do mês, ordenados por dia.
+  function itensDoMes(ano, mes){
+    var out = [];
+
+    linhasPendentes().forEach(function(l){
+      if (!l.prazoDate) return;
+      if (l.prazoDate.getFullYear() !== ano) return;
+      if (l.prazoDate.getMonth() + 1 !== mes) return;
+      out.push({
+        tipo: 'pedido',
+        nome: l.fornecedor,
+        montante: l.montante,
+        dia: l.prazoDate.getDate(),
+        referencia: l.referencia,
+        ticketNumero: l.ticketNumero
+      });
+    });
+
+    ocorrenciasCompromissos(ano, mes).forEach(function(o){ out.push(o); });
+
+    out.sort(function(a, b){ return a.dia - b.dia; });
+    return out;
+  }
+
+  function semanaDoDia(dia){
+    return Math.min(Math.floor((dia - 1) / 7), 4);
+  }
+
+  function renderTesTotal(itens){
+    var total = itens.reduce(function(acc, i){ return acc + i.montante; }, 0);
+    var nPedidos = itens.filter(function(i){ return i.tipo === 'pedido'; }).length;
+    var nFixos = itens.filter(function(i){ return i.tipo === 'fixo'; }).length;
+
+    tesTotalTitle.textContent = 'Total a pagar em ' + MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
+    tesTotalValor.textContent = formatEuro(total);
+    tesTotalSub.textContent = nPedidos + ' ' + (nPedidos === 1 ? 'pedido pendente' : 'pedidos pendentes') +
+      ' · ' + nFixos + ' ' + (nFixos === 1 ? 'compromisso fixo' : 'compromissos fixos');
+  }
+
+  function renderTesSemanas(itens){
+    var nSemanas = Math.ceil(diasNoMes(anoAtivo, mesAtivo) / 7);
+    var totais = [];
+    var i;
+    for (i = 0; i < nSemanas; i++) totais.push(0);
+
+    itens.forEach(function(it){
+      var idx = Math.min(semanaDoDia(it.dia), nSemanas - 1);
+      totais[idx] += it.montante;
+    });
+
+    var max = Math.max.apply(null, totais.concat([0]));
+
+    tesSemanasEl.innerHTML = totais.map(function(v, idx){
+      var ini = idx * 7 + 1;
+      var fim = Math.min(ini + 6, diasNoMes(anoAtivo, mesAtivo));
+      var pct = max > 0 ? (v / max) * 100 : 0;
+      return '<div class="tes-week">' +
+        '<span class="tes-week-label">Semana ' + (idx + 1) + ' · ' + ini + '–' + fim + '</span>' +
+        '<span class="tes-week-track"><span class="tes-week-fill" style="width:' + pct.toFixed(1) + '%;"></span></span>' +
+        '<span class="tes-week-value">' + formatEuro(v) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderTesCalendario(itens){
+    var nd = diasNoMes(anoAtivo, mesAtivo);
+    var porDia = {};
+    itens.forEach(function(it){
+      porDia[it.dia] = (porDia[it.dia] || 0) + it.montante;
+    });
+
+    var max = 0;
+    Object.keys(porDia).forEach(function(d){ if (porDia[d] > max) max = porDia[d]; });
+
+    // Semana começa à segunda-feira (getDay(): 0 = domingo).
+    var primeiro = new Date(anoAtivo, mesAtivo - 1, 1).getDay();
+    var offset = (primeiro + 6) % 7;
+
+    var hoje = hojeMeiaNoite();
+    var ehMesCorrente = (hoje.getFullYear() === anoAtivo && hoje.getMonth() + 1 === mesAtivo);
+
+    var html = DOW_PT.map(function(d){ return '<div class="tes-cal-dow">' + d + '</div>'; }).join('');
+
+    var i;
+    for (i = 0; i < offset; i++){
+      html += '<div class="tes-cal-cell empty"></div>';
+    }
+
+    for (i = 1; i <= nd; i++){
+      var v = porDia[i] || 0;
+      var classes = 'tes-cal-cell';
+      var style = '';
+
+      if (v > 0){
+        classes += ' has-value';
+        var ratio = max > 0 ? v / max : 0;
+        var alpha = 0.10 + 0.75 * ratio;
+        style = ' style="background:rgba(217,17,36,' + alpha.toFixed(2) + ');"';
+        if (alpha > 0.5) classes += ' dark';
+      }
+
+      if (ehMesCorrente && i === hoje.getDate()) classes += ' hoje';
+      if (diaSelecionado === i) classes += ' selected';
+
+      html += '<div class="' + classes + '" data-dia="' + i + '"' + style + '>' +
+        '<span class="tes-cal-day">' + i + '</span>' +
+        (v > 0 ? '<span class="tes-cal-amount">' + formatEuro(v) + '</span>' : '') +
+        '</div>';
+    }
+
+    tesCalendarioEl.innerHTML = html;
+  }
+
+  function renderTesDiaDetalhe(itens){
+    if (diaSelecionado === null){
+      tesDiaDetalhe.style.display = 'none';
+      return;
+    }
+
+    var doDia = itens.filter(function(it){ return it.dia === diaSelecionado; });
+
+    tesDiaDetalhe.style.display = 'block';
+    tesDiaTitulo.textContent = pad2(diaSelecionado) + ' de ' + MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
+
+    if (doDia.length === 0){
+      tesDiaLista.innerHTML = '<p class="tes-empty">Nada a pagar neste dia.</p>';
+      return;
+    }
+
+    var total = doDia.reduce(function(acc, i){ return acc + i.montante; }, 0);
+
+    tesDiaLista.innerHTML = '<table class="tes-table"><thead><tr>' +
+      '<th>Tipo</th><th>Descrição</th><th>Referência</th><th style="text-align:right;">Valor</th>' +
+      '</tr></thead><tbody>' +
+      doDia.map(function(it){
+        return '<tr>' +
+          '<td><span class="tes-tag ' + (it.tipo === 'fixo' ? 'tes-tag-fixo' : 'tes-tag-pedido') + '">' +
+          (it.tipo === 'fixo' ? 'Fixo' : 'Pedido') + '</span></td>' +
+          '<td>' + escapeHtml(it.nome) + '</td>' +
+          '<td class="mono">' + escapeHtml(it.tipo === 'fixo' ? (it.categoria || '') : (it.referencia || '')) + '</td>' +
+          '<td class="num">' + formatEuro(it.montante) + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody><tfoot><tr>' +
+      '<td colspan="3" class="mono"><strong>Total do dia</strong></td>' +
+      '<td class="num">' + formatEuro(total) + '</td>' +
+      '</tr></tfoot></table>';
+  }
+
+  tesCalendarioEl.addEventListener('click', function(e){
+    var cell = e.target.closest('.tes-cal-cell');
+    if (!cell || cell.classList.contains('empty')) return;
+    var dia = parseInt(cell.getAttribute('data-dia'), 10);
+    diaSelecionado = (diaSelecionado === dia) ? null : dia;
+    renderTesouraria();
+  });
+
+  // Lista completa dos pendentes, sem filtro de período, com as acções de
+  // pagamento que antes viviam no cartão.
+  function renderTesPendentes(){
+    var linhas = linhasPendentes();
+    var hoje = hojeMeiaNoite();
+
+    if (linhas.length === 0){
+      tesPendentesEl.innerHTML = '<p class="tes-empty">Sem pagamentos pendentes ✓</p>';
+      return;
+    }
+
+    var total = linhas.reduce(function(acc, l){ return acc + l.montante; }, 0);
+
+    tesPendentesEl.innerHTML = '<table class="tes-table"><thead><tr>' +
+      '<th>Prazo</th><th>Fornecedor / descrição</th><th>Referência</th><th>Pedido</th>' +
+      '<th style="text-align:right;">Valor</th><th></th>' +
+      '</tr></thead><tbody>' +
+      linhas.map(function(l, idx){
+        var vencido = l.prazoDate && l.prazoDate < hoje;
+        return '<tr' + (vencido ? ' class="vencido"' : '') + '>' +
+          '<td class="mono"><strong>' + (l.prazoDate ? formatDateDDMMYYYY(l.prazoDate) : '—') + '</strong></td>' +
+          '<td>' + escapeHtml(l.fornecedor) + '</td>' +
+          '<td class="mono">' + escapeHtml(l.referencia || '—') + '</td>' +
+          '<td class="mono">' + (l.ticketNumero ? '#' + escapeHtml(l.ticketNumero) : '—') + '</td>' +
+          '<td class="num">' + formatEuro(l.montante) + '</td>' +
+          '<td>' + (l.iban ? '<button type="button" class="btn-small btn-tes-pagar" data-idx="' + idx + '">🏦 Pagar</button>' : '') + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody><tfoot><tr>' +
+      '<td colspan="4" class="mono"><strong>Total pendente</strong></td>' +
+      '<td class="num">' + formatEuro(total) + '</td><td></td>' +
+      '</tr></tfoot></table>';
+
+    tesPendentesEl.querySelectorAll('.btn-tes-pagar').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var l = linhas[parseInt(btn.getAttribute('data-idx'), 10)];
+        if (!l || !l.iban) return;
+        copyToClipboard('IBAN: ' + l.iban + ' — Montante: ' + l.montante.toFixed(2) + '€', btn);
+        window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
+      });
+    });
+  }
+
+  function renderTesouraria(){
+    var itens = itensDoMes(anoAtivo, mesAtivo);
+    tesMesLabel.textContent = MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
+    renderTesTotal(itens);
+    renderTesSemanas(itens);
+    renderTesCalendario(itens);
+    renderTesDiaDetalhe(itens);
+    renderTesPendentes();
+    renderCompromissos();
+  }
+
+  function mudarMes(delta){
+    mesAtivo += delta;
+    if (mesAtivo > 12){ mesAtivo = 1; anoAtivo++; }
+    if (mesAtivo < 1){ mesAtivo = 12; anoAtivo--; }
+    diaSelecionado = null;
+    renderTesouraria();
+  }
+
+  document.getElementById('btnMesAnterior').addEventListener('click', function(){ mudarMes(-1); });
+  document.getElementById('btnMesSeguinte').addEventListener('click', function(){ mudarMes(1); });
+
+  function abrirTesouraria(){
+    tesouraria.classList.add('open');
+    tesouraria.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  document.getElementById('cardPagamentos').addEventListener('click', function(e){
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    abrirTesouraria();
+  });
+
+  document.getElementById('btnFecharTesouraria').addEventListener('click', function(){
+    tesouraria.classList.remove('open');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* ---------- Compromissos fixos: lista e edição ---------- */
+
+  var CATEGORIA_ORDEM = ['Pessoal', 'Espaço', 'Utilities', 'Serviços', 'Estado', 'Outros'];
+
+  function descreveCompromisso(c){
+    var partes = [c.periodicidade || 'mensal'];
+
+    if (c.dia === 'ultimo') partes.push('último dia');
+    else if (c.dia !== undefined && c.dia !== null && c.dia !== '') partes.push('dia ' + c.dia);
+    else partes.push('dia por confirmar');
+
+    var meses = mesesArray(c.meses);
+    if (meses.length){
+      partes.push(meses.map(function(m){ return MESES_PT[m - 1].slice(0, 3); }).join('/'));
+    }
+
+    return partes.join(' · ');
+  }
+
+  function renderCompromissos(){
+    var ids = Object.keys(allCompromissos);
+
+    if (ids.length === 0){
+      tesCompromissosLista.innerHTML = '<p class="tes-empty">Sem compromissos fixos registados.</p>';
+      return;
+    }
+
+    var porCategoria = {};
+    ids.forEach(function(id){
+      var c = allCompromissos[id];
+      var cat = (c && c.categoria) || 'Outros';
+      if (!porCategoria[cat]) porCategoria[cat] = [];
+      porCategoria[cat].push(Object.assign({ id: id }, c));
+    });
+
+    var cats = Object.keys(porCategoria).sort(function(a, b){
+      var ia = CATEGORIA_ORDEM.indexOf(a); var ib = CATEGORIA_ORDEM.indexOf(b);
+      if (ia === -1) ia = 99;
+      if (ib === -1) ib = 99;
+      if (ia !== ib) return ia - ib;
+      return a.localeCompare(b);
+    });
+
+    tesCompromissosLista.innerHTML = cats.map(function(cat){
+      var itens = porCategoria[cat].sort(function(a, b){
+        return String(a.nome || '').localeCompare(String(b.nome || ''));
+      });
+
+      return '<div class="tes-cat">' +
+        '<div class="tes-cat-title">' + escapeHtml(cat) + '</div>' +
+        itens.map(function(c){
+          return '<div class="tes-comp' + (c.ativo ? '' : ' inativo') + '">' +
+            '<span class="tes-comp-nome">' + escapeHtml(c.nome || c.id) +
+            (c.ativo ? '' : '<span class="tes-comp-inativo-tag">inativo</span>') + '</span>' +
+            '<span class="tes-comp-meta">' + escapeHtml(descreveCompromisso(c)) + '</span>' +
+            '<span class="tes-comp-valor">' + formatEuro(parseMontante(c.valor)) + '</span>' +
+            '<button type="button" class="btn-small btn-editar-comp" data-id="' + escapeHtml(c.id) + '">✎ Editar</button>' +
+            '</div>';
+        }).join('') +
+        '</div>';
+    }).join('');
+
+    tesCompromissosLista.querySelectorAll('.btn-editar-comp').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        abrirCompromissoModal(btn.getAttribute('data-id'));
+      });
+    });
+  }
+
+  var compromissoModalOverlay = document.getElementById('compromissoModalOverlay');
+  var compromissoModalTitulo = document.getElementById('compromissoModalTitulo');
+  var cfMesesGrid = document.getElementById('cfMesesGrid');
+  var btnApagarCompromisso = document.getElementById('btnApagarCompromisso');
+  var compromissoEmEdicao = null;
+
+  cfMesesGrid.innerHTML = MESES_PT.map(function(m, idx){
+    return '<label class="mes-check"><input type="checkbox" class="cf-mes" value="' + (idx + 1) + '">' + m.slice(0, 3) + '</label>';
+  }).join('');
+
+  function abrirCompromissoModal(id){
+    compromissoEmEdicao = id;
+    var c = (id && allCompromissos[id]) || {};
+
+    compromissoModalTitulo.textContent = id ? 'Editar compromisso' : 'Novo compromisso';
+    btnApagarCompromisso.style.display = id ? 'inline-block' : 'none';
+
+    document.getElementById('cfNome').value = c.nome || '';
+    document.getElementById('cfCategoria').value = c.categoria || 'Outros';
+    document.getElementById('cfValor').value = (c.valor === undefined || c.valor === null) ? '' : c.valor;
+    document.getElementById('cfPeriodicidade').value = c.periodicidade || 'mensal';
+    document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
+    document.getElementById('cfNotas').value = c.notas || '';
+    document.getElementById('cfAtivo').checked = !!c.ativo;
+
+    var meses = mesesArray(c.meses);
+    cfMesesGrid.querySelectorAll('.cf-mes').forEach(function(chk){
+      chk.checked = meses.indexOf(parseInt(chk.value, 10)) !== -1;
+    });
+
+    compromissoModalOverlay.classList.add('open');
+  }
+
+  function fecharCompromissoModal(){
+    compromissoModalOverlay.classList.remove('open');
+    compromissoEmEdicao = null;
+  }
+
+  document.getElementById('btnNovoCompromisso').addEventListener('click', function(){
+    abrirCompromissoModal(null);
+  });
+  document.getElementById('compromissoModalClose').addEventListener('click', fecharCompromissoModal);
+  document.getElementById('compromissoCancel').addEventListener('click', fecharCompromissoModal);
+  compromissoModalOverlay.addEventListener('click', function(e){
+    if (e.target === compromissoModalOverlay) fecharCompromissoModal();
+  });
+
+  document.getElementById('btnGuardarCompromisso').addEventListener('click', function(){
+    var nome = document.getElementById('cfNome').value.trim();
+    if (!nome){
+      alert('O compromisso precisa de um nome.');
+      return;
+    }
+
+    var diaRaw = document.getElementById('cfDia').value.trim().toLowerCase();
+    var dia = null;
+    if (diaRaw === 'ultimo' || diaRaw === 'último'){
+      dia = 'ultimo';
+    } else if (diaRaw !== ''){
+      var n = parseInt(diaRaw, 10);
+      if (isNaN(n) || n < 1 || n > 31){
+        alert('O dia tem de ser um número entre 1 e 31, «ultimo», ou ficar vazio.');
+        return;
+      }
+      dia = n;
+    }
+
+    var meses = [];
+    cfMesesGrid.querySelectorAll('.cf-mes').forEach(function(chk){
+      if (chk.checked) meses.push(parseInt(chk.value, 10));
+    });
+
+    var valorRaw = document.getElementById('cfValor').value.trim();
+    var notas = document.getElementById('cfNotas').value.trim();
+
+    var registo = {
+      nome: nome,
+      categoria: document.getElementById('cfCategoria').value,
+      valor: valorRaw === '' ? 0 : parseMontante(valorRaw),
+      periodicidade: document.getElementById('cfPeriodicidade').value,
+      dia: dia,
+      meses: meses,
+      ativo: document.getElementById('cfAtivo').checked
+    };
+    if (notas) registo.notas = notas;
+
+    var ref = compromissoEmEdicao ? compromissosRef.child(compromissoEmEdicao) : compromissosRef.push();
+
+    ref.set(registo).then(fecharCompromissoModal).catch(function(err){
+      alert('Erro ao guardar: ' + err.message);
+    });
+  });
+
+  btnApagarCompromisso.addEventListener('click', function(){
+    if (!compromissoEmEdicao) return;
+    var c = allCompromissos[compromissoEmEdicao] || {};
+    if (!confirm('Apagar «' + (c.nome || compromissoEmEdicao) + '»? Esta ação não pode ser desfeita.')) return;
+    compromissosRef.child(compromissoEmEdicao).remove().then(fecharCompromissoModal).catch(function(err){
+      alert('Erro ao apagar: ' + err.message);
+    });
+  });
+
+  compromissosRef.on('value', function(snapshot){
+    allCompromissos = snapshot.val() || {};
+    renderTesouraria();
+  }, function(){
+    tesCompromissosLista.innerHTML = '<p class="tes-empty">Erro de ligação à base de dados.</p>';
+  });
+
   tabsEl.addEventListener('click', function (e) {
     if (!e.target.classList.contains('payments-tab')) return;
     var status = e.target.getAttribute('data-status');
@@ -1541,6 +2937,8 @@ window.addEventListener('load', function () {
     loadingEl.style.display = 'none';
     pagamentosCarregados = true;
     render();
+    renderPagamentosCard();
+    renderTesouraria();
     agendarNotificacoes();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
