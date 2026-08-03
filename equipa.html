@@ -844,6 +844,91 @@
     background:var(--black);
     color:var(--white);
   }
+
+  /* ---------- Editar semana (edição em lote) ---------- */
+  .modal-lg{
+    max-width:760px;
+    max-height:calc(100vh - 80px);
+    display:flex;
+    flex-direction:column;
+  }
+
+  .modal-lg .modal-header{
+    flex-shrink:0;
+  }
+
+  .modal-body-scroll{
+    overflow-y:auto;
+    flex:1;
+    min-height:0;
+  }
+
+  .modal-lg .modal-actions{
+    flex-shrink:0;
+  }
+
+  .semana-pessoa-bloco{
+    border:2px solid var(--line);
+    background:var(--white);
+    padding:14px;
+    margin-bottom:14px;
+  }
+
+  .semana-pessoa-bloco:last-child{
+    margin-bottom:0;
+  }
+
+  .semana-pessoa-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .semana-pessoa-nome{
+    font-weight:700;
+    font-size:14px;
+  }
+
+  .semana-grid-wrap{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .semana-mini-grelha{
+    border-collapse:collapse;
+    width:100%;
+    min-width:480px;
+  }
+
+  .semana-mini-grelha th,
+  .semana-mini-grelha td{
+    border:1px solid var(--line);
+    text-align:center;
+    padding:5px 4px;
+  }
+
+  .semana-mini-grelha th{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    line-height:1.4;
+    background:var(--bg);
+  }
+
+  .semana-turno-label{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    background:var(--bg);
+    white-space:nowrap;
+  }
+
+  .semana-mini-grelha input[type="checkbox"]{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -878,6 +963,7 @@
       <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
       <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
       <button type="button" class="btn-vista-mensal" id="btnVistaMensal">📅 Vista mensal</button>
+      <button type="button" class="btn-vista-mensal" id="btnEditarSemana">✏️ Editar semana</button>
     </div>
 
     <div class="grelha-wrap">
@@ -960,6 +1046,23 @@
 
     <div class="cal-weekdays" id="calWeekdays"></div>
     <div class="cal-days" id="calGrid"></div>
+  </div>
+</div>
+
+<!-- Modal Editar semana -->
+<div class="modal-overlay" id="editarSemanaOverlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 id="editarSemanaTitulo">Editar turnos</h2>
+      <button class="modal-close" id="editarSemanaClose">×</button>
+    </div>
+
+    <div class="modal-body-scroll" id="editarSemanaBody"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="editarSemanaCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarSemana">Guardar alterações</button>
+    </div>
   </div>
 </div>
 
@@ -1606,6 +1709,111 @@
     calViewMonth++;
     if (calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
     renderCalModal();
+  });
+
+  /* ---------- Editar semana (preenchimento em lote) ---------- */
+  var editarSemanaDias = null;
+  var editarSemanaEstadoInicial = {};
+
+  function buildEditarSemanaHtml(dias){
+    editarSemanaEstadoInicial = {};
+    dias.forEach(function(d){
+      var dStr = toDateStr(d);
+      TURNOS.forEach(function(t){
+        editarSemanaEstadoInicial[chaveTurno(dStr, t.id)] = efetivoDoTurno(dStr, t.id).pessoas
+          .map(function(e){ return e.pessoaId; })
+          .sort();
+      });
+    });
+
+    var ativas = pessoasAtivasArray();
+    if (!ativas.length) return '<p class="empty-state">Sem pessoas ativas.</p>';
+
+    return ativas.map(function(p){
+      var html = '<div class="semana-pessoa-bloco">';
+      html += '<div class="semana-pessoa-header"><span class="pessoa-color-dot" style="background:' + (p.cor || '#999') + '"></span>';
+      html += '<span class="semana-pessoa-nome">' + escapeHtml(p.nome) + '</span></div>';
+      html += '<div class="semana-grid-wrap"><table class="semana-mini-grelha"><thead><tr><th></th>';
+      dias.forEach(function(d){
+        html += '<th>' + DIA_ABREV[d.getDay()] + '<br>' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+      TURNOS.forEach(function(t){
+        html += '<tr><td class="semana-turno-label" title="' + t.horario + '">' + t.id.toUpperCase() + '</td>';
+        dias.forEach(function(d){
+          var dStr = toDateStr(d);
+          var checked = editarSemanaEstadoInicial[chaveTurno(dStr, t.id)].indexOf(p.id) !== -1;
+          html += '<td><input type="checkbox" data-pessoa="' + p.id + '" data-data="' + dStr + '" data-turno="' + t.id + '"' + (checked ? ' checked' : '') + '></td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+      return html;
+    }).join('');
+  }
+
+  function openEditarSemanaModal(){
+    var monday = getWeekStart();
+    var dias = [];
+    for (var i = 0; i < 7; i++){
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dias.push(d);
+    }
+    editarSemanaDias = dias;
+
+    var fmt = function(d){ return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); };
+    document.getElementById('editarSemanaTitulo').textContent = 'Editar turnos — semana de ' + fmt(dias[0]) + ' a ' + fmt(dias[6]);
+    document.getElementById('editarSemanaBody').innerHTML = buildEditarSemanaHtml(dias);
+    document.getElementById('editarSemanaOverlay').classList.add('open');
+  }
+
+  function closeEditarSemanaModal(){
+    document.getElementById('editarSemanaOverlay').classList.remove('open');
+    editarSemanaDias = null;
+    editarSemanaEstadoInicial = {};
+  }
+
+  document.getElementById('btnEditarSemana').addEventListener('click', openEditarSemanaModal);
+  document.getElementById('editarSemanaClose').addEventListener('click', closeEditarSemanaModal);
+  document.getElementById('editarSemanaCancel').addEventListener('click', closeEditarSemanaModal);
+  document.getElementById('editarSemanaOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('editarSemanaOverlay')) closeEditarSemanaModal();
+  });
+
+  document.getElementById('btnGuardarSemana').addEventListener('click', function(){
+    if (!editarSemanaDias) return;
+
+    var promises = [];
+    editarSemanaDias.forEach(function(d){
+      var dStr = toDateStr(d);
+      TURNOS.forEach(function(t){
+        var key = chaveTurno(dStr, t.id);
+        var checks = document.querySelectorAll('#editarSemanaBody input[data-data="' + dStr + '"][data-turno="' + t.id + '"]');
+        var novosIds = [];
+        Array.prototype.forEach.call(checks, function(c){ if (c.checked) novosIds.push(c.getAttribute('data-pessoa')); });
+        novosIds.sort();
+
+        var iniciais = editarSemanaEstadoInicial[key] || [];
+        var mudou = novosIds.length !== iniciais.length || novosIds.some(function(id, idx){ return id !== iniciais[idx]; });
+        if (!mudou) return;
+
+        var arr = novosIds.map(function(id){
+          var p = pessoas[id] || {};
+          return { pessoaId: id, nome: p.nome || 'Pessoa removida', cor: p.cor || '#999999' };
+        });
+        promises.push(turnosRef.child(key).set({ data: dStr, turno: t.id, pessoas: arr }));
+      });
+    });
+
+    if (!promises.length){
+      closeEditarSemanaModal();
+      return;
+    }
+
+    Promise.all(promises).then(closeEditarSemanaModal).catch(function(err){
+      alert('Erro ao guardar alterações: ' + err.message);
+    });
   });
 
   renderGrelha();
