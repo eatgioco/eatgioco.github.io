@@ -781,6 +781,11 @@
   }
 
   /* ---------- Mini-calendário mensal ---------- */
+  /* Abre por cima da vista mensal, que também é um modal */
+  #calModalOverlay{
+    z-index:110;
+  }
+
   .cal-modal{
     max-width:360px;
   }
@@ -1236,56 +1241,171 @@
     margin-top:4px;
   }
 
-  /* ---------- Vista mensal (várias semanas em scroll contínuo) ---------- */
-  .mensal-scroll{
-    margin-top:14px;
-    max-height:min(78vh, 900px);
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-    border:3px solid var(--black);
-    background:var(--bg);
-    padding:0 14px 4px;
+  /* ---------- Vista mensal (modal quase full-screen, calendário contínuo) ---------- */
+  #mensalModalOverlay{
+    padding:16px;
+    align-items:center;
   }
 
-  /* Sticky dentro do próprio contentor com scroll: fica fixo como âncora de "estás em [mês]" */
+  .mensal-modal{
+    max-width:1400px;
+    width:100%;
+    height:calc(100vh - 32px);
+    padding:0;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .mensal-modal-header{
+    margin:0;
+    padding:12px 14px;
+    border-bottom:3px solid var(--black);
+    background:var(--bg);
+    flex-shrink:0;
+  }
+
+  .mensal-modal-header h2{
+    font-size:16px;
+  }
+
+  .mensal-modal .modal-close{
+    font-size:20px;
+    font-weight:700;
+  }
+
+  .mensal-scroll{
+    flex:1;
+    min-height:0;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+    background:var(--white);
+  }
+
+  /* Largura mínima partilhada por todas as tabelas: dá UM scroll horizontal para o
+     calendário inteiro (46 da coluna de ações + 112 dos turnos + 7 dias) em vez de
+     um scroll independente por semana, que partia a continuidade visual */
+  .mensal-inner{
+    min-width:904px;
+  }
+
+  /* Âncora de "estás em [mês]" enquanto se faz scroll dentro do mês */
   .mensal-mes-separador{
     position:sticky;
     top:0;
-    z-index:5;
-    margin:0 -14px;
-    padding:10px 14px;
+    z-index:6;
+    padding:9px 14px;
     background:var(--black);
     color:var(--white);
     font-family:'Space Mono', monospace;
-    font-size:13px;
+    font-size:12px;
     font-weight:700;
     letter-spacing:2px;
     text-transform:uppercase;
   }
 
-  .mensal-semana-bloco{
-    padding-top:18px;
-    padding-bottom:18px;
+  .mensal-grelha{
+    border-collapse:separate;
+    border-spacing:0;
+    table-layout:fixed;
+    width:100%;
+  }
+
+  .col-acoes{
+    width:46px;
+  }
+
+  .mensal-grelha th,
+  .mensal-grelha td{
+    padding:0;
+    vertical-align:top;
+    border-right:2px solid var(--line);
     border-bottom:2px solid var(--line);
   }
 
-  .mensal-semana-bloco:last-child{
-    border-bottom:none;
+  .mensal-grelha tr > *:last-child{
+    border-right:none;
   }
 
-  .mensal-semana-header{
+  /* A coluna dos turnos deixa de encostar a 0: a das ações fica à esquerda dela */
+  .mensal-grelha .col-sticky{
+    left:46px;
+  }
+
+  /* Nomes dos dias: uma só vez por mês, logo abaixo do separador */
+  .mensal-dias-header th{
+    background:var(--bg);
     font-family:'Space Mono', monospace;
-    font-size:13px;
+    font-size:10px;
     font-weight:700;
-    margin-bottom:8px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    text-align:center;
+    padding:7px 4px;
+    vertical-align:middle;
+    color:var(--muted);
   }
 
-  .mensal-grelha-wrap{
-    margin-top:0;
+  /* Linha fina de datas, uma por semana, colada às 3 linhas de turnos */
+  .mensal-data-cell{
+    text-align:center;
+    padding:4px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    background:var(--bg);
+    cursor:pointer;
+    vertical-align:middle;
   }
 
-  .mensal-resumo-grid{
-    margin-top:16px;
+  .mensal-data-cell:hover{
+    background:#EDE8DD;
+  }
+
+  .mensal-data-cell.hoje{
+    color:var(--red);
+    box-shadow:inset 0 -2px 0 var(--red);
+  }
+
+  .mensal-data-lock{
+    font-size:9px;
+    margin-left:2px;
+  }
+
+  /* Coluna de ações: sticky à esquerda de tudo, ícones centrados nas 3 linhas de turnos */
+  .mensal-acoes-cell,
+  .mensal-acoes-vazia{
+    position:sticky;
+    left:0;
+    z-index:2;
+    background:var(--bg);
+    border-right:3px solid var(--black);
+  }
+
+  .mensal-acoes-cell{
+    vertical-align:middle;
+    text-align:center;
+  }
+
+  .btn-acao-mensal{
+    display:block;
+    width:30px;
+    height:26px;
+    margin:4px auto;
+    padding:0;
+    border:1px solid var(--line);
+    background:var(--white);
+    cursor:pointer;
+    font-size:12px;
+    line-height:1;
+  }
+
+  .btn-acao-mensal:hover{
+    border-color:var(--red);
+  }
+
+  .btn-acao-mensal:disabled{
+    opacity:0.5;
+    cursor:default;
   }
 
   .mensal-loading{
@@ -1364,15 +1484,27 @@
       </div>
     </div>
 
-    <!-- Vista mensal: várias semanas empilhadas, scroll contínuo, separadas por mês.
-         Cada bloco é construído por criarBlocoSemana(), que reutiliza exatamente as
-         mesmas funções de leitura e desenho da vista semana (buildGrelhaTableInner,
-         calcularResumoSemana, semanaConfirmada) — nunca duplica essa lógica. -->
-    <div id="vistaMensalContainer" style="display:none;">
-      <div class="mensal-scroll" id="vistaMensalScroll"></div>
-    </div>
   </div>
 </main>
+
+<!-- Vista mensal: modal quase full-screen, várias semanas coladas em scroll contínuo,
+     separadas só por mês. Cada semana é desenhada por buildMensalSemanaTableHtml(), que
+     partilha com a vista semana os mesmos construtores de célula e de rótulo de turno
+     (buildCelulaHtml / buildTurnoLabelHtml) — a lógica de efetivo, fecho, férias e
+     validação vive num sítio só e serve as duas vistas. -->
+<div class="modal-overlay" id="mensalModalOverlay">
+  <div class="modal mensal-modal">
+    <div class="modal-header mensal-modal-header">
+      <h2>Vista mensal</h2>
+      <div class="modal-header-right">
+        <button type="button" class="btn-vista-mensal" id="btnIrParaDataMensal">📅 Ir para data</button>
+        <button class="modal-close" id="mensalModalClose" aria-label="Fechar vista mensal">✕</button>
+      </div>
+    </div>
+
+    <div class="mensal-scroll" id="vistaMensalScroll"></div>
+  </div>
+</div>
 
 <!-- Modal Pessoa -->
 <div class="modal-overlay" id="pessoaModalOverlay">
@@ -1623,6 +1755,7 @@
   var vistaAtual = 'semana';
   var blocosMensais = [];   // { monday: Date, key: 'YYYY-MM-DD' (segunda-feira), el: Element }, ordem ascendente
   var mensalScrollEl = null;
+  var mensalInnerEl = null;
   var mensalCarregandoTop = false;
   var mensalCarregandoBottom = false;
   var fecharTurnoSemanaMonday = null;
@@ -2199,8 +2332,72 @@
     return out;
   }
 
-  /* Constrói o miolo (colgroup+thead+tbody) da grelha 7×3 para uma semana qualquer.
-     Usada tanto pela vista semana única como por cada bloco da vista mensal — nunca duplicada. */
+  /* ---- Construtores partilhados pelas duas vistas (semana única e mensal) ----
+     Toda a lógica de efetivo, fecho, férias, confirmação e validação de mínimo vive
+     aqui. As duas vistas só diferem no esqueleto da tabela à volta destas peças. */
+
+  /* Rótulo do turno (coluna sticky à esquerda), com cadeado se a semana toda tiver
+     este turno fechado. Clicar abre o fecho do turno para essa semana. */
+  function buildTurnoLabelHtml(t, dias, mondayStr){
+    var turnoFechadoSemana = dias.every(function(d){ return estaFechado(toDateStr(d), t.id); });
+    var html = '<td class="col-sticky turno-label"';
+    html += ' title="' + (turnoFechadoSemana ? 'Turno fechado toda a semana — clica para reabrir' : 'Clica para fechar este turno em toda a semana') + '"';
+    html += ' onclick="openFecharTurnoSemanaModal(\'' + t.id + '\',\'' + mondayStr + '\')">';
+    html += '<span class="turno-horario">' + t.horario + (turnoFechadoSemana ? ' 🔒' : '') + '</span>';
+    html += '<span class="turno-duracao">' + fmtHoras(t.horas) + '</span>';
+    html += '</td>';
+    return html;
+  }
+
+  /* Uma célula (data × turno): fechada, confirmada ou prevista pelo padrão */
+  function buildCelulaHtml(dStr, turnoId, isToday){
+    var efet = efetivoDoTurno(dStr, turnoId);
+    var lista = efet.pessoas;
+    var html = '';
+
+    if (efet.fechado){
+      html += '<td class="celula celula-fechada' + (isToday ? ' hoje' : '') + '"';
+      html += ' title="Sem serviço" onclick="openTurnoModal(\'' + dStr + '\',\'' + turnoId + '\')">';
+      html += '<div class="celula-inner"><span class="fechado-tag">FECHADO</span></div></td>';
+      return html;
+    }
+
+    html += '<td class="celula' + (isToday ? ' hoje' : '') + '" onclick="openTurnoModal(\'' + dStr + '\',\'' + turnoId + '\')">';
+    if (efet.confirmado){
+      html += '<button type="button" class="btn-revert-padrao" title="Reverter ao padrão" onclick="revertParaPadrao(\'' + dStr + '\',\'' + turnoId + '\',event)">↺</button>';
+    }
+    /* Aviso de cobertura: menos de duas pessoas neste turno */
+    if (celulaSubdimensionada(lista)){
+      html += '<span class="celula-aviso" title="' + (lista.length ? 'Só 1 pessoa' : 'Ninguém') + ' neste turno — o mínimo são ' + MINIMO_POR_TURNO + '">⚠️</span>';
+    }
+
+    html += '<div class="celula-inner">';
+    if (lista.length){
+      var curto = lista.length >= 4;
+      lista.forEach(function(entrada){
+        var info = dadosPessoa(entrada);
+        var label = curto ? iniciais(info.nome) : primeiroNome(info.nome);
+        /* Confirmação manual anterior ao registo das férias: assinalar para revisão, sem apagar */
+        var conflitoFerias = efet.confirmado && estaDeFerias(entrada.pessoaId, dStr);
+        if (efet.confirmado){
+          html += '<span class="p-chip" title="' + escapeHtml(info.nome) + (conflitoFerias ? ' — de férias nesta data, rever' : '') + '"';
+          html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
+          html += (conflitoFerias ? '⚠️ ' : '') + escapeHtml(label) + '</span>';
+        } else {
+          html += '<span class="p-chip p-chip-previsto" title="' + escapeHtml(info.nome) + ' (previsto pelo padrão)"';
+          html += ' style="color:' + info.cor + ';border-color:' + info.cor + '">';
+          html += escapeHtml(label) + '</span>';
+        }
+      });
+    } else {
+      html += '<span class="celula-vazia">+</span>';
+    }
+    html += '</div></td>';
+    return html;
+  }
+
+  /* Miolo (colgroup+thead+tbody) da grelha 7×3 da vista semana única.
+     Também usado para gerar a imagem exportada, nas duas vistas. */
   function buildGrelhaTableInner(monday){
     var todayStr = toDateStr(new Date());
     var mondayStr = toDateStr(monday);
@@ -2230,63 +2427,12 @@
     html += '</tr></thead><tbody>';
 
     TURNOS.forEach(function(t){
-      /* Cadeado na linha quando os 7 dias visíveis têm este turno fechado */
-      var turnoFechadoSemana = dias.every(function(d){ return estaFechado(toDateStr(d), t.id); });
-
       html += '<tr>';
-      html += '<td class="col-sticky turno-label"';
-      html += ' title="' + (turnoFechadoSemana ? 'Turno fechado toda a semana — clica para reabrir' : 'Clica para fechar este turno em toda a semana') + '"';
-      html += ' onclick="openFecharTurnoSemanaModal(\'' + t.id + '\',\'' + mondayStr + '\')">';
-      html += '<span class="turno-horario">' + t.horario + (turnoFechadoSemana ? ' 🔒' : '') + '</span>';
-      html += '<span class="turno-duracao">' + fmtHoras(t.horas) + '</span>';
-      html += '</td>';
-
+      html += buildTurnoLabelHtml(t, dias, mondayStr);
       dias.forEach(function(d){
         var dStr = toDateStr(d);
-        var isToday = dStr === todayStr;
-        var efet = efetivoDoTurno(dStr, t.id);
-        var lista = efet.pessoas;
-
-        if (efet.fechado){
-          html += '<td class="celula celula-fechada' + (isToday ? ' hoje' : '') + '"';
-          html += ' title="Sem serviço" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
-          html += '<div class="celula-inner"><span class="fechado-tag">FECHADO</span></div></td>';
-          return;
-        }
-
-        html += '<td class="celula' + (isToday ? ' hoje' : '') + '" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
-        if (efet.confirmado){
-          html += '<button type="button" class="btn-revert-padrao" title="Reverter ao padrão" onclick="revertParaPadrao(\'' + dStr + '\',\'' + t.id + '\',event)">↺</button>';
-        }
-        /* Aviso de cobertura: menos de duas pessoas neste turno */
-        if (celulaSubdimensionada(lista)){
-          html += '<span class="celula-aviso" title="' + (lista.length ? 'Só 1 pessoa' : 'Ninguém') + ' neste turno — o mínimo são ' + MINIMO_POR_TURNO + '">⚠️</span>';
-        }
-
-        html += '<div class="celula-inner">';
-        if (lista.length){
-          var curto = lista.length >= 4;
-          lista.forEach(function(entrada){
-            var info = dadosPessoa(entrada);
-            var label = curto ? iniciais(info.nome) : primeiroNome(info.nome);
-            /* Confirmação manual anterior ao registo das férias: assinalar para revisão, sem apagar */
-            var conflitoFerias = efet.confirmado && estaDeFerias(entrada.pessoaId, dStr);
-            if (efet.confirmado){
-              html += '<span class="p-chip" title="' + escapeHtml(info.nome) + (conflitoFerias ? ' — de férias nesta data, rever' : '') + '"';
-              html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
-              html += (conflitoFerias ? '⚠️ ' : '') + escapeHtml(label) + '</span>';
-            } else {
-              html += '<span class="p-chip p-chip-previsto" title="' + escapeHtml(info.nome) + ' (previsto pelo padrão)"';
-              html += ' style="color:' + info.cor + ';border-color:' + info.cor + '">';
-              html += escapeHtml(label) + '</span>';
-            }
-          });
-        } else {
-          html += '<span class="celula-vazia">+</span>';
-        }
-        html += '</div></td>';
+        html += buildCelulaHtml(dStr, t.id, dStr === todayStr);
       });
-
       html += '</tr>';
     });
     html += '</tbody>';
@@ -2958,10 +3104,12 @@
     descarregarBlob(blob, nomeFicheiro);
   }
 
-  /* Reutilizada pelo botão singular da vista única e pelo botão de cada bloco da vista mensal */
-  function exportarSemanaClick(monday, wrap, btn){
+  /* Reutilizada pelo botão da vista única e pelo ícone 🖼️ de cada semana da vista mensal.
+     aoTerminar é opcional: a vista mensal usa-o para deitar fora o wrapper temporário. */
+  function exportarSemanaClick(monday, wrap, btn, aoTerminar){
     if (typeof html2canvas !== 'function'){
       alert('A biblioteca de exportação não carregou. Verifica a ligação à internet.');
+      if (aoTerminar) aoTerminar();
       return;
     }
 
@@ -2979,6 +3127,7 @@
       wrap.classList.remove('exportando');
       wrap.style.width = '';
       btn.disabled = false;
+      if (aoTerminar) aoTerminar();
     };
 
     html2canvas(wrap, {
@@ -3037,48 +3186,99 @@
     return el;
   }
 
-  /* Constrói (ou atualiza, se já existir) o conteúdo de um bloco de semana da vista
-     mensal. Não duplica lógica: usa exatamente buildGrelhaTableInner, calcularResumoSemana
-     e semanaConfirmada, as mesmas funções que desenham a vista única. */
-  function atualizarBlocoSemana(wrapper, monday){
+  /* Nomes dos dias, sem datas — aparece uma vez por mês, logo abaixo do separador.
+     Mesmo colgroup das tabelas de semana, por isso as colunas alinham na perfeição. */
+  function buildMensalDiasHeaderHtml(){
+    var html = '<table class="mensal-grelha mensal-dias-header"><colgroup><col class="col-acoes"><col class="col-label">';
+    for (var i = 0; i < 7; i++) html += '<col>';
+    html += '</colgroup><thead><tr><th class="mensal-acoes-vazia"></th><th class="col-sticky"></th>';
+    DIA_LABELS_UI.forEach(function(l){ html += '<th>' + l + '</th>'; });
+    html += '</tr></thead></table>';
+    return html;
+  }
+
+  /* Uma semana no formato compacto: linha fina de datas + as 3 linhas de turnos,
+     com a coluna de ações à esquerda a abranger as 3 linhas de turnos.
+     As células e os rótulos de turno vêm dos mesmos construtores da vista semana. */
+  function buildMensalSemanaTableHtml(monday){
+    var todayStr = toDateStr(new Date());
+    var mondayStr = toDateStr(monday);
     var dias = diasDaSemana(monday);
     var trancada = semanaConfirmada(monday);
-    var mondayLabel = formatWeekLabel(monday);
+    var label = formatWeekLabel(monday);
 
-    if (!wrapper.querySelector('.mensal-semana-header')){
-      wrapper.innerHTML =
-        '<div class="mensal-semana-header"><span class="mensal-lock-slot"></span>Semana de ' + mondayLabel + '</div>' +
-        '<div class="grelha-wrap mensal-grelha-wrap">' +
-          '<div class="export-header">' +
-            '<span class="export-header-title">● GIOCO® · Turnos</span>' +
-            '<span class="export-header-sub">Semana de ' + mondayLabel + '</span>' +
-          '</div>' +
-          '<table class="grelha"></table>' +
-        '</div>' +
-        '<div class="semana-acoes">' +
-          '<button type="button" class="btn-acao-semana" data-acao="editar" title="Editar os turnos desta semana em lote">✏️ Editar</button>' +
-          '<button type="button" class="btn-acao-semana" data-acao="confirmar" title="Trancar esta semana: o previsto pelo padrão passa a confirmado">🔒 Confirmar</button>' +
-          '<button type="button" class="btn-acao-semana" data-acao="exportar" title="Exportar a grelha desta semana como imagem PNG">🖼️ Exportar</button>' +
-        '</div>' +
-        '<div class="resumo-grid mensal-resumo-grid">' +
-          '<div class="resumo-card"><h3 class="mono">Esta semana</h3><div class="mensal-resumo-semana"></div></div>' +
-        '</div>';
+    var html = '<table class="mensal-grelha"><colgroup><col class="col-acoes"><col class="col-label">';
+    for (var i = 0; i < 7; i++) html += '<col>';
+    html += '</colgroup><tbody>';
 
-      wrapper.querySelector('[data-acao="editar"]').addEventListener('click', function(){ openEditarSemanaModal(monday); });
-      wrapper.querySelector('[data-acao="confirmar"]').addEventListener('click', function(){ confirmarSemanaClick(monday); });
-      wrapper.querySelector('[data-acao="exportar"]').addEventListener('click', function(e){
-        exportarSemanaClick(monday, wrapper.querySelector('.grelha-wrap'), e.currentTarget);
+    /* Linha de datas: só os números, com o cadeado da semana confirmada na coluna dos turnos */
+    html += '<tr><td class="mensal-acoes-vazia"></td>';
+    html += '<td class="col-sticky mensal-data-cell">';
+    if (trancada) html += '<span class="semana-lock" title="Semana confirmada — todas as células estão trancadas">🔒</span>';
+    html += '</td>';
+    dias.forEach(function(d){
+      var dStr = toDateStr(d);
+      var fechadoTodo = diaTodoFechado(dStr);
+      html += '<td class="mensal-data-cell dia-head' + (dStr === todayStr ? ' hoje' : '') + '"';
+      html += ' title="' + (fechadoTodo ? 'Loja fechada — clica para reabrir' : 'Clica para fechar a loja neste dia') + '"';
+      html += ' onclick="openFecharDiaModal(\'' + dStr + '\')">';
+      html += pad2(d.getDate());
+      if (fechadoTodo) html += '<span class="mensal-data-lock" title="Loja fechada o dia todo">🔒</span>';
+      html += '</td>';
+    });
+    html += '</tr>';
+
+    TURNOS.forEach(function(t, idx){
+      html += '<tr>';
+      if (idx === 0){
+        /* rowspan pelas 3 linhas de turnos: os ícones ficam centrados só nelas */
+        html += '<td class="mensal-acoes-cell" rowspan="' + TURNOS.length + '">';
+        html += '<button type="button" class="btn-acao-mensal" data-acao="editar" title="Editar os turnos da semana de ' + label + '" aria-label="Editar semana de ' + label + '">✏️</button>';
+        html += '<button type="button" class="btn-acao-mensal" data-acao="confirmar" title="' + (trancada ? 'Semana de ' + label + ' já confirmada' : 'Confirmar a semana de ' + label) + '" aria-label="Confirmar semana de ' + label + '">🔒</button>';
+        html += '<button type="button" class="btn-acao-mensal" data-acao="exportar" title="Exportar a semana de ' + label + ' como imagem PNG" aria-label="Exportar semana de ' + label + '">🖼️</button>';
+        html += '</td>';
+      }
+      html += buildTurnoLabelHtml(t, dias, mondayStr);
+      dias.forEach(function(d){
+        var dStr = toDateStr(d);
+        html += buildCelulaHtml(dStr, t.id, dStr === todayStr);
       });
-    } else {
-      wrapper.querySelector('.mensal-semana-header').lastChild.textContent = 'Semana de ' + mondayLabel;
-      wrapper.querySelector('.export-header-sub').textContent = 'Semana de ' + mondayLabel;
-    }
+      html += '</tr>';
+    });
 
-    wrapper.querySelector('.mensal-lock-slot').innerHTML = trancada
-      ? '<span class="semana-lock" title="Semana confirmada — todas as células estão trancadas">🔒</span> '
-      : '';
-    wrapper.querySelector('table.grelha').innerHTML = buildGrelhaTableInner(monday);
-    renderResumoTabelaEl(calcularResumoSemana(dias), wrapper.querySelector('.mensal-resumo-semana'));
+    html += '</tbody></table>';
+    return html;
+  }
+
+  /* Exporta a semana com o MESMO aspeto da vista semana (grelha completa com datas e
+     cabeçalho), não o formato compacto: monta um .grelha-wrap temporário fora do ecrã. */
+  function exportarSemanaMensal(monday, btn){
+    var temp = document.createElement('div');
+    temp.className = 'grelha-wrap';
+    temp.style.position = 'absolute';
+    temp.style.left = '-10000px';
+    temp.style.top = window.scrollY + 'px';
+    temp.style.width = '1100px';
+    temp.innerHTML =
+      '<div class="export-header">' +
+        '<span class="export-header-title">● GIOCO® · Turnos</span>' +
+        '<span class="export-header-sub">Semana de ' + formatWeekLabel(monday) + '</span>' +
+      '</div>' +
+      '<table class="grelha">' + buildGrelhaTableInner(monday) + '</table>';
+    document.body.appendChild(temp);
+
+    exportarSemanaClick(monday, temp, btn, function(){
+      if (temp.parentNode) temp.parentNode.removeChild(temp);
+    });
+  }
+
+  function atualizarBlocoSemana(wrapper, monday){
+    wrapper.innerHTML = buildMensalSemanaTableHtml(monday);
+    wrapper.querySelector('[data-acao="editar"]').addEventListener('click', function(){ openEditarSemanaModal(monday); });
+    wrapper.querySelector('[data-acao="confirmar"]').addEventListener('click', function(){ confirmarSemanaClick(monday); });
+    wrapper.querySelector('[data-acao="exportar"]').addEventListener('click', function(e){
+      exportarSemanaMensal(monday, e.currentTarget);
+    });
   }
 
   function criarBlocoSemana(monday){
@@ -3094,50 +3294,54 @@
     blocosMensais.forEach(function(b){ atualizarBlocoSemana(b.el, b.monday); });
   }
 
-  /* Insere uma semana no fim da lista (ordem ascendente), com separador de mês se necessário */
+  /* Separador + cabeçalho de dias são recalculados de raiz sempre que a lista muda.
+     Mais simples (e à prova de inserções no topo, no fundo ou por recentragem) do que
+     tentar realocar o separador certo em cada caso. São 2 nós por mês, é barato. */
+  function reconstruirSeparadores(){
+    Array.prototype.forEach.call(
+      mensalInnerEl.querySelectorAll('.mensal-mes-separador, .mensal-dias-header-wrap'),
+      function(el){ el.parentNode.removeChild(el); }
+    );
+
+    var ultimoMes = null;
+    blocosMensais.forEach(function(b){
+      var mk = monthKey(b.monday);
+      if (mk === ultimoMes) return;
+      ultimoMes = mk;
+
+      var header = document.createElement('div');
+      header.className = 'mensal-dias-header-wrap';
+      header.setAttribute('data-mes', mk);
+      header.innerHTML = buildMensalDiasHeaderHtml();
+
+      mensalInnerEl.insertBefore(header, b.el);
+      mensalInnerEl.insertBefore(criarSeparadorMes(b.monday), header);
+    });
+  }
+
   function appendSemana(monday){
     var key = toDateStr(monday);
     if (blocosMensais.some(function(b){ return b.key === key; })) return;
-
     var bloco = criarBlocoSemana(monday);
-    var ultimo = blocosMensais[blocosMensais.length - 1];
-    if (!ultimo || monthKey(ultimo.monday) !== monthKey(monday)){
-      mensalScrollEl.appendChild(criarSeparadorMes(monday));
-    }
-    mensalScrollEl.appendChild(bloco);
+    mensalInnerEl.appendChild(bloco);
     blocosMensais.push({ monday: monday, key: key, el: bloco });
   }
 
-  /* Insere uma semana no início da lista. Se ficar no mesmo mês do que já era o
-     primeiro bloco, realoca o separador existente em vez de duplicar — o separador
-     de um mês tem sempre de ficar antes da PRIMEIRA semana desse mês na lista. */
   function prependSemana(monday){
     var key = toDateStr(monday);
     if (blocosMensais.some(function(b){ return b.key === key; })) return;
-
     var bloco = criarBlocoSemana(monday);
-    var mKey = monthKey(monday);
-    var primeiro = blocosMensais[0];
-
-    if (primeiro && monthKey(primeiro.monday) === mKey){
-      var separadorExistente = mensalScrollEl.querySelector('.mensal-mes-separador[data-mes="' + mKey + '"]');
-      mensalScrollEl.insertBefore(bloco, primeiro.el);
-      if (separadorExistente) mensalScrollEl.insertBefore(separadorExistente, bloco);
-    } else {
-      var refNode = primeiro ? primeiro.el : mensalScrollEl.firstChild;
-      mensalScrollEl.insertBefore(bloco, refNode);
-      mensalScrollEl.insertBefore(criarSeparadorMes(monday), bloco);
-    }
+    mensalInnerEl.insertBefore(bloco, blocosMensais.length ? blocosMensais[0].el : null);
     blocosMensais.unshift({ monday: monday, key: key, el: bloco });
   }
 
   function carregarSemanasIniciais(centro){
     if (!todosDadosProntos()){
-      mensalScrollEl.innerHTML = '<p class="mensal-loading">A carregar mais semanas...</p>';
+      mensalInnerEl.innerHTML = '<p class="mensal-loading">A carregar mais semanas...</p>';
       setTimeout(function(){ carregarSemanasIniciais(centro); }, 250);
       return;
     }
-    mensalScrollEl.innerHTML = '';
+    mensalInnerEl.innerHTML = '';
     blocosMensais = [];
 
     for (var i = -2; i <= 2; i++){
@@ -3145,6 +3349,7 @@
       m.setDate(centro.getDate() + i * 7);
       appendSemana(m);
     }
+    reconstruirSeparadores();
 
     var alvo = blocosMensais.filter(function(b){ return b.key === toDateStr(centro); })[0];
     if (alvo) alvo.el.scrollIntoView({ block: 'center' });
@@ -3160,6 +3365,7 @@
       m.setDate(base.getDate() - i * 7);
       prependSemana(m);
     }
+    reconstruirSeparadores();
     /* Compensa o scroll para o utilizador não sentir o "salto" de conteúdo novo em cima */
     el.scrollTop += (el.scrollHeight - alturaAntes);
     mensalCarregandoTop = false;
@@ -3173,6 +3379,7 @@
       m.setDate(base.getDate() + i * 7);
       appendSemana(m);
     }
+    reconstruirSeparadores();
     mensalCarregandoBottom = false;
   }
 
@@ -3200,33 +3407,39 @@
     carregarSemanasIniciais(targetMonday);
   }
 
+  /* O modal não mexe na vista semana por trás: ao fechar, ela fica exatamente como estava */
   function abrirVistaMensal(){
     vistaAtual = 'mensal';
-    document.getElementById('vistaSemanaContainer').style.display = 'none';
-    document.getElementById('vistaMensalContainer').style.display = 'block';
-    Array.prototype.forEach.call(document.querySelectorAll('.week-nav .week-nav-btn, .week-nav .week-label, .week-nav .btn-hoje'), function(e){
-      e.style.display = 'none';
-    });
-    document.getElementById('btnAlternarVista').textContent = '📆 Vista semana';
+    document.getElementById('mensalModalOverlay').classList.add('open');
     carregarSemanasIniciais(getMonday(new Date()));
   }
 
   function fecharVistaMensal(){
     vistaAtual = 'semana';
-    document.getElementById('vistaSemanaContainer').style.display = 'block';
-    document.getElementById('vistaMensalContainer').style.display = 'none';
-    Array.prototype.forEach.call(document.querySelectorAll('.week-nav .week-nav-btn, .week-nav .week-label, .week-nav .btn-hoje'), function(e){
-      e.style.display = '';
-    });
-    document.getElementById('btnAlternarVista').textContent = '🗓️ Vista mensal';
-    renderGrelha();
+    document.getElementById('mensalModalOverlay').classList.remove('open');
   }
 
-  document.getElementById('btnAlternarVista').addEventListener('click', function(){
-    if (vistaAtual === 'mensal') fecharVistaMensal(); else abrirVistaMensal();
+  document.getElementById('btnAlternarVista').addEventListener('click', abrirVistaMensal);
+  document.getElementById('mensalModalClose').addEventListener('click', fecharVistaMensal);
+  document.getElementById('mensalModalOverlay').addEventListener('click', function(e){
+    if (e.target === this) fecharVistaMensal();
+  });
+  document.getElementById('btnIrParaDataMensal').addEventListener('click', openCalModal);
+
+  /* Esc fecha primeiro o calendário de "Ir para data", que abre por cima do mensal */
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('calModalOverlay').classList.contains('open')){
+      closeCalModal();
+      return;
+    }
+    if (document.getElementById('mensalModalOverlay').classList.contains('open')) fecharVistaMensal();
   });
 
   mensalScrollEl = document.getElementById('vistaMensalScroll');
+  mensalInnerEl = document.createElement('div');
+  mensalInnerEl.className = 'mensal-inner';
+  mensalScrollEl.appendChild(mensalInnerEl);
   mensalScrollEl.addEventListener('scroll', onMensalScroll);
 
   /* Ponto único chamado sempre que os dados mudam: repinta a vista única sempre,
