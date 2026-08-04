@@ -874,6 +874,44 @@
     color:var(--white);
   }
 
+  /* ---------- Ações da semana (por baixo da grelha) ---------- */
+  .semana-acoes{
+    display:flex;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:12px;
+  }
+
+  /* Rótulos curtos + title, e padding apertado: os três cabem numa só linha mesmo
+     a 375px (sem media queries, proibidas no OS). Se não couberem, quebram. */
+  .btn-acao-semana{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:9px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .btn-acao-semana:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn-acao-semana:disabled{
+    opacity:0.5;
+    cursor:default;
+  }
+
+  .btn-acao-semana:disabled:hover{
+    background:var(--white);
+    color:var(--black);
+  }
+
   /* ---------- Editar semana (edição em lote) ---------- */
   .modal-lg{
     max-width:760px;
@@ -1040,7 +1078,43 @@
     color:var(--muted);
   }
 
-  /* ---------- Aviso de cobertura assembler / loja ---------- */
+  .rem-linha{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+    gap:14px;
+  }
+
+  /* "Salário mensal (€)" ocupa duas linhas ao telemóvel; empurrar os campos para
+     baixo mantém o select e o input alinhados, independentemente do rótulo */
+  .rem-linha .field{
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+  }
+
+  /* ---------- Ativo no canto superior direito do modal ---------- */
+  .modal-header-right{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-shrink:0;
+  }
+
+  .ativo-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .ativo-toggle input{
+    width:18px;
+    height:18px;
+  }
+
+  /* ---------- Aviso de cobertura mínima da célula ---------- */
   .celula-aviso{
     position:absolute;
     right:4px;
@@ -1133,9 +1207,6 @@
       <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
       <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
       <button type="button" class="btn-vista-mensal" id="btnVistaMensal">📅 Vista mensal</button>
-      <button type="button" class="btn-vista-mensal" id="btnEditarSemana">✏️ Editar semana</button>
-      <button type="button" class="btn-vista-mensal" id="btnConfirmarSemana">🔒 Confirmar semana</button>
-      <button type="button" class="btn-vista-mensal" id="btnExportarSemana">🖼️ Exportar semana</button>
     </div>
 
     <div class="grelha-wrap" id="grelhaWrap">
@@ -1145,6 +1216,13 @@
         <span class="export-header-sub" id="exportHeaderSub"></span>
       </div>
       <table class="grelha" id="grelhaTurnos"></table>
+    </div>
+
+    <!-- Ações da semana visível: ficam colados à grelha, não à navegação -->
+    <div class="semana-acoes">
+      <button type="button" class="btn-acao-semana" id="btnEditarSemana" title="Editar os turnos desta semana em lote">✏️ Editar</button>
+      <button type="button" class="btn-acao-semana" id="btnConfirmarSemana" title="Trancar esta semana: o previsto pelo padrão passa a confirmado">🔒 Confirmar</button>
+      <button type="button" class="btn-acao-semana" id="btnExportarSemana" title="Exportar a grelha desta semana como imagem PNG">🖼️ Exportar</button>
     </div>
 
     <div class="resumo-grid">
@@ -1165,7 +1243,13 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="pessoaModalTitle">Nova pessoa</h2>
-      <button class="modal-close" id="pessoaModalClose">×</button>
+      <div class="modal-header-right">
+        <label class="ativo-toggle">
+          <input type="checkbox" id="pessoaAtivo" checked>
+          Ativo
+        </label>
+        <button class="modal-close" id="pessoaModalClose">×</button>
+      </div>
     </div>
 
     <div class="field">
@@ -1176,61 +1260,25 @@
       <label class="field-label">Função</label>
       <input type="text" id="pessoaFuncao">
     </div>
-    <div class="field">
-      <label class="field-label">Telefone</label>
-      <input type="tel" id="pessoaTelefone">
-    </div>
-    <div class="field">
-      <label class="field-label">Email</label>
-      <input type="email" id="pessoaEmail">
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label">Telefone</label>
+        <input type="tel" id="pessoaTelefone">
+      </div>
+      <div class="field">
+        <label class="field-label">Email</label>
+        <input type="email" id="pessoaEmail">
+      </div>
     </div>
     <div class="field">
       <label class="field-label">Cor</label>
       <input type="color" id="pessoaCor" value="#D91124">
     </div>
-    <label class="field-checkbox">
-      <input type="checkbox" id="pessoaAtivo" checked>
-      Ativo
-    </label>
 
     <div class="field">
-      <label class="field-label">Categorias operacionais</label>
-      <label class="field-checkbox" style="margin-bottom:6px;">
-        <input type="checkbox" id="pessoaCatAssembler">
-        Assembler
-      </label>
-      <label class="field-checkbox" style="margin-bottom:0;">
-        <input type="checkbox" id="pessoaCatLoja">
-        Loja / Front-office
-      </label>
-    </div>
-
-    <div class="field">
-      <label class="field-label">Tipo de contrato</label>
-      <select id="pessoaTipoContrato">
-        <option value="fixo">Fixo</option>
-        <option value="part-time">Part-time</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label class="field-label">🔒 Remuneração</label>
-      <div class="rem-box">
-        <div class="rem-locked" id="remLocked">
-          <span>Valores ocultos.</span>
-          <button type="button" class="btn" id="btnMostrarRemuneracao">Mostrar</button>
-        </div>
-        <div id="remFields" style="display:none;">
-          <div class="field" id="fieldSalario" style="margin-bottom:0;">
-            <label class="field-label">Salário mensal (€)</label>
-            <input type="number" id="pessoaSalario" min="0" step="0.01">
-          </div>
-          <div class="field" id="fieldValorHora" style="margin-bottom:0;">
-            <label class="field-label">Valor/hora (€)</label>
-            <input type="number" id="pessoaValorHora" min="0" step="0.01">
-          </div>
-        </div>
-      </div>
+      <label class="field-label">Padrão semanal</label>
+      <div class="padrao-grid-wrap" id="padraoGridWrap"></div>
+      <p class="padrao-hint">Deixa tudo por marcar para uma pessoa sem horário fixo (variável). Confirmações já feitas na grelha não mudam ao alterar o padrão.</p>
     </div>
 
     <div class="field">
@@ -1257,9 +1305,27 @@
     </div>
 
     <div class="field">
-      <label class="field-label">Padrão semanal</label>
-      <div class="padrao-grid-wrap" id="padraoGridWrap"></div>
-      <p class="padrao-hint">Deixa tudo por marcar para uma pessoa sem horário fixo (variável). Confirmações já feitas na grelha não mudam ao alterar o padrão.</p>
+      <label class="field-label">🔒 Remuneração</label>
+      <div class="rem-box">
+        <div class="rem-locked" id="remLocked">
+          <span>Valores ocultos.</span>
+          <button type="button" class="btn" id="btnMostrarRemuneracao">Mostrar</button>
+        </div>
+        <!-- Uma só linha: o rótulo do valor acompanha o tipo de contrato -->
+        <div class="rem-linha" id="remFields" style="display:none;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Tipo</label>
+            <select id="pessoaTipoContrato">
+              <option value="fixo">Fixo</option>
+              <option value="part-time">Part-time</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label" id="remValorLabel">Salário mensal (€)</label>
+            <input type="number" id="pessoaValor" min="0" step="0.01">
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -1387,12 +1453,6 @@
   }
 
   /* ---------- Férias ---------- */
-  /* Firebase pode devolver listas como array ou como objecto indexado */
-  function paraArray(raw){
-    if (!raw) return [];
-    return Array.isArray(raw) ? raw.filter(Boolean) : Object.keys(raw).map(function(k){ return raw[k]; });
-  }
-
   function feriasDaPessoa(pessoaId){
     var raw = ferias[pessoaId];
     if (!raw) return [];
@@ -1414,24 +1474,12 @@
     return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : dStr;
   }
 
-  /* ---------- Categorias operacionais ---------- */
-  var CATEGORIAS = [
-    { id:'assembler', label:'Assembler' },
-    { id:'loja', label:'Loja/Front-office' }
-  ];
+  /* ---------- Cobertura mínima de uma célula ---------- */
+  /* Cada turno de cada dia devia ter pelo menos duas pessoas. Só avisa, nunca bloqueia. */
+  var MINIMO_POR_TURNO = 2;
 
-  function categoriasDaPessoa(pessoaId){
-    var p = pessoas[pessoaId];
-    return p ? paraArray(p.categorias) : [];
-  }
-
-  /* Categorias sem ninguém que as cubra, entre as pessoas atribuídas à célula */
-  function categoriasEmFalta(lista){
-    var cobertas = {};
-    lista.forEach(function(entrada){
-      categoriasDaPessoa(entrada.pessoaId).forEach(function(c){ cobertas[c] = true; });
-    });
-    return CATEGORIAS.filter(function(c){ return !cobertas[c.id]; }).map(function(c){ return c.label; });
+  function celulaSubdimensionada(lista){
+    return lista.length < MINIMO_POR_TURNO;
   }
 
   /* ------------------------------------------------------------------
@@ -1601,19 +1649,30 @@
     return feriasRef.child(pessoaId).set(obj);
   }
 
-  /* ---------- Remuneração: mostra/esconde os campos ---------- */
+  /* ---------- Remuneração: uma linha só, rótulo do valor conforme o tipo ---------- */
+  /* Guarda os dois valores enquanto o modal está aberto, para que alternar entre
+     Fixo e Part-time não deite fora o que estava gravado no outro campo. */
+  var remValores = { salario: '', valorHora: '' };
+
+  function campoDoTipo(){
+    return document.getElementById('pessoaTipoContrato').value === 'fixo' ? 'salario' : 'valorHora';
+  }
+
   function aplicarTipoContratoUI(){
-    var tipo = document.getElementById('pessoaTipoContrato').value;
-    document.getElementById('fieldSalario').style.display = tipo === 'fixo' ? 'block' : 'none';
-    document.getElementById('fieldValorHora').style.display = tipo === 'part-time' ? 'block' : 'none';
+    var fixo = document.getElementById('pessoaTipoContrato').value === 'fixo';
+    document.getElementById('remValorLabel').textContent = fixo ? 'Salário mensal (€)' : 'Valor/hora (€)';
+    document.getElementById('pessoaValor').value = remValores[fixo ? 'salario' : 'valorHora'];
   }
 
   function aplicarRemuneracaoUI(){
     document.getElementById('remLocked').style.display = remuneracaoDesbloqueada ? 'none' : 'flex';
-    document.getElementById('remFields').style.display = remuneracaoDesbloqueada ? 'block' : 'none';
+    document.getElementById('remFields').style.display = remuneracaoDesbloqueada ? 'grid' : 'none';
     aplicarTipoContratoUI();
   }
 
+  document.getElementById('pessoaValor').addEventListener('input', function(){
+    remValores[campoDoTipo()] = this.value;
+  });
   document.getElementById('pessoaTipoContrato').addEventListener('change', aplicarTipoContratoUI);
   document.getElementById('btnMostrarRemuneracao').addEventListener('click', function(){
     if (pedirPinRemuneracao()) aplicarRemuneracaoUI();
@@ -1631,13 +1690,11 @@
     document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
     document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
 
-    var cats = id ? categoriasDaPessoa(id) : [];
-    document.getElementById('pessoaCatAssembler').checked = cats.indexOf('assembler') !== -1;
-    document.getElementById('pessoaCatLoja').checked = cats.indexOf('loja') !== -1;
-
     document.getElementById('pessoaTipoContrato').value = (p && p.tipoContrato === 'part-time') ? 'part-time' : 'fixo';
-    document.getElementById('pessoaSalario').value = (p && p.salario) ? p.salario : '';
-    document.getElementById('pessoaValorHora').value = (p && p.valorHora) ? p.valorHora : '';
+    remValores = {
+      salario: (p && p.salario) ? String(p.salario) : '',
+      valorHora: (p && p.valorHora) ? String(p.valorHora) : ''
+    };
     aplicarRemuneracaoUI();
 
     pessoaFeriasEdit = id ? feriasDaPessoa(id) : [];
@@ -1673,12 +1730,12 @@
       return;
     }
 
-    var cats = [];
-    if (document.getElementById('pessoaCatAssembler').checked) cats.push('assembler');
-    if (document.getElementById('pessoaCatLoja').checked) cats.push('loja');
+    /* O input visível só mostra um dos dois valores de cada vez; o outro vem do
+       que ficou guardado em remValores ao abrir o modal, para não se perder. */
+    remValores[campoDoTipo()] = document.getElementById('pessoaValor').value;
 
-    var numOuZero = function(elId){
-      var n = parseFloat(document.getElementById(elId).value);
+    var numOuZero = function(valor){
+      var n = parseFloat(valor);
       return isNaN(n) || n < 0 ? 0 : n;
     };
 
@@ -1691,11 +1748,11 @@
       email: document.getElementById('pessoaEmail').value.trim(),
       cor: document.getElementById('pessoaCor').value,
       ativo: document.getElementById('pessoaAtivo').checked,
-      categorias: cats,
       tipoContrato: document.getElementById('pessoaTipoContrato').value,
-      salario: numOuZero('pessoaSalario'),
-      valorHora: numOuZero('pessoaValorHora')
+      salario: numOuZero(remValores.salario),
+      valorHora: numOuZero(remValores.valorHora)
     });
+    delete dados.categorias;   /* campo descontinuado — limpa registos antigos ao gravar */
     var pad = lerPadraoDoFormulario();
     var feriasParaGravar = pessoaFeriasEdit.slice();
 
@@ -1924,12 +1981,9 @@
         if (efet.confirmado){
           html += '<button type="button" class="btn-revert-padrao" title="Reverter ao padrão" onclick="revertParaPadrao(\'' + dStr + '\',\'' + t.id + '\',event)">↺</button>';
         }
-        /* Aviso de cobertura: a célula devia ter alguém de cada categoria operacional */
-        if (lista.length){
-          var falta = categoriasEmFalta(lista);
-          if (falta.length){
-            html += '<span class="celula-aviso" title="Ninguém com categoria: ' + escapeHtml(falta.join(', ')) + '">⚠️</span>';
-          }
+        /* Aviso de cobertura: menos de duas pessoas neste turno */
+        if (celulaSubdimensionada(lista)){
+          html += '<span class="celula-aviso" title="' + (lista.length ? 'Só 1 pessoa' : 'Ninguém') + ' neste turno — o mínimo são ' + MINIMO_POR_TURNO + '">⚠️</span>';
         }
 
         html += '<div class="celula-inner">';
