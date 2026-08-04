@@ -1176,15 +1176,6 @@
     padding:2px 6px;
   }
 
-  .fechado-motivo{
-    font-size:10px;
-    line-height:1.3;
-    color:var(--muted);
-    max-width:100%;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-
   /* Mesmas riscas na mini-grelha do modal "Editar semana" */
   .semana-mini-grelha td.cel-fechada{
     background-color:#EDEAE2;
@@ -1462,11 +1453,6 @@
       O dia todo está marcado como fechado. Para reabrir, clica no cabeçalho do dia na grelha.
     </p>
 
-    <div class="field" id="turnoFechadoMotivoField" style="display:none;">
-      <label class="field-label">Motivo (opcional)</label>
-      <input type="text" id="turnoFechadoMotivo" placeholder="Feriado, obras…">
-    </div>
-
     <div id="turnoPessoasBloco">
       <label class="field-label">Quem trabalha</label>
       <div class="check-list" id="turnoPessoasList"></div>
@@ -1494,11 +1480,6 @@
       Loja fechada o dia todo
     </label>
 
-    <div class="field">
-      <label class="field-label">Motivo (opcional)</label>
-      <input type="text" id="fecharDiaMotivo" placeholder="Feriado, obras…">
-    </div>
-
     <div class="modal-actions">
       <button type="button" class="btn" id="fecharDiaCancel">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btnGuardarFecharDia">Guardar</button>
@@ -1522,11 +1503,6 @@
       Fechar este turno em todos os dias desta semana
     </label>
     <p class="modal-hint" id="fecharTurnoSemanaHint" style="display:none;"></p>
-
-    <div class="field">
-      <label class="field-label">Motivo (opcional)</label>
-      <input type="text" id="fecharTurnoSemanaMotivo" placeholder="Feriado, obras…">
-    </div>
 
     <div class="modal-actions">
       <button type="button" class="btn" id="fecharTurnoSemanaCancel">Cancelar</button>
@@ -1622,7 +1598,7 @@
   }
 
   /* ---------- Loja fechada (dia todo / turno individual) ----------
-     Guardado em 'fechados/{data}' = { diaTodo, turnos:{t1,t3,t2}, motivo }.
+     Guardado em 'fechados/{data}' = { diaTodo, turnos:{t1,t3,t2} }.
      "Efetivo fechado" de uma célula = diaTodo OU a flag do próprio turno. Toda a
      restante lógica (padrão, horas, mínimo de pessoas, edição em lote) parte daqui. */
   function estadoFechadoDoDia(dStr){
@@ -1631,7 +1607,7 @@
     TURNOS.forEach(function(x){
       if (f.turnos && f.turnos[x.id] === true) t[x.id] = true;
     });
-    return { diaTodo: f.diaTodo === true, turnos: t, motivo: f.motivo || '' };
+    return { diaTodo: f.diaTodo === true, turnos: t };
   }
 
   function diaTodoFechado(dStr){
@@ -1641,10 +1617,6 @@
   function estaFechado(dStr, turnoId){
     var e = estadoFechadoDoDia(dStr);
     return e.diaTodo || e.turnos[turnoId] === true;
-  }
-
-  function motivoFecho(dStr){
-    return estadoFechadoDoDia(dStr).motivo;
   }
 
   /* Escrita única no caminho do dia (set de objecto, não update multi-chave).
@@ -1659,8 +1631,7 @@
     }
     return fechadosRef.child(dStr).set({
       diaTodo: estado.diaTodo === true,
-      turnos: turnosAtivos,
-      motivo: estado.motivo || ''
+      turnos: turnosAtivos
     });
   }
 
@@ -2191,13 +2162,9 @@
         var lista = efet.pessoas;
 
         if (efet.fechado){
-          var motivo = motivoFecho(dStr);
           html += '<td class="celula celula-fechada' + (isToday ? ' hoje' : '') + '"';
-          html += ' title="Sem serviço' + (motivo ? ' — ' + escapeHtml(motivo) : '') + '"';
-          html += ' onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
-          html += '<div class="celula-inner"><span class="fechado-tag">FECHADO</span>';
-          if (motivo) html += '<span class="fechado-motivo">' + escapeHtml(motivo) + '</span>';
-          html += '</div></td>';
+          html += ' title="Sem serviço" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
+          html += '<div class="celula-inner"><span class="fechado-tag">FECHADO</span></div></td>';
           return;
         }
 
@@ -2311,13 +2278,12 @@
   window.revertParaPadrao = revertParaPadrao;
 
   /* ---------- Modal de atribuição ---------- */
-  /* Com o turno fechado, a lista de pessoas some — só fica o motivo. Desligar o
-     toggle traz a lista de volta já preenchida pelo padrão (as pessoas que lá
-     estavam antes de fechar foram apagadas e não se restauram). */
+  /* Com o turno fechado, a lista de pessoas some. Desligar o toggle traz a lista
+     de volta já preenchida pelo padrão (as pessoas que lá estavam antes de
+     fechar foram apagadas e não se restauram). */
   function aplicarTurnoFechadoUI(){
     var fechadoDia = turnoModalData ? diaTodoFechado(turnoModalData) : false;
     var ligado = document.getElementById('turnoFechadoToggle').checked;
-    document.getElementById('turnoFechadoMotivoField').style.display = ligado ? 'block' : 'none';
     document.getElementById('turnoPessoasBloco').style.display = ligado ? 'none' : 'block';
     document.getElementById('turnoFechadoHint').style.display = fechadoDia ? 'block' : 'none';
   }
@@ -2335,7 +2301,6 @@
     toggle.checked = estaFechado(dStr, turnoId);
     /* Fecho do dia todo só se desfaz no cabeçalho do dia */
     toggle.disabled = estadoFechado.diaTodo;
-    document.getElementById('turnoFechadoMotivo').value = estadoFechado.motivo;
     aplicarTurnoFechadoUI();
 
     var el = document.getElementById('turnoPessoasList');
@@ -2413,7 +2378,6 @@
     /* Fechar este turno: grava a flag e apaga a confirmação que lá estivesse */
     if (document.getElementById('turnoFechadoToggle').checked){
       estado.turnos[tid] = true;
-      estado.motivo = document.getElementById('turnoFechadoMotivo').value.trim();
       gravarFechado(dStr, estado)
         .then(function(){ return limparConfirmacoes([{ data: dStr, turno: tid }]); })
         .then(closeTurnoModal).catch(falhar);
@@ -2477,7 +2441,6 @@
     var estado = estadoFechadoDoDia(dStr);
     document.getElementById('fecharDiaData').textContent = formatDataLonga(dStr);
     document.getElementById('fecharDiaToggle').checked = estado.diaTodo;
-    document.getElementById('fecharDiaMotivo').value = estado.motivo;
     document.getElementById('fecharDiaOverlay').classList.add('open');
   }
   window.openFecharDiaModal = openFecharDiaModal;
@@ -2495,7 +2458,6 @@
     var fechar = document.getElementById('fecharDiaToggle').checked;
 
     estado.diaTodo = fechar;
-    estado.motivo = document.getElementById('fecharDiaMotivo').value.trim();
 
     var chain = gravarFechado(dStr, estado);
     if (fechar){
@@ -2545,15 +2507,6 @@
       hint.style.display = 'none';
     }
 
-    /* Motivo já usado por este turno nesta semana, para não obrigar a reescrever.
-       Só conta o fecho do próprio turno: o motivo de um dia fechado por inteiro
-       é de outra coisa e não deve alastrar aos restantes dias. */
-    var motivoExistente = '';
-    dias.forEach(function(dStr){
-      if (!motivoExistente && estadoFechadoDoDia(dStr).turnos[turnoId] === true) motivoExistente = motivoFecho(dStr);
-    });
-    document.getElementById('fecharTurnoSemanaMotivo').value = motivoExistente;
-
     document.getElementById('fecharTurnoSemanaInfo').textContent = 'Semana de ' + formatWeekLabel(getWeekStart());
     document.getElementById('fecharTurnoSemanaHorario').textContent = def ? def.horario : '';
     document.getElementById('fecharTurnoSemanaOverlay').classList.add('open');
@@ -2575,7 +2528,6 @@
     if (!fecharTurnoSemanaId) return;
     var tid = fecharTurnoSemanaId;
     var fechar = document.getElementById('fecharTurnoSemanaToggle').checked;
-    var motivo = document.getElementById('fecharTurnoSemanaMotivo').value.trim();
     var dias = diasDaSemanaVisivel();
 
     /* Um dia de cada vez, em sequência — nunca uma escrita multi-chave */
@@ -2588,13 +2540,8 @@
         if (estado.diaTodo && fechar) return null;
 
         if (fechar){
-          /* O motivo é partilhado pelo dia. Em lote só se escreve quando há um
-             motivo novo — deixar o campo vazio não apaga o que outro turno
-             desse dia já tinha. Para limpar, usa-se o modal da própria célula. */
-          var novoMotivo = motivo || estado.motivo;
-          if (estado.turnos[tid] === true && estado.motivo === novoMotivo) return null;
+          if (estado.turnos[tid] === true) return null;
           estado.turnos[tid] = true;
-          estado.motivo = novoMotivo;
         } else {
           if (estado.turnos[tid] !== true) return null;
           delete estado.turnos[tid];
@@ -2708,8 +2655,7 @@
           var dStr = toDateStr(d);
           /* Célula fechada: sem checkbox nenhuma, só as riscas */
           if (estaFechado(dStr, t.id)){
-            var motivo = motivoFecho(dStr);
-            html += '<td class="cel-fechada" title="Sem serviço' + (motivo ? ' — ' + escapeHtml(motivo) : '') + '">·</td>';
+            html += '<td class="cel-fechada" title="Sem serviço">·</td>';
             return;
           }
           var checked = editarSemanaEstadoInicial[chaveTurno(dStr, t.id)].indexOf(p.id) !== -1;
