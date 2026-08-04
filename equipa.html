@@ -879,6 +879,11 @@
     color:var(--white);
   }
 
+  /* "Vista mensal" encosta à direita; "Ir para data" fica colado ao "Hoje" */
+  #btnAlternarVista{
+    margin-left:auto;
+  }
+
   /* ---------- Ações da semana (por baixo da grelha) ---------- */
   .semana-acoes{
     display:flex;
@@ -1333,7 +1338,7 @@
 
   /* Nomes dos dias: uma só vez por mês, logo abaixo do separador */
   .mensal-dias-header th{
-    background:var(--bg);
+    background:#EDE8DD;
     font-family:'Space Mono', monospace;
     font-size:10px;
     font-weight:700;
@@ -1345,20 +1350,22 @@
     color:var(--muted);
   }
 
-  /* Linha fina de datas, uma por semana, colada às 3 linhas de turnos */
+  /* Linha fina de datas, uma por semana, colada às 3 linhas de turnos.
+     Fundo mais escuro do que as células: é o que marca onde começa cada semana,
+     agora que não há título nem separador entre elas. */
   .mensal-data-cell{
     text-align:center;
     padding:4px;
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    background:var(--bg);
+    background:#E3DDCE;
     cursor:pointer;
     vertical-align:middle;
   }
 
   .mensal-data-cell:hover{
-    background:#EDE8DD;
+    background:#D6CFBC;
   }
 
   .mensal-data-cell.hoje{
@@ -1379,6 +1386,12 @@
     z-index:2;
     background:var(--bg);
     border-right:3px solid var(--black);
+  }
+
+  /* Acompanha o tom da linha de datas, para a banda da semana ler como uma só
+     (no cabeçalho dos nomes dos dias, a regra '.mensal-dias-header th' ganha) */
+  .mensal-acoes-vazia{
+    background:#E3DDCE;
   }
 
   .mensal-acoes-cell{
