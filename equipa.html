@@ -12,6 +12,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   :root{
@@ -560,6 +561,28 @@
     font-family:'Space Mono', monospace;
   }
 
+  /* Pessoa de férias nesta data: não pode ser marcada */
+  .check-item-ferias{
+    opacity:0.6;
+    cursor:not-allowed;
+  }
+
+  .check-item-ferias:hover{
+    border-color:var(--line);
+  }
+
+  .check-item-ferias .check-item-nome{
+    text-decoration:line-through;
+  }
+
+  .check-item-tag-ferias{
+    font-size:11px;
+    color:var(--amber);
+    margin-left:auto;
+    font-family:'Space Mono', monospace;
+    white-space:nowrap;
+  }
+
   /* ---------- Modal (shared pattern with fornecedores.html / mrn-dashboard.html) ---------- */
   .modal-overlay{
     display:none;
@@ -657,10 +680,16 @@
     height:20px;
   }
 
+  /* minmax(0,…) + min-width:0 — sem isto os input[type=date] impõem a sua
+     largura mínima e a grelha rebenta o modal ao telemóvel */
   .form-grid{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
     gap:14px;
+  }
+
+  .form-grid input{
+    min-width:0;
   }
 
   .modal-actions{
@@ -929,6 +958,147 @@
     height:16px;
     cursor:pointer;
   }
+
+  .semana-mini-grelha td.cel-ferias{
+    background:#EDE8DD;
+  }
+
+  /* ---------- Férias (dentro do modal de pessoa) ---------- */
+  .ferias-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .ferias-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border:2px solid var(--line);
+    background:var(--white);
+    padding:8px 10px;
+    min-width:0;
+  }
+
+  .ferias-item-datas{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .ferias-item-notas{
+    font-size:12px;
+    color:var(--muted);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-width:0;
+  }
+
+  .ferias-item-remove{
+    margin-left:auto;
+    flex-shrink:0;
+    background:none;
+    border:2px solid var(--line);
+    width:28px;
+    height:28px;
+    cursor:pointer;
+    font-size:13px;
+    line-height:1;
+  }
+
+  .ferias-item-remove:hover{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .ferias-vazio{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .ferias-add-form{
+    border:2px dashed var(--line);
+    padding:12px;
+    margin-top:10px;
+  }
+
+  /* ---------- Remuneração (bloqueada por palavra-passe) ---------- */
+  .rem-box{
+    border:2px solid var(--line);
+    background:var(--white);
+    padding:12px;
+  }
+
+  .rem-locked{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Aviso de cobertura assembler / loja ---------- */
+  .celula-aviso{
+    position:absolute;
+    right:4px;
+    bottom:3px;
+    font-size:11px;
+    line-height:1;
+    cursor:help;
+  }
+
+  .semana-lock{
+    font-size:11px;
+  }
+
+  /* ---------- Exportação da grelha como imagem ---------- */
+  .export-header{
+    display:none;
+  }
+
+  /* A largura é fixada em JS antes de capturar: com 'max-content' aqui, a tabela
+     interna (width:100%) entra em ciclo e o elemento fica com 1.000.000px */
+  .grelha-wrap.exportando{
+    overflow:visible;
+  }
+
+  .grelha-wrap.exportando .export-header{
+    display:block;
+    background:var(--white);
+    padding:14px 16px;
+    border-bottom:3px solid var(--black);
+  }
+
+  /* Fora com botões de edição e placeholders — a imagem é para partilhar */
+  .grelha-wrap.exportando .btn-revert-padrao,
+  .grelha-wrap.exportando .celula-aviso,
+  .grelha-wrap.exportando .celula-vazia{
+    display:none;
+  }
+
+  .grelha-wrap.exportando .col-sticky{
+    position:static;
+  }
+
+  .export-header-title{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+  }
+
+  .export-header-sub{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-top:4px;
+  }
 </style>
 </head>
 <body>
@@ -964,9 +1134,16 @@
       <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
       <button type="button" class="btn-vista-mensal" id="btnVistaMensal">📅 Vista mensal</button>
       <button type="button" class="btn-vista-mensal" id="btnEditarSemana">✏️ Editar semana</button>
+      <button type="button" class="btn-vista-mensal" id="btnConfirmarSemana">🔒 Confirmar semana</button>
+      <button type="button" class="btn-vista-mensal" id="btnExportarSemana">🖼️ Exportar semana</button>
     </div>
 
-    <div class="grelha-wrap">
+    <div class="grelha-wrap" id="grelhaWrap">
+      <!-- Só visível durante a exportação para imagem -->
+      <div class="export-header">
+        <span class="export-header-title">● GIOCO® · Turnos</span>
+        <span class="export-header-sub" id="exportHeaderSub"></span>
+      </div>
       <table class="grelha" id="grelhaTurnos"></table>
     </div>
 
@@ -1015,6 +1192,69 @@
       <input type="checkbox" id="pessoaAtivo" checked>
       Ativo
     </label>
+
+    <div class="field">
+      <label class="field-label">Categorias operacionais</label>
+      <label class="field-checkbox" style="margin-bottom:6px;">
+        <input type="checkbox" id="pessoaCatAssembler">
+        Assembler
+      </label>
+      <label class="field-checkbox" style="margin-bottom:0;">
+        <input type="checkbox" id="pessoaCatLoja">
+        Loja / Front-office
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Tipo de contrato</label>
+      <select id="pessoaTipoContrato">
+        <option value="fixo">Fixo</option>
+        <option value="part-time">Part-time</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">🔒 Remuneração</label>
+      <div class="rem-box">
+        <div class="rem-locked" id="remLocked">
+          <span>Valores ocultos.</span>
+          <button type="button" class="btn" id="btnMostrarRemuneracao">Mostrar</button>
+        </div>
+        <div id="remFields" style="display:none;">
+          <div class="field" id="fieldSalario" style="margin-bottom:0;">
+            <label class="field-label">Salário mensal (€)</label>
+            <input type="number" id="pessoaSalario" min="0" step="0.01">
+          </div>
+          <div class="field" id="fieldValorHora" style="margin-bottom:0;">
+            <label class="field-label">Valor/hora (€)</label>
+            <input type="number" id="pessoaValorHora" min="0" step="0.01">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Férias</label>
+      <div class="ferias-list" id="feriasList"></div>
+      <button type="button" class="btn" id="btnAddFeriasToggle" style="margin-top:10px;">+ Adicionar período</button>
+      <div class="ferias-add-form" id="feriasAddForm" style="display:none;">
+        <div class="form-grid">
+          <div class="field" style="margin-bottom:12px;">
+            <label class="field-label">Início</label>
+            <input type="date" id="feriaInicio">
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label class="field-label">Fim</label>
+            <input type="date" id="feriaFim">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label class="field-label">Notas (opcional)</label>
+          <input type="text" id="feriaNotas">
+        </div>
+        <button type="button" class="btn btn-primary" id="btnAddFeria">Adicionar à lista</button>
+      </div>
+    </div>
 
     <div class="field">
       <label class="field-label">Padrão semanal</label>
@@ -1096,14 +1336,20 @@
   var pessoasRef = db.ref('pessoas');
   var turnosRef = db.ref('turnos');
   var padroesRef = db.ref('padroes');
+  var feriasRef = db.ref('ferias');
 
   var pessoas = {};
   var pessoasCarregadas = false;
   var turnos = {};
   var padroes = {};
+  var ferias = {};
   var weekOffset = 0;
 
+  /* O fecho automático de semanas passadas só pode correr com os quatro nós já carregados */
+  var dadosProntos = { pessoas:false, padroes:false, ferias:false, turnos:false };
+
   var editingPessoaId = null;
+  var pessoaFeriasEdit = [];
   var turnoModalData = null;
   var turnoModalTurnoId = null;
 
@@ -1138,6 +1384,81 @@
 
   function pad2(n){
     return n < 10 ? '0' + n : String(n);
+  }
+
+  /* ---------- Férias ---------- */
+  /* Firebase pode devolver listas como array ou como objecto indexado */
+  function paraArray(raw){
+    if (!raw) return [];
+    return Array.isArray(raw) ? raw.filter(Boolean) : Object.keys(raw).map(function(k){ return raw[k]; });
+  }
+
+  function feriasDaPessoa(pessoaId){
+    var raw = ferias[pessoaId];
+    if (!raw) return [];
+    return Object.keys(raw)
+      .map(function(fid){ return Object.assign({ id: fid }, raw[fid]); })
+      .filter(function(f){ return f.inicio && f.fim; })
+      .sort(function(a, b){ return a.inicio.localeCompare(b.inicio); });
+  }
+
+  /* Datas em YYYY-MM-DD comparam-se bem por ordem lexicográfica */
+  function estaDeFerias(pessoaId, dStr){
+    return feriasDaPessoa(pessoaId).some(function(f){
+      return f.inicio <= dStr && dStr <= f.fim;
+    });
+  }
+
+  function formatDataCurta(dStr){
+    var p = String(dStr || '').split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : dStr;
+  }
+
+  /* ---------- Categorias operacionais ---------- */
+  var CATEGORIAS = [
+    { id:'assembler', label:'Assembler' },
+    { id:'loja', label:'Loja/Front-office' }
+  ];
+
+  function categoriasDaPessoa(pessoaId){
+    var p = pessoas[pessoaId];
+    return p ? paraArray(p.categorias) : [];
+  }
+
+  /* Categorias sem ninguém que as cubra, entre as pessoas atribuídas à célula */
+  function categoriasEmFalta(lista){
+    var cobertas = {};
+    lista.forEach(function(entrada){
+      categoriasDaPessoa(entrada.pessoaId).forEach(function(c){ cobertas[c] = true; });
+    });
+    return CATEGORIAS.filter(function(c){ return !cobertas[c.id]; }).map(function(c){ return c.label; });
+  }
+
+  /* ------------------------------------------------------------------
+     ATENÇÃO — isto NÃO é segurança.
+     A constante abaixo é só um travão visual, para que um colega que
+     passe pelo ecrã não veja salários por acidente. O código corre num
+     repositório PÚBLICO: quem abrir o source lê a palavra-passe em dois
+     segundos, e os valores continuam a vir do Firebase à mesma (o RTDB
+     está em modo de teste, sem autenticação).
+     Proteção a sério exige Firebase Auth + regras de leitura no RTDB —
+     ver "Firebase Auth adiado" nas restrições do CLAUDE.md. Até lá,
+     tratar os salários gravados em 'pessoas' como dados públicos.
+     Para mudar a palavra-passe basta alterar esta linha.
+     ------------------------------------------------------------------ */
+  var REMUNERACAO_PIN = 'gioco2026';
+  var remuneracaoDesbloqueada = false;
+
+  function pedirPinRemuneracao(){
+    if (remuneracaoDesbloqueada) return true;
+    var tentativa = prompt('Palavra-passe para ver a remuneração:');
+    if (tentativa === null) return false;
+    if (tentativa !== REMUNERACAO_PIN){
+      alert('Palavra-passe errada.');
+      return false;
+    }
+    remuneracaoDesbloqueada = true;
+    return true;
   }
 
   /* ---------- Pessoas ---------- */
@@ -1222,6 +1543,82 @@
     return temAlgum ? padroesRef.child(pessoaId).set(pad) : padroesRef.child(pessoaId).remove();
   }
 
+  /* ---------- Férias: editor dentro do modal de pessoa ---------- */
+  function renderFeriasEditList(){
+    var el = document.getElementById('feriasList');
+    if (!pessoaFeriasEdit.length){
+      el.innerHTML = '<p class="ferias-vazio">Sem períodos de férias registados.</p>';
+      return;
+    }
+    el.innerHTML = pessoaFeriasEdit.map(function(f, idx){
+      var html = '<div class="ferias-item">';
+      html += '<span class="ferias-item-datas">' + formatDataCurta(f.inicio) + ' → ' + formatDataCurta(f.fim) + '</span>';
+      if (f.notas) html += '<span class="ferias-item-notas">' + escapeHtml(f.notas) + '</span>';
+      html += '<button type="button" class="ferias-item-remove" title="Remover período" onclick="removerFeriaEdit(' + idx + ')">×</button>';
+      html += '</div>';
+      return html;
+    }).join('');
+  }
+
+  window.removerFeriaEdit = function(idx){
+    pessoaFeriasEdit.splice(idx, 1);
+    renderFeriasEditList();
+  };
+
+  document.getElementById('btnAddFeriasToggle').addEventListener('click', function(){
+    var form = document.getElementById('feriasAddForm');
+    var aberto = form.style.display !== 'none';
+    form.style.display = aberto ? 'none' : 'block';
+    this.textContent = aberto ? '+ Adicionar período' : '− Fechar';
+  });
+
+  document.getElementById('btnAddFeria').addEventListener('click', function(){
+    var inicio = document.getElementById('feriaInicio').value;
+    var fim = document.getElementById('feriaFim').value;
+    if (!inicio || !fim){
+      alert('Indica a data de início e a de fim.');
+      return;
+    }
+    if (fim < inicio){
+      alert('A data de fim é anterior à de início.');
+      return;
+    }
+    pessoaFeriasEdit.push({ inicio: inicio, fim: fim, notas: document.getElementById('feriaNotas').value.trim() });
+    pessoaFeriasEdit.sort(function(a, b){ return a.inicio.localeCompare(b.inicio); });
+    document.getElementById('feriaInicio').value = '';
+    document.getElementById('feriaFim').value = '';
+    document.getElementById('feriaNotas').value = '';
+    renderFeriasEditList();
+  });
+
+  function salvarFerias(pessoaId, lista){
+    if (!lista.length) return feriasRef.child(pessoaId).remove();
+    var obj = {};
+    lista.forEach(function(f, i){
+      var fid = f.id || ('f' + Date.now() + '_' + i);
+      obj[fid] = { inicio: f.inicio, fim: f.fim, notas: f.notas || '' };
+    });
+    return feriasRef.child(pessoaId).set(obj);
+  }
+
+  /* ---------- Remuneração: mostra/esconde os campos ---------- */
+  function aplicarTipoContratoUI(){
+    var tipo = document.getElementById('pessoaTipoContrato').value;
+    document.getElementById('fieldSalario').style.display = tipo === 'fixo' ? 'block' : 'none';
+    document.getElementById('fieldValorHora').style.display = tipo === 'part-time' ? 'block' : 'none';
+  }
+
+  function aplicarRemuneracaoUI(){
+    document.getElementById('remLocked').style.display = remuneracaoDesbloqueada ? 'none' : 'flex';
+    document.getElementById('remFields').style.display = remuneracaoDesbloqueada ? 'block' : 'none';
+    aplicarTipoContratoUI();
+  }
+
+  document.getElementById('pessoaTipoContrato').addEventListener('change', aplicarTipoContratoUI);
+  document.getElementById('btnMostrarRemuneracao').addEventListener('click', function(){
+    if (pedirPinRemuneracao()) aplicarRemuneracaoUI();
+  });
+
   function openPessoaModal(id){
     editingPessoaId = id || null;
     var p = id ? Object.assign({ id: id }, pessoas[id]) : null;
@@ -1233,6 +1630,24 @@
     document.getElementById('pessoaCor').value = (p && p.cor) ? p.cor : '#D91124';
     document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
     document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
+
+    var cats = id ? categoriasDaPessoa(id) : [];
+    document.getElementById('pessoaCatAssembler').checked = cats.indexOf('assembler') !== -1;
+    document.getElementById('pessoaCatLoja').checked = cats.indexOf('loja') !== -1;
+
+    document.getElementById('pessoaTipoContrato').value = (p && p.tipoContrato === 'part-time') ? 'part-time' : 'fixo';
+    document.getElementById('pessoaSalario').value = (p && p.salario) ? p.salario : '';
+    document.getElementById('pessoaValorHora').value = (p && p.valorHora) ? p.valorHora : '';
+    aplicarRemuneracaoUI();
+
+    pessoaFeriasEdit = id ? feriasDaPessoa(id) : [];
+    document.getElementById('feriasAddForm').style.display = 'none';
+    document.getElementById('btnAddFeriasToggle').textContent = '+ Adicionar período';
+    document.getElementById('feriaInicio').value = '';
+    document.getElementById('feriaFim').value = '';
+    document.getElementById('feriaNotas').value = '';
+    renderFeriasEditList();
+
     document.getElementById('padraoGridWrap').innerHTML = buildPadraoTableHtml(id ? padroes[id] : null);
     document.getElementById('pessoaModalOverlay').classList.add('open');
   }
@@ -1241,6 +1656,7 @@
   function closePessoaModal(){
     document.getElementById('pessoaModalOverlay').classList.remove('open');
     editingPessoaId = null;
+    pessoaFeriasEdit = [];
   }
 
   document.getElementById('btnNovaPessoa').addEventListener('click', function(){ openPessoaModal(null); });
@@ -1257,20 +1673,35 @@
       return;
     }
 
-    var dados = {
+    var cats = [];
+    if (document.getElementById('pessoaCatAssembler').checked) cats.push('assembler');
+    if (document.getElementById('pessoaCatLoja').checked) cats.push('loja');
+
+    var numOuZero = function(elId){
+      var n = parseFloat(document.getElementById(elId).value);
+      return isNaN(n) || n < 0 ? 0 : n;
+    };
+
+    var pessoaId = editingPessoaId;
+    /* Escrita única no caminho da pessoa: escritas multi-chave no RTDB não são de confiança */
+    var dados = Object.assign({}, pessoaId ? (pessoas[pessoaId] || {}) : {}, {
       nome: nome,
       funcao: document.getElementById('pessoaFuncao').value.trim(),
       telefone: document.getElementById('pessoaTelefone').value.trim(),
       email: document.getElementById('pessoaEmail').value.trim(),
       cor: document.getElementById('pessoaCor').value,
-      ativo: document.getElementById('pessoaAtivo').checked
-    };
+      ativo: document.getElementById('pessoaAtivo').checked,
+      categorias: cats,
+      tipoContrato: document.getElementById('pessoaTipoContrato').value,
+      salario: numOuZero('pessoaSalario'),
+      valorHora: numOuZero('pessoaValorHora')
+    });
     var pad = lerPadraoDoFormulario();
+    var feriasParaGravar = pessoaFeriasEdit.slice();
 
-    var pessoaId = editingPessoaId;
     var promise;
     if (pessoaId){
-      promise = pessoasRef.child(pessoaId).update(dados);
+      promise = pessoasRef.child(pessoaId).set(dados);
     } else {
       var novaRef = pessoasRef.push();
       pessoaId = novaRef.key;
@@ -1279,6 +1710,8 @@
 
     promise.then(function(){
       return salvarPadrao(pessoaId, pad);
+    }).then(function(){
+      return salvarFerias(pessoaId, feriasParaGravar);
     }).then(closePessoaModal).catch(function(err){
       alert('Erro ao guardar pessoa: ' + err.message);
     });
@@ -1301,13 +1734,24 @@
     }
     pessoas = val;
     pessoasCarregadas = true;
+    dadosProntos.pessoas = true;
     renderPessoas();
     renderGrelha();
+    tentarFechoAutomatico();
   });
 
   padroesRef.on('value', function(snapshot){
     padroes = snapshot.val() || {};
+    dadosProntos.padroes = true;
     renderGrelha();
+    tentarFechoAutomatico();
+  });
+
+  feriasRef.on('value', function(snapshot){
+    ferias = snapshot.val() || {};
+    dadosProntos.ferias = true;
+    renderGrelha();
+    tentarFechoAutomatico();
   });
 
   /* ---------- Turnos ---------- */
@@ -1374,11 +1818,12 @@
     return normalizaPessoas(turnos[chaveTurno(dStr, turnoId)]);
   }
 
-  /* Pessoas previstas pelo padrão semanal para esta data+turno (só pessoas ativas) */
+  /* Pessoas previstas pelo padrão semanal para esta data+turno (só pessoas ativas e fora de férias) */
   function pessoasDoPadrao(dStr, turnoId){
     var diaKey = DIA_KEYS_BY_GETDAY[parseDataStr(dStr).getDay()];
     var out = [];
     pessoasAtivasArray().forEach(function(p){
+      if (estaDeFerias(p.id, dStr)) return;
       var pad = padroes[p.id];
       if (pad && Array.isArray(pad[diaKey]) && pad[diaKey].indexOf(turnoId) !== -1){
         out.push({ pessoaId: p.id, nome: p.nome, cor: p.cor });
@@ -1447,7 +1892,12 @@
     for (i = 0; i < 7; i++) html += '<col>';
     html += '</colgroup>';
 
-    html += '<thead><tr><th class="col-sticky">Turno</th>';
+    var trancada = semanaConfirmada(monday);
+    document.getElementById('exportHeaderSub').textContent = 'Semana de ' + formatWeekLabel(monday);
+
+    html += '<thead><tr><th class="col-sticky">';
+    if (trancada) html += '<span class="semana-lock" title="Semana confirmada — todas as células estão trancadas">🔒</span> ';
+    html += 'Turno</th>';
     dias.forEach(function(d){
       var isToday = toDateStr(d) === todayStr;
       html += '<th class="' + (isToday ? 'hoje' : '') + '">';
@@ -1474,16 +1924,26 @@
         if (efet.confirmado){
           html += '<button type="button" class="btn-revert-padrao" title="Reverter ao padrão" onclick="revertParaPadrao(\'' + dStr + '\',\'' + t.id + '\',event)">↺</button>';
         }
+        /* Aviso de cobertura: a célula devia ter alguém de cada categoria operacional */
+        if (lista.length){
+          var falta = categoriasEmFalta(lista);
+          if (falta.length){
+            html += '<span class="celula-aviso" title="Ninguém com categoria: ' + escapeHtml(falta.join(', ')) + '">⚠️</span>';
+          }
+        }
+
         html += '<div class="celula-inner">';
         if (lista.length){
           var curto = lista.length >= 4;
           lista.forEach(function(entrada){
             var info = dadosPessoa(entrada);
             var label = curto ? iniciais(info.nome) : primeiroNome(info.nome);
+            /* Confirmação manual anterior ao registo das férias: assinalar para revisão, sem apagar */
+            var conflitoFerias = efet.confirmado && estaDeFerias(entrada.pessoaId, dStr);
             if (efet.confirmado){
-              html += '<span class="p-chip" title="' + escapeHtml(info.nome) + '"';
+              html += '<span class="p-chip" title="' + escapeHtml(info.nome) + (conflitoFerias ? ' — de férias nesta data, rever' : '') + '"';
               html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
-              html += escapeHtml(label) + '</span>';
+              html += (conflitoFerias ? '⚠️ ' : '') + escapeHtml(label) + '</span>';
             } else {
               html += '<span class="p-chip p-chip-previsto" title="' + escapeHtml(info.nome) + ' (previsto pelo padrão)"';
               html += ' style="color:' + info.cor + ';border-color:' + info.cor + '">';
@@ -1596,11 +2056,18 @@
         el.innerHTML = '<p class="empty-state">Sem pessoas ativas.</p>';
       } else {
         el.innerHTML = lista.map(function(p){
-          var out = '<label class="check-item">';
-          out += '<input type="checkbox" value="' + p.id + '"' + (atribuidos[p.id] ? ' checked' : '') + '>';
+          var marcado = !!atribuidos[p.id];
+          var deFerias = estaDeFerias(p.id, dStr);
+          /* De férias: impossível de marcar. Se já estava marcado (férias registadas
+             depois da confirmação), fica editável para se poder corrigir à mão. */
+          var bloqueado = deFerias && !marcado;
+
+          var out = '<label class="check-item' + (bloqueado ? ' check-item-ferias' : '') + '">';
+          out += '<input type="checkbox" value="' + p.id + '"' + (marcado ? ' checked' : '') + (bloqueado ? ' disabled' : '') + '>';
           out += '<span class="resumo-dot" style="background:' + (p.cor || '#999999') + '"></span>';
-          out += escapeHtml(p.nome);
+          out += '<span class="check-item-nome">' + escapeHtml(p.nome) + '</span>';
           if (p.ativo === false) out += '<span class="check-item-inativo">inativo</span>';
+          if (deFerias) out += '<span class="check-item-tag-ferias">' + (marcado ? '⚠️ férias' : '(férias)') + '</span>';
           out += '</label>';
           return out;
         }).join('');
@@ -1644,7 +2111,9 @@
 
   turnosRef.on('value', function(snapshot){
     turnos = snapshot.val() || {};
+    dadosProntos.turnos = true;
     renderGrelha();
+    tentarFechoAutomatico();
   });
 
   /* ---------- Mini-calendário mensal (só navegação, sem dados de turnos) ---------- */
@@ -1743,7 +2212,12 @@
         dias.forEach(function(d){
           var dStr = toDateStr(d);
           var checked = editarSemanaEstadoInicial[chaveTurno(dStr, t.id)].indexOf(p.id) !== -1;
-          html += '<td><input type="checkbox" data-pessoa="' + p.id + '" data-data="' + dStr + '" data-turno="' + t.id + '"' + (checked ? ' checked' : '') + '></td>';
+          var deFerias = estaDeFerias(p.id, dStr);
+          /* Mesma regra do modal de célula: de férias não se marca, mas um
+             registo antigo que já o inclua fica editável para se corrigir. */
+          var bloqueado = deFerias && !checked;
+          html += '<td' + (deFerias ? ' class="cel-ferias" title="' + (checked ? '⚠️ De férias nesta data — rever' : 'De férias') + '"' : '') + '>';
+          html += '<input type="checkbox" data-pessoa="' + p.id + '" data-data="' + dStr + '" data-turno="' + t.id + '"' + (checked ? ' checked' : '') + (bloqueado ? ' disabled' : '') + '></td>';
         });
         html += '</tr>';
       });
@@ -1813,6 +2287,162 @@
 
     Promise.all(promises).then(closeEditarSemanaModal).catch(function(err){
       alert('Erro ao guardar alterações: ' + err.message);
+    });
+  });
+
+  /* ---------- Confirmar semana (manual) e fecho automático das passadas ---------- */
+  var SEMANAS_A_FECHAR = 12;
+  var fechoAutomaticoFeito = false;
+
+  function celulasDaSemana(monday){
+    var out = [];
+    for (var i = 0; i < 7; i++){
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      var dStr = toDateStr(d);
+      TURNOS.forEach(function(t){ out.push({ data: dStr, turno: t.id }); });
+    }
+    return out;
+  }
+
+  /* Semana trancada = as 21 células já têm confirmação explícita em 'turnos' */
+  function semanaConfirmada(monday){
+    return celulasDaSemana(monday).every(function(c){
+      return !!turnos[chaveTurno(c.data, c.turno)];
+    });
+  }
+
+  /* "Cozinha" o previsto pelo padrão em confirmações reais.
+     Escreve célula a célula, em sequência: escritas multi-chave no RTDB não são de confiança. */
+  function confirmarSemana(monday){
+    var pendentes = celulasDaSemana(monday).filter(function(c){
+      return !turnos[chaveTurno(c.data, c.turno)];
+    });
+
+    return pendentes.reduce(function(chain, c){
+      return chain.then(function(){
+        var arr = pessoasDoPadrao(c.data, c.turno).map(function(e){
+          return { pessoaId: e.pessoaId, nome: e.nome || 'Pessoa removida', cor: e.cor || '#999999' };
+        });
+        return turnosRef.child(chaveTurno(c.data, c.turno)).set({ data: c.data, turno: c.turno, pessoas: arr });
+      });
+    }, Promise.resolve()).then(function(){ return pendentes.length; });
+  }
+
+  document.getElementById('btnConfirmarSemana').addEventListener('click', function(){
+    var monday = getWeekStart();
+    if (semanaConfirmada(monday)){
+      alert('Esta semana já está toda confirmada.');
+      return;
+    }
+    if (!confirm('Confirmar a semana de ' + formatWeekLabel(monday) + '?\n\nO que está previsto pelo padrão passa a confirmação fixa em todas as células ainda por confirmar.')) return;
+
+    confirmarSemana(monday).then(renderGrelha).catch(function(err){
+      alert('Erro ao confirmar semana: ' + err.message);
+    });
+  });
+
+  /* Corre uma vez ao abrir a página, quando pessoas + padrões + férias + turnos já chegaram */
+  function tentarFechoAutomatico(){
+    if (fechoAutomaticoFeito) return;
+    if (!dadosProntos.pessoas || !dadosProntos.padroes || !dadosProntos.ferias || !dadosProntos.turnos) return;
+    fechoAutomaticoFeito = true;
+
+    var hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    var mondayAtual = getMonday(hoje);
+
+    var alvos = [];
+    for (var i = SEMANAS_A_FECHAR; i >= 1; i--){
+      var m = new Date(mondayAtual);
+      m.setDate(mondayAtual.getDate() - i * 7);
+      var fim = new Date(m);
+      fim.setDate(m.getDate() + 6);
+      if (fim >= hoje) continue;          /* a semana ainda não decorreu por completo */
+      if (semanaConfirmada(m)) continue;  /* já trancada, manual ou automaticamente */
+      alvos.push(m);
+    }
+    if (!alvos.length) return;
+
+    alvos.reduce(function(chain, m){
+      return chain.then(function(){ return confirmarSemana(m); });
+    }, Promise.resolve()).then(function(){
+      renderGrelha();
+    }).catch(function(err){
+      /* Silencioso de propósito: corre em fundo, não deve interromper quem está a usar a página */
+      console.warn('Fecho automático de semanas passadas falhou:', err);
+    });
+  }
+
+  /* ---------- Exportar semana como imagem ---------- */
+  function descarregarBlob(blob, nomeFicheiro){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = nomeFicheiro;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function partilharOuDescarregar(blob, nomeFicheiro){
+    var ficheiro = null;
+    try {
+      ficheiro = new File([blob], nomeFicheiro, { type: 'image/png' });
+    } catch (e){ /* File() não suportado — segue para download */ }
+
+    if (ficheiro && navigator.share && navigator.canShare && navigator.canShare({ files: [ficheiro] })){
+      navigator.share({ files: [ficheiro], title: 'GIOCO · Turnos' }).catch(function(err){
+        if (err && err.name === 'AbortError') return;   /* o utilizador cancelou */
+        descarregarBlob(blob, nomeFicheiro);
+      });
+      return;
+    }
+    descarregarBlob(blob, nomeFicheiro);
+  }
+
+  document.getElementById('btnExportarSemana').addEventListener('click', function(){
+    if (typeof html2canvas !== 'function'){
+      alert('A biblioteca de exportação não carregou. Verifica a ligação à internet.');
+      return;
+    }
+
+    var btn = this;
+    var wrap = document.getElementById('grelhaWrap');
+    var nomeFicheiro = 'gioco-turnos-' + toDateStr(getWeekStart()) + '.png';
+
+    /* Medir antes de tirar o overflow: dá a largura real da tabela, mesmo a que
+       está fora do ecrã ao telemóvel. Sem isto a captura corta na dobra. */
+    var larguraTotal = Math.max(wrap.scrollWidth, wrap.offsetWidth);
+
+    btn.disabled = true;
+    wrap.style.width = larguraTotal + 'px';
+    wrap.classList.add('exportando');
+
+    var limpar = function(){
+      wrap.classList.remove('exportando');
+      wrap.style.width = '';
+      btn.disabled = false;
+    };
+
+    html2canvas(wrap, {
+      backgroundColor: '#FFFFFF',
+      scale: 2,
+      scrollX: 0,
+      scrollY: -window.scrollY
+    }).then(function(canvas){
+      limpar();
+      canvas.toBlob(function(blob){
+        if (!blob){
+          alert('Não foi possível gerar a imagem.');
+          return;
+        }
+        partilharOuDescarregar(blob, nomeFicheiro);
+      }, 'image/png');
+    }).catch(function(err){
+      limpar();
+      alert('Erro ao exportar: ' + err.message);
     });
   });
 
