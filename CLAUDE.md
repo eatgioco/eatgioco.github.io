@@ -44,7 +44,10 @@ lojaChecklistTemplates / lojaChecklistRegistos — checklists abertura/fecho
 lojaTemperaturas / lojaTemperaturasFotos      — registos HACCP (fotos em base64)
 lojaPedidos           — pedidos/sugestões do staff
 pessoas               — membros da equipa
-turnos                — escala semanal
+turnos                — escala semanal (confirmações manuais, chave {data}_{turnoId})
+padroes               — padrão semanal recorrente por pessoa
+ferias                — períodos de férias por pessoa
+fechados              — loja encerrada por data: { diaTodo, turnos:{t1,t3,t2}, motivo }
 notificacoes          — central de notificações (lida: bool, tipo, criadoEm)
 tasks                 — tarefas do dashboard
 ```

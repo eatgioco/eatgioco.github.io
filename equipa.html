@@ -1128,6 +1128,77 @@
     font-size:11px;
   }
 
+  /* ---------- Loja fechada (dia todo / turno individual) ---------- */
+  /* Cabeçalho do dia e rótulo do turno são clicáveis: abrem o fecho em lote */
+  .grelha thead th.dia-head,
+  td.turno-label{
+    cursor:pointer;
+  }
+
+  .grelha thead th.dia-head:hover,
+  td.turno-label:hover{
+    background:#EDE8DD;
+  }
+
+  .head-lock{
+    display:block;
+    font-size:10px;
+    line-height:1;
+    margin-top:4px;
+  }
+
+  /* Especificidade (0,2,1) para ganhar a 'td.celula.hoje' — tem de vir depois */
+  td.celula.celula-fechada{
+    background-color:#EDEAE2;
+    background-image:repeating-linear-gradient(45deg,
+      rgba(20,20,20,0.08) 0, rgba(20,20,20,0.08) 5px,
+      rgba(0,0,0,0) 5px, rgba(0,0,0,0) 11px);
+  }
+
+  td.celula.celula-fechada:hover{
+    background-color:#E3DFD4;
+  }
+
+  .celula-fechada .celula-inner{
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+  }
+
+  .fechado-tag{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:1px;
+    color:var(--muted);
+    background:var(--white);
+    border:1px solid var(--line);
+    padding:2px 6px;
+  }
+
+  .fechado-motivo{
+    font-size:10px;
+    line-height:1.3;
+    color:var(--muted);
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* Mesmas riscas na mini-grelha do modal "Editar semana" */
+  .semana-mini-grelha td.cel-fechada{
+    background-color:#EDEAE2;
+    background-image:repeating-linear-gradient(45deg,
+      rgba(20,20,20,0.08) 0, rgba(20,20,20,0.08) 4px,
+      rgba(0,0,0,0) 4px, rgba(0,0,0,0) 9px);
+  }
+
+  .modal-hint{
+    margin:-8px 0 16px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
   /* ---------- Exportação da grelha como imagem ---------- */
   .export-header{
     display:none;
@@ -1383,12 +1454,83 @@
     <p class="field-label" id="turnoModalData" style="margin-bottom:6px;"></p>
     <p class="turno-modal-horario" id="turnoModalHorario"></p>
 
-    <label class="field-label">Quem trabalha</label>
-    <div class="check-list" id="turnoPessoasList"></div>
+    <label class="field-checkbox">
+      <input type="checkbox" id="turnoFechadoToggle">
+      Fechar este turno (sem serviço)
+    </label>
+    <p class="modal-hint" id="turnoFechadoHint" style="display:none;">
+      O dia todo está marcado como fechado. Para reabrir, clica no cabeçalho do dia na grelha.
+    </p>
+
+    <div class="field" id="turnoFechadoMotivoField" style="display:none;">
+      <label class="field-label">Motivo (opcional)</label>
+      <input type="text" id="turnoFechadoMotivo" placeholder="Feriado, obras…">
+    </div>
+
+    <div id="turnoPessoasBloco">
+      <label class="field-label">Quem trabalha</label>
+      <div class="check-list" id="turnoPessoasList"></div>
+    </div>
 
     <div class="modal-actions">
       <button type="button" class="btn" id="turnoModalCancel">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btnGuardarTurno">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Fechar dia (cabeçalho do dia) -->
+<div class="modal-overlay" id="fecharDiaOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Loja fechada</h2>
+      <button class="modal-close" id="fecharDiaClose">×</button>
+    </div>
+
+    <p class="field-label" id="fecharDiaData" style="margin-bottom:16px;"></p>
+
+    <label class="field-checkbox">
+      <input type="checkbox" id="fecharDiaToggle">
+      Loja fechada o dia todo
+    </label>
+
+    <div class="field">
+      <label class="field-label">Motivo (opcional)</label>
+      <input type="text" id="fecharDiaMotivo" placeholder="Feriado, obras…">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="fecharDiaCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarFecharDia">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Fechar turno na semana visível (cabeçalho da linha do turno) -->
+<div class="modal-overlay" id="fecharTurnoSemanaOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Fechar turno</h2>
+      <button class="modal-close" id="fecharTurnoSemanaClose">×</button>
+    </div>
+
+    <p class="field-label" id="fecharTurnoSemanaInfo" style="margin-bottom:6px;"></p>
+    <p class="turno-modal-horario" id="fecharTurnoSemanaHorario"></p>
+
+    <label class="field-checkbox">
+      <input type="checkbox" id="fecharTurnoSemanaToggle">
+      Fechar este turno em todos os dias desta semana
+    </label>
+    <p class="modal-hint" id="fecharTurnoSemanaHint" style="display:none;"></p>
+
+    <div class="field">
+      <label class="field-label">Motivo (opcional)</label>
+      <input type="text" id="fecharTurnoSemanaMotivo" placeholder="Feriado, obras…">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="fecharTurnoSemanaCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarFecharTurnoSemana">Guardar</button>
     </div>
   </div>
 </div>
@@ -1403,21 +1545,26 @@
   var turnosRef = db.ref('turnos');
   var padroesRef = db.ref('padroes');
   var feriasRef = db.ref('ferias');
+  var fechadosRef = db.ref('fechados');
 
   var pessoas = {};
   var pessoasCarregadas = false;
   var turnos = {};
   var padroes = {};
   var ferias = {};
+  var fechados = {};
   var weekOffset = 0;
 
-  /* O fecho automático de semanas passadas só pode correr com os quatro nós já carregados */
-  var dadosProntos = { pessoas:false, padroes:false, ferias:false, turnos:false };
+  /* O fecho automático de semanas passadas só pode correr com todos os nós já carregados —
+     'fechados' incluído, senão confirmava células que afinal estão fechadas */
+  var dadosProntos = { pessoas:false, padroes:false, ferias:false, turnos:false, fechados:false };
 
   var editingPessoaId = null;
   var pessoaFeriasEdit = [];
   var turnoModalData = null;
   var turnoModalTurnoId = null;
+  var fecharDiaData = null;
+  var fecharTurnoSemanaId = null;
 
   var calViewYear = null;
   var calViewMonth = null;
@@ -1472,6 +1619,60 @@
   function formatDataCurta(dStr){
     var p = String(dStr || '').split('-');
     return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : dStr;
+  }
+
+  /* ---------- Loja fechada (dia todo / turno individual) ----------
+     Guardado em 'fechados/{data}' = { diaTodo, turnos:{t1,t3,t2}, motivo }.
+     "Efetivo fechado" de uma célula = diaTodo OU a flag do próprio turno. Toda a
+     restante lógica (padrão, horas, mínimo de pessoas, edição em lote) parte daqui. */
+  function estadoFechadoDoDia(dStr){
+    var f = fechados[dStr] || {};
+    var t = {};
+    TURNOS.forEach(function(x){
+      if (f.turnos && f.turnos[x.id] === true) t[x.id] = true;
+    });
+    return { diaTodo: f.diaTodo === true, turnos: t, motivo: f.motivo || '' };
+  }
+
+  function diaTodoFechado(dStr){
+    return estadoFechadoDoDia(dStr).diaTodo;
+  }
+
+  function estaFechado(dStr, turnoId){
+    var e = estadoFechadoDoDia(dStr);
+    return e.diaTodo || e.turnos[turnoId] === true;
+  }
+
+  function motivoFecho(dStr){
+    return estadoFechadoDoDia(dStr).motivo;
+  }
+
+  /* Escrita única no caminho do dia (set de objecto, não update multi-chave).
+     Sem nada fechado, o nó desaparece em vez de ficar um registo vazio. */
+  function gravarFechado(dStr, estado){
+    var turnosAtivos = {};
+    TURNOS.forEach(function(t){
+      if (estado.turnos && estado.turnos[t.id] === true) turnosAtivos[t.id] = true;
+    });
+    if (estado.diaTodo !== true && !Object.keys(turnosAtivos).length){
+      return fechadosRef.child(dStr).remove();
+    }
+    return fechadosRef.child(dStr).set({
+      diaTodo: estado.diaTodo === true,
+      turnos: turnosAtivos,
+      motivo: estado.motivo || ''
+    });
+  }
+
+  /* Ao fechar, a confirmação que lá estava é apagada — não fica "à espera de revisão".
+     Célula a célula, em sequência: escritas multi-chave no RTDB não são de confiança. */
+  function limparConfirmacoes(celulas){
+    return celulas.reduce(function(chain, c){
+      return chain.then(function(){
+        if (!turnos[chaveTurno(c.data, c.turno)]) return null;
+        return turnosRef.child(chaveTurno(c.data, c.turno)).remove();
+      });
+    }, Promise.resolve());
   }
 
   /* ---------- Cobertura mínima de uma célula ---------- */
@@ -1889,11 +2090,13 @@
     return out;
   }
 
-  /* Resolve o efetivo de uma célula: confirmação manual tem sempre prioridade sobre o padrão */
+  /* Resolve o efetivo de uma célula. Ordem: fechado > confirmação manual > padrão.
+     Célula fechada nunca gera previsto, diga o padrão o que disser. */
   function efetivoDoTurno(dStr, turnoId){
+    if (estaFechado(dStr, turnoId)) return { pessoas: [], confirmado: false, fechado: true };
     var key = chaveTurno(dStr, turnoId);
-    if (turnos[key]) return { pessoas: normalizaPessoas(turnos[key]), confirmado: true };
-    return { pessoas: pessoasDoPadrao(dStr, turnoId), confirmado: false };
+    if (turnos[key]) return { pessoas: normalizaPessoas(turnos[key]), confirmado: true, fechado: false };
+    return { pessoas: pessoasDoPadrao(dStr, turnoId), confirmado: false, fechado: false };
   }
 
   /* Nome/cor actuais da pessoa; cai para o snapshot guardado se já não existir */
@@ -1956,18 +2159,28 @@
     if (trancada) html += '<span class="semana-lock" title="Semana confirmada — todas as células estão trancadas">🔒</span> ';
     html += 'Turno</th>';
     dias.forEach(function(d){
-      var isToday = toDateStr(d) === todayStr;
-      html += '<th class="' + (isToday ? 'hoje' : '') + '">';
+      var dStr = toDateStr(d);
+      var isToday = dStr === todayStr;
+      var fechadoTodo = diaTodoFechado(dStr);
+      html += '<th class="dia-head' + (isToday ? ' hoje' : '') + '"';
+      html += ' title="' + (fechadoTodo ? 'Loja fechada — clica para reabrir' : 'Clica para fechar a loja neste dia') + '"';
+      html += ' onclick="openFecharDiaModal(\'' + dStr + '\')">';
       html += '<span class="dia-abrev">' + DIA_ABREV[d.getDay()] + '</span>';
       html += '<span class="dia-num">' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '</span>';
+      if (fechadoTodo) html += '<span class="head-lock" title="Loja fechada o dia todo">🔒</span>';
       html += '</th>';
     });
     html += '</tr></thead><tbody>';
 
     TURNOS.forEach(function(t){
+      /* Cadeado na linha quando os 7 dias visíveis têm este turno fechado */
+      var turnoFechadoSemana = dias.every(function(d){ return estaFechado(toDateStr(d), t.id); });
+
       html += '<tr>';
-      html += '<td class="col-sticky turno-label">';
-      html += '<span class="turno-horario">' + t.horario + '</span>';
+      html += '<td class="col-sticky turno-label"';
+      html += ' title="' + (turnoFechadoSemana ? 'Turno fechado toda a semana — clica para reabrir' : 'Clica para fechar este turno em toda a semana') + '"';
+      html += ' onclick="openFecharTurnoSemanaModal(\'' + t.id + '\')">';
+      html += '<span class="turno-horario">' + t.horario + (turnoFechadoSemana ? ' 🔒' : '') + '</span>';
       html += '<span class="turno-duracao">' + fmtHoras(t.horas) + '</span>';
       html += '</td>';
 
@@ -1976,6 +2189,17 @@
         var isToday = dStr === todayStr;
         var efet = efetivoDoTurno(dStr, t.id);
         var lista = efet.pessoas;
+
+        if (efet.fechado){
+          var motivo = motivoFecho(dStr);
+          html += '<td class="celula celula-fechada' + (isToday ? ' hoje' : '') + '"';
+          html += ' title="Sem serviço' + (motivo ? ' — ' + escapeHtml(motivo) : '') + '"';
+          html += ' onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
+          html += '<div class="celula-inner"><span class="fechado-tag">FECHADO</span>';
+          if (motivo) html += '<span class="fechado-motivo">' + escapeHtml(motivo) + '</span>';
+          html += '</div></td>';
+          return;
+        }
 
         html += '<td class="celula' + (isToday ? ' hoje' : '') + '" onclick="openTurnoModal(\'' + dStr + '\',\'' + t.id + '\')">';
         if (efet.confirmado){
@@ -2087,6 +2311,17 @@
   window.revertParaPadrao = revertParaPadrao;
 
   /* ---------- Modal de atribuição ---------- */
+  /* Com o turno fechado, a lista de pessoas some — só fica o motivo. Desligar o
+     toggle traz a lista de volta já preenchida pelo padrão (as pessoas que lá
+     estavam antes de fechar foram apagadas e não se restauram). */
+  function aplicarTurnoFechadoUI(){
+    var fechadoDia = turnoModalData ? diaTodoFechado(turnoModalData) : false;
+    var ligado = document.getElementById('turnoFechadoToggle').checked;
+    document.getElementById('turnoFechadoMotivoField').style.display = ligado ? 'block' : 'none';
+    document.getElementById('turnoPessoasBloco').style.display = ligado ? 'none' : 'block';
+    document.getElementById('turnoFechadoHint').style.display = fechadoDia ? 'block' : 'none';
+  }
+
   function openTurnoModal(dStr, turnoId){
     turnoModalData = dStr;
     turnoModalTurnoId = turnoId;
@@ -2095,12 +2330,23 @@
     document.getElementById('turnoModalData').textContent = formatDataLonga(dStr);
     document.getElementById('turnoModalHorario').textContent = def ? def.horario : '';
 
+    var estadoFechado = estadoFechadoDoDia(dStr);
+    var toggle = document.getElementById('turnoFechadoToggle');
+    toggle.checked = estaFechado(dStr, turnoId);
+    /* Fecho do dia todo só se desfaz no cabeçalho do dia */
+    toggle.disabled = estadoFechado.diaTodo;
+    document.getElementById('turnoFechadoMotivo').value = estadoFechado.motivo;
+    aplicarTurnoFechadoUI();
+
     var el = document.getElementById('turnoPessoasList');
     if (!pessoasCarregadas){
       el.innerHTML = '<p class="empty-state">A carregar…</p>';
     } else {
+      /* Ignora o fecho de propósito: é o estado a que a célula volta se for reaberta */
       var atribuidos = {};
-      efetivoDoTurno(dStr, turnoId).pessoas.forEach(function(entrada){ atribuidos[entrada.pessoaId] = entrada; });
+      var baseKey = chaveTurno(dStr, turnoId);
+      var base = turnos[baseKey] ? normalizaPessoas(turnos[baseKey]) : pessoasDoPadrao(dStr, turnoId);
+      base.forEach(function(entrada){ atribuidos[entrada.pessoaId] = entrada; });
 
       var lista = pessoasAtivasArray();
       /* Inclui quem está atribuído mas já não está activo, para não o perder ao guardar */
@@ -2144,8 +2390,35 @@
     if (e.target === document.getElementById('turnoModalOverlay')) closeTurnoModal();
   });
 
+  document.getElementById('turnoFechadoToggle').addEventListener('change', aplicarTurnoFechadoUI);
+
+  function mesmosIds(a, b){
+    return a.length === b.length && a.every(function(id, i){ return id === b[i]; });
+  }
+
   document.getElementById('btnGuardarTurno').addEventListener('click', function(){
     if (!turnoModalData || !turnoModalTurnoId) return;
+
+    var dStr = turnoModalData;
+    var tid = turnoModalTurnoId;
+    var estado = estadoFechadoDoDia(dStr);
+    var falhar = function(err){ alert('Erro ao guardar turno: ' + err.message); };
+
+    /* Dia todo fechado: o toggle está bloqueado, não há nada a gravar por aqui */
+    if (estado.diaTodo){
+      closeTurnoModal();
+      return;
+    }
+
+    /* Fechar este turno: grava a flag e apaga a confirmação que lá estivesse */
+    if (document.getElementById('turnoFechadoToggle').checked){
+      estado.turnos[tid] = true;
+      estado.motivo = document.getElementById('turnoFechadoMotivo').value.trim();
+      gravarFechado(dStr, estado)
+        .then(function(){ return limparConfirmacoes([{ data: dStr, turno: tid }]); })
+        .then(closeTurnoModal).catch(falhar);
+      return;
+    }
 
     var checks = document.querySelectorAll('#turnoPessoasList input[type="checkbox"]');
     var arr = [];
@@ -2155,12 +2428,28 @@
       arr.push({ pessoaId: c.value, nome: p.nome || 'Pessoa removida', cor: p.cor || '#999999' });
     });
 
+    var estavaFechado = estado.turnos[tid] === true;
+    var chain = Promise.resolve();
+    if (estavaFechado){
+      delete estado.turnos[tid];
+      chain = gravarFechado(dStr, estado);
+    }
+
+    /* Reabrir sem mexer nas pessoas devolve a célula ao padrão, sem confirmação nova */
+    if (estavaFechado){
+      var selecionados = arr.map(function(e){ return e.pessoaId; }).sort();
+      var doPadrao = pessoasDoPadrao(dStr, tid).map(function(e){ return e.pessoaId; }).sort();
+      if (mesmosIds(selecionados, doPadrao)){
+        chain.then(closeTurnoModal).catch(falhar);
+        return;
+      }
+    }
+
     /* Grava sempre como confirmação explícita (mesmo array vazio), para travar a célula contra o padrão */
-    var key = chaveTurno(turnoModalData, turnoModalTurnoId);
-    turnosRef.child(key).set({ data: turnoModalData, turno: turnoModalTurnoId, pessoas: arr })
-      .then(closeTurnoModal).catch(function(err){
-        alert('Erro ao guardar turno: ' + err.message);
-      });
+    var key = chaveTurno(dStr, tid);
+    chain.then(function(){
+      return turnosRef.child(key).set({ data: dStr, turno: tid, pessoas: arr });
+    }).then(closeTurnoModal).catch(falhar);
   });
 
   turnosRef.on('value', function(snapshot){
@@ -2168,6 +2457,158 @@
     dadosProntos.turnos = true;
     renderGrelha();
     tentarFechoAutomatico();
+  });
+
+  fechadosRef.on('value', function(snapshot){
+    fechados = snapshot.val() || {};
+    dadosProntos.fechados = true;
+    renderGrelha();
+    tentarFechoAutomatico();
+  });
+
+  /* ---------- Fechar o dia todo (cabeçalho do dia) ---------- */
+  function closeFecharDiaModal(){
+    document.getElementById('fecharDiaOverlay').classList.remove('open');
+    fecharDiaData = null;
+  }
+
+  function openFecharDiaModal(dStr){
+    fecharDiaData = dStr;
+    var estado = estadoFechadoDoDia(dStr);
+    document.getElementById('fecharDiaData').textContent = formatDataLonga(dStr);
+    document.getElementById('fecharDiaToggle').checked = estado.diaTodo;
+    document.getElementById('fecharDiaMotivo').value = estado.motivo;
+    document.getElementById('fecharDiaOverlay').classList.add('open');
+  }
+  window.openFecharDiaModal = openFecharDiaModal;
+
+  document.getElementById('fecharDiaClose').addEventListener('click', closeFecharDiaModal);
+  document.getElementById('fecharDiaCancel').addEventListener('click', closeFecharDiaModal);
+  document.getElementById('fecharDiaOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('fecharDiaOverlay')) closeFecharDiaModal();
+  });
+
+  document.getElementById('btnGuardarFecharDia').addEventListener('click', function(){
+    if (!fecharDiaData) return;
+    var dStr = fecharDiaData;
+    var estado = estadoFechadoDoDia(dStr);
+    var fechar = document.getElementById('fecharDiaToggle').checked;
+
+    estado.diaTodo = fechar;
+    estado.motivo = document.getElementById('fecharDiaMotivo').value.trim();
+
+    var chain = gravarFechado(dStr, estado);
+    if (fechar){
+      /* Fecha os três turnos de uma vez: limpa as confirmações de todos */
+      chain = chain.then(function(){
+        return limparConfirmacoes(TURNOS.map(function(t){ return { data: dStr, turno: t.id }; }));
+      });
+    }
+    chain.then(closeFecharDiaModal).catch(function(err){
+      alert('Erro ao guardar: ' + err.message);
+    });
+  });
+
+  /* ---------- Fechar um turno em toda a semana visível (cabeçalho da linha) ---------- */
+  function diasDaSemanaVisivel(){
+    var monday = getWeekStart();
+    var out = [];
+    for (var i = 0; i < 7; i++){
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      out.push(toDateStr(d));
+    }
+    return out;
+  }
+
+  function closeFecharTurnoSemanaModal(){
+    document.getElementById('fecharTurnoSemanaOverlay').classList.remove('open');
+    fecharTurnoSemanaId = null;
+  }
+
+  function openFecharTurnoSemanaModal(turnoId){
+    fecharTurnoSemanaId = turnoId;
+    var def = turnoDef(turnoId);
+    var dias = diasDaSemanaVisivel();
+
+    var fechadosCount = dias.filter(function(dStr){ return estaFechado(dStr, turnoId); }).length;
+    var toggle = document.getElementById('fecharTurnoSemanaToggle');
+    toggle.checked = fechadosCount === 7;
+    /* Estado misto: alguns dias já fechados célula a célula. Ligar fecha os que faltam. */
+    toggle.indeterminate = fechadosCount > 0 && fechadosCount < 7;
+
+    var hint = document.getElementById('fecharTurnoSemanaHint');
+    if (toggle.indeterminate){
+      hint.textContent = fechadosCount + ' de 7 dias já têm este turno fechado. Ligar fecha os restantes; desligar reabre todos.';
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+
+    /* Motivo já usado por este turno nesta semana, para não obrigar a reescrever.
+       Só conta o fecho do próprio turno: o motivo de um dia fechado por inteiro
+       é de outra coisa e não deve alastrar aos restantes dias. */
+    var motivoExistente = '';
+    dias.forEach(function(dStr){
+      if (!motivoExistente && estadoFechadoDoDia(dStr).turnos[turnoId] === true) motivoExistente = motivoFecho(dStr);
+    });
+    document.getElementById('fecharTurnoSemanaMotivo').value = motivoExistente;
+
+    document.getElementById('fecharTurnoSemanaInfo').textContent = 'Semana de ' + formatWeekLabel(getWeekStart());
+    document.getElementById('fecharTurnoSemanaHorario').textContent = def ? def.horario : '';
+    document.getElementById('fecharTurnoSemanaOverlay').classList.add('open');
+  }
+  window.openFecharTurnoSemanaModal = openFecharTurnoSemanaModal;
+
+  document.getElementById('fecharTurnoSemanaClose').addEventListener('click', closeFecharTurnoSemanaModal);
+  document.getElementById('fecharTurnoSemanaCancel').addEventListener('click', closeFecharTurnoSemanaModal);
+  document.getElementById('fecharTurnoSemanaOverlay').addEventListener('click', function(e){
+    if (e.target === document.getElementById('fecharTurnoSemanaOverlay')) closeFecharTurnoSemanaModal();
+  });
+  /* Clicar num toggle indeterminado dá checked=true — é o que se quer (fecha os que faltam) */
+  document.getElementById('fecharTurnoSemanaToggle').addEventListener('change', function(){
+    this.indeterminate = false;
+    document.getElementById('fecharTurnoSemanaHint').style.display = 'none';
+  });
+
+  document.getElementById('btnGuardarFecharTurnoSemana').addEventListener('click', function(){
+    if (!fecharTurnoSemanaId) return;
+    var tid = fecharTurnoSemanaId;
+    var fechar = document.getElementById('fecharTurnoSemanaToggle').checked;
+    var motivo = document.getElementById('fecharTurnoSemanaMotivo').value.trim();
+    var dias = diasDaSemanaVisivel();
+
+    /* Um dia de cada vez, em sequência — nunca uma escrita multi-chave */
+    dias.reduce(function(chain, dStr){
+      return chain.then(function(){
+        var estado = estadoFechadoDoDia(dStr);
+        /* Dia todo fechado já cobre este turno — não há nada a acrescentar.
+           Reabrir, esse sim, limpa a flag do turno mesmo nesses dias, para não
+           ficar um fecho individual escondido por baixo do fecho do dia. */
+        if (estado.diaTodo && fechar) return null;
+
+        if (fechar){
+          /* O motivo é partilhado pelo dia. Em lote só se escreve quando há um
+             motivo novo — deixar o campo vazio não apaga o que outro turno
+             desse dia já tinha. Para limpar, usa-se o modal da própria célula. */
+          var novoMotivo = motivo || estado.motivo;
+          if (estado.turnos[tid] === true && estado.motivo === novoMotivo) return null;
+          estado.turnos[tid] = true;
+          estado.motivo = novoMotivo;
+        } else {
+          if (estado.turnos[tid] !== true) return null;
+          delete estado.turnos[tid];
+        }
+        return gravarFechado(dStr, estado);
+      });
+    }, Promise.resolve()).then(function(){
+      if (!fechar) return null;
+      var alvos = dias.filter(function(dStr){ return !diaTodoFechado(dStr); })
+        .map(function(dStr){ return { data: dStr, turno: tid }; });
+      return limparConfirmacoes(alvos);
+    }).then(closeFecharTurnoSemanaModal).catch(function(err){
+      alert('Erro ao guardar: ' + err.message);
+    });
   });
 
   /* ---------- Mini-calendário mensal (só navegação, sem dados de turnos) ---------- */
@@ -2265,6 +2706,12 @@
         html += '<tr><td class="semana-turno-label" title="' + t.horario + '">' + t.id.toUpperCase() + '</td>';
         dias.forEach(function(d){
           var dStr = toDateStr(d);
+          /* Célula fechada: sem checkbox nenhuma, só as riscas */
+          if (estaFechado(dStr, t.id)){
+            var motivo = motivoFecho(dStr);
+            html += '<td class="cel-fechada" title="Sem serviço' + (motivo ? ' — ' + escapeHtml(motivo) : '') + '">·</td>';
+            return;
+          }
           var checked = editarSemanaEstadoInicial[chaveTurno(dStr, t.id)].indexOf(p.id) !== -1;
           var deFerias = estaDeFerias(p.id, dStr);
           /* Mesma regra do modal de célula: de férias não se marca, mas um
@@ -2316,6 +2763,7 @@
     editarSemanaDias.forEach(function(d){
       var dStr = toDateStr(d);
       TURNOS.forEach(function(t){
+        if (estaFechado(dStr, t.id)) return;   /* célula fechada: não se grava nada */
         var key = chaveTurno(dStr, t.id);
         var checks = document.querySelectorAll('#editarSemanaBody input[data-data="' + dStr + '"][data-turno="' + t.id + '"]');
         var novosIds = [];
@@ -2359,10 +2807,11 @@
     return out;
   }
 
-  /* Semana trancada = as 21 células já têm confirmação explícita em 'turnos' */
+  /* Semana trancada = as 21 células já têm confirmação explícita em 'turnos'.
+     Células fechadas contam como resolvidas: não há nada para confirmar nelas. */
   function semanaConfirmada(monday){
     return celulasDaSemana(monday).every(function(c){
-      return !!turnos[chaveTurno(c.data, c.turno)];
+      return estaFechado(c.data, c.turno) || !!turnos[chaveTurno(c.data, c.turno)];
     });
   }
 
@@ -2370,7 +2819,7 @@
      Escreve célula a célula, em sequência: escritas multi-chave no RTDB não são de confiança. */
   function confirmarSemana(monday){
     var pendentes = celulasDaSemana(monday).filter(function(c){
-      return !turnos[chaveTurno(c.data, c.turno)];
+      return !estaFechado(c.data, c.turno) && !turnos[chaveTurno(c.data, c.turno)];
     });
 
     return pendentes.reduce(function(chain, c){
@@ -2399,7 +2848,7 @@
   /* Corre uma vez ao abrir a página, quando pessoas + padrões + férias + turnos já chegaram */
   function tentarFechoAutomatico(){
     if (fechoAutomaticoFeito) return;
-    if (!dadosProntos.pessoas || !dadosProntos.padroes || !dadosProntos.ferias || !dadosProntos.turnos) return;
+    if (!dadosProntos.pessoas || !dadosProntos.padroes || !dadosProntos.ferias || !dadosProntos.turnos || !dadosProntos.fechados) return;
     fechoAutomaticoFeito = true;
 
     var hoje = new Date();
