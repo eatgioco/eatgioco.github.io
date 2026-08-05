@@ -1154,9 +1154,18 @@
   /* ---------- Detalhe expansível de uma linha de pagamento ---------- */
   /* Mesmo formato dos tickets de pagamentos.html. */
   .pay-detalhe{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
     padding:10px 12px 12px 34px;
     border-top:1px dashed var(--line);
     background:var(--bg);
+  }
+
+  .pay-detalhe-info{
+    flex:1;
+    min-width:0;
   }
 
   .pay-detalhe .card-row{
@@ -1164,10 +1173,15 @@
     font-size:13px;
   }
 
+  /* Coluna à direita (Pagar em cima do Fechar), alinhada pelo fundo com
+     a última linha da coluna de informação, para aproveitar o espaço
+     vazio em vez de empilhar tudo por baixo. */
   .pay-detalhe-actions{
     display:flex;
-    gap:8px;
-    margin-top:10px;
+    flex-direction:column;
+    align-items:stretch;
+    gap:6px;
+    flex-shrink:0;
   }
 
   .copy-icon-btn{
@@ -2494,6 +2508,7 @@ window.addEventListener('load', function () {
   // pagamentos.html. Campos vazios são omitidos em silêncio.
   function blocoDetalhePagamento(l, incluirPedido){
     var h = '<div class="pay-detalhe" data-chave="' + escapeHtml(chaveLinha(l)) + '">';
+    h += '<div class="pay-detalhe-info">';
 
     h += '<div class="card-row"><span>Montante: ' + formatEuro(l.montante) +
          '<button type="button" class="copy-icon-btn" data-copiar="montante" title="Copiar montante">📋</button></span></div>';
@@ -2513,6 +2528,8 @@ window.addEventListener('load', function () {
     if (incluirPedido && l.ticketNumero){
       h += '<div class="card-row"><span>Pedido: #' + escapeHtml(l.ticketNumero) + '</span></div>';
     }
+
+    h += '</div>'; // .pay-detalhe-info
 
     h += '<div class="pay-detalhe-actions">';
     if (l.iban){
