@@ -1093,14 +1093,29 @@
     gap:6px;
   }
 
+  .pay-line-wrap{
+    border:1px solid var(--line);
+    border-left:3px solid var(--line);
+  }
+
   .pay-line{
     display:flex;
     align-items:baseline;
     gap:10px;
     padding:8px 10px;
-    border:1px solid var(--line);
-    border-left:3px solid var(--line);
     font-size:13px;
+    cursor:pointer;
+  }
+
+  .pay-line:hover{
+    background:var(--bg);
+  }
+
+  .pay-line-caret{
+    flex-shrink:0;
+    width:10px;
+    font-size:10px;
+    color:var(--muted);
   }
 
   .pay-line-prazo{
@@ -1120,16 +1135,6 @@
     white-space:nowrap;
   }
 
-  .pay-line-ref{
-    flex-shrink:0;
-    max-width:200px;
-    font-size:11px;
-    color:var(--muted);
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-
   .pay-line-valor{
     flex-shrink:0;
     font-family:'Space Mono', monospace;
@@ -1137,13 +1142,75 @@
     white-space:nowrap;
   }
 
-  .pay-line.vencido{
+  .pay-line-wrap.vencido{
     border-color:var(--red);
     color:var(--red);
   }
 
-  .pay-line.vencido .pay-line-ref{
+  .pay-line-wrap.vencido .pay-line-caret{
     color:var(--red);
+  }
+
+  /* ---------- Detalhe expansível de uma linha de pagamento ---------- */
+  /* Mesmo formato dos tickets de fornecedores.html. */
+  .pay-detalhe{
+    padding:10px 12px 12px 34px;
+    border-top:1px dashed var(--line);
+    background:var(--bg);
+  }
+
+  .pay-detalhe .card-row{
+    padding:2px 0;
+    font-size:13px;
+  }
+
+  .pay-detalhe-actions{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+
+  .copy-icon-btn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:11px;
+    padding:0;
+    margin-left:5px;
+    line-height:1;
+    opacity:0.5;
+    position:relative;
+    vertical-align:middle;
+  }
+
+  .copy-icon-btn:hover{
+    opacity:1;
+  }
+
+  .copy-icon-btn::after{
+    content:'Copiado ✓';
+    position:absolute;
+    bottom:100%;
+    left:50%;
+    transform:translateX(-50%) translateY(-4px);
+    background:var(--black);
+    color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    padding:3px 6px;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .15s ease;
+  }
+
+  .copy-icon-btn.copy-icon-copied::after{
+    opacity:1;
+  }
+
+  .copy-icon-btn.copy-icon-error::after{
+    content:'Erro';
+    opacity:1;
   }
 
   .pay-card-hint{
@@ -1443,6 +1510,23 @@
 
   .tes-table tr.vencido td:first-child{
     border-left:3px solid var(--red);
+  }
+
+  .tes-table tr.tes-linha{
+    cursor:pointer;
+  }
+
+  .tes-table tr.tes-linha:hover td{
+    background:var(--bg);
+  }
+
+  .tes-table tr.tes-linha-detalhe td{
+    padding:0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .tes-table tr.tes-linha-detalhe .pay-detalhe{
+    border-top:none;
   }
 
   .tes-tag{
@@ -2331,6 +2415,7 @@ window.addEventListener('load', function () {
   var payEmptyEl = document.getElementById('paymentsEmptyInline');
 
   var periodoAtual = 'tudo';
+  var cartaoLinhaAberta = null; // chave da linha expandida no cartão, ou null
 
   function hojeMeiaNoite(){
     var d = new Date();
@@ -2376,6 +2461,101 @@ window.addEventListener('load', function () {
 
   function ddmm(d){
     return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+  }
+
+  // Feedback no próprio ícone, igual ao de fornecedores.html: o botão não
+  // muda de texto (é um emoji), mostra um balão 'Copiado ✓' por 1,5s.
+  function copyIconFeedback(text, btnEl){
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function(){
+      btnEl.classList.add('copy-icon-copied');
+      setTimeout(function(){ btnEl.classList.remove('copy-icon-copied'); }, 1500);
+    }).catch(function(){
+      btnEl.classList.add('copy-icon-error');
+      setTimeout(function(){ btnEl.classList.remove('copy-icon-error'); }, 1500);
+    });
+  }
+
+  // Identifica uma linha de forma estável entre re-renders (o pedido pode
+  // ser regravado pelo Firebase a qualquer momento).
+  function chaveLinha(l){
+    return l.ticketId + '|' + l.lineIdx;
+  }
+
+  function linhaPorChave(chave){
+    var lista = linhasPendentes();
+    for (var i = 0; i < lista.length; i++){
+      if (chaveLinha(lista[i]) === chave) return lista[i];
+    }
+    return null;
+  }
+
+  // Bloco de apoio ao pagamento, no mesmo formato dos tickets de
+  // fornecedores.html. Campos vazios são omitidos em silêncio.
+  function blocoDetalhePagamento(l, incluirPedido){
+    var h = '<div class="pay-detalhe" data-chave="' + escapeHtml(chaveLinha(l)) + '">';
+
+    h += '<div class="card-row"><span>Montante: ' + formatEuro(l.montante) +
+         '<button type="button" class="copy-icon-btn" data-copiar="montante" title="Copiar montante">📋</button></span></div>';
+
+    h += '<div class="card-row"><span>Prazo: ' + escapeHtml(l.prazo || 'n/d') + '</span></div>';
+
+    if (l.iban){
+      h += '<div class="card-row"><span>IBAN: ' + escapeHtml(l.iban) +
+           '<button type="button" class="copy-icon-btn" data-copiar="iban" title="Copiar IBAN">📋</button></span></div>';
+    }
+
+    if (l.referencia){
+      h += '<div class="card-row"><span>Referência: ' + escapeHtml(l.referencia) +
+           '<button type="button" class="copy-icon-btn" data-copiar="referencia" title="Copiar referência">📋</button></span></div>';
+    }
+
+    if (incluirPedido && l.ticketNumero){
+      h += '<div class="card-row"><span>Pedido: #' + escapeHtml(l.ticketNumero) + '</span></div>';
+    }
+
+    h += '<div class="pay-detalhe-actions">';
+    if (l.iban){
+      h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
+    }
+    h += '<button type="button" class="btn-small pay-detalhe-fechar">✕ Fechar</button>';
+    h += '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  function valorParaCopiar(l, campo){
+    if (campo === 'montante') return l.montante.toFixed(2);
+    if (campo === 'iban') return l.iban;
+    if (campo === 'referencia') return l.referencia;
+    return '';
+  }
+
+  // Trata cliques em 📋 e em '✕ Fechar' dentro de um bloco de detalhe.
+  // Devolve true se já consumiu o clique.
+  function tratarCliqueDetalhe(e, fecharFn){
+    var btnCopiar = e.target.closest('.copy-icon-btn');
+    if (btnCopiar){
+      var bloco = btnCopiar.closest('.pay-detalhe');
+      var l = bloco && linhaPorChave(bloco.getAttribute('data-chave'));
+      if (l) copyIconFeedback(valorParaCopiar(l, btnCopiar.getAttribute('data-copiar')), btnCopiar);
+      return true;
+    }
+    var btnPagar = e.target.closest('.pay-detalhe-pagar');
+    if (btnPagar){
+      var blocoPagar = btnPagar.closest('.pay-detalhe');
+      var linhaPagar = blocoPagar && linhaPorChave(blocoPagar.getAttribute('data-chave'));
+      if (linhaPagar && linhaPagar.iban){
+        copyToClipboard('IBAN: ' + linhaPagar.iban + ' — Montante: ' + linhaPagar.montante.toFixed(2) + '€', btnPagar);
+        window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
+      }
+      return true;
+    }
+    if (e.target.closest('.pay-detalhe-fechar')){
+      fecharFn();
+      return true;
+    }
+    return false;
   }
 
   // Horizonte do filtro: tudo o que vence até hoje+N dias, inclusive o que
@@ -2446,14 +2626,36 @@ window.addEventListener('load', function () {
 
     payLinesEl.innerHTML = filtradas.map(function(l){
       var vencido = l.prazoDate && l.prazoDate <= hoje;
-      return '<div class="pay-line' + (vencido ? ' vencido' : '') + '">' +
+      var chave = chaveLinha(l);
+      var aberta = cartaoLinhaAberta === chave;
+      var html = '<div class="pay-line-wrap' + (vencido ? ' vencido' : '') + '" data-chave="' + escapeHtml(chave) + '">' +
+        '<div class="pay-line">' +
+        '<span class="pay-line-caret">' + (aberta ? '▾' : '▸') + '</span>' +
         '<span class="pay-line-prazo">' + (l.prazoDate ? ddmm(l.prazoDate) : '—') + '</span>' +
         '<span class="pay-line-nome">' + escapeHtml(l.fornecedor) + '</span>' +
-        (l.referencia ? '<span class="pay-line-ref">' + escapeHtml(l.referencia) + '</span>' : '') +
         '<span class="pay-line-valor">' + formatEuro(l.montante) + '</span>' +
         '</div>';
+      if (aberta) html += blocoDetalhePagamento(l, true);
+      html += '</div>';
+      return html;
     }).join('');
   }
+
+  // Delegado uma única vez: procura a linha pela chave estável em vez de
+  // depender de closures de um render específico, porque a lista é
+  // reconstruída a cada clique (expandir/recolher/copiar).
+  payLinesEl.addEventListener('click', function(e){
+    if (tratarCliqueDetalhe(e, function(){ cartaoLinhaAberta = null; renderPagamentosCard(); })){
+      e.stopPropagation();
+      return;
+    }
+    var wrap = e.target.closest('.pay-line-wrap');
+    if (!wrap) return;
+    e.stopPropagation(); // não abrir a tesouraria por causa deste clique
+    var chave = wrap.getAttribute('data-chave');
+    cartaoLinhaAberta = (cartaoLinhaAberta === chave) ? null : chave;
+    renderPagamentosCard();
+  });
 
   payPillsEl.addEventListener('click', function(e){
     var btn = e.target.closest('.pay-pill');
@@ -2485,6 +2687,7 @@ window.addEventListener('load', function () {
   var mesAtivo = new Date().getMonth() + 1;
   var anoAtivo = new Date().getFullYear();
   var diaSelecionado = null;
+  var tesLinhaAberta = null; // chave da linha expandida na lista detalhada, ou null
 
   function diasNoMes(ano, mes){
     return new Date(ano, mes, 0).getDate();
@@ -2723,31 +2926,39 @@ window.addEventListener('load', function () {
       '<th>Prazo</th><th>Fornecedor / descrição</th><th>Referência</th><th>Pedido</th>' +
       '<th style="text-align:right;">Valor</th><th></th>' +
       '</tr></thead><tbody>' +
-      linhas.map(function(l, idx){
+      linhas.map(function(l){
         var vencido = l.prazoDate && l.prazoDate <= hoje;
-        return '<tr' + (vencido ? ' class="vencido"' : '') + '>' +
+        var chave = chaveLinha(l);
+        var aberta = tesLinhaAberta === chave;
+        var html = '<tr class="tes-linha' + (vencido ? ' vencido' : '') + '" data-chave="' + escapeHtml(chave) + '">' +
           '<td class="mono"><strong>' + (l.prazoDate ? formatDateDDMMYYYY(l.prazoDate) : '—') + '</strong></td>' +
           '<td>' + escapeHtml(l.fornecedor) + '</td>' +
           '<td class="mono">' + escapeHtml(l.referencia || '—') + '</td>' +
           '<td class="mono">' + (l.ticketNumero ? '#' + escapeHtml(l.ticketNumero) : '—') + '</td>' +
           '<td class="num">' + formatEuro(l.montante) + '</td>' +
-          '<td>' + (l.iban ? '<button type="button" class="btn-small btn-tes-pagar" data-idx="' + idx + '">🏦 Pagar</button>' : '') + '</td>' +
+          '<td class="pay-line-caret">' + (aberta ? '▾' : '▸') + '</td>' +
           '</tr>';
+        if (aberta){
+          html += '<tr class="tes-linha-detalhe"><td colspan="6">' + blocoDetalhePagamento(l, true) + '</td></tr>';
+        }
+        return html;
       }).join('') +
       '</tbody><tfoot><tr>' +
       '<td colspan="4" class="mono"><strong>Total pendente</strong></td>' +
       '<td class="num">' + formatEuro(total) + '</td><td></td>' +
       '</tr></tfoot></table>';
-
-    tesPendentesEl.querySelectorAll('.btn-tes-pagar').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var l = linhas[parseInt(btn.getAttribute('data-idx'), 10)];
-        if (!l || !l.iban) return;
-        copyToClipboard('IBAN: ' + l.iban + ' — Montante: ' + l.montante.toFixed(2) + '€', btn);
-        window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
-      });
-    });
   }
+
+  // Delegado uma única vez sobre o contentor (sobrevive à substituição do
+  // innerHTML a cada render), procurando a linha pela chave estável.
+  tesPendentesEl.addEventListener('click', function(e){
+    if (tratarCliqueDetalhe(e, function(){ tesLinhaAberta = null; renderTesPendentes(); })) return;
+    var tr = e.target.closest('.tes-linha');
+    if (!tr) return;
+    var chave = tr.getAttribute('data-chave');
+    tesLinhaAberta = (tesLinhaAberta === chave) ? null : chave;
+    renderTesPendentes();
+  });
 
   function renderTesouraria(){
     var itens = itensDoMes(anoAtivo, mesAtivo);
