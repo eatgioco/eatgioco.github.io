@@ -799,6 +799,115 @@
     flex:0 0 auto;
   }
 
+  .sheet-image{
+    width:120px;
+    aspect-ratio:1/1;
+    border:2px solid var(--black);
+    background-image:repeating-linear-gradient(45deg, var(--bg), var(--bg) 10px, #EAE4D6 10px, #EAE4D6 20px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:36px;
+    color:#b0a99a;
+    margin:0 auto 18px;
+  }
+
+  .sheet-row{
+    display:flex;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+    align-items:flex-start;
+  }
+
+  .sheet-row:last-child{
+    border-bottom:none;
+  }
+
+  .sheet-row strong{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    flex:0 0 130px;
+    padding-top:2px;
+  }
+
+  .sheet-row span{
+    flex:1;
+  }
+
+  .sheet-missing{
+    color:var(--red);
+  }
+
+  .sheet-chips{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .sheet-chip{
+    font-family:'Space Mono', monospace;
+    font-size:10.5px;
+    font-weight:700;
+    padding:5px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    white-space:nowrap;
+  }
+
+  .checkbox-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:8px 12px;
+  }
+
+  .cat-manage-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .cat-manage-row input[type="text"]{
+    flex:1;
+    border:2px solid transparent;
+    padding:6px 8px;
+    background:transparent;
+  }
+
+  .cat-manage-row input[type="text"]:hover{
+    border-color:var(--line);
+  }
+
+  .cat-manage-row input[type="text"]:focus{
+    outline:none;
+    border-color:var(--red);
+    background:var(--white);
+  }
+
+  .cat-manage-count{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .cat-manage-add{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .cat-manage-add input{
+    flex:1;
+  }
+
 </style>
 </head>
 <body>
@@ -848,6 +957,7 @@
 
   <div class="controls">
     <input type="text" class="search-input" id="ingSearchInput" placeholder="Pesquisar ingrediente por nome...">
+    <button type="button" class="btn" id="btnCatManage">⚙ Categorias</button>
   </div>
 
   <div class="ing-chips" id="ingCatChips"></div>
@@ -1013,18 +1123,78 @@
           <label class="field-label">Fornecedor</label>
           <select id="ingFFornecedor"></select>
         </div>
-        <div class="field full">
+        <div class="field">
           <label class="field-label">Unidade</label>
           <input type="text" id="ingFUnidade" placeholder="ex: kg, un, lt">
         </div>
+        <div class="field">
+          <label class="field-label">Tipo de Armazenamento</label>
+          <select id="ingFTipoArmazenamento">
+            <option value="">Não definido</option>
+            <option value="ambiente">Ambiente</option>
+            <option value="refrigerado">Refrigerado</option>
+            <option value="congelado">Congelado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Local de Armazenamento</label>
+          <select id="ingFLocalArmazenamento"></select>
+        </div>
+        <div class="field full" id="ingFLocalOutroWrap" style="display:none;">
+          <label class="field-label">Local (outro)</label>
+          <input type="text" id="ingFLocalOutro" placeholder="Especifique o local">
+        </div>
+        <div class="field full">
+          <label class="field-label">Alergénios</label>
+          <div class="checkbox-grid" id="ingFAlergenios"></div>
+        </div>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn" id="ingBtnCancelar">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="ingBtnApagar">Apagar</button>
         <div class="modal-actions-right">
+          <button type="button" class="btn" id="ingBtnCancelar">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar</button>
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modal de Ficha do Ingrediente -->
+<div class="modal-overlay" id="ingSheetOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Ficha do Ingrediente</h2>
+      <button class="modal-close" id="ingSheetClose">×</button>
+    </div>
+    <div class="sheet-image">🖼</div>
+    <div id="ingSheetBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="ingSheetCloseBtn">Fechar</button>
+      <div class="modal-actions-right">
+        <button type="button" class="btn btn-primary" id="ingSheetEditBtn">Editar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Gestão de Categorias -->
+<div class="modal-overlay" id="catManageOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Categorias de Ingredientes</h2>
+      <button class="modal-close" id="catManageClose">×</button>
+    </div>
+    <div id="catManageList"></div>
+    <div class="cat-manage-add">
+      <input type="text" id="catManageNewLabel" placeholder="Nova categoria...">
+      <button type="button" class="btn btn-primary" id="catManageAddBtn">+ Adicionar categoria</button>
+    </div>
+    <div class="modal-actions">
+      <div class="modal-actions-right">
+        <button type="button" class="btn" id="catManageCloseBtn">Fechar</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1039,8 +1209,9 @@ window.addEventListener('load', function () {
   var db = firebase.database();
   var suppliersRef = db.ref('suppliers');
   var ingredientesRef = db.ref('ingredientes');
+  var categoriasRef = db.ref('categoriasIngredientes');
 
-  var CATEGORIAS = {
+  var CATEGORIAS_SEED = {
     CH: "Queijos & Laticínios",
     MT: "Carnes & Enchidos",
     PR: "Conservas",
@@ -1057,6 +1228,45 @@ window.addEventListener('load', function () {
     SP: "Licores & Spirits",
     CF: "Café"
   };
+
+  var ALERGENIOS = {
+    GL: "Glúten", CR: "Crustáceos", OV: "Ovos", PE: "Peixe",
+    AM: "Amendoim", SO: "Soja", LE: "Leite/Lactose", FC: "Frutos de casca rija",
+    AI: "Aipo", MO: "Mostarda", SE: "Sésamo", SU: "Dióxido de enxofre e sulfitos",
+    TR: "Tremoço", MOL: "Moluscos"
+  };
+
+  var LOCAIS_ARMAZENAMENTO = [
+    "Bancada Fria EDENOX MPS-250HC",
+    "Bancada Fria AMITEK AK941",
+    "Bancada Fria AMITEK AK943T",
+    "Placa Fria Drop-in 3GN",
+    "MLL ECO 40",
+    "MLL ECO 50",
+    "Máquina de Gelo EURFRIGOR ECP25",
+    "Despensa",
+    "Arrumo",
+    "Bancada",
+    "Outro"
+  ];
+
+  var TIPO_ARMAZENAMENTO_LABELS = {
+    ambiente: "Ambiente",
+    refrigerado: "Refrigerado",
+    congelado: "Congelado"
+  };
+
+  var CATEGORIAS = {};
+  var CATEGORIA_ORDER = [];
+
+  categoriasRef.once('value').then(function (snapshot) {
+    if (snapshot.exists()) return;
+    var seed = {};
+    Object.keys(CATEGORIAS_SEED).forEach(function (key) {
+      seed[key] = { label: CATEGORIAS_SEED[key] };
+    });
+    categoriasRef.set(seed);
+  });
 
   var allIngredientes = {};
   var currentEditingSupplierNome = null;
@@ -1144,9 +1354,9 @@ window.addEventListener('load', function () {
   });
 
   // ===== Aba "Por ingrediente" =====
-  var CATEGORIA_ORDER = Object.keys(CATEGORIAS);
   var ingCurrentCategoria = "Todas";
   var ingCurrentSearch = "";
+  var currentSheetId = null;
 
   var tabFornecedor = document.getElementById('tabFornecedor');
   var tabIngrediente = document.getElementById('tabIngrediente');
@@ -1163,16 +1373,72 @@ window.addEventListener('load', function () {
   var ingModalOverlay = document.getElementById('ingModalOverlay');
   var ingModalClose = document.getElementById('ingModalClose');
   var ingBtnCancelar = document.getElementById('ingBtnCancelar');
+  var ingBtnApagar = document.getElementById('ingBtnApagar');
   var ingredientForm = document.getElementById('ingredientForm');
   var ingFId = document.getElementById('ingFId');
   var ingFNome = document.getElementById('ingFNome');
   var ingFCategoria = document.getElementById('ingFCategoria');
   var ingFFornecedor = document.getElementById('ingFFornecedor');
   var ingFUnidade = document.getElementById('ingFUnidade');
+  var ingFTipoArmazenamento = document.getElementById('ingFTipoArmazenamento');
+  var ingFLocalArmazenamento = document.getElementById('ingFLocalArmazenamento');
+  var ingFLocalOutroWrap = document.getElementById('ingFLocalOutroWrap');
+  var ingFLocalOutro = document.getElementById('ingFLocalOutro');
+  var ingFAlergenios = document.getElementById('ingFAlergenios');
 
-  ingFCategoria.innerHTML = '<option value="">Sem categoria</option>' + CATEGORIA_ORDER.map(function (key) {
-    return '<option value="' + escapeHtml(key) + '">' + escapeHtml(CATEGORIAS[key]) + '</option>';
+  var ingSheetOverlay = document.getElementById('ingSheetOverlay');
+  var ingSheetClose = document.getElementById('ingSheetClose');
+  var ingSheetCloseBtn = document.getElementById('ingSheetCloseBtn');
+  var ingSheetEditBtn = document.getElementById('ingSheetEditBtn');
+  var ingSheetBody = document.getElementById('ingSheetBody');
+
+  var btnCatManage = document.getElementById('btnCatManage');
+  var catManageOverlay = document.getElementById('catManageOverlay');
+  var catManageClose = document.getElementById('catManageClose');
+  var catManageCloseBtn = document.getElementById('catManageCloseBtn');
+  var catManageList = document.getElementById('catManageList');
+  var catManageNewLabel = document.getElementById('catManageNewLabel');
+  var catManageAddBtn = document.getElementById('catManageAddBtn');
+
+  ingFLocalArmazenamento.innerHTML = '<option value="">—</option>' + LOCAIS_ARMAZENAMENTO.map(function (loc) {
+    return '<option value="' + escapeHtml(loc) + '">' + escapeHtml(loc) + '</option>';
   }).join('');
+
+  ingFLocalArmazenamento.addEventListener('change', function () {
+    ingFLocalOutroWrap.style.display = ingFLocalArmazenamento.value === 'Outro' ? '' : 'none';
+  });
+
+  ingFAlergenios.innerHTML = Object.keys(ALERGENIOS).map(function (code) {
+    return '<label class="checkbox-label"><input type="checkbox" class="ingAlergenioCheckbox" value="' + escapeHtml(code) + '"> ' + escapeHtml(ALERGENIOS[code]) + '</label>';
+  }).join('');
+
+  function renderIngCategoriaSelect() {
+    var prevValue = ingFCategoria.value;
+    ingFCategoria.innerHTML = '<option value="">Sem categoria</option>' + CATEGORIA_ORDER.map(function (key) {
+      return '<option value="' + escapeHtml(key) + '">' + escapeHtml(CATEGORIAS[key]) + '</option>';
+    }).join('');
+    ingFCategoria.value = prevValue;
+  }
+
+  categoriasRef.on('value', function (snapshot) {
+    var val = snapshot.val() || {};
+    CATEGORIAS = {};
+    Object.keys(val).forEach(function (key) {
+      CATEGORIAS[key] = val[key].label;
+    });
+    CATEGORIA_ORDER = Object.keys(CATEGORIAS).sort(function (a, b) {
+      return CATEGORIAS[a].localeCompare(CATEGORIAS[b]);
+    });
+    renderIngCategoriaSelect();
+    renderIngChips();
+    renderIngGrid();
+    if (ingredientesSection && ingredientesSection.style.display !== 'none') {
+      renderIngredienteAccordion();
+    }
+    if (catManageOverlay.classList.contains('open')) {
+      renderCatManageList();
+    }
+  });
 
   tabFornecedor.addEventListener('click', function () {
     if (tabFornecedor.classList.contains('active')) return;
@@ -1294,6 +1560,11 @@ window.addEventListener('load', function () {
 
     ingGrid.querySelectorAll('.ing-card').forEach(function (card) {
       card.addEventListener('click', function () {
+        openIngSheet(card.getAttribute('data-id'));
+      });
+      var editIcon = card.querySelector('.ing-edit-icon');
+      editIcon.addEventListener('click', function (e) {
+        e.stopPropagation();
         openIngModal(card.getAttribute('data-id'));
       });
     });
@@ -1318,6 +1589,24 @@ window.addEventListener('load', function () {
     ingFCategoria.value = ing.categoria || "";
     renderIngFornecedorOptions(ing.fornecedor);
     ingFUnidade.value = ing.unidade || "";
+    ingFTipoArmazenamento.value = ing.tipoArmazenamento || "";
+
+    var localConhecido = ing.localArmazenamento && LOCAIS_ARMAZENAMENTO.indexOf(ing.localArmazenamento) !== -1 && ing.localArmazenamento !== 'Outro';
+    if (ing.localArmazenamento && !localConhecido) {
+      ingFLocalArmazenamento.value = 'Outro';
+      ingFLocalOutro.value = ing.localArmazenamento;
+      ingFLocalOutroWrap.style.display = '';
+    } else {
+      ingFLocalArmazenamento.value = ing.localArmazenamento || "";
+      ingFLocalOutro.value = "";
+      ingFLocalOutroWrap.style.display = 'none';
+    }
+
+    var alergeniosSelecionados = Array.isArray(ing.alergenios) ? ing.alergenios : [];
+    ingFAlergenios.querySelectorAll('.ingAlergenioCheckbox').forEach(function (cb) {
+      cb.checked = alergeniosSelecionados.indexOf(cb.value) !== -1;
+    });
+
     ingModalOverlay.classList.add('open');
   }
 
@@ -1331,15 +1620,37 @@ window.addEventListener('load', function () {
     if (e.target === ingModalOverlay) closeIngModal();
   });
 
+  ingBtnApagar.addEventListener('click', function () {
+    var id = ingFId.value;
+    if (!id) return;
+    var nome = ingFNome.value;
+    if (confirm('Apagar ' + nome + '? Esta ação não pode ser desfeita.')) {
+      ingredientesRef.child(id).remove();
+      closeIngModal();
+    }
+  });
+
   ingredientForm.addEventListener('submit', function (e) {
     e.preventDefault();
     var id = ingFId.value;
     if (!id) return;
+
+    var localArmazenamento = ingFLocalArmazenamento.value === 'Outro'
+      ? ingFLocalOutro.value.trim()
+      : ingFLocalArmazenamento.value;
+
+    var alergenios = Array.prototype.slice.call(ingFAlergenios.querySelectorAll('.ingAlergenioCheckbox:checked')).map(function (cb) {
+      return cb.value;
+    });
+
     var data = {
       nome: ingFNome.value.trim(),
       categoria: ingFCategoria.value || null,
       fornecedor: ingFFornecedor.value || null,
-      unidade: ingFUnidade.value.trim() || null
+      unidade: ingFUnidade.value.trim() || null,
+      tipoArmazenamento: ingFTipoArmazenamento.value || null,
+      localArmazenamento: localArmazenamento || null,
+      alergenios: alergenios
     };
     if (!data.nome) return;
     ingredientesRef.child(id).update(data);
@@ -1349,6 +1660,137 @@ window.addEventListener('load', function () {
   ingSearchInput.addEventListener('input', function () {
     ingCurrentSearch = ingSearchInput.value.trim().toLowerCase();
     renderIngGrid();
+  });
+
+  // ===== Ficha do ingrediente (leitura) =====
+  function renderIngSheet(id) {
+    var ing = allIngredientes[id];
+    if (!ing) return;
+
+    var catLabel = ing.categoria ? (CATEGORIAS[ing.categoria] || ing.categoria) : 'Sem categoria';
+    var fornecedorHtml = ing.fornecedor
+      ? escapeHtml(ing.fornecedor)
+      : '<span class="sheet-missing">Sem fornecedor</span>';
+    var unidadeHtml = ing.unidade ? escapeHtml(ing.unidade) : '—';
+
+    var tipoLabel = TIPO_ARMAZENAMENTO_LABELS[ing.tipoArmazenamento] || '';
+    var armazenamentoHtml;
+    if (tipoLabel && ing.localArmazenamento) {
+      armazenamentoHtml = escapeHtml(tipoLabel + ' — ' + ing.localArmazenamento);
+    } else if (tipoLabel) {
+      armazenamentoHtml = escapeHtml(tipoLabel);
+    } else if (ing.localArmazenamento) {
+      armazenamentoHtml = escapeHtml(ing.localArmazenamento);
+    } else {
+      armazenamentoHtml = 'Não definido';
+    }
+
+    var alergenios = Array.isArray(ing.alergenios) ? ing.alergenios : [];
+    var alergeniosHtml = alergenios.length
+      ? '<div class="sheet-chips">' + alergenios.map(function (code) {
+          return '<span class="sheet-chip">' + escapeHtml(ALERGENIOS[code] || code) + '</span>';
+        }).join('') + '</div>'
+      : 'Nenhum alergénio assinalado';
+
+    ingSheetBody.innerHTML =
+      '<div class="sheet-row"><strong>Nome</strong><span>' + escapeHtml(ing.nome) + '</span></div>' +
+      '<div class="sheet-row"><strong>Categoria</strong><span>' + escapeHtml(catLabel) + '</span></div>' +
+      '<div class="sheet-row"><strong>Fornecedor</strong><span>' + fornecedorHtml + '</span></div>' +
+      '<div class="sheet-row"><strong>Unidade</strong><span>' + unidadeHtml + '</span></div>' +
+      '<div class="sheet-row"><strong>Armazenamento</strong><span>' + armazenamentoHtml + '</span></div>' +
+      '<div class="sheet-row"><strong>Alergénios</strong><span>' + alergeniosHtml + '</span></div>';
+  }
+
+  function openIngSheet(id) {
+    currentSheetId = id;
+    renderIngSheet(id);
+    ingSheetOverlay.classList.add('open');
+  }
+
+  function closeIngSheet() {
+    ingSheetOverlay.classList.remove('open');
+    currentSheetId = null;
+  }
+
+  ingSheetClose.addEventListener('click', closeIngSheet);
+  ingSheetCloseBtn.addEventListener('click', closeIngSheet);
+  ingSheetOverlay.addEventListener('click', function (e) {
+    if (e.target === ingSheetOverlay) closeIngSheet();
+  });
+
+  ingSheetEditBtn.addEventListener('click', function () {
+    var id = currentSheetId;
+    closeIngSheet();
+    openIngModal(id);
+  });
+
+  // ===== Gestão de categorias =====
+  function renderCatManageList() {
+    var counts = {};
+    Object.keys(allIngredientes).forEach(function (id) {
+      var cat = allIngredientes[id].categoria;
+      if (cat) counts[cat] = (counts[cat] || 0) + 1;
+    });
+
+    catManageList.innerHTML = CATEGORIA_ORDER.map(function (key) {
+      var count = counts[key] || 0;
+      var disabledAttr = count > 0 ? ' disabled title="Categoria em uso por ' + count + ' ingrediente(s)"' : '';
+      return '<div class="cat-manage-row" data-key="' + escapeHtml(key) + '">' +
+        '<input type="text" class="cat-manage-label" value="' + escapeHtml(CATEGORIAS[key]) + '">' +
+        '<span class="cat-manage-count">(' + count + ')</span>' +
+        '<button type="button" class="btn-small cat-manage-delete"' + disabledAttr + '>Apagar</button>' +
+      '</div>';
+    }).join('');
+
+    catManageList.querySelectorAll('.cat-manage-row').forEach(function (row) {
+      var key = row.getAttribute('data-key');
+      var input = row.querySelector('.cat-manage-label');
+
+      function save() {
+        var val = input.value.trim();
+        if (val && val !== CATEGORIAS[key]) {
+          categoriasRef.child(key).child('label').set(val);
+        } else {
+          input.value = CATEGORIAS[key];
+        }
+      }
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+
+      var deleteBtn = row.querySelector('.cat-manage-delete');
+      deleteBtn.addEventListener('click', function () {
+        if (deleteBtn.disabled) return;
+        if (confirm('Apagar a categoria "' + CATEGORIAS[key] + '"?')) {
+          categoriasRef.child(key).remove();
+        }
+      });
+    });
+  }
+
+  btnCatManage.addEventListener('click', function () {
+    renderCatManageList();
+    catManageOverlay.classList.add('open');
+  });
+
+  function closeCatManage() {
+    catManageOverlay.classList.remove('open');
+    catManageNewLabel.value = "";
+  }
+
+  catManageClose.addEventListener('click', closeCatManage);
+  catManageCloseBtn.addEventListener('click', closeCatManage);
+  catManageOverlay.addEventListener('click', function (e) {
+    if (e.target === catManageOverlay) closeCatManage();
+  });
+
+  catManageAddBtn.addEventListener('click', function () {
+    var texto = catManageNewLabel.value.trim();
+    if (!texto) return;
+    var newKey = categoriasRef.push().key;
+    categoriasRef.child(newKey).set({ label: texto });
+    catManageNewLabel.value = "";
   });
 
   var seedData = {
