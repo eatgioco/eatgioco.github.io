@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1200">
-<title>GIOCO — Fornecedores</title>
+<title>GIOCO — Compras</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -459,32 +459,6 @@
     margin-bottom:4px;
   }
 
-  .tabs{
-    max-width:1200px;
-    margin:20px auto 0;
-    padding:0 24px;
-    display:flex;
-    gap:8px;
-  }
-
-  .tab-btn{
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    padding:10px 18px;
-    border:2px solid var(--black);
-    border-bottom:none;
-    background:var(--white);
-    color:var(--black);
-    cursor:pointer;
-    letter-spacing:0.3px;
-  }
-
-  .tab-btn.active{
-    background:var(--black);
-    color:var(--white);
-  }
-
   .header-actions{
     display:flex;
     gap:10px;
@@ -511,124 +485,6 @@
   .home-link:hover{
     background:var(--black);
     color:var(--white);
-  }
-
-  .status-badge{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    text-transform:uppercase;
-    letter-spacing:0.5px;
-    padding:4px 8px;
-    background:var(--black);
-    color:var(--white);
-    white-space:nowrap;
-  }
-
-  .payment-line{
-    display:flex;
-    gap:8px;
-    margin-bottom:8px;
-    flex-wrap:wrap;
-  }
-
-  .payment-line select{
-    flex:1 1 180px;
-  }
-
-  .payment-montante{
-    width:110px;
-    flex:0 0 110px;
-  }
-
-  .payment-lines-list{
-    margin-top:10px;
-  }
-
-  .payment-lines-list .card-row{
-    padding:2px 0;
-  }
-
-  .payment-line-detail{
-    padding-bottom:8px;
-    margin-bottom:8px;
-    border-bottom:1px solid var(--line);
-  }
-
-  .payment-line-detail:last-child{
-    padding-bottom:0;
-    margin-bottom:0;
-    border-bottom:none;
-  }
-
-  .copy-icon-btn{
-    background:none;
-    border:none;
-    cursor:pointer;
-    font-size:11px;
-    padding:0;
-    margin-left:5px;
-    line-height:1;
-    opacity:0.5;
-    position:relative;
-    vertical-align:middle;
-  }
-
-  .copy-icon-btn:hover{
-    opacity:1;
-  }
-
-  .copy-icon-btn::after{
-    content:'Copiado ✓';
-    position:absolute;
-    bottom:100%;
-    left:50%;
-    transform:translateX(-50%) translateY(-4px);
-    background:var(--black);
-    color:var(--white);
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    padding:3px 6px;
-    white-space:nowrap;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity .15s ease;
-  }
-
-  .copy-icon-btn.copy-icon-copied::after{
-    opacity:1;
-  }
-
-  .copy-icon-btn.copy-icon-error::after{
-    content:'Erro';
-    opacity:1;
-  }
-
-  .payment-ticket{
-    cursor:default;
-  }
-
-  .payment-ticket:hover{
-    transform:none;
-    box-shadow:none;
-  }
-
-  .payment-ticket-done{
-    opacity:0.55;
-  }
-
-  .status-badge-done{
-    background:var(--green);
-  }
-
-  .section-title{
-    margin:24px 0 12px;
-    font-size:14px;
-    text-transform:uppercase;
-    letter-spacing:1px;
-  }
-
-  #paymentsPendingSection .section-title{
-    margin-top:0;
   }
 
   .checkbox-group{
@@ -741,43 +597,6 @@
     color:var(--red);
   }
 
-  .payment-referencia{
-    flex:1 1 140px;
-  }
-
-  .payment-prazo{
-    flex:1 1 160px;
-  }
-
-  .status-badge-cancelled{
-    background:var(--red);
-  }
-
-  .ticket-ref{
-    display:block;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--red);
-    margin-bottom:2px;
-  }
-
-  .payment-ticket-cancelled{
-    opacity:0.55;
-    text-decoration:line-through;
-  }
-
-  @keyframes ticket-highlight-pulse{
-    0%   { box-shadow:0 0 0 0 rgba(217,17,36,0.5); }
-    70%  { box-shadow:0 0 0 14px rgba(217,17,36,0); }
-    100% { box-shadow:0 0 0 0 rgba(217,17,36,0); }
-  }
-
-  .payment-ticket-highlight{
-    animation:ticket-highlight-pulse 1s ease-out 2;
-    border-color:var(--red) !important;
-  }
-
 </style>
 </head>
 <body>
@@ -793,15 +612,9 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-primary" id="btnNovo">+ Novo</button>
-      <button class="btn" id="btnPedirPagamento">💰 Pedir Pagamento</button>
     </div>
   </div>
 </header>
-
-<div class="tabs" id="viewTabs">
-  <button class="tab-btn active" data-view="fornecedores">Fornecedores</button>
-  <button class="tab-btn" data-view="pagamentos">Pagamentos</button>
-</div>
 
 <div id="fornecedoresView">
   <div class="controls">
@@ -820,27 +633,6 @@
   <main>
     <div class="grid" id="grid"></div>
     <div class="empty-state" id="emptyState" style="display:none;">Nenhum fornecedor encontrado.</div>
-  </main>
-</div>
-
-<div id="pagamentosView" style="display:none;">
-  <main>
-    <div class="empty-state" id="paymentsEmpty" style="display:none;">Nenhum pedido de pagamento.</div>
-
-    <div id="paymentsPendingSection" style="display:none;">
-      <h2 class="section-title">Pendentes</h2>
-      <div class="grid" id="paymentsGridPending"></div>
-    </div>
-
-    <div id="paymentsDoneSection" style="display:none;">
-      <h2 class="section-title">Concluídos</h2>
-      <div class="grid" id="paymentsGridDone"></div>
-    </div>
-
-    <div id="paymentsCancelledSection" style="display:none;">
-      <h2 class="section-title">Anulados</h2>
-      <div class="grid" id="paymentsGridCancelled"></div>
-    </div>
   </main>
 </div>
 
@@ -975,36 +767,6 @@
   </div>
 </div>
 
-<!-- Modal de Pedido de Pagamento -->
-<div class="modal-overlay" id="paymentModalOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="paymentModalTitle">Pedido de Pagamento</h2>
-      <button class="modal-close" id="paymentModalClose">×</button>
-    </div>
-
-    <div class="field-label" style="margin-bottom:8px;">Linhas de pagamento</div>
-    <div id="paymentLines"></div>
-    <button type="button" class="btn" id="btnAddPaymentLine">+ Adicionar linha</button>
-
-    <div class="field" style="margin-top:18px;">
-      <label class="field-label" for="paymentCriadoPor">Criado por</label>
-      <select id="paymentCriadoPor" disabled>
-        <option>A carregar...</option>
-      </select>
-    </div>
-
-    <p id="paymentEnviadoAviso" style="display:none; margin:16px 0 0; padding:12px 14px; border:2px solid var(--green, #1E7A46); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
-
-    <div class="modal-actions">
-      <button type="button" class="btn" id="paymentModalCancel">Cancelar</button>
-      <div class="modal-actions-right">
-        <button type="button" class="btn btn-primary" id="btnEnviarPagamento">Enviar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 window.addEventListener('load', function () {
 
@@ -1015,8 +777,6 @@ window.addEventListener('load', function () {
   firebase.initializeApp(firebaseConfig);
   var db = firebase.database();
   var suppliersRef = db.ref('suppliers');
-  var paymentRequestsRef = db.ref('paymentRequests');
-  var pessoasRef = db.ref('pessoas');
   var ingredientesRef = db.ref('ingredientes');
 
   var CATEGORIAS = {
@@ -1115,48 +875,6 @@ window.addEventListener('load', function () {
       renderIngredienteAccordion();
     }
   });
-
-  var pessoasAtivas = [];
-  var pessoasCarregadas = false;
-
-  function carregarPessoas(onUpdate){
-    pessoasRef.on('value', function (snapshot) {
-      var val = snapshot.val() || {};
-      pessoasAtivas = Object.keys(val)
-        .map(function (id) { return Object.assign({ id: id }, val[id]); })
-        .filter(function (p) { return p.ativo !== false; })
-        .sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
-      pessoasCarregadas = true;
-      onUpdate();
-    });
-  }
-
-  function popularSelectPessoas(selectEl){
-    if (!selectEl) return;
-    var previous = selectEl.value;
-    if (!pessoasCarregadas){
-      selectEl.disabled = true;
-      selectEl.innerHTML = '<option>A carregar...</option>';
-      return;
-    }
-    selectEl.disabled = false;
-    var html = '';
-    pessoasAtivas.forEach(function (p) {
-      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
-    });
-    html += '<option value="outro">Outro</option>';
-    selectEl.innerHTML = html;
-    if (previous) selectEl.value = previous;
-  }
-
-  function resolvePessoaSelecao(selectEl){
-    var val = selectEl ? selectEl.value : null;
-    var found = pessoasAtivas.filter(function (p) { return p.id === val; })[0];
-    return {
-      criadoPorId: found ? found.id : null,
-      criadoPor: found ? found.nome : 'Outro'
-    };
-  }
 
   var seedData = {
     s01: {
@@ -1327,29 +1045,6 @@ window.addEventListener('load', function () {
   var btnEnviarEmail = document.getElementById('btnEnviarEmail');
   var btnEnviarWhatsapp = document.getElementById('btnEnviarWhatsapp');
   var currentOrderSupplier = null;
-
-  var viewTabs = document.getElementById('viewTabs');
-  var fornecedoresView = document.getElementById('fornecedoresView');
-  var pagamentosView = document.getElementById('pagamentosView');
-  var paymentsGridPending = document.getElementById('paymentsGridPending');
-  var paymentsGridDone = document.getElementById('paymentsGridDone');
-  var paymentsGridCancelled = document.getElementById('paymentsGridCancelled');
-  var paymentsPendingSection = document.getElementById('paymentsPendingSection');
-  var paymentsDoneSection = document.getElementById('paymentsDoneSection');
-  var paymentsCancelledSection = document.getElementById('paymentsCancelledSection');
-  var paymentsEmpty = document.getElementById('paymentsEmpty');
-  var btnPedirPagamento = document.getElementById('btnPedirPagamento');
-
-  var paymentModalOverlay = document.getElementById('paymentModalOverlay');
-  var paymentModalClose = document.getElementById('paymentModalClose');
-  var paymentModalCancel = document.getElementById('paymentModalCancel');
-  var paymentLines = document.getElementById('paymentLines');
-  var btnAddPaymentLine = document.getElementById('btnAddPaymentLine');
-  var btnEnviarPagamento = document.getElementById('btnEnviarPagamento');
-
-  var allPaymentRequests = {};
-  var editingTicketId = null;
-  var pendingHighlightId = null;
 
   function escapeHtml(str) {
     if (!str) return "";
@@ -1534,26 +1229,6 @@ window.addEventListener('load', function () {
     });
   }
 
-  function copyIconFeedback(text, btnEl) {
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(function () {
-      btnEl.classList.add('copy-icon-copied');
-      setTimeout(function () {
-        btnEl.classList.remove('copy-icon-copied');
-      }, 1500);
-    }).catch(function () {
-      btnEl.classList.add('copy-icon-error');
-      setTimeout(function () {
-        btnEl.classList.remove('copy-icon-error');
-      }, 1500);
-    });
-  }
-
-  function formatMontanteForCopy(montante) {
-    var n = parseFloat(String(montante).replace(',', '.'));
-    return isNaN(n) ? String(montante) : n.toFixed(2);
-  }
-
   function openModal(supplier) {
     supplierForm.reset();
     if (supplier) {
@@ -1673,93 +1348,12 @@ window.addEventListener('load', function () {
     render();
   });
 
-  function switchView(view) {
-    var buttons = viewTabs.querySelectorAll('.tab-btn');
-    buttons.forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-view') === view);
-    });
-
-    if (view === 'pagamentos') {
-      fornecedoresView.style.display = 'none';
-      pagamentosView.style.display = 'block';
-      btnNovo.style.display = 'none';
-    } else {
-      fornecedoresView.style.display = 'block';
-      pagamentosView.style.display = 'none';
-      btnNovo.style.display = 'inline-block';
-    }
-  }
-
-  viewTabs.addEventListener('click', function (e) {
-    if (!e.target.classList.contains('tab-btn')) return;
-    switchView(e.target.getAttribute('data-view'));
-  });
-
-  if (window.location.hash === '#pagamentos') {
-    switchView('pagamentos');
-  } else if (window.location.hash.indexOf('#pagamento-') === 0) {
-    pendingHighlightId = window.location.hash.substring('#pagamento-'.length);
-    switchView('pagamentos');
-    setTimeout(function () { pendingHighlightId = null; }, 5000);
-  }
-
   function pad2(n) {
     return n < 10 ? "0" + n : String(n);
   }
 
   function formatDateDDMMYYYY(d) {
     return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
-  }
-
-  var MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-  function formatSubjectDate(d) {
-    return d.getDate() + " / " + MONTHS_PT[d.getMonth()] + " / " + d.getFullYear();
-  }
-
-  function toISODate(d) {
-    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
-  }
-
-  function isoToDDMMYYYY(iso) {
-    if (!iso) return "";
-    var parts = iso.split("-");
-    if (parts.length !== 3) return "";
-    return parts[2] + "/" + parts[1] + "/" + parts[0];
-  }
-
-  function ddmmyyyyToIso(ddmmyyyy) {
-    if (!ddmmyyyy) return "";
-    var parts = ddmmyyyy.split("/");
-    if (parts.length !== 3) return "";
-    return parts[2] + "-" + parts[1] + "-" + parts[0];
-  }
-
-  function nextNumeroReferencia(d) {
-    var mm = pad2(d.getMonth() + 1);
-    var aa = String(d.getFullYear()).slice(-2);
-    var count = 0;
-    Object.keys(allPaymentRequests).forEach(function (id) {
-      var nr = allPaymentRequests[id].numeroReferencia;
-      if (!nr) return;
-      var parts = String(nr).split("/");
-      if (parts.length === 3 && parts[1] === mm && parts[2] === aa) count++;
-    });
-    return (count + 1) + "/" + mm + "/" + aa;
-  }
-
-  function parsePrazoDays(text) {
-    if (!text) return null;
-    var match = String(text).match(/(\d+)\s*dias?/i);
-    return match ? parseInt(match[1], 10) : null;
-  }
-
-  function prazoDateFromCondicoes(condicoesPagamento) {
-    var days = parsePrazoDays(condicoesPagamento);
-    if (days === null) return "";
-    var d = new Date();
-    d.setDate(d.getDate() + days);
-    return toISODate(d);
   }
 
   // Aceita nº de telefone (com ou sem indicativo) ou link de grupo WhatsApp.
@@ -1956,415 +1550,6 @@ window.addEventListener('load', function () {
     if (e.target === orderModalOverlay) closeOrderModal();
   });
 
-  function supplierOptionsHtml() {
-    var entries = Object.keys(allSuppliers).map(function (id) {
-      return { id: id, nome: allSuppliers[id].nome };
-    }).sort(function (a, b) {
-      return (a.nome || "").localeCompare(b.nome || "");
-    });
-
-    var html = '<option value="">Selecionar fornecedor...</option>';
-    entries.forEach(function (s) {
-      html += '<option value="' + s.id + '">' + escapeHtml(s.nome) + '</option>';
-    });
-    return html;
-  }
-
-  function createPaymentLineRow() {
-    var row = document.createElement('div');
-    row.className = 'payment-line';
-    row.innerHTML =
-      '<select class="payment-fornecedor">' + supplierOptionsHtml() + '</select>' +
-      '<input type="number" class="payment-montante" min="0" step="0.01" placeholder="€">' +
-      '<input type="text" class="payment-referencia" placeholder="Referência">' +
-      '<input type="date" class="payment-prazo">';
-
-    var select = row.querySelector('.payment-fornecedor');
-    var prazoInput = row.querySelector('.payment-prazo');
-    select.addEventListener('change', function () {
-      var supplier = allSuppliers[select.value];
-      prazoInput.value = supplier ? prazoDateFromCondicoes(supplier.condicoesPagamento) : "";
-    });
-
-    return row;
-  }
-
-  function resetPaymentLines() {
-    paymentLines.innerHTML = "";
-    paymentLines.appendChild(createPaymentLineRow());
-  }
-
-  function getValidPaymentLines() {
-    var rows = paymentLines.querySelectorAll('.payment-line');
-    var lines = [];
-    rows.forEach(function (row) {
-      var fornecedorId = row.querySelector('.payment-fornecedor').value;
-      var montante = row.querySelector('.payment-montante').value.trim();
-      var referencia = row.querySelector('.payment-referencia').value.trim();
-      var prazoIso = row.querySelector('.payment-prazo').value;
-      if (fornecedorId && montante) {
-        var supplier = allSuppliers[fornecedorId] || {};
-        lines.push({
-          fornecedor: supplier.nome || "",
-          montante: montante,
-          prazo: isoToDDMMYYYY(prazoIso),
-          referencia: referencia,
-          iban: supplier.iban || "",
-          banco: supplier.banco || ""
-        });
-      }
-    });
-    return lines;
-  }
-
-  function resetAvisoEnvio() {
-    var aviso = document.getElementById('paymentEnviadoAviso');
-    aviso.style.display = 'none';
-    aviso.textContent = '';
-    btnEnviarPagamento.style.display = '';
-    btnAddPaymentLine.style.display = '';
-    paymentModalCancel.textContent = 'Cancelar';
-  }
-
-  function openPaymentModal() {
-    editingTicketId = null;
-    document.getElementById('paymentModalTitle').textContent = 'Pedido de Pagamento';
-    btnEnviarPagamento.textContent = 'Enviar';
-    resetAvisoEnvio();
-    document.getElementById('paymentCriadoPor').parentElement.style.display = '';
-    resetPaymentLines();
-    paymentModalOverlay.classList.add('open');
-  }
-
-  function openEditPaymentModal(p) {
-    editingTicketId = p.id;
-    document.getElementById('paymentModalTitle').textContent = 'Editar Pagamento';
-    btnEnviarPagamento.textContent = 'Guardar Alterações';
-    resetAvisoEnvio();
-    document.getElementById('paymentCriadoPor').parentElement.style.display = 'none';
-
-    paymentLines.innerHTML = "";
-    var lines = p.lines && p.lines.length ? p.lines : [{}];
-    lines.forEach(function (l) {
-      var row = createPaymentLineRow();
-      var matchId = Object.keys(allSuppliers).find(function (id) {
-        return allSuppliers[id].nome === l.fornecedor;
-      });
-      if (matchId) row.querySelector('.payment-fornecedor').value = matchId;
-      row.querySelector('.payment-montante').value = l.montante || "";
-      row.querySelector('.payment-referencia').value = l.referencia || "";
-      row.querySelector('.payment-prazo').value = ddmmyyyyToIso(l.prazo);
-      paymentLines.appendChild(row);
-    });
-
-    paymentModalOverlay.classList.add('open');
-  }
-
-  function closePaymentModal() {
-    paymentModalOverlay.classList.remove('open');
-    editingTicketId = null;
-  }
-
-  btnPedirPagamento.addEventListener('click', openPaymentModal);
-
-  btnAddPaymentLine.addEventListener('click', function () {
-    paymentLines.appendChild(createPaymentLineRow());
-  });
-
-  paymentModalClose.addEventListener('click', closePaymentModal);
-  paymentModalCancel.addEventListener('click', closePaymentModal);
-  paymentModalOverlay.addEventListener('click', function (e) {
-    if (e.target === paymentModalOverlay) closePaymentModal();
-  });
-
-  function buildPaymentLinesBlock(lines) {
-    var bodyLines = [];
-    lines.forEach(function (l, idx) {
-      if (idx > 0) bodyLines.push("");
-      bodyLines.push("Fornecedor: " + l.fornecedor);
-      if (l.referencia) bodyLines.push("Referência: " + l.referencia);
-      bodyLines.push("Montante: " + l.montante + "€");
-      bodyLines.push("Prazo: " + (l.prazo || "n/d"));
-      bodyLines.push("IBAN: " + (l.iban || "n/d") + (l.banco ? " (" + l.banco + ")" : ""));
-    });
-    return bodyLines;
-  }
-
-  btnEnviarPagamento.addEventListener('click', function () {
-    var lines = getValidPaymentLines();
-    if (lines.length === 0) {
-      alert('Adicione pelo menos uma linha com fornecedor e montante.');
-      return;
-    }
-
-    if (editingTicketId) {
-      saveEditedPayment(editingTicketId, lines);
-    } else {
-      sendNewPaymentRequest(lines);
-    }
-  });
-
-  function sendNewPaymentRequest(lines) {
-    var dateStr = formatDateDDMMYYYY(new Date());
-    var numeroReferencia = nextNumeroReferencia(new Date());
-    var autor = resolvePessoaSelecao(document.getElementById('paymentCriadoPor'));
-    var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
-
-    var bodyLines = [];
-    bodyLines.push("Boa tarde,");
-    bodyLines.push("");
-    bodyLines.push("Segue pedido de pagamento:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
-    bodyLines.push("");
-    bodyLines.push("Pedido criado por: " + autor.criadoPor);
-    bodyLines.push("");
-    bodyLines.push("Obrigado,");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
-
-    paymentRequestsRef.push({
-      date: dateStr,
-      status: "pendente",
-      origem: "fornecedor",
-      numeroReferencia: numeroReferencia,
-      criadoPor: autor.criadoPor,
-      criadoPorId: autor.criadoPorId,
-      lines: lines
-    });
-
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
-
-    mostrarAvisoEnvio();
-  }
-
-  function mostrarAvisoEnvio() {
-    var aviso = document.getElementById('paymentEnviadoAviso');
-    aviso.textContent = '✅ Pedido criado. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado — ou avisa o Manel diretamente.';
-    aviso.style.display = 'block';
-    if (btnEnviarPagamento) btnEnviarPagamento.style.display = 'none';
-    if (btnAddPaymentLine) btnAddPaymentLine.style.display = 'none';
-    if (paymentModalCancel) paymentModalCancel.textContent = 'Fechar';
-  }
-
-  function saveEditedPayment(id, lines) {
-    var existing = allPaymentRequests[id] || {};
-    var numeroReferencia = existing.numeroReferencia || "";
-
-    paymentRequestsRef.child(id).update({ lines: lines });
-
-    var subject = "Pedido de pagamento EDITADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
-    var bodyLines = [];
-    bodyLines.push("O pedido #" + numeroReferencia + " foi editado. Novos dados:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
-    bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
-
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
-
-    closePaymentModal();
-  }
-
-  function cancelPaymentRequest(p) {
-    paymentRequestsRef.child(p.id).update({ status: 'anulado' });
-
-    var numeroReferencia = p.numeroReferencia || "";
-    var subject = "Pedido de pagamento ANULADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
-    var bodyLines = [];
-    bodyLines.push("O pedido #" + numeroReferencia + " foi anulado:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(p.lines || []));
-    bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
-
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
-  }
-
-  function buildPaymentCard(p) {
-    var status = p.status || 'pendente';
-    var isDone = status === 'concluido';
-    var isCancelled = status === 'anulado';
-    var isFornecedorOrigin = !!p.numeroReferencia;
-
-    var card = document.createElement('div');
-    var cardClass = 'card payment-ticket';
-    if (isDone) cardClass += ' payment-ticket-done';
-    if (isCancelled) cardClass += ' payment-ticket-cancelled';
-    card.className = cardClass;
-    card.setAttribute('data-id', p.id);
-
-    var badgeClass = 'status-badge';
-    var badgeText = 'pendente';
-    if (isDone) { badgeClass += ' status-badge-done'; badgeText = '✓ Concluído'; }
-    if (isCancelled) { badgeClass += ' status-badge-cancelled'; badgeText = '✕ Anulado'; }
-
-    var html = '';
-    html += '<div class="card-top">';
-    html += '<div>';
-    if (p.numeroReferencia) html += '<span class="ticket-ref">#' + escapeHtml(p.numeroReferencia) + '</span>';
-    html += '<h3 class="card-title">' + escapeHtml(p.date || "") + '</h3>';
-    html += '</div>';
-    html += '<span class="' + badgeClass + '">' + badgeText + '</span>';
-    html += '</div>';
-
-    html += '<div class="card-row" style="font-size:12px; color:var(--muted); margin-bottom:6px;">Criado por: ' + escapeHtml(p.criadoPor || '—') + '</div>';
-
-    var showCopyButtons = status === 'pendente';
-
-    html += '<div class="payment-lines-list">';
-    (p.lines || []).forEach(function (l, idx) {
-      var fornecedorLabel = l.fornecedor + (l.banco ? ' — ' + l.banco : '');
-      html += '<div class="payment-line-detail">';
-      html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong></div>';
-
-      html += '<div class="card-row"><span>Montante: ' + escapeHtml(l.montante) + '€';
-      if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-montante" data-line="' + idx + '" title="Copiar montante">📋</button>';
-      html += '</span></div>';
-
-      html += '<div class="card-row"><span>Prazo: ' + escapeHtml(l.prazo || 'n/d') + '</span></div>';
-
-      if (l.iban) {
-        html += '<div class="card-row"><span>IBAN: ' + escapeHtml(l.iban);
-        if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-iban-line" data-line="' + idx + '" title="Copiar IBAN">📋</button>';
-        html += '</span></div>';
-      }
-
-      if (l.referencia) {
-        html += '<div class="card-row"><span>Referência: ' + escapeHtml(l.referencia);
-        if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-ref" data-line="' + idx + '" title="Copiar referência">📋</button>';
-        html += '</span></div>';
-      }
-
-      html += '</div>';
-    });
-    html += '</div>';
-
-    html += '<div class="card-actions">';
-    if (status === 'pendente') {
-      html += '<button type="button" class="btn-small btn-mark-done">✓ Marcar como concluído</button>';
-      html += '<button type="button" class="btn-small btn-edit-request">✏ Editar</button>';
-      html += '<button type="button" class="btn-small btn-cancel-request">✕ Anular</button>';
-    }
-    if (!isFornecedorOrigin) {
-      html += '<button type="button" class="btn-small btn-delete-request">🗑 Apagar</button>';
-    }
-    html += '</div>';
-
-    card.innerHTML = html;
-
-    if (showCopyButtons) {
-      card.querySelectorAll('.btn-copy-montante').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyIconFeedback(formatMontanteForCopy(l.montante), btn);
-        });
-      });
-      card.querySelectorAll('.btn-copy-iban-line').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyIconFeedback(l.iban, btn);
-        });
-      });
-      card.querySelectorAll('.btn-copy-ref').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
-          copyIconFeedback(l.referencia, btn);
-        });
-      });
-    }
-
-    if (status === 'pendente') {
-      card.querySelector('.btn-mark-done').addEventListener('click', function () {
-        paymentRequestsRef.child(p.id).update({ status: 'concluido' });
-      });
-      card.querySelector('.btn-edit-request').addEventListener('click', function () {
-        openEditPaymentModal(p);
-      });
-      card.querySelector('.btn-cancel-request').addEventListener('click', function () {
-        if (isFornecedorOrigin) {
-          if (confirm('Anular o pedido #' + p.numeroReferencia + '? Esta ação não pode ser desfeita e será enviado um email de anulação.')) {
-            cancelPaymentRequest(p);
-          }
-        } else {
-          cancelPaymentRequest(p);
-        }
-      });
-    }
-
-    var deleteBtn = card.querySelector('.btn-delete-request');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', function () {
-        if (confirm('Apagar este pedido de pagamento? Esta ação não pode ser desfeita.')) {
-          paymentRequestsRef.child(p.id).remove();
-        }
-      });
-    }
-
-    return card;
-  }
-
-  function renderPayments() {
-    var entries = Object.keys(allPaymentRequests).map(function (id) {
-      return Object.assign({ id: id }, allPaymentRequests[id]);
-    });
-
-    entries.sort(function (a, b) {
-      return b.id.localeCompare(a.id);
-    });
-
-    var pending = entries.filter(function (p) { return (p.status || 'pendente') === 'pendente'; });
-    var done = entries.filter(function (p) { return p.status === 'concluido'; });
-    var cancelled = entries.filter(function (p) { return p.status === 'anulado'; });
-
-    paymentsGridPending.innerHTML = "";
-    paymentsGridDone.innerHTML = "";
-    paymentsGridCancelled.innerHTML = "";
-
-    if (entries.length === 0) {
-      paymentsEmpty.style.display = "block";
-      paymentsPendingSection.style.display = "none";
-      paymentsDoneSection.style.display = "none";
-      paymentsCancelledSection.style.display = "none";
-      return;
-    }
-    paymentsEmpty.style.display = "none";
-
-    paymentsPendingSection.style.display = pending.length ? "block" : "none";
-    paymentsDoneSection.style.display = done.length ? "block" : "none";
-    paymentsCancelledSection.style.display = cancelled.length ? "block" : "none";
-
-    pending.forEach(function (p) {
-      paymentsGridPending.appendChild(buildPaymentCard(p));
-    });
-
-    done.forEach(function (p) {
-      paymentsGridDone.appendChild(buildPaymentCard(p));
-    });
-
-    cancelled.forEach(function (p) {
-      paymentsGridCancelled.appendChild(buildPaymentCard(p));
-    });
-
-    highlightTicketIfNeeded();
-  }
-
-  function highlightTicketIfNeeded() {
-    if (!pendingHighlightId) return;
-    var el = document.querySelector('.payment-ticket[data-id="' + pendingHighlightId + '"]');
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('payment-ticket-highlight');
-    setTimeout(function () {
-      el.classList.remove('payment-ticket-highlight');
-    }, 2200);
-  }
-
   statusMsg.textContent = "A ligar à base de dados...";
 
   suppliersRef.on('value', function (snapshot) {
@@ -2394,72 +1579,6 @@ window.addEventListener('load', function () {
     render();
   }, function (error) {
     statusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
-  });
-
-  function buildNumeroReferenciaMigrations(val) {
-    var groups = {};
-    Object.keys(val).forEach(function (id) {
-      var p = val[id];
-      if (p.origem === 'avulso') return;
-      var dateParts = String(p.date || "").split("/");
-      if (dateParts.length !== 3) return;
-      var mm = dateParts[1];
-      var aa = dateParts[2].slice(-2);
-      var key = mm + "/" + aa;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push({ id: id, day: parseInt(dateParts[0], 10) || 0, numeroReferencia: p.numeroReferencia || "" });
-    });
-
-    var migrations = {};
-    Object.keys(groups).forEach(function (key) {
-      var parts = key.split("/");
-      var mm = parts[0], aa = parts[1];
-      var list = groups[key];
-
-      var takenNs = {};
-      list.forEach(function (item) {
-        if (item.numeroReferencia) {
-          var n = parseInt(item.numeroReferencia.split("/")[0], 10);
-          if (!isNaN(n)) takenNs[n] = true;
-        }
-      });
-
-      var missing = list.filter(function (item) { return !item.numeroReferencia; });
-      missing.sort(function (a, b) {
-        if (a.day !== b.day) return a.day - b.day;
-        return a.id.localeCompare(b.id);
-      });
-
-      var nextN = 1;
-      missing.forEach(function (item) {
-        while (takenNs[nextN]) nextN++;
-        migrations[item.id + "/numeroReferencia"] = nextN + "/" + mm + "/" + aa;
-        takenNs[nextN] = true;
-        nextN++;
-      });
-    });
-
-    return migrations;
-  }
-
-  paymentRequestsRef.on('value', function (snapshot) {
-    var val = snapshot.val() || {};
-
-    var hasMissing = Object.keys(val).some(function (id) { return val[id].origem !== 'avulso' && !val[id].numeroReferencia; });
-    if (hasMissing) {
-      var migrations = buildNumeroReferenciaMigrations(val);
-      if (Object.keys(migrations).length > 0) {
-        paymentRequestsRef.update(migrations);
-        return;
-      }
-    }
-
-    allPaymentRequests = val;
-    renderPayments();
-  });
-
-  carregarPessoas(function () {
-    popularSelectPessoas(document.getElementById('paymentCriadoPor'));
   });
 
 });

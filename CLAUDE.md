@@ -27,7 +27,9 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | Ficheiro | Módulo | Audiência |
 |---|---|---|
 | `index.html` | Home / menu do OS | Equipa |
-| `fornecedores.html` | Base de dados de fornecedores + ciclo de pedidos de pagamento | Equipa |
+| `compras.html` | Base de dados de fornecedores + encomendas | Equipa |
+| `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
+| `ingredientes.html` | Base de dados de ingredientes (sem entrada própria no menu, absorvido por `compras.html` numa fase futura) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
 | `equipa.html` | Pessoas e turnos (escala semanal) | Equipa |
