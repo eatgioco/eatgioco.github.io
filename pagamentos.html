@@ -487,6 +487,8 @@
 <div class="status-msg" id="statusMsg"></div>
 
 <main>
+  <p id="concluidoAviso" style="display:none; margin:0 0 20px; padding:12px 14px; border:2px solid var(--green, #1E7A46); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
+
   <div class="empty-state" id="paymentsEmpty" style="display:none;">Nenhum pedido de pagamento.</div>
 
   <div id="paymentsPendingSection" style="display:none;">
@@ -919,6 +921,45 @@ window.addEventListener('load', function () {
     closePaymentModal();
   }
 
+  function buildConcluidoLinesBlock(lines) {
+    var bodyLines = [];
+    lines.forEach(function (l, idx) {
+      if (idx > 0) bodyLines.push("");
+      bodyLines.push("Fornecedor: " + l.fornecedor);
+      bodyLines.push("Montante: " + l.montante + "€");
+      bodyLines.push("Prazo: " + (l.prazo || "n/d"));
+      bodyLines.push("IBAN: " + (l.iban || "n/d") + (l.banco ? " (" + l.banco + ")" : ""));
+    });
+    return bodyLines;
+  }
+
+  function enviarEmailConcluido(p) {
+    var subject = "Pagamento Concluído | Fornecedores | – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock(p.lines || []));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
+      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    mostrarAvisoConcluido();
+  }
+
+  function mostrarAvisoConcluido() {
+    var aviso = document.getElementById('concluidoAviso');
+    aviso.textContent = '✅ Pagamento marcado como concluído. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado. Não esqueças de anexar o comprovativo de transferência antes de enviar.';
+    aviso.style.display = 'block';
+    aviso.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   function cancelPaymentRequest(p) {
     paymentRequestsRef.child(p.id).update({ status: 'anulado' });
 
@@ -1032,6 +1073,7 @@ window.addEventListener('load', function () {
     if (status === 'pendente') {
       card.querySelector('.btn-mark-done').addEventListener('click', function () {
         paymentRequestsRef.child(p.id).update({ status: 'concluido' });
+        enviarEmailConcluido(p);
       });
       card.querySelector('.btn-edit-request').addEventListener('click', function () {
         openEditPaymentModal(p);
