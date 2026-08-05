@@ -597,6 +597,208 @@
     color:var(--red);
   }
 
+  .tabs-bar{
+    max-width:1200px;
+    margin:16px auto 0;
+    padding:0 24px;
+    display:flex;
+    gap:0;
+    border-bottom:2px solid var(--black);
+  }
+
+  .tab-btn{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    padding:12px 20px;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+    margin-bottom:-2px;
+  }
+
+  .tab-btn:hover{
+    color:var(--black);
+  }
+
+  .tab-btn.active{
+    color:var(--black);
+    border-bottom-color:var(--red);
+  }
+
+  .ing-stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:14px;
+    max-width:1200px;
+    margin:20px auto 0;
+    padding:0 24px;
+  }
+
+  .ing-stat-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:14px 16px;
+  }
+
+  .ing-stat-value{
+    font-family:'Space Mono', monospace;
+    font-size:24px;
+    font-weight:700;
+    line-height:1.1;
+  }
+
+  .ing-stat-card.accent .ing-stat-value{
+    color:var(--red);
+  }
+
+  .ing-stat-label{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .ing-chips{
+    max-width:1200px;
+    margin:16px auto 0;
+    padding:0 24px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .ing-chip{
+    font-family:'Space Mono', monospace;
+    font-size:11.5px;
+    font-weight:700;
+    padding:7px 13px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    letter-spacing:0.3px;
+    white-space:nowrap;
+  }
+
+  .ing-chip.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .ing-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(155px, 1fr));
+    gap:14px;
+  }
+
+  .ing-group{
+    margin-bottom:26px;
+  }
+
+  .ing-group-header{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--black);
+    padding-bottom:8px;
+    margin-bottom:14px;
+    border-bottom:2px solid var(--black);
+  }
+
+  .ing-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+
+  .ing-card:hover{
+    transform:translate(-2px,-2px);
+    box-shadow:4px 4px 0 var(--red);
+  }
+
+  .ing-card-image{
+    aspect-ratio:1/1;
+    border-bottom:2px solid var(--black);
+    background-image:repeating-linear-gradient(45deg, var(--bg), var(--bg) 10px, #EAE4D6 10px, #EAE4D6 20px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:30px;
+    color:#b0a99a;
+  }
+
+  .ing-card-body{
+    padding:10px 12px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    flex:1;
+  }
+
+  .ing-card-cat{
+    align-self:flex-start;
+    font-family:'Space Mono', monospace;
+    font-size:9.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    padding:3px 7px;
+    background:var(--red);
+    color:var(--bg);
+  }
+
+  .ing-card-cat.none{
+    background:var(--line);
+    color:var(--muted);
+  }
+
+  .ing-card-name{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    font-weight:700;
+    line-height:1.3;
+    color:var(--black);
+  }
+
+  .ing-card-footer{
+    margin-top:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+  }
+
+  .ing-supplier-tag{
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    color:var(--muted);
+    border:1px solid #b0a99a;
+    padding:3px 8px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:105px;
+  }
+
+  .ing-supplier-tag.missing{
+    border:1px dashed var(--red);
+    color:var(--red);
+  }
+
+  .ing-edit-icon{
+    font-size:14px;
+    color:var(--muted);
+    flex:0 0 auto;
+  }
+
 </style>
 </head>
 <body>
@@ -616,6 +818,11 @@
   </div>
 </header>
 
+<div class="tabs-bar">
+  <button type="button" class="tab-btn active" id="tabFornecedor">Por fornecedor</button>
+  <button type="button" class="tab-btn" id="tabIngrediente">Por ingrediente</button>
+</div>
+
 <div id="fornecedoresView">
   <div class="controls">
     <input type="text" class="search-input" id="searchInput" placeholder="Pesquisar fornecedor por nome...">
@@ -633,6 +840,23 @@
   <main>
     <div class="grid" id="grid"></div>
     <div class="empty-state" id="emptyState" style="display:none;">Nenhum fornecedor encontrado.</div>
+  </main>
+</div>
+
+<div id="ingredientesView" style="display:none;">
+  <div class="ing-stats" id="ingStatsBar"></div>
+
+  <div class="controls">
+    <input type="text" class="search-input" id="ingSearchInput" placeholder="Pesquisar ingrediente por nome...">
+  </div>
+
+  <div class="ing-chips" id="ingCatChips"></div>
+
+  <div class="status-msg" id="ingStatusMsg"></div>
+
+  <main>
+    <div id="ingGrid"></div>
+    <div class="empty-state" id="ingEmptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
   </main>
 </div>
 
@@ -767,6 +991,43 @@
   </div>
 </div>
 
+<!-- Modal de Ingrediente -->
+<div class="modal-overlay" id="ingModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Editar Ingrediente</h2>
+      <button class="modal-close" id="ingModalClose">×</button>
+    </div>
+    <form id="ingredientForm">
+      <input type="hidden" id="ingFId">
+      <div class="form-grid">
+        <div class="field full">
+          <label class="field-label">Nome</label>
+          <input type="text" id="ingFNome" required>
+        </div>
+        <div class="field">
+          <label class="field-label">Categoria</label>
+          <select id="ingFCategoria"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">Fornecedor</label>
+          <select id="ingFFornecedor"></select>
+        </div>
+        <div class="field full">
+          <label class="field-label">Unidade</label>
+          <input type="text" id="ingFUnidade" placeholder="ex: kg, un, lt">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="ingBtnCancelar">Cancelar</button>
+        <div class="modal-actions-right">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
 
@@ -874,6 +1135,220 @@ window.addEventListener('load', function () {
     if (ingredientesSection && ingredientesSection.style.display !== 'none') {
       renderIngredienteAccordion();
     }
+    ingStatusMsg.textContent = "";
+    renderIngStats();
+    renderIngChips();
+    renderIngGrid();
+  }, function (error) {
+    ingStatusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
+  });
+
+  // ===== Aba "Por ingrediente" =====
+  var CATEGORIA_ORDER = Object.keys(CATEGORIAS);
+  var ingCurrentCategoria = "Todas";
+  var ingCurrentSearch = "";
+
+  var tabFornecedor = document.getElementById('tabFornecedor');
+  var tabIngrediente = document.getElementById('tabIngrediente');
+  var fornecedoresView = document.getElementById('fornecedoresView');
+  var ingredientesView = document.getElementById('ingredientesView');
+
+  var ingStatsBar = document.getElementById('ingStatsBar');
+  var ingCatChips = document.getElementById('ingCatChips');
+  var ingGrid = document.getElementById('ingGrid');
+  var ingEmptyState = document.getElementById('ingEmptyState');
+  var ingStatusMsg = document.getElementById('ingStatusMsg');
+  var ingSearchInput = document.getElementById('ingSearchInput');
+
+  var ingModalOverlay = document.getElementById('ingModalOverlay');
+  var ingModalClose = document.getElementById('ingModalClose');
+  var ingBtnCancelar = document.getElementById('ingBtnCancelar');
+  var ingredientForm = document.getElementById('ingredientForm');
+  var ingFId = document.getElementById('ingFId');
+  var ingFNome = document.getElementById('ingFNome');
+  var ingFCategoria = document.getElementById('ingFCategoria');
+  var ingFFornecedor = document.getElementById('ingFFornecedor');
+  var ingFUnidade = document.getElementById('ingFUnidade');
+
+  ingFCategoria.innerHTML = '<option value="">Sem categoria</option>' + CATEGORIA_ORDER.map(function (key) {
+    return '<option value="' + escapeHtml(key) + '">' + escapeHtml(CATEGORIAS[key]) + '</option>';
+  }).join('');
+
+  tabFornecedor.addEventListener('click', function () {
+    if (tabFornecedor.classList.contains('active')) return;
+    tabFornecedor.classList.add('active');
+    tabIngrediente.classList.remove('active');
+    fornecedoresView.style.display = '';
+    ingredientesView.style.display = 'none';
+    btnNovo.style.display = 'inline-block';
+  });
+
+  tabIngrediente.addEventListener('click', function () {
+    if (tabIngrediente.classList.contains('active')) return;
+    tabIngrediente.classList.add('active');
+    tabFornecedor.classList.remove('active');
+    ingredientesView.style.display = '';
+    fornecedoresView.style.display = 'none';
+    btnNovo.style.display = 'none';
+  });
+
+  function renderIngStats() {
+    var ids = Object.keys(allIngredientes);
+    var total = ids.length;
+    var semFornecedor = ids.filter(function (id) { return !allIngredientes[id].fornecedor; }).length;
+    ingStatsBar.innerHTML =
+      '<div class="ing-stat-card"><div class="ing-stat-value">' + total + '</div><div class="ing-stat-label">Total de ingredientes</div></div>' +
+      '<div class="ing-stat-card accent"><div class="ing-stat-value">' + semFornecedor + '</div><div class="ing-stat-label">Sem fornecedor atribuído</div></div>';
+  }
+
+  function renderIngChips() {
+    var grupos = {};
+    Object.keys(allIngredientes).forEach(function (id) {
+      var cat = allIngredientes[id].categoria || 'null';
+      grupos[cat] = (grupos[cat] || 0) + 1;
+    });
+    var total = Object.keys(allIngredientes).length;
+
+    var html = '<button type="button" class="ing-chip' + (ingCurrentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">Todas (' + total + ')</button>';
+    CATEGORIA_ORDER.forEach(function (key) {
+      var count = grupos[key] || 0;
+      html += '<button type="button" class="ing-chip' + (ingCurrentCategoria === key ? ' active' : '') + '" data-cat="' + escapeHtml(key) + '">' + escapeHtml(CATEGORIAS[key]) + ' (' + count + ')</button>';
+    });
+    var semCatCount = grupos['null'] || 0;
+    html += '<button type="button" class="ing-chip' + (ingCurrentCategoria === 'null' ? ' active' : '') + '" data-cat="null">Sem categoria (' + semCatCount + ')</button>';
+
+    ingCatChips.innerHTML = html;
+    ingCatChips.querySelectorAll('.ing-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        ingCurrentCategoria = btn.getAttribute('data-cat');
+        renderIngChips();
+        renderIngGrid();
+      });
+    });
+  }
+
+  function ingredienteCardHtml(ing) {
+    var catLabel = ing.categoria ? (CATEGORIAS[ing.categoria] || ing.categoria) : 'Sem categoria';
+    var catClass = ing.categoria ? '' : ' none';
+    var fornecedorHtml = ing.fornecedor
+      ? '<span class="ing-supplier-tag" title="' + escapeHtml(ing.fornecedor) + '">' + escapeHtml(ing.fornecedor) + '</span>'
+      : '<span class="ing-supplier-tag missing">Sem fornecedor</span>';
+
+    return '<div class="ing-card" data-id="' + escapeHtml(ing.id) + '">' +
+      '<div class="ing-card-image">🖼</div>' +
+      '<div class="ing-card-body">' +
+        '<span class="ing-card-cat' + catClass + '">' + escapeHtml(catLabel) + '</span>' +
+        '<div class="ing-card-name">' + escapeHtml(ing.nome) + '</div>' +
+        '<div class="ing-card-footer">' + fornecedorHtml + '<span class="ing-edit-icon">✎</span></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderIngGrid() {
+    var ids = Object.keys(allIngredientes);
+    var items = ids.map(function (id) {
+      return Object.assign({ id: id }, allIngredientes[id]);
+    });
+
+    items = items.filter(function (ing) {
+      var cat = ing.categoria || 'null';
+      var matchesCat = ingCurrentCategoria === 'Todas' || cat === ingCurrentCategoria;
+      var matchesSearch = !ingCurrentSearch || (ing.nome || '').toLowerCase().indexOf(ingCurrentSearch) !== -1;
+      return matchesCat && matchesSearch;
+    });
+
+    if (items.length === 0) {
+      ingGrid.innerHTML = '';
+      ingEmptyState.style.display = 'block';
+      return;
+    }
+    ingEmptyState.style.display = 'none';
+
+    var html = '';
+
+    if (ingCurrentCategoria === 'Todas') {
+      var grupos = {};
+      items.forEach(function (ing) {
+        var cat = ing.categoria || 'null';
+        if (!grupos[cat]) grupos[cat] = [];
+        grupos[cat].push(ing);
+      });
+
+      var catKeys = CATEGORIA_ORDER.filter(function (key) { return grupos[key]; });
+      if (grupos['null']) catKeys.push('null');
+
+      catKeys.forEach(function (catKey) {
+        var label = catKey === 'null' ? 'Sem categoria' : (CATEGORIAS[catKey] || catKey);
+        var groupItems = grupos[catKey].slice().sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+        html += '<div class="ing-group">';
+        html += '<div class="ing-group-header">' + escapeHtml(label) + '</div>';
+        html += '<div class="ing-grid">' + groupItems.map(ingredienteCardHtml).join('') + '</div>';
+        html += '</div>';
+      });
+    } else {
+      items.sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+      html += '<div class="ing-grid">' + items.map(ingredienteCardHtml).join('') + '</div>';
+    }
+
+    ingGrid.innerHTML = html;
+
+    ingGrid.querySelectorAll('.ing-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        openIngModal(card.getAttribute('data-id'));
+      });
+    });
+  }
+
+  function renderIngFornecedorOptions(selectedNome) {
+    var nomes = Object.keys(allSuppliers).map(function (id) {
+      return allSuppliers[id].nome;
+    }).filter(Boolean).sort(function (a, b) { return a.localeCompare(b); });
+
+    ingFFornecedor.innerHTML = '<option value="">Sem fornecedor</option>' + nomes.map(function (nome) {
+      return '<option value="' + escapeHtml(nome) + '">' + escapeHtml(nome) + '</option>';
+    }).join('');
+    ingFFornecedor.value = selectedNome || "";
+  }
+
+  function openIngModal(id) {
+    var ing = allIngredientes[id];
+    if (!ing) return;
+    ingFId.value = id;
+    ingFNome.value = ing.nome || "";
+    ingFCategoria.value = ing.categoria || "";
+    renderIngFornecedorOptions(ing.fornecedor);
+    ingFUnidade.value = ing.unidade || "";
+    ingModalOverlay.classList.add('open');
+  }
+
+  function closeIngModal() {
+    ingModalOverlay.classList.remove('open');
+  }
+
+  ingModalClose.addEventListener('click', closeIngModal);
+  ingBtnCancelar.addEventListener('click', closeIngModal);
+  ingModalOverlay.addEventListener('click', function (e) {
+    if (e.target === ingModalOverlay) closeIngModal();
+  });
+
+  ingredientForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var id = ingFId.value;
+    if (!id) return;
+    var data = {
+      nome: ingFNome.value.trim(),
+      categoria: ingFCategoria.value || null,
+      fornecedor: ingFFornecedor.value || null,
+      unidade: ingFUnidade.value.trim() || null
+    };
+    if (!data.nome) return;
+    ingredientesRef.child(id).update(data);
+    closeIngModal();
+  });
+
+  ingSearchInput.addEventListener('input', function () {
+    ingCurrentSearch = ingSearchInput.value.trim().toLowerCase();
+    renderIngGrid();
   });
 
   var seedData = {
