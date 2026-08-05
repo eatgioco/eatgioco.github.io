@@ -1173,6 +1173,11 @@
     font-size:13px;
   }
 
+  .pay-detalhe-nota{
+    color:var(--muted);
+    font-style:italic;
+  }
+
   /* Coluna à direita (Pagar em cima do Fechar), alinhada pelo fundo com
      a última linha da coluna de informação, para aproveitar o espaço
      vazio em vez de empilhar tudo por baixo. */
@@ -2133,6 +2138,17 @@
         <input type="text" id="cfDia" placeholder="1-31 ou «ultimo»">
         <span class="field-hint">Vazio = dia por confirmar</span>
       </div>
+      <div class="field">
+        <label class="field-label">Método de pagamento</label>
+        <select id="cfMetodoPagamento">
+          <option value="iban">IBAN</option>
+          <option value="debito">Débito Direto</option>
+        </select>
+      </div>
+      <div class="field" id="cfIbanField">
+        <label class="field-label">IBAN</label>
+        <input type="text" id="cfIban">
+      </div>
       <div class="field full">
         <label class="field-label">Meses ativos</label>
         <div class="meses-grid" id="cfMesesGrid"></div>
@@ -2473,6 +2489,56 @@ window.addEventListener('load', function () {
     return out;
   }
 
+  // Achata as ocorrências de compromissos fixos ativos do mês corrente e
+  // do seguinte (horizonte suficiente para os filtros de período do
+  // cartão de pagamentos) no mesmo formato de linha usado pelos pedidos,
+  // para poderem aparecer misturadas na mesma lista.
+  function linhasCompromissosFixos(){
+    var out = [];
+
+    function ocorrenciasDoMes(ano, mes){
+      ocorrenciasCompromissos(ano, mes).forEach(function(o){
+        var d = new Date(ano, mes - 1, o.dia);
+        d.setHours(0, 0, 0, 0);
+        var c = allCompromissos[o.id] || {};
+        out.push({
+          tipo: 'fixo',
+          compromissoId: o.id,
+          fornecedor: o.nome,
+          montante: o.montante,
+          prazo: formatDateDDMMYYYY(d),
+          prazoDate: d,
+          referencia: '',
+          metodoPagamento: c.metodoPagamento || 'iban',
+          iban: c.iban || ''
+        });
+      });
+    }
+
+    var hoje = new Date();
+    var ano1 = hoje.getFullYear(), mes1 = hoje.getMonth() + 1;
+    var ano2 = ano1, mes2 = mes1 + 1;
+    if (mes2 > 12){ mes2 = 1; ano2++; }
+    ocorrenciasDoMes(ano1, mes1);
+    ocorrenciasDoMes(ano2, mes2);
+
+    return out;
+  }
+
+  // Pedidos pendentes + ocorrências de compromissos fixos, todos juntos e
+  // ordenados por prazo ascendente — usada pelo cartão de Pagamentos e
+  // pela lista detalhada de Tesouraria.
+  function linhasCombinadas(){
+    var out = linhasPendentes().concat(linhasCompromissosFixos());
+    out.sort(function(a, b){
+      if (!a.prazoDate && !b.prazoDate) return 0;
+      if (!a.prazoDate) return 1;
+      if (!b.prazoDate) return -1;
+      return a.prazoDate - b.prazoDate;
+    });
+    return out;
+  }
+
   function ddmm(d){
     return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
   }
@@ -2491,13 +2557,18 @@ window.addEventListener('load', function () {
   }
 
   // Identifica uma linha de forma estável entre re-renders (o pedido pode
-  // ser regravado pelo Firebase a qualquer momento).
+  // ser regravado pelo Firebase a qualquer momento). Uma ocorrência de
+  // compromisso fixo é identificada pelo id do compromisso + o mês da
+  // ocorrência, já que o mesmo compromisso gera uma linha por mês.
   function chaveLinha(l){
+    if (l.tipo === 'fixo'){
+      return 'fixo|' + l.compromissoId + '|' + l.prazoDate.getFullYear() + '-' + (l.prazoDate.getMonth() + 1);
+    }
     return l.ticketId + '|' + l.lineIdx;
   }
 
   function linhaPorChave(chave){
-    var lista = linhasPendentes();
+    var lista = linhasCombinadas();
     for (var i = 0; i < lista.length; i++){
       if (chaveLinha(lista[i]) === chave) return lista[i];
     }
@@ -2515,7 +2586,15 @@ window.addEventListener('load', function () {
 
     h += '<div class="card-row"><span>Prazo: ' + escapeHtml(l.prazo || 'n/d') + '</span></div>';
 
-    if (l.iban){
+    if (l.tipo === 'fixo' && l.metodoPagamento === 'debito'){
+      h += '<div class="card-row"><span class="pay-detalhe-nota">Débito direto — não requer ação manual</span></div>';
+    } else if (l.tipo === 'fixo'){
+      // Compromisso com método IBAN: mostra sempre a linha, mesmo sem
+      // valor preenchido (registos antigos sem metodoPagamento definido).
+      h += '<div class="card-row"><span>IBAN: ' + (l.iban ? escapeHtml(l.iban) : 'não definido') +
+           (l.iban ? '<button type="button" class="copy-icon-btn" data-copiar="iban" title="Copiar IBAN">📋</button>' : '') +
+           '</span></div>';
+    } else if (l.iban){
       h += '<div class="card-row"><span>IBAN: ' + escapeHtml(l.iban) +
            '<button type="button" class="copy-icon-btn" data-copiar="iban" title="Copiar IBAN">📋</button></span></div>';
     }
@@ -2532,7 +2611,7 @@ window.addEventListener('load', function () {
     h += '</div>'; // .pay-detalhe-info
 
     h += '<div class="pay-detalhe-actions">';
-    if (l.iban){
+    if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
       h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
     }
     h += '<button type="button" class="btn-small pay-detalhe-fechar">✕ Fechar</button>';
@@ -2587,7 +2666,7 @@ window.addEventListener('load', function () {
   }
 
   function renderPagamentosCard(){
-    var linhas = linhasPendentes();
+    var linhas = linhasCombinadas();
     var hoje = hojeMeiaNoite();
 
     var totalGeral = 0;
@@ -2929,7 +3008,7 @@ window.addEventListener('load', function () {
   // Lista completa dos pendentes, sem filtro de período, com as acções de
   // pagamento que antes viviam no cartão.
   function renderTesPendentes(){
-    var linhas = linhasPendentes();
+    var linhas = linhasCombinadas();
     var hoje = hojeMeiaNoite();
 
     if (linhas.length === 0){
@@ -3156,6 +3235,9 @@ window.addEventListener('load', function () {
     document.getElementById('cfPeriodicidade').value = c.periodicidade || 'mensal';
     document.getElementById('cfTipo').value = tipoDe(c);
     document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
+    document.getElementById('cfMetodoPagamento').value = c.metodoPagamento || 'iban';
+    document.getElementById('cfIban').value = c.iban || '';
+    atualizarVisibilidadeIbanCompromisso();
     document.getElementById('cfNotas').value = c.notas || '';
     document.getElementById('cfAtivo').checked = !!c.ativo;
 
@@ -3171,6 +3253,14 @@ window.addEventListener('load', function () {
     compromissoModalOverlay.classList.remove('open');
     compromissoEmEdicao = null;
   }
+
+  // O campo IBAN só faz sentido quando o método de pagamento é IBAN.
+  function atualizarVisibilidadeIbanCompromisso(){
+    var metodo = document.getElementById('cfMetodoPagamento').value;
+    document.getElementById('cfIbanField').style.display = metodo === 'iban' ? '' : 'none';
+  }
+
+  document.getElementById('cfMetodoPagamento').addEventListener('change', atualizarVisibilidadeIbanCompromisso);
 
   document.getElementById('btnNovoCompromisso').addEventListener('click', function(){
     abrirCompromissoModal(null);
@@ -3208,6 +3298,8 @@ window.addEventListener('load', function () {
 
     var valorRaw = document.getElementById('cfValor').value.trim();
     var notas = document.getElementById('cfNotas').value.trim();
+    var metodoPagamento = document.getElementById('cfMetodoPagamento').value;
+    var ibanRaw = document.getElementById('cfIban').value.trim();
 
     var registo = {
       nome: nome,
@@ -3217,9 +3309,11 @@ window.addEventListener('load', function () {
       tipo: document.getElementById('cfTipo').value,
       dia: dia,
       meses: meses,
+      metodoPagamento: metodoPagamento,
       ativo: document.getElementById('cfAtivo').checked
     };
     if (notas) registo.notas = notas;
+    if (metodoPagamento === 'iban' && ibanRaw) registo.iban = ibanRaw;
 
     var ref = compromissoEmEdicao ? compromissosRef.child(compromissoEmEdicao) : compromissosRef.push();
 
@@ -3240,6 +3334,7 @@ window.addEventListener('load', function () {
   compromissosRef.on('value', function(snapshot){
     allCompromissos = snapshot.val() || {};
     renderTesouraria();
+    if (pagamentosCarregados) renderPagamentosCard();
   }, function(){
     tesCompromissosLista.innerHTML = '<p class="tes-empty">Erro de ligação à base de dados.</p>';
   });
