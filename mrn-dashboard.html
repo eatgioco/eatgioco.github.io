@@ -511,68 +511,39 @@
     flex:1;
   }
 
-  .task-list{
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    margin-top:12px;
-    max-height:240px;
-    overflow-y:auto;
+  .task-summary{
+    margin-top:22px;
   }
 
-  .task-item{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:8px 10px;
-    border:1px solid var(--line);
-    font-size:13px;
+  .task-summary-count{
+    font-family:'Space Mono', monospace;
+    font-size:26px;
+    font-weight:700;
+    margin:0;
+    line-height:1.1;
   }
 
-  .task-item input[type="checkbox"]{
-    width:auto;
-    flex-shrink:0;
-    cursor:pointer;
+  .task-summary-break{
+    font-size:12px;
+    color:var(--muted);
+    margin:6px 0 0;
   }
 
-  .task-item span{
-    flex:1;
-    word-break:break-word;
-  }
-
-  .btn-delete-task{
-    flex-shrink:0;
-    background:none;
-    border:none;
-    cursor:pointer;
-    font-size:13px;
-    padding:2px 4px;
-  }
-
-  .btn-delete-task:hover{
+  .task-summary-due{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
     color:var(--red);
+    margin:10px 0 0;
   }
 
-  .task-done-details{
-    margin-top:14px;
-  }
-
-  .task-done-details summary{
-    cursor:pointer;
+  .task-card-hint{
+    margin:18px 0 0;
     font-family:'Space Mono', monospace;
     font-size:11px;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:0.5px;
-  }
-
-  .task-done-details .task-list{
-    margin-top:10px;
-  }
-
-  .task-done-details .task-item span{
-    text-decoration:line-through;
-    color:var(--muted);
+    font-weight:700;
+    color:var(--red);
+    letter-spacing:0.3px;
   }
 
   .loading-state{
@@ -1948,13 +1919,14 @@
         <button type="button" class="btn-small" id="btnAddTask">+</button>
       </div>
 
-      <div class="task-list" id="taskList"></div>
-      <p class="empty-state-inline" id="taskEmptyInline" style="display:none;">Sem tarefas pendentes ✓</p>
+      <div class="task-summary" id="taskSummary" style="display:none;">
+        <p class="task-summary-count" id="taskSummaryCount">0 pendentes</p>
+        <p class="task-summary-break" id="taskSummaryBreak"></p>
+        <p class="task-summary-due" id="taskSummaryDue" style="display:none;"></p>
+      </div>
 
-      <details class="task-done-details" id="taskDoneDetails" style="display:none;">
-        <summary id="taskDoneSummary">Concluídas (0)</summary>
-        <div class="task-list" id="taskListDone"></div>
-      </details>
+      <p class="empty-state-inline" id="taskEmptyInline" style="display:none;">Sem tarefas pendentes ✓</p>
+      <p class="task-card-hint">→ Abrir tarefas</p>
     </div>
   </div>
 
@@ -3468,6 +3440,7 @@ window.addEventListener('load', function () {
     render();
     renderPagamentosCard();
     renderTesouraria();
+    renderTasks();
     agendarNotificacoes();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
@@ -3475,11 +3448,11 @@ window.addEventListener('load', function () {
 
   var taskInput = document.getElementById('taskInput');
   var btnAddTask = document.getElementById('btnAddTask');
-  var taskListEl = document.getElementById('taskList');
-  var taskListDoneEl = document.getElementById('taskListDone');
   var taskEmptyEl = document.getElementById('taskEmptyInline');
-  var taskDoneDetails = document.getElementById('taskDoneDetails');
-  var taskDoneSummary = document.getElementById('taskDoneSummary');
+  var taskSummaryEl = document.getElementById('taskSummary');
+  var taskSummaryCountEl = document.getElementById('taskSummaryCount');
+  var taskSummaryBreakEl = document.getElementById('taskSummaryBreak');
+  var taskSummaryDueEl = document.getElementById('taskSummaryDue');
   var allTasks = {};
 
   function addTask() {
@@ -3497,44 +3470,68 @@ window.addEventListener('load', function () {
     }
   });
 
-  function buildTaskItemHtml(t) {
-    return '<div class="task-item" data-id="' + t.id + '">' +
-      '<input type="checkbox" class="task-check"' + (t.concluida ? ' checked' : '') + '>' +
-      '<span>' + escapeHtml(t.texto) + '</span>' +
-      '<button type="button" class="btn-delete-task" title="Apagar">🗑</button>' +
-      '</div>';
+  document.getElementById('cardTasks').addEventListener('click', function (e) {
+    if (e.target.closest('.task-input-row')) return;
+    window.location.href = 'tarefas.html';
+  });
+
+  // Resumo do cartão — mesma lógica de "atrasadas / hoje" que tarefas.html:
+  // tarefas próprias com prazo <= hoje, mais todos os itens pendentes de
+  // paymentRequests/ e lojaPedidos/ (que contam sempre como "hoje").
+  function tarefasHojeISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
 
-  function attachTaskHandlers(container) {
-    container.querySelectorAll('.task-item').forEach(function (item) {
-      var id = item.getAttribute('data-id');
-      item.querySelector('.task-check').addEventListener('change', function (e) {
-        tasksRef.child(id).update({ concluida: e.target.checked });
-      });
-      item.querySelector('.btn-delete-task').addEventListener('click', function () {
-        tasksRef.child(id).remove();
-      });
+  function pagamentosPendentesTarefas() {
+    var val = allPaymentRequests || {};
+    return Object.keys(val).filter(function (id) {
+      var status = val[id].status || 'pendente';
+      return status !== 'concluido' && status !== 'anulado';
+    });
+  }
+
+  function pedidosPendentesTarefas() {
+    var val = allPedidos || {};
+    return Object.keys(val).filter(function (id) {
+      var estado = val[id].estado || 'novo';
+      return estado === 'novo' || estado === 'em análise';
     });
   }
 
   function renderTasks() {
-    var entries = Object.keys(allTasks).map(function (id) {
+    var hoje = tarefasHojeISO();
+
+    var proprias = Object.keys(allTasks).map(function (id) {
       return Object.assign({ id: id }, allTasks[id]);
-    });
+    }).filter(function (t) { return !t.concluida; });
 
-    var pending = entries.filter(function (t) { return !t.concluida; })
-      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    var done = entries.filter(function (t) { return t.concluida; })
-      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    var externos = pagamentosPendentesTarefas().length + pedidosPendentesTarefas().length;
+    var total = proprias.length + externos;
 
-    taskEmptyEl.style.display = pending.length ? 'none' : 'block';
-    taskListEl.innerHTML = pending.map(buildTaskItemHtml).join('');
-    attachTaskHandlers(taskListEl);
+    if (total === 0) {
+      taskSummaryEl.style.display = 'none';
+      taskEmptyEl.style.display = 'block';
+      return;
+    }
 
-    taskDoneDetails.style.display = done.length ? 'block' : 'none';
-    taskDoneSummary.textContent = 'Concluídas (' + done.length + ')';
-    taskListDoneEl.innerHTML = done.map(buildTaskItemHtml).join('');
-    attachTaskHandlers(taskListDoneEl);
+    taskEmptyEl.style.display = 'none';
+    taskSummaryEl.style.display = 'block';
+
+    taskSummaryCountEl.textContent = total + (total === 1 ? ' pendente' : ' pendentes');
+    taskSummaryBreakEl.textContent = proprias.length + (proprias.length === 1 ? ' tua' : ' tuas') +
+      ' · ' + externos + (externos === 1 ? ' noutro módulo' : ' noutros módulos');
+
+    var hojeCount = proprias.filter(function (t) {
+      return t.prazo && t.prazo <= hoje;
+    }).length + externos;
+
+    if (hojeCount > 0) {
+      taskSummaryDueEl.textContent = '⚠ ' + hojeCount + (hojeCount === 1 ? ' atrasada / para hoje' : ' atrasadas / para hoje');
+      taskSummaryDueEl.style.display = 'block';
+    } else {
+      taskSummaryDueEl.style.display = 'none';
+    }
   }
 
   tasksRef.on('value', function (snapshot) {
@@ -3687,6 +3684,7 @@ window.addEventListener('load', function () {
     pedidosLoadingEl.style.display = 'none';
     pedidosCarregados = true;
     renderPedidosDash();
+    renderTasks();
     agendarNotificacoes();
   }, function(error){
     pedidosLoadingEl.textContent = 'Erro de ligação à base de dados.';

@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>GIOCO OS · Tarefas</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:8px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--red);
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  .loading-state{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    margin:28px 0 0;
+  }
+
+  /* ---------- Adicionar tarefa ---------- */
+  .add-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:18px;
+    margin-top:28px;
+    max-width:720px;
+  }
+
+  .add-row{
+    display:flex;
+    gap:8px;
+  }
+
+  .add-row input{
+    flex:1;
+    padding:11px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--black);
+  }
+
+  .add-row input:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+
+  .btn-add{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    padding:0 18px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    line-height:1;
+  }
+
+  .btn-add:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  /* ---------- Secções ---------- */
+  .task-section{
+    margin-top:32px;
+    max-width:720px;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .section-title .section-count{
+    color:var(--black);
+  }
+
+  .section-title-late .section-count{
+    color:var(--red);
+  }
+
+  .task-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  /* ---------- Linhas ---------- */
+  .task-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    background:var(--white);
+    border:2px solid var(--black);
+    font-size:14px;
+  }
+
+  .task-row input[type="checkbox"]{
+    width:18px;
+    height:18px;
+    flex-shrink:0;
+    cursor:pointer;
+    accent-color:var(--red);
+  }
+
+  .task-text{
+    flex:1;
+    word-break:break-word;
+    cursor:text;
+    padding:2px 0;
+  }
+
+  .task-text:hover{
+    text-decoration:underline dotted var(--muted);
+  }
+
+  .task-text-input{
+    flex:1;
+    padding:4px 6px;
+    border:2px solid var(--black);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--black);
+  }
+
+  .task-text-input:focus{
+    outline:none;
+  }
+
+  .prazo-chip{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:5px 9px;
+    border:1px solid var(--line);
+    background:var(--bg);
+    color:var(--muted);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .prazo-chip:hover{
+    border-color:var(--black);
+    color:var(--black);
+  }
+
+  .prazo-chip-set{
+    border-color:var(--black);
+    color:var(--black);
+  }
+
+  .prazo-chip-late{
+    border-color:var(--red);
+    background:var(--red);
+    color:var(--white);
+  }
+
+  .task-del{
+    flex-shrink:0;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:14px;
+    padding:2px 4px;
+    opacity:0.45;
+  }
+
+  .task-del:hover{
+    opacity:1;
+  }
+
+  /* Envelhecimento das tarefas sem prazo — só sinal visual */
+  .task-row-age-warm{
+    border-color:var(--amber);
+    background:#FDF6E3;
+  }
+
+  .task-row-age-warm .task-text{
+    color:#7a5c05;
+  }
+
+  .task-row-age-hot{
+    border-color:var(--red);
+    background:#FBEAEC;
+  }
+
+  .task-row-age-hot .task-text{
+    color:var(--red);
+  }
+
+  .task-age-label{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:0.3px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .task-row-age-warm .task-age-label{ color:var(--amber); }
+  .task-row-age-hot .task-age-label{ color:var(--red); }
+
+  /* ---------- Itens de outros módulos (só leitura) ---------- */
+  .task-row-ext{
+    text-decoration:none;
+    color:var(--black);
+    border-style:dashed;
+    cursor:pointer;
+  }
+
+  .task-row-ext:hover{
+    box-shadow:3px 3px 0 var(--red);
+  }
+
+  .ext-badge{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+    padding:4px 7px;
+    border:1px solid var(--black);
+    background:var(--bg);
+    white-space:nowrap;
+  }
+
+  .ext-text{
+    flex:1;
+    word-break:break-word;
+  }
+
+  .ext-ref{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--red);
+    margin-right:6px;
+  }
+
+  .ext-meta{
+    display:block;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .ext-arrow{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Concluídas hoje ---------- */
+  .done-details{
+    margin-top:32px;
+    max-width:720px;
+  }
+
+  .done-details summary{
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .done-details summary:hover{
+    color:var(--black);
+  }
+
+  .done-details .task-list{
+    margin-top:12px;
+  }
+
+  .done-details .task-row{
+    border-color:var(--line);
+    background:transparent;
+  }
+
+  .done-details .task-text{
+    text-decoration:line-through;
+    color:var(--muted);
+  }
+
+  /* ---------- Estado vazio ---------- */
+  .empty-state{
+    margin-top:40px;
+    padding:48px 20px;
+    text-align:center;
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    color:var(--muted);
+    border:2px dashed var(--line);
+    max-width:720px;
+  }
+
+  /* ---------- Seletor de prazo ---------- */
+  .prazo-pop{
+    display:none;
+    position:absolute;
+    z-index:50;
+    background:var(--white);
+    border:2px solid var(--black);
+    box-shadow:4px 4px 0 var(--red);
+    padding:10px;
+    width:230px;
+  }
+
+  .prazo-pop-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+  }
+
+  .prazo-opt{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 6px;
+    border:1px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .prazo-opt:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .prazo-opt-clear{
+    border-color:var(--muted);
+    color:var(--muted);
+  }
+
+  .prazo-opt-clear:hover{
+    background:var(--muted);
+    color:var(--white);
+  }
+
+  .prazo-pop-sep{
+    margin:10px 0 8px;
+    border-top:1px solid var(--line);
+  }
+
+  .prazo-pop-date-label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .prazo-pop input[type="date"]{
+    width:100%;
+    padding:8px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    color:var(--black);
+    cursor:pointer;
+  }
+
+  .prazo-pop input[type="date"]:focus{
+    outline:none;
+    border-color:var(--black);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main id="main">
+  <h1 class="page-title">GIOCO OS · Tarefas</h1>
+  <p class="page-subtitle">Lista unificada</p>
+
+  <div class="add-card">
+    <div class="add-row">
+      <input type="text" id="taskInput" placeholder="Nova tarefa..." autocomplete="off">
+      <button type="button" class="btn-add" id="btnAddTask" title="Adicionar tarefa">+</button>
+    </div>
+  </div>
+
+  <p class="loading-state" id="loadingState">A carregar...</p>
+
+  <p class="empty-state" id="emptyState" style="display:none;">Sem tarefas pendentes ✓</p>
+
+  <div class="task-section" id="secHoje" style="display:none;">
+    <p class="section-title section-title-late">Atrasadas / Hoje <span class="section-count" id="countHoje"></span></p>
+    <div class="task-list" id="listHoje"></div>
+  </div>
+
+  <div class="task-section" id="secProximas" style="display:none;">
+    <p class="section-title">Próximas <span class="section-count" id="countProximas"></span></p>
+    <div class="task-list" id="listProximas"></div>
+  </div>
+
+  <div class="task-section" id="secSemPrazo" style="display:none;">
+    <p class="section-title">Sem prazo <span class="section-count" id="countSemPrazo"></span></p>
+    <div class="task-list" id="listSemPrazo"></div>
+  </div>
+
+  <details class="done-details" id="secConcluidas" style="display:none;">
+    <summary id="summaryConcluidas">Concluídas hoje (0)</summary>
+    <div class="task-list" id="listConcluidas"></div>
+  </details>
+</main>
+
+<div class="prazo-pop" id="prazoPop">
+  <div class="prazo-pop-grid">
+    <button type="button" class="prazo-opt" data-op="hoje">Hoje</button>
+    <button type="button" class="prazo-opt" data-op="amanha">Amanhã</button>
+    <button type="button" class="prazo-opt" data-op="semana">Esta semana</button>
+    <button type="button" class="prazo-opt prazo-opt-clear" data-op="sem">Sem prazo</button>
+  </div>
+  <div class="prazo-pop-sep"></div>
+  <label class="prazo-pop-date-label" for="prazoPopDate">Escolher data</label>
+  <input type="date" id="prazoPopDate">
+</div>
+
+<script>
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+
+  var tasksRef = db.ref('tasks');
+  var paymentRequestsRef = db.ref('paymentRequests');
+  var pedidosRef = db.ref('lojaPedidos');
+
+  var allTasks = {};
+  var allPayments = {};
+  var allPedidos = {};
+
+  var carregado = { tasks: false, payments: false, pedidos: false };
+
+  /* ---------- Helpers ---------- */
+  function escapeHtml(str) {
+    return String(str === undefined || str === null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function pad2(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function toISODate(d) {
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  function hojeISO() {
+    return toISODate(new Date());
+  }
+
+  function isoMaisDias(iso, dias) {
+    var p = iso.split("-");
+    var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+    d.setDate(d.getDate() + dias);
+    return toISODate(d);
+  }
+
+  // Fim da semana corrente (domingo). Se hoje já for domingo, é hoje.
+  function fimDaSemanaISO() {
+    var d = new Date();
+    var diaSemana = d.getDay(); // 0 = domingo
+    var faltam = diaSemana === 0 ? 0 : 7 - diaSemana;
+    d.setDate(d.getDate() + faltam);
+    return toISODate(d);
+  }
+
+  function ddmmyyyyToIso(str) {
+    if (!str) return "";
+    var parts = String(str).split("/");
+    if (parts.length !== 3) return "";
+    return parts[2] + "-" + parts[1] + "-" + parts[0];
+  }
+
+  function labelPrazo(iso) {
+    var hoje = hojeISO();
+    if (iso === hoje) return "Hoje";
+    if (iso === isoMaisDias(hoje, 1)) return "Amanhã";
+    if (iso === isoMaisDias(hoje, -1)) return "Ontem";
+    var p = iso.split("-");
+    return p[2] + "/" + p[1];
+  }
+
+  function diasDesde(ts) {
+    if (!ts) return 0;
+    return Math.floor((Date.now() - ts) / 86400000);
+  }
+
+  function truncar(texto, max) {
+    var t = String(texto || "");
+    return t.length > max ? t.slice(0, max - 1) + "…" : t;
+  }
+
+  function ehHoje(ts) {
+    if (!ts) return false;
+    return toISODate(new Date(ts)) === hojeISO();
+  }
+
+  /* ---------- Recolha dos itens ---------- */
+  function tarefasProprias() {
+    return Object.keys(allTasks).map(function (id) {
+      var t = allTasks[id];
+      return {
+        id: id,
+        texto: t.texto || "",
+        concluida: !!t.concluida,
+        createdAt: t.createdAt || 0,
+        concluidaEm: t.concluidaEm || 0,
+        prazo: t.prazo || null
+      };
+    });
+  }
+
+  function pagamentoPendente(p) {
+    var status = p.status || 'pendente';
+    return status !== 'concluido' && status !== 'anulado';
+  }
+
+  function pagamentoIso(p) {
+    var isos = (p.lines || []).map(function (l) {
+      return ddmmyyyyToIso(l.prazo);
+    }).filter(function (iso) { return !!iso; }).sort();
+    return isos.length ? isos[0] : hojeISO();
+  }
+
+  function pagamentoResumo(p) {
+    var lines = p.lines || [];
+    var total = lines.reduce(function (soma, l) {
+      var n = parseFloat(String(l.montante).replace(',', '.'));
+      return soma + (isNaN(n) ? 0 : n);
+    }, 0);
+    var nome = lines.length ? (lines[0].fornecedor || "—") : "—";
+    if (lines.length > 1) nome += " +" + (lines.length - 1);
+    return { nome: nome, total: total.toFixed(2) + "€" };
+  }
+
+  function itensExternos() {
+    var itens = [];
+
+    Object.keys(allPayments).forEach(function (id) {
+      var p = allPayments[id];
+      if (!pagamentoPendente(p)) return;
+      var resumo = pagamentoResumo(p);
+      itens.push({
+        tipo: 'pagamento',
+        id: id,
+        iso: pagamentoIso(p),
+        badge: '💶 Pagamento',
+        ref: p.numeroReferencia ? '#' + p.numeroReferencia : '',
+        titulo: resumo.nome,
+        meta: resumo.total + (p.date ? ' · pedido em ' + p.date : ''),
+        href: 'pagamentos.html#pagamento-' + id
+      });
+    });
+
+    Object.keys(allPedidos).forEach(function (id) {
+      var p = allPedidos[id];
+      var estado = p.estado || 'novo';
+      if (estado !== 'novo' && estado !== 'em análise') return;
+      itens.push({
+        tipo: 'loja',
+        id: id,
+        iso: hojeISO(),
+        badge: '📝 Loja',
+        ref: '',
+        titulo: truncar(p.descricao, 90),
+        meta: (p.zona ? 'Zona: ' + p.zona : '') + (p.pessoa ? ' · ' + p.pessoa : ''),
+        href: 'loja-sao-bento.html#pedidos-section'
+      });
+    });
+
+    return itens;
+  }
+
+  /* ---------- HTML das linhas ---------- */
+  function prazoChipHtml(t, hoje) {
+    if (!t.prazo) {
+      return '<button type="button" class="prazo-chip" title="Definir prazo">+ prazo</button>';
+    }
+    var cls = 'prazo-chip prazo-chip-set';
+    if (t.prazo <= hoje) cls += ' prazo-chip-late';
+    return '<button type="button" class="' + cls + '" title="Alterar prazo">📅 ' + escapeHtml(labelPrazo(t.prazo)) + '</button>';
+  }
+
+  function tarefaRowHtml(t, opcoes) {
+    opcoes = opcoes || {};
+    var hoje = hojeISO();
+    var classes = 'task-row';
+    var idade = '';
+
+    if (opcoes.envelhecer) {
+      var dias = diasDesde(t.createdAt);
+      if (dias >= 7) {
+        classes += ' task-row-age-hot';
+        idade = '<span class="task-age-label">' + dias + ' dias</span>';
+      } else if (dias >= 3) {
+        classes += ' task-row-age-warm';
+        idade = '<span class="task-age-label">' + dias + ' dias</span>';
+      }
+    }
+
+    return '<div class="' + classes + '" data-id="' + t.id + '">' +
+      '<input type="checkbox" class="task-check"' + (t.concluida ? ' checked' : '') + '>' +
+      '<span class="task-text">' + escapeHtml(t.texto) + '</span>' +
+      idade +
+      (opcoes.semPrazoChip ? '' : prazoChipHtml(t, hoje)) +
+      '<button type="button" class="task-del" title="Apagar">🗑</button>' +
+      '</div>';
+  }
+
+  function externoRowHtml(item) {
+    return '<a class="task-row task-row-ext" href="' + escapeHtml(item.href) + '">' +
+      '<span class="ext-badge">' + escapeHtml(item.badge) + '</span>' +
+      '<span class="ext-text">' +
+        (item.ref ? '<span class="ext-ref">' + escapeHtml(item.ref) + '</span>' : '') +
+        escapeHtml(item.titulo) +
+        (item.meta ? '<span class="ext-meta">' + escapeHtml(item.meta) + '</span>' : '') +
+      '</span>' +
+      '<span class="ext-arrow">→</span>' +
+      '</a>';
+  }
+
+  /* ---------- Render ---------- */
+  var editingTaskId = null;
+  var popTaskId = null;
+  var renderPendente = false;
+
+  function flushRender() {
+    if (editingTaskId || popTaskId) {
+      renderPendente = true;
+      return;
+    }
+    renderPendente = false;
+    renderAll();
+  }
+
+  function mostrarSeccao(el, visivel) {
+    el.style.display = visivel ? 'block' : 'none';
+  }
+
+  function renderAll() {
+    if (!carregado.tasks || !carregado.payments || !carregado.pedidos) return;
+    document.getElementById('loadingState').style.display = 'none';
+
+    var hoje = hojeISO();
+    var tarefas = tarefasProprias();
+    var externos = itensExternos();
+
+    var pendentes = tarefas.filter(function (t) { return !t.concluida; });
+
+    // 1. Atrasadas / Hoje — tarefas com prazo <= hoje + todos os itens pendentes
+    //    de outros módulos (contam sempre como "hoje").
+    var hojeItens = [];
+    pendentes.forEach(function (t) {
+      if (t.prazo && t.prazo <= hoje) {
+        hojeItens.push({ iso: t.prazo, ordem: t.createdAt, html: tarefaRowHtml(t) });
+      }
+    });
+    externos.forEach(function (e) {
+      hojeItens.push({ iso: e.iso, ordem: 0, html: externoRowHtml(e) });
+    });
+    hojeItens.sort(function (a, b) {
+      if (a.iso !== b.iso) return a.iso < b.iso ? -1 : 1;
+      return b.ordem - a.ordem;
+    });
+
+    // 2. Próximas — tarefas com prazo futuro, por data crescente
+    var proximas = pendentes.filter(function (t) {
+      return t.prazo && t.prazo > hoje;
+    }).sort(function (a, b) {
+      if (a.prazo !== b.prazo) return a.prazo < b.prazo ? -1 : 1;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+
+    // 3. Sem prazo — mais recentes primeiro
+    var semPrazo = pendentes.filter(function (t) {
+      return !t.prazo;
+    }).sort(function (a, b) {
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+
+    // 4. Concluídas hoje
+    var concluidasHoje = tarefas.filter(function (t) {
+      return t.concluida && ehHoje(t.concluidaEm);
+    }).sort(function (a, b) {
+      return (b.concluidaEm || 0) - (a.concluidaEm || 0);
+    });
+
+    document.getElementById('listHoje').innerHTML = hojeItens.map(function (i) { return i.html; }).join('');
+    document.getElementById('countHoje').textContent = '(' + hojeItens.length + ')';
+    mostrarSeccao(document.getElementById('secHoje'), hojeItens.length > 0);
+
+    document.getElementById('listProximas').innerHTML = proximas.map(function (t) { return tarefaRowHtml(t); }).join('');
+    document.getElementById('countProximas').textContent = '(' + proximas.length + ')';
+    mostrarSeccao(document.getElementById('secProximas'), proximas.length > 0);
+
+    document.getElementById('listSemPrazo').innerHTML = semPrazo.map(function (t) {
+      return tarefaRowHtml(t, { envelhecer: true });
+    }).join('');
+    document.getElementById('countSemPrazo').textContent = '(' + semPrazo.length + ')';
+    mostrarSeccao(document.getElementById('secSemPrazo'), semPrazo.length > 0);
+
+    document.getElementById('listConcluidas').innerHTML = concluidasHoje.map(function (t) { return tarefaRowHtml(t); }).join('');
+    document.getElementById('summaryConcluidas').textContent = 'Concluídas hoje (' + concluidasHoje.length + ')';
+    document.getElementById('secConcluidas').style.display = concluidasHoje.length ? 'block' : 'none';
+
+    var totalPendente = hojeItens.length + proximas.length + semPrazo.length;
+    document.getElementById('emptyState').style.display = totalPendente === 0 ? 'block' : 'none';
+  }
+
+  /* ---------- Escritas (uma chave de cada vez) ---------- */
+  function addTask() {
+    var input = document.getElementById('taskInput');
+    var texto = input.value.trim();
+    if (!texto) return;
+    tasksRef.push({ texto: texto, concluida: false, createdAt: Date.now() });
+    input.value = '';
+  }
+
+  function setConcluida(id, valor) {
+    if (!allTasks[id]) return;
+    if (valor) {
+      allTasks[id].concluidaEm = Date.now();
+      allTasks[id].concluida = true;
+      tasksRef.child(id).child('concluidaEm').set(allTasks[id].concluidaEm).then(function () {
+        return tasksRef.child(id).child('concluida').set(true);
+      });
+    } else {
+      allTasks[id].concluida = false;
+      delete allTasks[id].concluidaEm;
+      tasksRef.child(id).child('concluida').set(false).then(function () {
+        return tasksRef.child(id).child('concluidaEm').remove();
+      });
+    }
+    flushRender();
+  }
+
+  function setPrazo(id, iso) {
+    if (!allTasks[id]) return;
+    if (iso) {
+      allTasks[id].prazo = iso;
+      tasksRef.child(id).child('prazo').set(iso);
+    } else {
+      delete allTasks[id].prazo;
+      tasksRef.child(id).child('prazo').remove();
+    }
+  }
+
+  function setTexto(id, texto) {
+    if (!allTasks[id]) return;
+    allTasks[id].texto = texto;
+    tasksRef.child(id).child('texto').set(texto);
+  }
+
+  function apagarTarefa(id) {
+    delete allTasks[id];
+    tasksRef.child(id).remove();
+    flushRender();
+  }
+
+  /* ---------- Edição inline ---------- */
+  function iniciarEdicao(span) {
+    var row = span.closest('.task-row');
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    if (!allTasks[id]) return;
+
+    fecharPrazoPop(false);
+    editingTaskId = id;
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'task-text-input';
+    input.value = allTasks[id].texto || '';
+    row.replaceChild(input, span);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    var terminado = false;
+    function terminar(guardar) {
+      if (terminado) return;
+      terminado = true;
+      editingTaskId = null;
+      var novo = input.value.trim();
+      if (guardar && novo && novo !== (allTasks[id] || {}).texto) {
+        setTexto(id, novo);
+      }
+      flushRender();
+    }
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        terminar(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        terminar(false);
+      }
+    });
+    input.addEventListener('blur', function () {
+      terminar(true);
+    });
+  }
+
+  /* ---------- Seletor de prazo ---------- */
+  var prazoPop = document.getElementById('prazoPop');
+  var prazoPopDate = document.getElementById('prazoPopDate');
+
+  function abrirPrazoPop(btn) {
+    var row = btn.closest('.task-row');
+    if (!row) return;
+    popTaskId = row.getAttribute('data-id');
+    prazoPopDate.value = (allTasks[popTaskId] || {}).prazo || '';
+
+    prazoPop.style.display = 'block';
+    var r = btn.getBoundingClientRect();
+    var maxLeft = window.pageXOffset + document.documentElement.clientWidth - prazoPop.offsetWidth - 10;
+    prazoPop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
+    prazoPop.style.left = Math.max(10, Math.min(r.left + window.pageXOffset, maxLeft)) + 'px';
+  }
+
+  function fecharPrazoPop(render) {
+    prazoPop.style.display = 'none';
+    popTaskId = null;
+    if (render !== false && renderPendente) flushRender();
+  }
+
+  prazoPop.addEventListener('click', function (e) {
+    var opt = e.target.closest('.prazo-opt');
+    if (!opt || !popTaskId) return;
+    var op = opt.getAttribute('data-op');
+    var iso = null;
+    if (op === 'hoje') iso = hojeISO();
+    else if (op === 'amanha') iso = isoMaisDias(hojeISO(), 1);
+    else if (op === 'semana') iso = fimDaSemanaISO();
+    setPrazo(popTaskId, iso);
+    fecharPrazoPop(false);
+    flushRender();
+  });
+
+  prazoPopDate.addEventListener('change', function () {
+    if (!popTaskId) return;
+    setPrazo(popTaskId, prazoPopDate.value || null);
+    fecharPrazoPop(false);
+    flushRender();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!popTaskId) return;
+    if (e.target.closest('#prazoPop') || e.target.closest('.prazo-chip')) return;
+    fecharPrazoPop(true);
+  });
+
+  /* ---------- Delegação de eventos da lista ---------- */
+  var mainEl = document.getElementById('main');
+
+  mainEl.addEventListener('click', function (e) {
+    var chip = e.target.closest('.prazo-chip');
+    if (chip) {
+      if (popTaskId) {
+        var mesmo = chip.closest('.task-row').getAttribute('data-id') === popTaskId;
+        fecharPrazoPop(false);
+        if (mesmo) { flushRender(); return; }
+      }
+      abrirPrazoPop(chip);
+      return;
+    }
+
+    var del = e.target.closest('.task-del');
+    if (del) {
+      var rowDel = del.closest('.task-row');
+      apagarTarefa(rowDel.getAttribute('data-id'));
+      return;
+    }
+
+    var texto = e.target.closest('.task-text');
+    if (texto) {
+      iniciarEdicao(texto);
+    }
+  });
+
+  mainEl.addEventListener('change', function (e) {
+    var check = e.target.closest('.task-check');
+    if (!check) return;
+    var row = check.closest('.task-row');
+    setConcluida(row.getAttribute('data-id'), check.checked);
+  });
+
+  document.getElementById('btnAddTask').addEventListener('click', addTask);
+  document.getElementById('taskInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTask();
+    }
+  });
+
+  /* ---------- Ligação ao Firebase ---------- */
+  tasksRef.on('value', function (snapshot) {
+    allTasks = snapshot.val() || {};
+    carregado.tasks = true;
+    flushRender();
+  });
+
+  paymentRequestsRef.on('value', function (snapshot) {
+    allPayments = snapshot.val() || {};
+    carregado.payments = true;
+    flushRender();
+  });
+
+  pedidosRef.on('value', function (snapshot) {
+    allPedidos = snapshot.val() || {};
+    carregado.pedidos = true;
+    flushRender();
+  });
+</script>
+
+</body>
+</html>
