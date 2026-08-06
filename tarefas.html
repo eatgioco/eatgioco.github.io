@@ -21,7 +21,7 @@
     --line:#E2DDD1;
     --muted:#6b6660;
     --green:#1E7A46;
-    --amber:#B8860B;
+    --amber:#C08A2E;
   }
 
   *{box-sizing:border-box;}
@@ -97,6 +97,10 @@
     text-transform:uppercase;
   }
 
+  .col{
+    max-width:760px;
+  }
+
   .loading-state{
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -110,7 +114,6 @@
     border:2px solid var(--black);
     padding:18px;
     margin-top:28px;
-    max-width:720px;
   }
 
   .add-row{
@@ -150,10 +153,116 @@
     color:var(--white);
   }
 
+  /* ---------- Bloco HOJE ---------- */
+  .hoje-block{
+    margin-top:28px;
+    background:var(--black);
+    color:var(--white);
+    padding:20px 22px 22px;
+  }
+
+  .hoje-head{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+
+  .hoje-title{
+    margin:0;
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:2px;
+  }
+
+  .hoje-count{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:#9a948c;
+  }
+
+  .hoje-count.over{
+    color:var(--amber);
+  }
+
+  .hoje-aviso{
+    display:none;
+    margin:10px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--amber);
+  }
+
+  .hoje-list{
+    margin-top:14px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .hoje-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:11px 0;
+    border-top:1px solid #2e2c29;
+    font-size:14px;
+  }
+
+  .hoje-row:first-child{
+    border-top:none;
+  }
+
+  .hoje-num{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--red);
+    flex-shrink:0;
+  }
+
+  .hoje-text{
+    flex:1;
+    word-break:break-word;
+  }
+
+  .hoje-badge{
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    padding:3px 6px;
+    border:1px solid #4a4742;
+    color:#c9c3b9;
+    white-space:nowrap;
+  }
+
+  .hoje-x{
+    flex-shrink:0;
+    background:none;
+    border:none;
+    color:#8a847c;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    line-height:1;
+    padding:2px 5px;
+  }
+
+  .hoje-x:hover{
+    color:var(--white);
+  }
+
+  .hoje-empty{
+    margin:14px 0 0;
+    font-size:13px;
+    color:#9a948c;
+  }
+
   /* ---------- Secções ---------- */
   .task-section{
     margin-top:32px;
-    max-width:720px;
   }
 
   .section-title{
@@ -166,12 +275,8 @@
     color:var(--muted);
   }
 
-  .section-title .section-count{
+  .section-count{
     color:var(--black);
-  }
-
-  .section-title-late .section-count{
-    color:var(--red);
   }
 
   .task-list{
@@ -224,98 +329,138 @@
     outline:none;
   }
 
-  .prazo-chip{
+  /* ---------- Indicador de prazo ---------- */
+  .prazo{
     flex-shrink:0;
     font-family:'Space Mono', monospace;
-    font-size:11px;
-    font-weight:700;
-    padding:5px 9px;
-    border:1px solid var(--line);
-    background:var(--bg);
-    color:var(--muted);
-    cursor:pointer;
+    font-size:12px;
     white-space:nowrap;
+    padding:4px 7px;
+    border:1px solid transparent;
+    background:none;
   }
 
-  .prazo-chip:hover{
-    border-color:var(--black);
+  button.prazo{
+    cursor:pointer;
+  }
+
+  button.prazo:hover{
+    border-color:var(--line);
+  }
+
+  .prazo-late{
+    color:var(--red);
+    font-weight:700;
+  }
+
+  .prazo-soon{
+    color:var(--amber);
+  }
+
+  .prazo-future{
     color:var(--black);
   }
 
-  .prazo-chip-set{
-    border-color:var(--black);
-    color:var(--black);
+  .prazo-none{
+    color:var(--muted);
+    font-size:11px;
   }
 
-  .prazo-chip-late{
-    border-color:var(--red);
-    background:var(--red);
-    color:var(--white);
-  }
-
-  .task-del{
+  /* ---------- Botões de linha ---------- */
+  .row-btn{
     flex-shrink:0;
     background:none;
     border:none;
     cursor:pointer;
     font-size:14px;
-    padding:2px 4px;
+    line-height:1;
+    padding:3px 4px;
     opacity:0.45;
   }
 
-  .task-del:hover{
+  .row-btn:hover{
     opacity:1;
   }
 
-  /* Envelhecimento das tarefas sem prazo — só sinal visual */
-  .task-row-age-warm{
-    border-color:var(--amber);
-    background:#FDF6E3;
+  .btn-pin-on{
+    opacity:1;
+    color:var(--amber);
   }
 
-  .task-row-age-warm .task-text{
-    color:#7a5c05;
+  /* ---------- Aviso de revisão ---------- */
+  .review-note{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:11px 14px;
+    border:1px dashed var(--amber);
+    background:#FBF4E7;
+    font-size:13px;
+    color:#6d4e12;
   }
 
-  .task-row-age-hot{
-    border-color:var(--red);
-    background:#FBEAEC;
+  .review-note span{
+    flex:1;
   }
 
-  .task-row-age-hot .task-text{
-    color:var(--red);
-  }
-
-  .task-age-label{
-    flex-shrink:0;
+  .btn-review{
     font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.3px;
-    color:var(--muted);
+    font-size:11px;
+    font-weight:700;
+    padding:6px 9px;
+    border:1px solid var(--amber);
+    background:var(--white);
+    color:#6d4e12;
+    cursor:pointer;
     white-space:nowrap;
   }
 
-  .task-row-age-warm .task-age-label{ color:var(--amber); }
-  .task-row-age-hot .task-age-label{ color:var(--red); }
+  .btn-review:hover{
+    background:var(--amber);
+    color:var(--white);
+  }
 
-  /* ---------- Itens de outros módulos (só leitura) ---------- */
-  .task-row-ext{
-    text-decoration:none;
-    color:var(--black);
-    border-style:dashed;
+  /* ---------- Sugestão de prazo ---------- */
+  .sugestao{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:-2px;
+    padding:9px 14px;
+    border:1px solid var(--amber);
+    border-top:none;
+    background:#FBF4E7;
+    font-size:13px;
+    color:#6d4e12;
+  }
+
+  .sugestao span{
+    flex:1;
+  }
+
+  .btn-sugestao{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:5px 10px;
+    border:1px solid var(--amber);
+    background:var(--white);
+    color:#6d4e12;
     cursor:pointer;
   }
 
-  .task-row-ext:hover{
-    box-shadow:3px 3px 0 var(--red);
+  .btn-sugestao:hover{
+    background:var(--amber);
+    color:var(--white);
   }
 
+  /* ---------- Itens de outros módulos ---------- */
   .ext-badge{
     flex-shrink:0;
     font-family:'Space Mono', monospace;
-    font-size:10px;
+    font-size:9px;
     font-weight:700;
-    letter-spacing:0.3px;
+    letter-spacing:0.5px;
     text-transform:uppercase;
     padding:4px 7px;
     border:1px solid var(--black);
@@ -323,9 +468,16 @@
     white-space:nowrap;
   }
 
-  .ext-text{
+  .ext-link{
     flex:1;
+    text-decoration:none;
+    color:var(--black);
     word-break:break-word;
+    cursor:pointer;
+  }
+
+  .ext-link:hover{
+    text-decoration:underline;
   }
 
   .ext-ref{
@@ -343,20 +495,8 @@
     margin-top:2px;
   }
 
-  .ext-arrow{
-    flex-shrink:0;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    color:var(--muted);
-  }
-
-  /* ---------- Concluídas hoje ---------- */
-  .done-details{
-    margin-top:32px;
-    max-width:720px;
-  }
-
-  .done-details summary{
+  /* ---------- Colapsáveis ---------- */
+  .fold summary{
     cursor:pointer;
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -364,40 +504,41 @@
     letter-spacing:1px;
     text-transform:uppercase;
     color:var(--muted);
+    margin-bottom:12px;
   }
 
-  .done-details summary:hover{
+  .fold summary:hover{
     color:var(--black);
   }
 
-  .done-details .task-list{
-    margin-top:12px;
-  }
-
-  .done-details .task-row{
+  .fold-done .task-row{
     border-color:var(--line);
     background:transparent;
   }
 
-  .done-details .task-text{
+  .fold-done .task-text{
     text-decoration:line-through;
     color:var(--muted);
+    cursor:default;
+  }
+
+  .fold-done .task-text:hover{
+    text-decoration:line-through;
   }
 
   /* ---------- Estado vazio ---------- */
   .empty-state{
-    margin-top:40px;
+    margin-top:32px;
     padding:48px 20px;
     text-align:center;
     font-family:'Space Mono', monospace;
     font-size:16px;
     color:var(--muted);
     border:2px dashed var(--line);
-    max-width:720px;
   }
 
-  /* ---------- Seletor de prazo ---------- */
-  .prazo-pop{
+  /* ---------- Popovers ---------- */
+  .pop{
     display:none;
     position:absolute;
     z-index:50;
@@ -405,16 +546,18 @@
     border:2px solid var(--black);
     box-shadow:4px 4px 0 var(--red);
     padding:10px;
-    width:230px;
   }
 
-  .prazo-pop-grid{
+  #prazoPop{ width:230px; }
+  #adiarPop{ width:170px; }
+
+  .pop-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:6px;
   }
 
-  .prazo-opt{
+  .pop-opt{
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
@@ -424,29 +567,30 @@
     color:var(--black);
     cursor:pointer;
     white-space:nowrap;
+    width:100%;
   }
 
-  .prazo-opt:hover{
+  .pop-opt:hover{
     background:var(--black);
     color:var(--white);
   }
 
-  .prazo-opt-clear{
+  .pop-opt-clear{
     border-color:var(--muted);
     color:var(--muted);
   }
 
-  .prazo-opt-clear:hover{
+  .pop-opt-clear:hover{
     background:var(--muted);
     color:var(--white);
   }
 
-  .prazo-pop-sep{
+  .pop-sep{
     margin:10px 0 8px;
     border-top:1px solid var(--line);
   }
 
-  .prazo-pop-date-label{
+  .pop-label{
     display:block;
     font-family:'Space Mono', monospace;
     font-size:10px;
@@ -456,7 +600,7 @@
     margin-bottom:6px;
   }
 
-  .prazo-pop input[type="date"]{
+  .pop input[type="date"]{
     width:100%;
     padding:8px;
     border:2px solid var(--line);
@@ -467,9 +611,17 @@
     cursor:pointer;
   }
 
-  .prazo-pop input[type="date"]:focus{
+  .pop input[type="date"]:focus{
     outline:none;
     border-color:var(--black);
+  }
+
+  #adiarPop .pop-opt{
+    margin-bottom:6px;
+  }
+
+  #adiarPop .pop-opt:last-child{
+    margin-bottom:0;
   }
 </style>
 </head>
@@ -486,48 +638,65 @@
   <h1 class="page-title">GIOCO OS · Tarefas</h1>
   <p class="page-subtitle">Lista unificada</p>
 
-  <div class="add-card">
-    <div class="add-row">
-      <input type="text" id="taskInput" placeholder="Nova tarefa..." autocomplete="off">
-      <button type="button" class="btn-add" id="btnAddTask" title="Adicionar tarefa">+</button>
+  <div class="col">
+    <div class="add-card">
+      <div class="add-row">
+        <input type="text" id="taskInput" placeholder="Nova tarefa..." autocomplete="off">
+        <button type="button" class="btn-add" id="btnAddTask" title="Adicionar tarefa">+</button>
+      </div>
     </div>
+
+    <p class="loading-state" id="loadingState">A carregar...</p>
+
+    <div class="hoje-block" id="hojeBlock" style="display:none;">
+      <div class="hoje-head">
+        <h2 class="hoje-title">HOJE</h2>
+        <span class="hoje-count" id="hojeCount">0/5</span>
+      </div>
+      <p class="hoje-aviso" id="hojeAviso">A lista funciona melhor curta.</p>
+      <div class="hoje-list" id="hojeList"></div>
+      <p class="hoje-empty" id="hojeEmpty" style="display:none;">Toca na ☆ de qualquer item abaixo para o trazer para hoje.</p>
+    </div>
+
+    <p class="empty-state" id="emptyState" style="display:none;">Sem tarefas pendentes ✓</p>
+
+    <div class="task-section" id="secMinhas" style="display:none;">
+      <p class="section-title">As minhas <span class="section-count" id="countMinhas"></span></p>
+      <div class="task-list" id="listMinhas"></div>
+    </div>
+
+    <div class="task-section" id="secPagamentos" style="display:none;">
+      <p class="section-title">💶 Pagamentos <span class="section-count" id="countPagamentos"></span></p>
+      <div class="task-list" id="listPagamentos"></div>
+    </div>
+
+    <details class="task-section fold" id="secLoja" style="display:none;">
+      <summary id="summaryLoja">📝 Loja (0)</summary>
+      <div class="task-list" id="listLoja"></div>
+    </details>
+
+    <details class="task-section fold fold-done" id="secFeitas" style="display:none;">
+      <summary id="summaryFeitas">Feitas hoje (0)</summary>
+      <div class="task-list" id="listFeitas"></div>
+    </details>
   </div>
-
-  <p class="loading-state" id="loadingState">A carregar...</p>
-
-  <p class="empty-state" id="emptyState" style="display:none;">Sem tarefas pendentes ✓</p>
-
-  <div class="task-section" id="secHoje" style="display:none;">
-    <p class="section-title section-title-late">Atrasadas / Hoje <span class="section-count" id="countHoje"></span></p>
-    <div class="task-list" id="listHoje"></div>
-  </div>
-
-  <div class="task-section" id="secProximas" style="display:none;">
-    <p class="section-title">Próximas <span class="section-count" id="countProximas"></span></p>
-    <div class="task-list" id="listProximas"></div>
-  </div>
-
-  <div class="task-section" id="secSemPrazo" style="display:none;">
-    <p class="section-title">Sem prazo <span class="section-count" id="countSemPrazo"></span></p>
-    <div class="task-list" id="listSemPrazo"></div>
-  </div>
-
-  <details class="done-details" id="secConcluidas" style="display:none;">
-    <summary id="summaryConcluidas">Concluídas hoje (0)</summary>
-    <div class="task-list" id="listConcluidas"></div>
-  </details>
 </main>
 
-<div class="prazo-pop" id="prazoPop">
-  <div class="prazo-pop-grid">
-    <button type="button" class="prazo-opt" data-op="hoje">Hoje</button>
-    <button type="button" class="prazo-opt" data-op="amanha">Amanhã</button>
-    <button type="button" class="prazo-opt" data-op="semana">Esta semana</button>
-    <button type="button" class="prazo-opt prazo-opt-clear" data-op="sem">Sem prazo</button>
+<div class="pop" id="prazoPop">
+  <div class="pop-grid">
+    <button type="button" class="pop-opt" data-op="hoje">Hoje</button>
+    <button type="button" class="pop-opt" data-op="amanha">Amanhã</button>
+    <button type="button" class="pop-opt" data-op="semana">Esta semana</button>
+    <button type="button" class="pop-opt pop-opt-clear" data-op="sem">Sem prazo</button>
   </div>
-  <div class="prazo-pop-sep"></div>
-  <label class="prazo-pop-date-label" for="prazoPopDate">Escolher data</label>
+  <div class="pop-sep"></div>
+  <label class="pop-label" for="prazoPopDate">Escolher data</label>
   <input type="date" id="prazoPopDate">
+</div>
+
+<div class="pop" id="adiarPop">
+  <button type="button" class="pop-opt" data-op="amanha">Ver amanhã</button>
+  <button type="button" class="pop-opt" data-op="semana">Ver esta semana</button>
 </div>
 
 <script>
@@ -540,14 +709,23 @@
   var tasksRef = db.ref('tasks');
   var paymentRequestsRef = db.ref('paymentRequests');
   var pedidosRef = db.ref('lojaPedidos');
+  var todayPicksRef = db.ref('todayPicks');
+  var snoozedRef = db.ref('tarefasUi/snoozed');
+  var lastReviewRef = db.ref('uiState/tarefasLastReview');
+
+  var MAX_HOJE = 5;
+  var SUGESTAO_MS = 9000;
 
   var allTasks = {};
   var allPayments = {};
   var allPedidos = {};
+  var todayPicks = {};
+  var snoozed = {};
+  var lastReview = 0;
 
-  var carregado = { tasks: false, payments: false, pedidos: false };
+  var carregado = { tasks: false, payments: false, pedidos: false, picks: false, snoozed: false, review: false };
 
-  /* ---------- Helpers ---------- */
+  /* ---------- Helpers gerais ---------- */
   function escapeHtml(str) {
     return String(str === undefined || str === null ? "" : str)
       .replace(/&/g, "&amp;")
@@ -568,9 +746,13 @@
     return toISODate(new Date());
   }
 
+  function isoParaData(iso) {
+    var p = String(iso).split("-");
+    return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  }
+
   function isoMaisDias(iso, dias) {
-    var p = iso.split("-");
-    var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+    var d = isoParaData(iso);
     d.setDate(d.getDate() + dias);
     return toISODate(d);
   }
@@ -578,10 +760,23 @@
   // Fim da semana corrente (domingo). Se hoje já for domingo, é hoje.
   function fimDaSemanaISO() {
     var d = new Date();
-    var diaSemana = d.getDay(); // 0 = domingo
-    var faltam = diaSemana === 0 ? 0 : 7 - diaSemana;
-    d.setDate(d.getDate() + faltam);
+    var dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? 0 : 7 - dow));
     return toISODate(d);
+  }
+
+  // Próxima ocorrência do dia da semana (hoje conta, se for o mesmo dia).
+  function proximoDiaSemanaISO(dow) {
+    var d = new Date();
+    var delta = (dow - d.getDay() + 7) % 7;
+    d.setDate(d.getDate() + delta);
+    return toISODate(d);
+  }
+
+  function fimDoDiaTs(iso) {
+    var d = isoParaData(iso);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
   }
 
   function ddmmyyyyToIso(str) {
@@ -591,18 +786,14 @@
     return parts[2] + "-" + parts[1] + "-" + parts[0];
   }
 
-  function labelPrazo(iso) {
-    var hoje = hojeISO();
-    if (iso === hoje) return "Hoje";
-    if (iso === isoMaisDias(hoje, 1)) return "Amanhã";
-    if (iso === isoMaisDias(hoje, -1)) return "Ontem";
-    var p = iso.split("-");
+  function formatDDMM(iso) {
+    var p = String(iso).split("-");
     return p[2] + "/" + p[1];
   }
 
   function diasDesde(ts) {
     if (!ts) return 0;
-    return Math.floor((Date.now() - ts) / 86400000);
+    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
   }
 
   function truncar(texto, max) {
@@ -611,20 +802,78 @@
   }
 
   function ehHoje(ts) {
-    if (!ts) return false;
-    return toISODate(new Date(ts)) === hojeISO();
+    return !!ts && toISODate(new Date(ts)) === hojeISO();
   }
 
-  /* ---------- Recolha dos itens ---------- */
+  function chaveItem(source, refId) {
+    return source + "_" + refId;
+  }
+
+  /* ---------- Classificação de prazo ---------- */
+  // Ultrapassado → vermelho/negrito. Hoje ou amanhã → âmbar. Futuro → normal.
+  // Sem prazo → idade em dias, cinzento, sempre igual.
+  function prazoInfo(item) {
+    var hoje = hojeISO();
+    if (item.prazo) {
+      if (item.prazo < hoje) return { cls: 'prazo-late', label: formatDDMM(item.prazo) };
+      if (item.prazo === hoje) return { cls: 'prazo-soon', label: 'Hoje' };
+      if (item.prazo === isoMaisDias(hoje, 1)) return { cls: 'prazo-soon', label: 'Amanhã' };
+      return { cls: 'prazo-future', label: formatDDMM(item.prazo) };
+    }
+    return { cls: 'prazo-none', label: diasDesde(item.criadoTs) + 'd' };
+  }
+
+  function estaAtrasadoOuHoje(item) {
+    return !!item.prazo && item.prazo <= hojeISO();
+  }
+
+  /* ---------- Deteção de datas no texto ---------- */
+  var ACENTOS = { 'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'é': 'e', 'ê': 'e',
+    'í': 'i', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ç': 'c' };
+
+  function normalizar(texto) {
+    return String(texto || "").toLowerCase().replace(/[áàâãéêíóôõúç]/g, function (c) {
+      return ACENTOS[c] || c;
+    });
+  }
+
+  var PADROES_DATA = [
+    { re: /\bhoje\b/, tipo: 'hoje', label: 'hoje' },
+    { re: /\bamanha\b/, tipo: 'amanha', label: 'amanhã' },
+    { re: /\bdomingo\b/, dow: 0, label: 'domingo' },
+    { re: /\bsegunda(\s*-?\s*feira)?\b/, dow: 1, label: 'segunda' },
+    { re: /\bterca(\s*-?\s*feira)?\b/, dow: 2, label: 'terça' },
+    { re: /\bquarta(\s*-?\s*feira)?\b/, dow: 3, label: 'quarta' },
+    { re: /\bquinta(\s*-?\s*feira)?\b/, dow: 4, label: 'quinta' },
+    { re: /\bsexta(\s*-?\s*feira)?\b/, dow: 5, label: 'sexta' },
+    { re: /\bsabado\b/, dow: 6, label: 'sábado' }
+  ];
+
+  function detetarData(texto) {
+    var t = normalizar(texto);
+    for (var i = 0; i < PADROES_DATA.length; i++) {
+      var p = PADROES_DATA[i];
+      if (!p.re.test(t)) continue;
+      var iso;
+      if (p.tipo === 'hoje') iso = hojeISO();
+      else if (p.tipo === 'amanha') iso = isoMaisDias(hojeISO(), 1);
+      else iso = proximoDiaSemanaISO(p.dow);
+      return { iso: iso, label: p.label };
+    }
+    return null;
+  }
+
+  /* ---------- Modelo de itens ---------- */
   function tarefasProprias() {
     return Object.keys(allTasks).map(function (id) {
       var t = allTasks[id];
       return {
+        source: 'task',
         id: id,
         texto: t.texto || "",
         concluida: !!t.concluida,
-        createdAt: t.createdAt || 0,
-        concluidaEm: t.concluidaEm || 0,
+        criadoTs: t.createdAt || 0,
+        completedAt: t.completedAt || 0,
         prazo: t.prazo || null
       };
     });
@@ -635,14 +884,15 @@
     return status !== 'concluido' && status !== 'anulado';
   }
 
-  function pagamentoIso(p) {
+  function pagamentoPrazo(p) {
     var isos = (p.lines || []).map(function (l) {
       return ddmmyyyyToIso(l.prazo);
     }).filter(function (iso) { return !!iso; }).sort();
-    return isos.length ? isos[0] : hojeISO();
+    return isos.length ? isos[0] : null;
   }
 
-  function pagamentoResumo(p) {
+  function pagamentoItem(id) {
+    var p = allPayments[id];
     var lines = p.lines || [];
     var total = lines.reduce(function (soma, l) {
       var n = parseFloat(String(l.montante).replace(',', '.'));
@@ -650,205 +900,149 @@
     }, 0);
     var nome = lines.length ? (lines[0].fornecedor || "—") : "—";
     if (lines.length > 1) nome += " +" + (lines.length - 1);
-    return { nome: nome, total: total.toFixed(2) + "€" };
+    var criadoIso = ddmmyyyyToIso(p.date);
+    return {
+      source: 'pagamento',
+      id: id,
+      texto: truncar(nome, 60) + " · " + total.toFixed(2) + "€",
+      ref: p.numeroReferencia ? '#' + p.numeroReferencia : '',
+      meta: p.date ? 'Pedido em ' + p.date : '',
+      badge: '💶 Pagamento',
+      prazo: pagamentoPrazo(p),
+      criadoTs: criadoIso ? isoParaData(criadoIso).getTime() : 0,
+      href: 'pagamentos.html#pagamento-' + id
+    };
   }
 
-  function itensExternos() {
-    var itens = [];
-
-    Object.keys(allPayments).forEach(function (id) {
-      var p = allPayments[id];
-      if (!pagamentoPendente(p)) return;
-      var resumo = pagamentoResumo(p);
-      itens.push({
-        tipo: 'pagamento',
-        id: id,
-        iso: pagamentoIso(p),
-        badge: '💶 Pagamento',
-        ref: p.numeroReferencia ? '#' + p.numeroReferencia : '',
-        titulo: resumo.nome,
-        meta: resumo.total + (p.date ? ' · pedido em ' + p.date : ''),
-        href: 'pagamentos.html#pagamento-' + id
-      });
-    });
-
-    Object.keys(allPedidos).forEach(function (id) {
-      var p = allPedidos[id];
-      var estado = p.estado || 'novo';
-      if (estado !== 'novo' && estado !== 'em análise') return;
-      itens.push({
-        tipo: 'loja',
-        id: id,
-        iso: hojeISO(),
-        badge: '📝 Loja',
-        ref: '',
-        titulo: truncar(p.descricao, 90),
-        meta: (p.zona ? 'Zona: ' + p.zona : '') + (p.pessoa ? ' · ' + p.pessoa : ''),
-        href: 'loja-sao-bento.html#pedidos-section'
-      });
-    });
-
-    return itens;
+  function pedidoPendente(p) {
+    var estado = p.estado || 'novo';
+    return estado === 'novo' || estado === 'em análise';
   }
 
-  /* ---------- HTML das linhas ---------- */
-  function prazoChipHtml(t, hoje) {
-    if (!t.prazo) {
-      return '<button type="button" class="prazo-chip" title="Definir prazo">+ prazo</button>';
+  function pedidoItem(id) {
+    var p = allPedidos[id];
+    var meta = [];
+    if (p.zona) meta.push('Zona: ' + p.zona);
+    if (p.pessoa) meta.push(p.pessoa);
+    return {
+      source: 'loja',
+      id: id,
+      texto: truncar(p.descricao, 90),
+      ref: '',
+      meta: meta.join(' · '),
+      badge: '📝 Loja',
+      prazo: null,
+      criadoTs: p.dataHora ? new Date(p.dataHora).getTime() : 0,
+      href: 'loja-sao-bento.html#pedidos-section'
+    };
+  }
+
+  /* ---------- Snooze ---------- */
+  function estaEscondido(source, refId) {
+    var s = snoozed[chaveItem(source, refId)];
+    return !!(s && s.hiddenUntil && s.hiddenUntil > Date.now());
+  }
+
+  function esconderAte(source, refId, ts) {
+    var chave = chaveItem(source, refId);
+    snoozed[chave] = { hiddenUntil: ts };
+    snoozedRef.child(chave).child('hiddenUntil').set(ts);
+  }
+
+  /* ---------- todayPicks ---------- */
+  function pickValido(pick) {
+    if (!pick || !pick.source || !pick.refId) return false;
+    if (pick.source === 'task') {
+      var t = allTasks[pick.refId];
+      return !!t && !t.concluida;
     }
-    var cls = 'prazo-chip prazo-chip-set';
-    if (t.prazo <= hoje) cls += ' prazo-chip-late';
-    return '<button type="button" class="' + cls + '" title="Alterar prazo">📅 ' + escapeHtml(labelPrazo(t.prazo)) + '</button>';
-  }
-
-  function tarefaRowHtml(t, opcoes) {
-    opcoes = opcoes || {};
-    var hoje = hojeISO();
-    var classes = 'task-row';
-    var idade = '';
-
-    if (opcoes.envelhecer) {
-      var dias = diasDesde(t.createdAt);
-      if (dias >= 7) {
-        classes += ' task-row-age-hot';
-        idade = '<span class="task-age-label">' + dias + ' dias</span>';
-      } else if (dias >= 3) {
-        classes += ' task-row-age-warm';
-        idade = '<span class="task-age-label">' + dias + ' dias</span>';
-      }
+    if (pick.source === 'pagamento') {
+      var p = allPayments[pick.refId];
+      return !!p && pagamentoPendente(p);
     }
-
-    return '<div class="' + classes + '" data-id="' + t.id + '">' +
-      '<input type="checkbox" class="task-check"' + (t.concluida ? ' checked' : '') + '>' +
-      '<span class="task-text">' + escapeHtml(t.texto) + '</span>' +
-      idade +
-      (opcoes.semPrazoChip ? '' : prazoChipHtml(t, hoje)) +
-      '<button type="button" class="task-del" title="Apagar">🗑</button>' +
-      '</div>';
-  }
-
-  function externoRowHtml(item) {
-    return '<a class="task-row task-row-ext" href="' + escapeHtml(item.href) + '">' +
-      '<span class="ext-badge">' + escapeHtml(item.badge) + '</span>' +
-      '<span class="ext-text">' +
-        (item.ref ? '<span class="ext-ref">' + escapeHtml(item.ref) + '</span>' : '') +
-        escapeHtml(item.titulo) +
-        (item.meta ? '<span class="ext-meta">' + escapeHtml(item.meta) + '</span>' : '') +
-      '</span>' +
-      '<span class="ext-arrow">→</span>' +
-      '</a>';
-  }
-
-  /* ---------- Render ---------- */
-  var editingTaskId = null;
-  var popTaskId = null;
-  var renderPendente = false;
-
-  function flushRender() {
-    if (editingTaskId || popTaskId) {
-      renderPendente = true;
-      return;
+    if (pick.source === 'loja') {
+      var l = allPedidos[pick.refId];
+      return !!l && pedidoPendente(l);
     }
-    renderPendente = false;
-    renderAll();
+    return false;
   }
 
-  function mostrarSeccao(el, visivel) {
-    el.style.display = visivel ? 'block' : 'none';
+  function estaFixado(source, refId) {
+    return !!todayPicks[chaveItem(source, refId)];
   }
 
-  function renderAll() {
-    if (!carregado.tasks || !carregado.payments || !carregado.pedidos) return;
-    document.getElementById('loadingState').style.display = 'none';
-
-    var hoje = hojeISO();
-    var tarefas = tarefasProprias();
-    var externos = itensExternos();
-
-    var pendentes = tarefas.filter(function (t) { return !t.concluida; });
-
-    // 1. Atrasadas / Hoje — tarefas com prazo <= hoje + todos os itens pendentes
-    //    de outros módulos (contam sempre como "hoje").
-    var hojeItens = [];
-    pendentes.forEach(function (t) {
-      if (t.prazo && t.prazo <= hoje) {
-        hojeItens.push({ iso: t.prazo, ordem: t.createdAt, html: tarefaRowHtml(t) });
-      }
-    });
-    externos.forEach(function (e) {
-      hojeItens.push({ iso: e.iso, ordem: 0, html: externoRowHtml(e) });
-    });
-    hojeItens.sort(function (a, b) {
-      if (a.iso !== b.iso) return a.iso < b.iso ? -1 : 1;
-      return b.ordem - a.ordem;
-    });
-
-    // 2. Próximas — tarefas com prazo futuro, por data crescente
-    var proximas = pendentes.filter(function (t) {
-      return t.prazo && t.prazo > hoje;
-    }).sort(function (a, b) {
-      if (a.prazo !== b.prazo) return a.prazo < b.prazo ? -1 : 1;
-      return (a.createdAt || 0) - (b.createdAt || 0);
-    });
-
-    // 3. Sem prazo — mais recentes primeiro
-    var semPrazo = pendentes.filter(function (t) {
-      return !t.prazo;
-    }).sort(function (a, b) {
-      return (b.createdAt || 0) - (a.createdAt || 0);
-    });
-
-    // 4. Concluídas hoje
-    var concluidasHoje = tarefas.filter(function (t) {
-      return t.concluida && ehHoje(t.concluidaEm);
-    }).sort(function (a, b) {
-      return (b.concluidaEm || 0) - (a.concluidaEm || 0);
-    });
-
-    document.getElementById('listHoje').innerHTML = hojeItens.map(function (i) { return i.html; }).join('');
-    document.getElementById('countHoje').textContent = '(' + hojeItens.length + ')';
-    mostrarSeccao(document.getElementById('secHoje'), hojeItens.length > 0);
-
-    document.getElementById('listProximas').innerHTML = proximas.map(function (t) { return tarefaRowHtml(t); }).join('');
-    document.getElementById('countProximas').textContent = '(' + proximas.length + ')';
-    mostrarSeccao(document.getElementById('secProximas'), proximas.length > 0);
-
-    document.getElementById('listSemPrazo').innerHTML = semPrazo.map(function (t) {
-      return tarefaRowHtml(t, { envelhecer: true });
-    }).join('');
-    document.getElementById('countSemPrazo').textContent = '(' + semPrazo.length + ')';
-    mostrarSeccao(document.getElementById('secSemPrazo'), semPrazo.length > 0);
-
-    document.getElementById('listConcluidas').innerHTML = concluidasHoje.map(function (t) { return tarefaRowHtml(t); }).join('');
-    document.getElementById('summaryConcluidas').textContent = 'Concluídas hoje (' + concluidasHoje.length + ')';
-    document.getElementById('secConcluidas').style.display = concluidasHoje.length ? 'block' : 'none';
-
-    var totalPendente = hojeItens.length + proximas.length + semPrazo.length;
-    document.getElementById('emptyState').style.display = totalPendente === 0 ? 'block' : 'none';
+  function itemDoPick(pick) {
+    if (pick.source === 'task') {
+      var t = allTasks[pick.refId];
+      return {
+        source: 'task',
+        id: pick.refId,
+        texto: t.texto || "",
+        badge: '',
+        prazo: t.prazo || null,
+        criadoTs: t.createdAt || 0
+      };
+    }
+    if (pick.source === 'pagamento') return pagamentoItem(pick.refId);
+    return pedidoItem(pick.refId);
   }
 
-  /* ---------- Escritas (uma chave de cada vez) ---------- */
-  function addTask() {
-    var input = document.getElementById('taskInput');
-    var texto = input.value.trim();
-    if (!texto) return;
-    tasksRef.push({ texto: texto, concluida: false, createdAt: Date.now() });
-    input.value = '';
+  function fixar(source, refId) {
+    var chave = chaveItem(source, refId);
+    if (todayPicks[chave]) {
+      delete todayPicks[chave];
+      todayPicksRef.child(chave).remove();
+      esconderAvisoHoje();
+    } else {
+      var pick = { source: source, refId: refId, pinnedAt: Date.now() };
+      todayPicks[chave] = pick;
+      todayPicksRef.child(chave).set(pick);
+      // Não bloqueia acima de 5 — só avisa.
+      if (Object.keys(todayPicks).length > MAX_HOJE) mostrarAvisoHoje();
+    }
+    flushRender();
   }
 
+  var avisoTimeout = null;
+
+  function mostrarAvisoHoje() {
+    var el = document.getElementById('hojeAviso');
+    el.style.display = 'block';
+    if (avisoTimeout) clearTimeout(avisoTimeout);
+    avisoTimeout = setTimeout(esconderAvisoHoje, 6000);
+  }
+
+  function esconderAvisoHoje() {
+    if (avisoTimeout) { clearTimeout(avisoTimeout); avisoTimeout = null; }
+    document.getElementById('hojeAviso').style.display = 'none';
+  }
+
+  // Limpa picks cujo item desapareceu, foi concluído ou deixou de estar pendente.
+  function limparPicks() {
+    var removidos = false;
+    Object.keys(todayPicks).forEach(function (chave) {
+      if (pickValido(todayPicks[chave])) return;
+      delete todayPicks[chave];
+      todayPicksRef.child(chave).remove();
+      removidos = true;
+    });
+    return removidos;
+  }
+
+  /* ---------- Escritas em tasks/ (uma chave de cada vez) ---------- */
   function setConcluida(id, valor) {
     if (!allTasks[id]) return;
     if (valor) {
-      allTasks[id].concluidaEm = Date.now();
+      allTasks[id].completedAt = Date.now();
       allTasks[id].concluida = true;
-      tasksRef.child(id).child('concluidaEm').set(allTasks[id].concluidaEm).then(function () {
+      tasksRef.child(id).child('completedAt').set(allTasks[id].completedAt).then(function () {
         return tasksRef.child(id).child('concluida').set(true);
       });
     } else {
       allTasks[id].concluida = false;
-      delete allTasks[id].concluidaEm;
+      delete allTasks[id].completedAt;
       tasksRef.child(id).child('concluida').set(false).then(function () {
-        return tasksRef.child(id).child('concluidaEm').remove();
+        return tasksRef.child(id).child('completedAt').remove();
       });
     }
     flushRender();
@@ -877,14 +1071,260 @@
     flushRender();
   }
 
+  /* ---------- Adicionar tarefa + sugestão de prazo ---------- */
+  var sugestao = null;
+  var sugestaoTimeout = null;
+
+  function limparSugestao() {
+    if (sugestaoTimeout) { clearTimeout(sugestaoTimeout); sugestaoTimeout = null; }
+    sugestao = null;
+  }
+
+  function addTask() {
+    var input = document.getElementById('taskInput');
+    var texto = input.value.trim();
+    if (!texto) return;
+    input.value = '';
+
+    var detetada = detetarData(texto);
+
+    // A chave é gerada localmente antes da escrita: o Firebase levanta o evento
+    // local ainda dentro do set(), e a sugestão tem de já existir nessa altura.
+    var ref = tasksRef.push();
+
+    limparSugestao();
+    if (detetada) {
+      sugestao = { id: ref.key, iso: detetada.iso, label: detetada.label };
+      sugestaoTimeout = setTimeout(function () {
+        limparSugestao();
+        flushRender();
+      }, SUGESTAO_MS);
+    }
+
+    ref.set({ texto: texto, concluida: false, createdAt: Date.now() });
+  }
+
+  /* ---------- Render ---------- */
+  var editingTaskId = null;
+  var popAberto = null;   // { tipo:'prazo'|'adiar', source, refId }
+  var renderPendente = false;
+
+  function flushRender() {
+    if (editingTaskId || popAberto) {
+      renderPendente = true;
+      return;
+    }
+    renderPendente = false;
+    renderAll();
+  }
+
+  function pinBtnHtml(source, refId) {
+    var on = estaFixado(source, refId);
+    return '<button type="button" class="row-btn btn-pin' + (on ? ' btn-pin-on' : '') +
+      '" data-source="' + source + '" data-ref="' + refId + '" title="' +
+      (on ? 'Tirar do Hoje' : 'Trazer para hoje') + '">' + (on ? '★' : '☆') + '</button>';
+  }
+
+  function prazoHtml(item, editavel) {
+    var info = prazoInfo(item);
+    if (editavel) {
+      return '<button type="button" class="prazo ' + info.cls + '" title="Definir prazo">' + escapeHtml(info.label) + '</button>';
+    }
+    return '<span class="prazo ' + info.cls + '">' + escapeHtml(info.label) + '</span>';
+  }
+
+  function tarefaRowHtml(t) {
+    return '<div class="task-row" data-source="task" data-id="' + t.id + '">' +
+      '<input type="checkbox" class="task-check"' + (t.concluida ? ' checked' : '') + '>' +
+      '<span class="task-text">' + escapeHtml(t.texto) + '</span>' +
+      prazoHtml(t, !t.concluida) +
+      pinBtnHtml('task', t.id) +
+      '<button type="button" class="row-btn btn-del" title="Apagar">🗑</button>' +
+      '</div>';
+  }
+
+  function tarefaFeitaRowHtml(t) {
+    return '<div class="task-row" data-source="task" data-id="' + t.id + '">' +
+      '<input type="checkbox" class="task-check" checked>' +
+      '<span class="task-text">' + escapeHtml(t.texto) + '</span>' +
+      '<button type="button" class="row-btn btn-del" title="Apagar">🗑</button>' +
+      '</div>';
+  }
+
+  function externoRowHtml(item) {
+    return '<div class="task-row" data-source="' + item.source + '" data-id="' + item.id + '">' +
+      '<span class="ext-badge">' + escapeHtml(item.badge) + '</span>' +
+      '<a class="ext-link" href="' + escapeHtml(item.href) + '">' +
+        (item.ref ? '<span class="ext-ref">' + escapeHtml(item.ref) + '</span>' : '') +
+        escapeHtml(item.texto) +
+        (item.meta ? '<span class="ext-meta">' + escapeHtml(item.meta) + '</span>' : '') +
+      '</a>' +
+      prazoHtml(item, false) +
+      pinBtnHtml(item.source, item.id) +
+      '<button type="button" class="row-btn btn-adiar" title="Adiar">⏰</button>' +
+      '</div>';
+  }
+
+  function sugestaoHtml() {
+    return '<div class="sugestao" id="sugestaoChip">' +
+      '<span>📅 Definir prazo para ' + escapeHtml(sugestao.label) + '?</span>' +
+      '<button type="button" class="btn-sugestao" data-op="sim">Sim</button>' +
+      '<button type="button" class="btn-sugestao" data-op="nao">Ignorar</button>' +
+      '</div>';
+  }
+
+  function reviewNoteHtml() {
+    return '<div class="review-note">' +
+      '<span>Há mais de 7 dias sem reveres estas tarefas</span>' +
+      '<button type="button" class="btn-review" id="btnRevi">Revi agora ✓</button>' +
+      '</div>';
+  }
+
+  function hojeRowHtml(item, indice, automatico) {
+    return '<div class="hoje-row" data-source="' + item.source + '" data-id="' + item.id +
+      '" data-auto="' + (automatico ? '1' : '0') + '">' +
+      '<span class="hoje-num">' + pad2(indice) + '</span>' +
+      '<span class="hoje-text">' + escapeHtml(item.texto) + '</span>' +
+      (item.badge ? '<span class="hoje-badge">' + escapeHtml(item.badge) + '</span>' : '') +
+      '<button type="button" class="hoje-x" title="' +
+        (automatico ? 'Esconder até amanhã' : 'Tirar do Hoje') + '">×</button>' +
+      '</div>';
+  }
+
+  // Composição do bloco Hoje: fixados manualmente (por pinnedAt) e depois
+  // preenchimento automático com prazos vencidos/hoje até 5.
+  function construirHoje(tarefas, pagamentos) {
+    var fixados = Object.keys(todayPicks).map(function (chave) {
+      return todayPicks[chave];
+    }).filter(pickValido).sort(function (a, b) {
+      return (a.pinnedAt || 0) - (b.pinnedAt || 0);
+    }).map(function (pick) {
+      return { item: itemDoPick(pick), automatico: false };
+    });
+
+    var candidatos = tarefas.filter(function (t) {
+      return !t.concluida && estaAtrasadoOuHoje(t);
+    }).concat(pagamentos.filter(estaAtrasadoOuHoje));
+
+    var automaticos = candidatos.filter(function (item) {
+      return !estaFixado(item.source, item.id) && !estaEscondido(item.source, item.id);
+    }).sort(function (a, b) {
+      if (a.prazo !== b.prazo) return a.prazo < b.prazo ? -1 : 1;
+      return (a.criadoTs || 0) - (b.criadoTs || 0);
+    }).slice(0, Math.max(0, MAX_HOJE - fixados.length)).map(function (item) {
+      return { item: item, automatico: true };
+    });
+
+    return fixados.concat(automaticos);
+  }
+
+  function renderAll() {
+    if (!carregado.tasks || !carregado.payments || !carregado.pedidos ||
+        !carregado.picks || !carregado.snoozed || !carregado.review) return;
+    document.getElementById('loadingState').style.display = 'none';
+
+    if (limparPicks()) { /* segue com o estado local já limpo */ }
+
+    var hoje = hojeISO();
+    var tarefas = tarefasProprias();
+
+    var pagamentos = Object.keys(allPayments)
+      .filter(function (id) { return pagamentoPendente(allPayments[id]); })
+      .map(pagamentoItem);
+
+    var pedidos = Object.keys(allPedidos)
+      .filter(function (id) { return pedidoPendente(allPedidos[id]); })
+      .map(pedidoItem);
+
+    /* ----- Bloco Hoje ----- */
+    var linhasHoje = construirHoje(tarefas, pagamentos);
+    document.getElementById('hojeBlock').style.display = 'block';
+    document.getElementById('hojeList').innerHTML = linhasHoje.map(function (l, i) {
+      return hojeRowHtml(l.item, i + 1, l.automatico);
+    }).join('');
+    var contador = document.getElementById('hojeCount');
+    contador.textContent = linhasHoje.length + '/' + MAX_HOJE;
+    contador.className = 'hoje-count' + (linhasHoje.length > MAX_HOJE ? ' over' : '');
+    document.getElementById('hojeEmpty').style.display = linhasHoje.length ? 'none' : 'block';
+
+    /* ----- As minhas ----- */
+    var minhas = tarefas.filter(function (t) { return !t.concluida; });
+    var grupoA = minhas.filter(estaAtrasadoOuHoje).sort(function (a, b) {
+      return a.prazo < b.prazo ? -1 : (a.prazo > b.prazo ? 1 : 0);
+    });
+    var grupoB = minhas.filter(function (t) { return t.prazo && t.prazo > hoje; }).sort(function (a, b) {
+      return a.prazo < b.prazo ? -1 : (a.prazo > b.prazo ? 1 : 0);
+    });
+    var grupoC = minhas.filter(function (t) { return !t.prazo; }).sort(function (a, b) {
+      return (b.criadoTs || 0) - (a.criadoTs || 0);
+    });
+
+    var mostrarRevisao = grupoC.length > 0 && (Date.now() - (lastReview || 0)) > 7 * 86400000;
+
+    var htmlMinhas = '';
+    grupoA.concat(grupoB).forEach(function (t) {
+      htmlMinhas += tarefaRowHtml(t);
+      if (sugestao && sugestao.id === t.id) htmlMinhas += sugestaoHtml();
+    });
+    if (mostrarRevisao) htmlMinhas += reviewNoteHtml();
+    grupoC.forEach(function (t) {
+      htmlMinhas += tarefaRowHtml(t);
+      if (sugestao && sugestao.id === t.id) htmlMinhas += sugestaoHtml();
+    });
+
+    document.getElementById('listMinhas').innerHTML = htmlMinhas;
+    document.getElementById('countMinhas').textContent = '(' + minhas.length + ')';
+    document.getElementById('secMinhas').style.display = minhas.length ? 'block' : 'none';
+
+    /* ----- Pagamentos ----- */
+    var pagVisiveis = pagamentos.filter(function (p) {
+      return !estaEscondido('pagamento', p.id);
+    }).sort(function (a, b) {
+      if (!a.prazo && !b.prazo) return (a.criadoTs || 0) - (b.criadoTs || 0);
+      if (!a.prazo) return 1;
+      if (!b.prazo) return -1;
+      return a.prazo < b.prazo ? -1 : (a.prazo > b.prazo ? 1 : 0);
+    });
+
+    document.getElementById('listPagamentos').innerHTML = pagVisiveis.map(externoRowHtml).join('');
+    document.getElementById('countPagamentos').textContent = '(' + pagVisiveis.length + ')';
+    document.getElementById('secPagamentos').style.display = pagVisiveis.length ? 'block' : 'none';
+
+    /* ----- Loja ----- */
+    var lojaVisiveis = pedidos.filter(function (p) {
+      return !estaEscondido('loja', p.id);
+    }).sort(function (a, b) {
+      return (b.criadoTs || 0) - (a.criadoTs || 0);
+    });
+
+    document.getElementById('listLoja').innerHTML = lojaVisiveis.map(externoRowHtml).join('');
+    document.getElementById('summaryLoja').textContent = '📝 Loja (' + lojaVisiveis.length + ')';
+    document.getElementById('secLoja').style.display = lojaVisiveis.length ? 'block' : 'none';
+
+    /* ----- Feitas hoje ----- */
+    var feitas = tarefas.filter(function (t) {
+      return t.concluida && ehHoje(t.completedAt);
+    }).sort(function (a, b) {
+      return (b.completedAt || 0) - (a.completedAt || 0);
+    });
+
+    document.getElementById('listFeitas').innerHTML = feitas.map(tarefaFeitaRowHtml).join('');
+    document.getElementById('summaryFeitas').textContent = 'Feitas hoje (' + feitas.length + ')';
+    document.getElementById('secFeitas').style.display = feitas.length ? 'block' : 'none';
+
+    /* ----- Estado vazio (fora do bloco Hoje) ----- */
+    var totalPendente = minhas.length + pagVisiveis.length + lojaVisiveis.length;
+    document.getElementById('emptyState').style.display = totalPendente === 0 ? 'block' : 'none';
+  }
+
   /* ---------- Edição inline ---------- */
   function iniciarEdicao(span) {
     var row = span.closest('.task-row');
-    if (!row) return;
+    if (!row || row.closest('.fold-done')) return;
     var id = row.getAttribute('data-id');
     if (!allTasks[id]) return;
 
-    fecharPrazoPop(false);
+    fecharPop(false);
     editingTaskId = id;
 
     var input = document.createElement('input');
@@ -901,116 +1341,178 @@
       terminado = true;
       editingTaskId = null;
       var novo = input.value.trim();
-      if (guardar && novo && novo !== (allTasks[id] || {}).texto) {
-        setTexto(id, novo);
-      }
+      if (guardar && novo && novo !== (allTasks[id] || {}).texto) setTexto(id, novo);
       flushRender();
     }
 
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        terminar(true);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        terminar(false);
-      }
+      if (e.key === 'Enter') { e.preventDefault(); terminar(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); terminar(false); }
     });
-    input.addEventListener('blur', function () {
-      terminar(true);
-    });
+    input.addEventListener('blur', function () { terminar(true); });
   }
 
-  /* ---------- Seletor de prazo ---------- */
+  /* ---------- Popovers ---------- */
   var prazoPop = document.getElementById('prazoPop');
   var prazoPopDate = document.getElementById('prazoPopDate');
+  var adiarPop = document.getElementById('adiarPop');
 
-  function abrirPrazoPop(btn) {
+  function abrirPop(tipo, btn) {
     var row = btn.closest('.task-row');
     if (!row) return;
-    popTaskId = row.getAttribute('data-id');
-    prazoPopDate.value = (allTasks[popTaskId] || {}).prazo || '';
+    var source = row.getAttribute('data-source');
+    var refId = row.getAttribute('data-id');
+    var pop = tipo === 'prazo' ? prazoPop : adiarPop;
 
-    prazoPop.style.display = 'block';
+    popAberto = { tipo: tipo, source: source, refId: refId };
+    if (tipo === 'prazo') prazoPopDate.value = (allTasks[refId] || {}).prazo || '';
+
+    pop.style.display = 'block';
     var r = btn.getBoundingClientRect();
-    var maxLeft = window.pageXOffset + document.documentElement.clientWidth - prazoPop.offsetWidth - 10;
-    prazoPop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
-    prazoPop.style.left = Math.max(10, Math.min(r.left + window.pageXOffset, maxLeft)) + 'px';
+    var maxLeft = window.pageXOffset + document.documentElement.clientWidth - pop.offsetWidth - 10;
+    pop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
+    pop.style.left = Math.max(10, Math.min(r.left + window.pageXOffset, maxLeft)) + 'px';
   }
 
-  function fecharPrazoPop(render) {
+  function fecharPop(render) {
     prazoPop.style.display = 'none';
-    popTaskId = null;
+    adiarPop.style.display = 'none';
+    popAberto = null;
     if (render !== false && renderPendente) flushRender();
   }
 
   prazoPop.addEventListener('click', function (e) {
-    var opt = e.target.closest('.prazo-opt');
-    if (!opt || !popTaskId) return;
+    var opt = e.target.closest('.pop-opt');
+    if (!opt || !popAberto) return;
     var op = opt.getAttribute('data-op');
     var iso = null;
     if (op === 'hoje') iso = hojeISO();
     else if (op === 'amanha') iso = isoMaisDias(hojeISO(), 1);
     else if (op === 'semana') iso = fimDaSemanaISO();
-    setPrazo(popTaskId, iso);
-    fecharPrazoPop(false);
+    setPrazo(popAberto.refId, iso);
+    fecharPop(false);
     flushRender();
   });
 
   prazoPopDate.addEventListener('change', function () {
-    if (!popTaskId) return;
-    setPrazo(popTaskId, prazoPopDate.value || null);
-    fecharPrazoPop(false);
+    if (!popAberto) return;
+    setPrazo(popAberto.refId, prazoPopDate.value || null);
+    fecharPop(false);
+    flushRender();
+  });
+
+  adiarPop.addEventListener('click', function (e) {
+    var opt = e.target.closest('.pop-opt');
+    if (!opt || !popAberto) return;
+    var op = opt.getAttribute('data-op');
+    // "Ver amanhã" → escondido até ao fim de hoje. "Ver esta semana" → até à véspera do fim da semana.
+    var ate = op === 'semana'
+      ? fimDoDiaTs(isoMaisDias(fimDaSemanaISO(), -1))
+      : fimDoDiaTs(hojeISO());
+    if (ate <= Date.now()) ate = fimDoDiaTs(hojeISO());
+    esconderAte(popAberto.source, popAberto.refId, ate);
+    fecharPop(false);
     flushRender();
   });
 
   document.addEventListener('click', function (e) {
-    if (!popTaskId) return;
-    if (e.target.closest('#prazoPop') || e.target.closest('.prazo-chip')) return;
-    fecharPrazoPop(true);
+    if (!popAberto) return;
+    if (e.target.closest('.pop') || e.target.closest('.prazo') || e.target.closest('.btn-adiar')) return;
+    fecharPop(true);
   });
 
-  /* ---------- Delegação de eventos da lista ---------- */
+  /* ---------- Delegação de eventos ---------- */
   var mainEl = document.getElementById('main');
 
   mainEl.addEventListener('click', function (e) {
-    var chip = e.target.closest('.prazo-chip');
-    if (chip) {
-      if (popTaskId) {
-        var mesmo = chip.closest('.task-row').getAttribute('data-id') === popTaskId;
-        fecharPrazoPop(false);
-        if (mesmo) { flushRender(); return; }
+    /* --- bloco Hoje --- */
+    var x = e.target.closest('.hoje-x');
+    if (x) {
+      var hojeRow = x.closest('.hoje-row');
+      var source = hojeRow.getAttribute('data-source');
+      var refId = hojeRow.getAttribute('data-id');
+      if (hojeRow.getAttribute('data-auto') === '1') {
+        esconderAte(source, refId, fimDoDiaTs(hojeISO()));
+      } else {
+        delete todayPicks[chaveItem(source, refId)];
+        todayPicksRef.child(chaveItem(source, refId)).remove();
+        esconderAvisoHoje();
       }
-      abrirPrazoPop(chip);
+      flushRender();
       return;
     }
 
-    var del = e.target.closest('.task-del');
+    /* --- sugestão de prazo --- */
+    var sug = e.target.closest('.btn-sugestao');
+    if (sug) {
+      if (sug.getAttribute('data-op') === 'sim' && sugestao) setPrazo(sugestao.id, sugestao.iso);
+      limparSugestao();
+      flushRender();
+      return;
+    }
+
+    /* --- revisão semanal --- */
+    if (e.target.closest('#btnRevi')) {
+      lastReview = Date.now();
+      lastReviewRef.set(lastReview);
+      flushRender();
+      return;
+    }
+
+    /* --- fixar --- */
+    var pin = e.target.closest('.btn-pin');
+    if (pin) {
+      fixar(pin.getAttribute('data-source'), pin.getAttribute('data-ref'));
+      return;
+    }
+
+    /* --- adiar --- */
+    var adiar = e.target.closest('.btn-adiar');
+    if (adiar) {
+      if (popAberto && popAberto.tipo === 'adiar' &&
+          popAberto.refId === adiar.closest('.task-row').getAttribute('data-id')) {
+        fecharPop(true);
+        return;
+      }
+      fecharPop(false);
+      abrirPop('adiar', adiar);
+      return;
+    }
+
+    /* --- indicador de prazo (só tarefas próprias) --- */
+    var prazoBtn = e.target.closest('button.prazo');
+    if (prazoBtn) {
+      if (popAberto && popAberto.tipo === 'prazo' &&
+          popAberto.refId === prazoBtn.closest('.task-row').getAttribute('data-id')) {
+        fecharPop(true);
+        return;
+      }
+      fecharPop(false);
+      abrirPop('prazo', prazoBtn);
+      return;
+    }
+
+    /* --- apagar --- */
+    var del = e.target.closest('.btn-del');
     if (del) {
-      var rowDel = del.closest('.task-row');
-      apagarTarefa(rowDel.getAttribute('data-id'));
+      apagarTarefa(del.closest('.task-row').getAttribute('data-id'));
       return;
     }
 
+    /* --- editar --- */
     var texto = e.target.closest('.task-text');
-    if (texto) {
-      iniciarEdicao(texto);
-    }
+    if (texto) iniciarEdicao(texto);
   });
 
   mainEl.addEventListener('change', function (e) {
     var check = e.target.closest('.task-check');
     if (!check) return;
-    var row = check.closest('.task-row');
-    setConcluida(row.getAttribute('data-id'), check.checked);
+    setConcluida(check.closest('.task-row').getAttribute('data-id'), check.checked);
   });
 
   document.getElementById('btnAddTask').addEventListener('click', addTask);
   document.getElementById('taskInput').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTask();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); addTask(); }
   });
 
   /* ---------- Ligação ao Firebase ---------- */
@@ -1029,6 +1531,24 @@
   pedidosRef.on('value', function (snapshot) {
     allPedidos = snapshot.val() || {};
     carregado.pedidos = true;
+    flushRender();
+  });
+
+  todayPicksRef.on('value', function (snapshot) {
+    todayPicks = snapshot.val() || {};
+    carregado.picks = true;
+    flushRender();
+  });
+
+  snoozedRef.on('value', function (snapshot) {
+    snoozed = snapshot.val() || {};
+    carregado.snoozed = true;
+    flushRender();
+  });
+
+  lastReviewRef.on('value', function (snapshot) {
+    lastReview = snapshot.val() || 0;
+    carregado.review = true;
     flushRender();
   });
 </script>

@@ -20,7 +20,7 @@
     --white:#FFFFFF;
     --line:#E2DDD1;
     --muted:#6b6660;
-    --amber:#B8860B;
+    --amber:#C08A2E;
     --green:#1E7A46;
     --blue:#1D5C8A;
   }
@@ -511,30 +511,91 @@
     flex:1;
   }
 
-  .task-summary{
-    margin-top:22px;
+  .task-sugestao{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    padding:8px 10px;
+    border:1px solid var(--amber);
+    background:#FBF4E7;
+    font-size:12px;
+    color:#6d4e12;
   }
 
-  .task-summary-count{
+  .task-sugestao span{
+    flex:1;
+  }
+
+  .btn-sugestao{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    padding:5px 8px;
+    border:1px solid var(--amber);
+    background:var(--white);
+    color:#6d4e12;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  .btn-sugestao:hover{
+    background:var(--amber);
+    color:var(--white);
+  }
+
+  .task-hoje{
+    margin-top:18px;
+    background:var(--black);
+    padding:6px 14px 8px;
+  }
+
+  .task-hoje-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-top:1px solid #2e2c29;
+    font-size:13px;
+    color:var(--white);
+  }
+
+  .task-hoje-row:first-child{
+    border-top:none;
+  }
+
+  .task-hoje-num{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--red);
+    flex-shrink:0;
+  }
+
+  .task-hoje-text{
+    flex:1;
+    word-break:break-word;
+  }
+
+  .task-hoje-badge{
+    flex-shrink:0;
+    font-size:12px;
+  }
+
+  .task-count{
     font-family:'Space Mono', monospace;
     font-size:26px;
     font-weight:700;
-    margin:0;
+    margin:22px 0 0;
     line-height:1.1;
   }
 
-  .task-summary-break{
-    font-size:12px;
-    color:var(--muted);
-    margin:6px 0 0;
-  }
-
-  .task-summary-due{
+  .task-due{
     font-family:'Space Mono', monospace;
     font-size:12px;
     font-weight:700;
     color:var(--red);
-    margin:10px 0 0;
+    margin:12px 0 0;
   }
 
   .task-card-hint{
@@ -1919,11 +1980,11 @@
         <button type="button" class="btn-small" id="btnAddTask">+</button>
       </div>
 
-      <div class="task-summary" id="taskSummary" style="display:none;">
-        <p class="task-summary-count" id="taskSummaryCount">0 pendentes</p>
-        <p class="task-summary-break" id="taskSummaryBreak"></p>
-        <p class="task-summary-due" id="taskSummaryDue" style="display:none;"></p>
-      </div>
+      <div class="task-sugestao" id="taskSugestao" style="display:none;"></div>
+
+      <div class="task-hoje" id="taskHoje" style="display:none;"></div>
+      <p class="task-count" id="taskCount" style="display:none;"></p>
+      <p class="task-due" id="taskDue" style="display:none;"></p>
 
       <p class="empty-state-inline" id="taskEmptyInline" style="display:none;">Sem tarefas pendentes ✓</p>
       <p class="task-card-hint">→ Abrir tarefas</p>
@@ -2213,6 +2274,8 @@ window.addEventListener('load', function () {
   var db = firebase.database();
   var paymentRequestsRef = db.ref('paymentRequests');
   var tasksRef = db.ref('tasks');
+  var todayPicksRef = db.ref('todayPicks');
+  var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
 
   var loadingEl = document.getElementById('paymentsLoading');
@@ -2267,6 +2330,13 @@ window.addEventListener('load', function () {
     var parts = iso.split("-");
     if (parts.length !== 3) return "";
     return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function ddmmyyyyToIso(str) {
+    if (!str) return "";
+    var parts = String(str).split("/");
+    if (parts.length !== 3) return "";
+    return parts[2] + "-" + parts[1] + "-" + parts[0];
   }
 
   function formatMontante(montante) {
@@ -3449,17 +3519,116 @@ window.addEventListener('load', function () {
   var taskInput = document.getElementById('taskInput');
   var btnAddTask = document.getElementById('btnAddTask');
   var taskEmptyEl = document.getElementById('taskEmptyInline');
-  var taskSummaryEl = document.getElementById('taskSummary');
-  var taskSummaryCountEl = document.getElementById('taskSummaryCount');
-  var taskSummaryBreakEl = document.getElementById('taskSummaryBreak');
-  var taskSummaryDueEl = document.getElementById('taskSummaryDue');
+  var taskHojeEl = document.getElementById('taskHoje');
+  var taskCountEl = document.getElementById('taskCount');
+  var taskDueEl = document.getElementById('taskDue');
+  var taskSugestaoEl = document.getElementById('taskSugestao');
   var allTasks = {};
+  var todayPicks = {};
+  var snoozedItens = {};
+
+  var MAX_HOJE = 5;
+  var SUGESTAO_MS = 9000;
+
+  /* ---------- Datas ---------- */
+  function tarefasHojeISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function tarefasIsoParaData(iso) {
+    var p = String(iso).split('-');
+    return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  }
+
+  function tarefasIsoMaisDias(iso, dias) {
+    var d = tarefasIsoParaData(iso);
+    d.setDate(d.getDate() + dias);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function tarefasProximoDiaSemanaISO(dow) {
+    var d = new Date();
+    d.setDate(d.getDate() + ((dow - d.getDay() + 7) % 7));
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  /* ---------- Deteção de datas no texto (igual à de tarefas.html) ---------- */
+  var ACENTOS = { 'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'é': 'e', 'ê': 'e',
+    'í': 'i', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ç': 'c' };
+
+  function normalizarTexto(texto) {
+    return String(texto || '').toLowerCase().replace(/[áàâãéêíóôõúç]/g, function (c) {
+      return ACENTOS[c] || c;
+    });
+  }
+
+  var PADROES_DATA = [
+    { re: /\bhoje\b/, tipo: 'hoje', label: 'hoje' },
+    { re: /\bamanha\b/, tipo: 'amanha', label: 'amanhã' },
+    { re: /\bdomingo\b/, dow: 0, label: 'domingo' },
+    { re: /\bsegunda(\s*-?\s*feira)?\b/, dow: 1, label: 'segunda' },
+    { re: /\bterca(\s*-?\s*feira)?\b/, dow: 2, label: 'terça' },
+    { re: /\bquarta(\s*-?\s*feira)?\b/, dow: 3, label: 'quarta' },
+    { re: /\bquinta(\s*-?\s*feira)?\b/, dow: 4, label: 'quinta' },
+    { re: /\bsexta(\s*-?\s*feira)?\b/, dow: 5, label: 'sexta' },
+    { re: /\bsabado\b/, dow: 6, label: 'sábado' }
+  ];
+
+  function detetarData(texto) {
+    var t = normalizarTexto(texto);
+    for (var i = 0; i < PADROES_DATA.length; i++) {
+      var p = PADROES_DATA[i];
+      if (!p.re.test(t)) continue;
+      var iso;
+      if (p.tipo === 'hoje') iso = tarefasHojeISO();
+      else if (p.tipo === 'amanha') iso = tarefasIsoMaisDias(tarefasHojeISO(), 1);
+      else iso = tarefasProximoDiaSemanaISO(p.dow);
+      return { iso: iso, label: p.label };
+    }
+    return null;
+  }
+
+  var sugestao = null;
+  var sugestaoTimeout = null;
+
+  function limparSugestao() {
+    if (sugestaoTimeout) { clearTimeout(sugestaoTimeout); sugestaoTimeout = null; }
+    sugestao = null;
+    taskSugestaoEl.style.display = 'none';
+    taskSugestaoEl.innerHTML = '';
+  }
+
+  function mostrarSugestao(id, detetada) {
+    sugestao = { id: id, iso: detetada.iso };
+    taskSugestaoEl.innerHTML =
+      '<span>📅 Definir prazo para ' + escapeHtml(detetada.label) + '?</span>' +
+      '<button type="button" class="btn-sugestao" data-op="sim">Sim</button>' +
+      '<button type="button" class="btn-sugestao" data-op="nao">Ignorar</button>';
+    taskSugestaoEl.style.display = 'flex';
+    sugestaoTimeout = setTimeout(limparSugestao, SUGESTAO_MS);
+  }
+
+  taskSugestaoEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-sugestao');
+    if (!btn) return;
+    // Trava aqui: limparSugestao() apaga o botão do DOM e, sem isto, o clique
+    // continuava a subir até ao cartão — que abria tarefas.html.
+    e.stopPropagation();
+    if (btn.getAttribute('data-op') === 'sim' && sugestao) {
+      tasksRef.child(sugestao.id).child('prazo').set(sugestao.iso);
+    }
+    limparSugestao();
+  });
 
   function addTask() {
     var texto = taskInput.value.trim();
     if (!texto) return;
-    tasksRef.push({ texto: texto, concluida: false, createdAt: Date.now() });
     taskInput.value = '';
+    var detetada = detetarData(texto);
+    var ref = tasksRef.push({ texto: texto, concluida: false, createdAt: Date.now() });
+    limparSugestao();
+    if (detetada) mostrarSugestao(ref.key, detetada);
   }
 
   btnAddTask.addEventListener('click', addTask);
@@ -3471,68 +3640,175 @@ window.addEventListener('load', function () {
   });
 
   document.getElementById('cardTasks').addEventListener('click', function (e) {
-    if (e.target.closest('.task-input-row')) return;
+    if (e.target.closest('.task-input-row') || e.target.closest('.task-sugestao')) return;
     window.location.href = 'tarefas.html';
   });
 
-  // Resumo do cartão — mesma lógica de "atrasadas / hoje" que tarefas.html:
-  // tarefas próprias com prazo <= hoje, mais todos os itens pendentes de
-  // paymentRequests/ e lojaPedidos/ (que contam sempre como "hoje").
-  function tarefasHojeISO() {
-    var d = new Date();
-    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  /* ---------- Bloco "Hoje" — mesma composição de tarefas.html ---------- */
+  function chaveItem(source, refId) {
+    return source + '_' + refId;
   }
 
-  function pagamentosPendentesTarefas() {
-    var val = allPaymentRequests || {};
-    return Object.keys(val).filter(function (id) {
-      var status = val[id].status || 'pendente';
-      return status !== 'concluido' && status !== 'anulado';
-    });
+  function itemEscondido(source, refId) {
+    var s = snoozedItens[chaveItem(source, refId)];
+    return !!(s && s.hiddenUntil && s.hiddenUntil > Date.now());
   }
 
-  function pedidosPendentesTarefas() {
-    var val = allPedidos || {};
-    return Object.keys(val).filter(function (id) {
-      var estado = val[id].estado || 'novo';
-      return estado === 'novo' || estado === 'em análise';
+  function pagamentoPendenteDash(p) {
+    var status = p.status || 'pendente';
+    return status !== 'concluido' && status !== 'anulado';
+  }
+
+  function pedidoPendenteDash(p) {
+    var estado = p.estado || 'novo';
+    return estado === 'novo' || estado === 'em análise';
+  }
+
+  function pagamentoPrazoDash(p) {
+    var isos = (p.lines || []).map(function (l) {
+      return ddmmyyyyToIso(l.prazo);
+    }).filter(function (iso) { return !!iso; }).sort();
+    return isos.length ? isos[0] : null;
+  }
+
+  function pagamentoTextoDash(p) {
+    var lines = p.lines || [];
+    var total = lines.reduce(function (soma, l) {
+      var n = parseFloat(String(l.montante).replace(',', '.'));
+      return soma + (isNaN(n) ? 0 : n);
+    }, 0);
+    var nome = lines.length ? (lines[0].fornecedor || '—') : '—';
+    if (lines.length > 1) nome += ' +' + (lines.length - 1);
+    if (nome.length > 42) nome = nome.slice(0, 41) + '…';
+    return nome + ' · ' + total.toFixed(2) + '€';
+  }
+
+  function itemHoje(source, refId) {
+    if (source === 'task') {
+      var t = allTasks[refId];
+      if (!t || t.concluida) return null;
+      return { source: source, id: refId, texto: t.texto || '', badge: '', prazo: t.prazo || null };
+    }
+    if (source === 'pagamento') {
+      var p = (allPaymentRequests || {})[refId];
+      if (!p || !pagamentoPendenteDash(p)) return null;
+      return { source: source, id: refId, texto: pagamentoTextoDash(p), badge: '💶', prazo: pagamentoPrazoDash(p) };
+    }
+    var l = (allPedidos || {})[refId];
+    if (!l || !pedidoPendenteDash(l)) return null;
+    var desc = String(l.descricao || '');
+    return { source: source, id: refId, texto: desc.length > 46 ? desc.slice(0, 45) + '…' : desc, badge: '📝', prazo: null };
+  }
+
+  function construirHojeDash() {
+    var hoje = tarefasHojeISO();
+
+    var fixados = Object.keys(todayPicks || {}).map(function (chave) {
+      return todayPicks[chave];
+    }).filter(function (pick) {
+      return pick && pick.source && pick.refId && itemHoje(pick.source, pick.refId);
+    }).sort(function (a, b) {
+      return (a.pinnedAt || 0) - (b.pinnedAt || 0);
+    }).map(function (pick) {
+      return itemHoje(pick.source, pick.refId);
     });
+
+    var fixadosChaves = {};
+    fixados.forEach(function (i) { fixadosChaves[chaveItem(i.source, i.id)] = true; });
+
+    var candidatos = [];
+    Object.keys(allTasks).forEach(function (id) {
+      var t = allTasks[id];
+      if (t.concluida || !t.prazo || t.prazo > hoje) return;
+      candidatos.push({ source: 'task', id: id, texto: t.texto || '', badge: '', prazo: t.prazo });
+    });
+    Object.keys(allPaymentRequests || {}).forEach(function (id) {
+      var p = allPaymentRequests[id];
+      if (!pagamentoPendenteDash(p)) return;
+      var prazo = pagamentoPrazoDash(p);
+      if (!prazo || prazo > hoje) return;
+      candidatos.push({ source: 'pagamento', id: id, texto: pagamentoTextoDash(p), badge: '💶', prazo: prazo });
+    });
+
+    var automaticos = candidatos.filter(function (item) {
+      return !fixadosChaves[chaveItem(item.source, item.id)] && !itemEscondido(item.source, item.id);
+    }).sort(function (a, b) {
+      return a.prazo < b.prazo ? -1 : (a.prazo > b.prazo ? 1 : 0);
+    }).slice(0, Math.max(0, MAX_HOJE - fixados.length));
+
+    return fixados.concat(automaticos);
   }
 
   function renderTasks() {
     var hoje = tarefasHojeISO();
 
-    var proprias = Object.keys(allTasks).map(function (id) {
-      return Object.assign({ id: id }, allTasks[id]);
-    }).filter(function (t) { return !t.concluida; });
+    var proprias = Object.keys(allTasks).filter(function (id) { return !allTasks[id].concluida; });
+    var pagamentosPendentes = Object.keys(allPaymentRequests || {}).filter(function (id) {
+      return pagamentoPendenteDash(allPaymentRequests[id]);
+    });
+    var pedidosPendentes = Object.keys(allPedidos || {}).filter(function (id) {
+      return pedidoPendenteDash(allPedidos[id]);
+    });
 
-    var externos = pagamentosPendentesTarefas().length + pedidosPendentesTarefas().length;
-    var total = proprias.length + externos;
+    var total = proprias.length + pagamentosPendentes.length + pedidosPendentes.length;
 
     if (total === 0) {
-      taskSummaryEl.style.display = 'none';
+      taskHojeEl.style.display = 'none';
+      taskCountEl.style.display = 'none';
+      taskDueEl.style.display = 'none';
       taskEmptyEl.style.display = 'block';
       return;
     }
-
     taskEmptyEl.style.display = 'none';
-    taskSummaryEl.style.display = 'block';
 
-    taskSummaryCountEl.textContent = total + (total === 1 ? ' pendente' : ' pendentes');
-    taskSummaryBreakEl.textContent = proprias.length + (proprias.length === 1 ? ' tua' : ' tuas') +
-      ' · ' + externos + (externos === 1 ? ' noutro módulo' : ' noutros módulos');
+    var linhas = construirHojeDash();
 
-    var hojeCount = proprias.filter(function (t) {
-      return t.prazo && t.prazo <= hoje;
-    }).length + externos;
-
-    if (hojeCount > 0) {
-      taskSummaryDueEl.textContent = '⚠ ' + hojeCount + (hojeCount === 1 ? ' atrasada / para hoje' : ' atrasadas / para hoje');
-      taskSummaryDueEl.style.display = 'block';
+    if (linhas.length) {
+      taskHojeEl.innerHTML = linhas.map(function (item, i) {
+        return '<div class="task-hoje-row">' +
+          '<span class="task-hoje-num">' + pad2(i + 1) + '</span>' +
+          '<span class="task-hoje-text">' + escapeHtml(item.texto) + '</span>' +
+          (item.badge ? '<span class="task-hoje-badge">' + item.badge + '</span>' : '') +
+          '</div>';
+      }).join('');
+      taskHojeEl.style.display = 'block';
+      taskCountEl.style.display = 'none';
     } else {
-      taskSummaryDueEl.style.display = 'none';
+      taskHojeEl.style.display = 'none';
+      taskCountEl.textContent = total + (total === 1 ? ' pendente' : ' pendentes');
+      taskCountEl.style.display = 'block';
+    }
+
+    // Aviso só para prazos já ultrapassados — nunca sem-prazo nem "hoje/amanhã".
+    // Pagamentos adiados não contam: estão escondidos da lista em tarefas.html,
+    // e o cartão não deve avisar de algo que a página não mostra. Tarefas contam
+    // sempre, porque o snooze só as tira do bloco Hoje, não de "As minhas".
+    var atrasadas = proprias.filter(function (id) {
+      var prazo = allTasks[id].prazo;
+      return prazo && prazo < hoje;
+    }).length + pagamentosPendentes.filter(function (id) {
+      if (itemEscondido('pagamento', id)) return false;
+      var prazo = pagamentoPrazoDash(allPaymentRequests[id]);
+      return prazo && prazo < hoje;
+    }).length;
+
+    if (atrasadas > 0) {
+      taskDueEl.textContent = '⚠ ' + atrasadas + (atrasadas === 1 ? ' atrasada' : ' atrasadas');
+      taskDueEl.style.display = 'block';
+    } else {
+      taskDueEl.style.display = 'none';
     }
   }
+
+  todayPicksRef.on('value', function (snapshot) {
+    todayPicks = snapshot.val() || {};
+    renderTasks();
+  });
+
+  snoozedRef.on('value', function (snapshot) {
+    snoozedItens = snapshot.val() || {};
+    renderTasks();
+  });
 
   tasksRef.on('value', function (snapshot) {
     allTasks = snapshot.val() || {};
