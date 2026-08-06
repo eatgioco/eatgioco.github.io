@@ -229,6 +229,13 @@
     background:var(--red);
   }
 
+  /* Pedido pendente com parte das linhas já paga: "X/Y pago" */
+  .status-badge-partial{
+    background:var(--white);
+    color:var(--green);
+    box-shadow:inset 0 0 0 2px var(--green);
+  }
+
   .ticket-ref{
     display:block;
     font-family:'Space Mono', monospace;
@@ -280,6 +287,21 @@
     padding-bottom:0;
     margin-bottom:0;
     border-bottom:none;
+  }
+
+  .payment-line-paid{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--green);
+    margin-left:8px;
+    white-space:nowrap;
+  }
+
+  .payment-line-actions{
+    margin-top:6px;
   }
 
   .copy-icon-btn{
@@ -748,22 +770,31 @@ window.addEventListener('load', function () {
 
   function getValidPaymentLines() {
     var rows = paymentLines.querySelectorAll('.payment-line');
+    // Numa edição, o modal cria uma linha por linha existente e pela mesma
+    // ordem — o índice da row corresponde ao índice em lines[]. Serve para
+    // não perder o estado de conclusão já gravado nessa linha. Linhas novas
+    // acrescentadas durante a edição não têm original e ficam pendentes.
+    var originais = (editingTicketId && allPaymentRequests[editingTicketId] && allPaymentRequests[editingTicketId].lines) || [];
     var lines = [];
-    rows.forEach(function (row) {
+    rows.forEach(function (row, i) {
       var fornecedorId = row.querySelector('.payment-fornecedor').value;
       var montante = row.querySelector('.payment-montante').value.trim();
       var referencia = row.querySelector('.payment-referencia').value.trim();
       var prazoIso = row.querySelector('.payment-prazo').value;
       if (fornecedorId && montante) {
         var supplier = allSuppliers[fornecedorId] || {};
-        lines.push({
+        var linha = {
           fornecedor: supplier.nome || "",
           montante: montante,
           prazo: isoToDDMMYYYY(prazoIso),
           referencia: referencia,
           iban: supplier.iban || "",
           banco: supplier.banco || ""
-        });
+        };
+        var original = originais[i];
+        if (original && original.status) linha.status = original.status;
+        if (original && original.concluidoEm) linha.concluidoEm = original.concluidoEm;
+        lines.push(linha);
       }
     });
     return lines;
@@ -953,6 +984,67 @@ window.addEventListener('load', function () {
     mostrarAvisoConcluido();
   }
 
+  // Estado de uma linha. Pedidos criados antes do estado por linha não têm
+  // `status` nas linhas: quando o pedido inteiro está concluído ou anulado,
+  // todas as linhas herdam esse estado. Só num pedido pendente é que cada
+  // linha decide por si (campo ausente = pendente).
+  function lineStatus(p, l) {
+    var status = p.status || 'pendente';
+    if (status !== 'pendente') return status;
+    return (l && l.status === 'concluido') ? 'concluido' : 'pendente';
+  }
+
+  function countLinhasConcluidas(p) {
+    return (p.lines || []).filter(function (l) {
+      return lineStatus(p, l) === 'concluido';
+    }).length;
+  }
+
+  function marcarLinhaConcluida(pedidoId, lineIndex) {
+    var p = allPaymentRequests[pedidoId];
+    if (!p) return;
+    var lines = p.lines || [];
+    var linha = lines[lineIndex];
+    if (!linha || lineStatus(p, linha) === 'concluido') return;
+
+    // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
+    var lineRef = paymentRequestsRef.child(pedidoId).child('lines').child(lineIndex);
+    lineRef.child('status').set('concluido');
+    lineRef.child('concluidoEm').set(Date.now());
+
+    linha.status = 'concluido';
+    linha.concluidoEm = Date.now();
+
+    // O status do pedido passa a ser derivado: fecha quando a última linha fecha.
+    var todasConcluidas = lines.every(function (l) { return lineStatus(p, l) === 'concluido'; });
+    if (todasConcluidas) {
+      paymentRequestsRef.child(pedidoId).update({ status: 'concluido' });
+    }
+
+    enviarEmailConcluidoLinha(p, linha);
+  }
+
+  function enviarEmailConcluidoLinha(p, linha) {
+    var subject = "Pagamento Concluído | " + linha.fornecedor + " | Pedido #" + (p.numeroReferencia || "") +
+      " – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock([linha]));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
+      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    mostrarAvisoConcluido();
+  }
+
   function mostrarAvisoConcluido() {
     var aviso = document.getElementById('concluidoAviso');
     aviso.textContent = '✅ Pagamento marcado como concluído. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado. Não esqueças de anexar o comprovativo de transferência antes de enviar.';
@@ -990,8 +1082,16 @@ window.addEventListener('load', function () {
     card.className = cardClass;
     card.setAttribute('data-id', p.id);
 
+    var lines = p.lines || [];
+    var linhasConcluidas = countLinhasConcluidas(p);
+    var temLinhaPaga = status === 'pendente' && linhasConcluidas > 0;
+
     var badgeClass = 'status-badge';
     var badgeText = 'pendente';
+    if (temLinhaPaga) {
+      badgeClass += ' status-badge-partial';
+      badgeText = linhasConcluidas + '/' + lines.length + ' pago';
+    }
     if (isDone) { badgeClass += ' status-badge-done'; badgeText = '✓ Concluído'; }
     if (isCancelled) { badgeClass += ' status-badge-cancelled'; badgeText = '✕ Anulado'; }
 
@@ -1006,13 +1106,18 @@ window.addEventListener('load', function () {
 
     html += '<div class="card-row" style="font-size:12px; color:var(--muted); margin-bottom:6px;">Criado por: ' + escapeHtml(p.criadoPor || '—') + '</div>';
 
-    var showCopyButtons = status === 'pendente';
+    var isPending = status === 'pendente';
 
     html += '<div class="payment-lines-list">';
-    (p.lines || []).forEach(function (l, idx) {
+    lines.forEach(function (l, idx) {
+      // Numa linha já paga os botões de copiar deixam de fazer sentido.
+      var linhaPaga = lineStatus(p, l) === 'concluido';
+      var showCopyButtons = isPending && !linhaPaga;
       var fornecedorLabel = l.fornecedor + (l.banco ? ' — ' + l.banco : '');
       html += '<div class="payment-line-detail">';
-      html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong></div>';
+      html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong>';
+      if (isPending && linhaPaga) html += '<span class="payment-line-paid">✓ Pago</span>';
+      html += '</div>';
 
       html += '<div class="card-row"><span>Montante: ' + escapeHtml(l.montante) + '€';
       if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-montante" data-line="' + idx + '" title="Copiar montante">📋</button>';
@@ -1032,13 +1137,20 @@ window.addEventListener('load', function () {
         html += '</span></div>';
       }
 
+      if (isPending && !linhaPaga) {
+        html += '<div class="payment-line-actions"><button type="button" class="btn-small btn-line-done" data-line="' + idx + '">✓ Pago</button></div>';
+      }
+
       html += '</div>';
     });
     html += '</div>';
 
     html += '<div class="card-actions">';
-    if (status === 'pendente') {
-      html += '<button type="button" class="btn-small btn-mark-done">✓ Marcar como concluído</button>';
+    if (isPending) {
+      // Assim que a primeira linha é paga, o pedido só fecha linha a linha.
+      if (linhasConcluidas === 0) {
+        html += '<button type="button" class="btn-small btn-mark-done">✓ Marcar como concluído</button>';
+      }
       html += '<button type="button" class="btn-small btn-edit-request">✏ Editar</button>';
       html += '<button type="button" class="btn-small btn-cancel-request">✕ Anular</button>';
     }
@@ -1049,7 +1161,7 @@ window.addEventListener('load', function () {
 
     card.innerHTML = html;
 
-    if (showCopyButtons) {
+    if (isPending) {
       card.querySelectorAll('.btn-copy-montante').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var l = p.lines[parseInt(btn.getAttribute('data-line'), 10)];
@@ -1068,13 +1180,19 @@ window.addEventListener('load', function () {
           copyIconFeedback(l.referencia, btn);
         });
       });
-    }
 
-    if (status === 'pendente') {
-      card.querySelector('.btn-mark-done').addEventListener('click', function () {
-        paymentRequestsRef.child(p.id).update({ status: 'concluido' });
-        enviarEmailConcluido(p);
+      card.querySelectorAll('.btn-line-done').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          marcarLinhaConcluida(p.id, parseInt(btn.getAttribute('data-line'), 10));
+        });
       });
+      var markDoneBtn = card.querySelector('.btn-mark-done');
+      if (markDoneBtn) {
+        markDoneBtn.addEventListener('click', function () {
+          paymentRequestsRef.child(p.id).update({ status: 'concluido' });
+          enviarEmailConcluido(p);
+        });
+      }
       card.querySelector('.btn-edit-request').addEventListener('click', function () {
         openEditPaymentModal(p);
       });

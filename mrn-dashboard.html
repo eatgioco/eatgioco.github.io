@@ -462,6 +462,35 @@
     flex-wrap:wrap;
   }
 
+  .payment-line-paid{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--green);
+    white-space:nowrap;
+  }
+
+  /* Pedido pendente com parte das linhas já paga: "X/Y pago" */
+  .payment-ticket-partial{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--green);
+    box-shadow:inset 0 0 0 2px var(--green);
+    padding:3px 6px;
+    white-space:nowrap;
+  }
+
+  .payment-line-btns{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
   .payment-ticket-actions{
     display:flex;
     gap:6px;
@@ -2366,15 +2395,59 @@ window.addEventListener('load', function () {
     });
   }
 
+  // Estado de uma linha, igual ao de pagamentos.html (páginas standalone, sem
+  // módulos partilhados). Pedidos criados antes do estado por linha não têm
+  // `status` nas linhas: quando o pedido inteiro está concluído ou anulado,
+  // todas as linhas herdam esse estado. Só num pedido pendente é que cada
+  // linha decide por si (campo ausente = pendente).
+  function lineStatus(p, l) {
+    var status = p.status || 'pendente';
+    if (status !== 'pendente') return status;
+    return (l && l.status === 'concluido') ? 'concluido' : 'pendente';
+  }
+
+  function countLinhasConcluidas(p) {
+    return (p.lines || []).filter(function (l) {
+      return lineStatus(p, l) === 'concluido';
+    }).length;
+  }
+
+  // Marcar aqui não dispara email — no dashboard nenhuma ação de conclusão
+  // envia email, ao contrário de pagamentos.html.
+  function marcarLinhaConcluida(pedidoId, lineIndex) {
+    var p = allPaymentRequests[pedidoId];
+    if (!p) return;
+    var lines = p.lines || [];
+    var linha = lines[lineIndex];
+    if (!linha || lineStatus(p, linha) === 'concluido') return;
+
+    // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
+    var lineRef = paymentRequestsRef.child(pedidoId).child('lines').child(lineIndex);
+    lineRef.child('status').set('concluido');
+    lineRef.child('concluidoEm').set(Date.now());
+
+    linha.status = 'concluido';
+    linha.concluidoEm = Date.now();
+
+    // O status do pedido passa a ser derivado: fecha quando a última linha fecha.
+    var todasConcluidas = lines.every(function (l) { return lineStatus(p, l) === 'concluido'; });
+    if (todasConcluidas) {
+      paymentRequestsRef.child(pedidoId).update({ status: 'concluido' });
+    }
+  }
+
   function buildTicketHtml(p) {
     var isFornecedor = (p.origem || 'fornecedor') !== 'avulso';
     var lines = p.lines || [];
+    var isPending = currentTab === 'pendente';
+    var linhasConcluidas = countLinhasConcluidas(p);
     var tag = isFornecedor ? 'a' : 'div';
     var hrefAttr = isFornecedor ? ' href="pagamentos.html#pagamento-' + p.id + '"' : '';
 
     var html = '<' + tag + ' class="payment-ticket" data-id="' + p.id + '"' + hrefAttr + '>';
 
     lines.forEach(function (l, idx) {
+      var linhaPaga = lineStatus(p, l) === 'concluido';
       html += '<div class="payment-line-detail">';
       html += '<div class="payment-line-top"><strong>' + escapeHtml(l.fornecedor || 'Sem descrição');
       if (isFornecedor && p.numeroReferencia) html += '<span class="ticket-ref">#' + escapeHtml(p.numeroReferencia) + '</span>';
@@ -2385,23 +2458,37 @@ window.addEventListener('load', function () {
       if (l.referencia) subParts.push('Ref: ' + escapeHtml(l.referencia));
 
       html += '<div class="payment-line-sub"><span>' + subParts.join(' — ') + '</span>';
-      if (currentTab === 'pendente' && l.iban) {
-        html += '<button type="button" class="btn-small btn-pagar" data-line="' + idx + '">🏦 Pagar</button>';
+      if (isPending && linhaPaga) {
+        html += '<span class="payment-line-paid">✓ Pago</span>';
+      } else if (isPending) {
+        html += '<span class="payment-line-btns">';
+        if (l.iban) html += '<button type="button" class="btn-small btn-pagar" data-line="' + idx + '">🏦 Pagar</button>';
+        html += '<button type="button" class="btn-small btn-linha-concluida" data-line="' + idx + '" title="Marcar esta linha como paga">✓</button>';
+        html += '</span>';
       }
       html += '</div>';
       html += '</div>';
     });
 
-    html += '<div class="payment-line-sub" style="margin-top:6px;"><span>Criado por: ' + escapeHtml(p.criadoPor || '—') + '</span></div>';
+    html += '<div class="payment-line-sub" style="margin-top:6px;"><span>Criado por: ' + escapeHtml(p.criadoPor || '—') + '</span>';
+    if (isPending && linhasConcluidas > 0) {
+      html += '<span class="payment-ticket-partial">' + linhasConcluidas + '/' + lines.length + ' pago</span>';
+    }
+    html += '</div>';
+
+    // Assim que a primeira linha é paga, o pedido só fecha linha a linha.
+    var podeConcluirTudo = isPending && linhasConcluidas === 0;
 
     var actionButtons = '';
     if (isFornecedor) {
-      if (currentTab === 'pendente') {
+      if (podeConcluirTudo) {
         actionButtons += '<button type="button" class="btn-small btn-marcar-concluido">✓ Marcar como concluído</button>';
       }
     } else {
-      if (currentTab === 'pendente') {
+      if (podeConcluirTudo) {
         actionButtons += '<button type="button" class="btn-small btn-marcar-concluido">✓ Marcar como concluído</button>';
+      }
+      if (isPending) {
         actionButtons += '<button type="button" class="btn-small btn-anular">✕ Anular</button>';
       }
       actionButtons += '<button type="button" class="btn-small btn-apagar">🗑 Apagar</button>';
@@ -2431,6 +2518,14 @@ window.addEventListener('load', function () {
         var text = 'IBAN: ' + line.iban + (line.montante ? ' — Montante: ' + formatMontante(line.montante) + '€' : '');
         copyToClipboard(text, btn);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
+      });
+    });
+
+    card.querySelectorAll('.btn-linha-concluida').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        marcarLinhaConcluida(p.id, parseInt(btn.getAttribute('data-line'), 10));
       });
     });
 
@@ -2500,6 +2595,8 @@ window.addEventListener('load', function () {
     var totalSum = 0;
     entries.forEach(function (p) {
       (p.lines || []).forEach(function (l) {
+        // No separador "pendente" o total é o que falta pagar.
+        if (currentTab === 'pendente' && lineStatus(p, l) === 'concluido') return;
         var n = parseFloat(String(l.montante).replace(',', '.'));
         totalSum += isNaN(n) ? 0 : n;
       });
@@ -2561,6 +2658,8 @@ window.addEventListener('load', function () {
       var p = allPaymentRequests[id];
       if ((p.status || 'pendente') !== 'pendente') return;
       (p.lines || []).forEach(function(l, idx){
+        // Linha já paga dentro de um pedido ainda pendente: não é dinheiro a sair.
+        if (lineStatus(p, l) === 'concluido') return;
         out.push({
           ticketId: id,
           lineIdx: idx,
