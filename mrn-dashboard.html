@@ -2604,9 +2604,9 @@ window.addEventListener('load', function () {
         var text = 'IBAN: ' + line.iban + (line.montante ? ' — Montante: ' + formatMontante(line.montante) + '€' : '');
         copyToClipboard(text, btn);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
-        if (confirm('Ficou pago?')) {
+        perguntarFicouPago(function () {
           marcarLinhaConcluida(p.id, lineIndex);
-        }
+        });
       });
     });
 
@@ -2923,6 +2923,27 @@ window.addEventListener('load', function () {
     return '';
   }
 
+  // Depois de abrir o banco numa aba nova, o foco desta aba é perdido — um
+  // confirm() imediato fica escondido atrás da aba nova (e alguns browsers
+  // nem sequer trazem a aba de volta para o mostrar). Em vez disso, espera
+  // que o utilizador regresse (evento 'focus') para perguntar. Se o foco
+  // nunca sair daqui (ex: aba do banco aberta em segundo plano, ou
+  // window.open bloqueado por um popup blocker), pergunta de qualquer
+  // forma passado um instante, sem ficar à espera de um focus que não vem.
+  function perguntarFicouPago(onConfirmado){
+    var perguntou = false;
+    function perguntar(){
+      if (perguntou) return;
+      perguntou = true;
+      window.removeEventListener('focus', perguntar);
+      if (confirm('Ficou pago?')) onConfirmado();
+    }
+    window.addEventListener('focus', perguntar);
+    setTimeout(function(){
+      if (document.hasFocus()) perguntar();
+    }, 400);
+  }
+
   // paymentRequests (com email) vs compromissosFixos (sem email) — a mesma
   // distinção que já existe em chaveLinha.
   function marcarConcluidoParaLinha(l){
@@ -2959,10 +2980,10 @@ window.addEventListener('load', function () {
       if (linhaPagar && linhaPagar.iban){
         copyToClipboard('IBAN: ' + linhaPagar.iban + ' — Montante: ' + linhaPagar.montante.toFixed(2) + '€', btnPagar);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
-        if (confirm('Ficou pago?')){
+        perguntarFicouPago(function(){
           marcarConcluidoParaLinha(linhaPagar);
           mostrarBlocoPago(blocoPagar);
-        }
+        });
       }
       return true;
     }
