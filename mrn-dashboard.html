@@ -2112,6 +2112,8 @@
   <details class="tes-details" id="tesPedidosDetails">
     <summary>Pedidos de pagamento — gestão</summary>
     <div class="tes-details-body">
+      <p id="dashConcluidoAviso" style="display:none; margin:0 0 16px; padding:12px 14px; border:2px solid var(--green, #1E7A46); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
+
       <div class="payments-tabs" id="paymentsTabs">
         <button type="button" class="payments-tab active" data-status="pendente">Pendentes</button>
         <button type="button" class="payments-tab" data-status="concluido">Concluídos</button>
@@ -2412,8 +2414,6 @@ window.addEventListener('load', function () {
     }).length;
   }
 
-  // Marcar aqui não dispara email — no dashboard nenhuma ação de conclusão
-  // envia email, ao contrário de pagamentos.html.
   function marcarLinhaConcluida(pedidoId, lineIndex) {
     var p = allPaymentRequests[pedidoId];
     if (!p) return;
@@ -2434,6 +2434,76 @@ window.addEventListener('load', function () {
     if (todasConcluidas) {
       paymentRequestsRef.child(pedidoId).update({ status: 'concluido' });
     }
+
+    enviarEmailConcluidoLinha(p, linha);
+  }
+
+  // Idênticos aos de pagamentos.html — páginas standalone, sem módulos
+  // partilhados, por isso replicados aqui em vez de importados.
+  var MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+  function formatSubjectDate(d) {
+    return d.getDate() + " / " + MONTHS_PT[d.getMonth()] + " / " + d.getFullYear();
+  }
+
+  function buildConcluidoLinesBlock(lines) {
+    var bodyLines = [];
+    lines.forEach(function (l, idx) {
+      if (idx > 0) bodyLines.push("");
+      bodyLines.push("Fornecedor: " + l.fornecedor);
+      bodyLines.push("Montante: " + l.montante + "€");
+      bodyLines.push("Prazo: " + (l.prazo || "n/d"));
+      bodyLines.push("IBAN: " + (l.iban || "n/d") + (l.banco ? " (" + l.banco + ")" : ""));
+    });
+    return bodyLines;
+  }
+
+  function enviarEmailConcluido(p) {
+    var subject = "Pagamento Concluído | Fornecedores | – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock(p.lines || []));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
+      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    mostrarAvisoConcluido();
+  }
+
+  function enviarEmailConcluidoLinha(p, linha) {
+    var subject = "Pagamento Concluído | " + linha.fornecedor + " | Pedido #" + (p.numeroReferencia || "") +
+      " – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock([linha]));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
+      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    mostrarAvisoConcluido();
+  }
+
+  function mostrarAvisoConcluido() {
+    var aviso = document.getElementById('dashConcluidoAviso');
+    aviso.textContent = '✅ Pagamento marcado como concluído. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado. Não esqueças de anexar o comprovativo de transferência antes de enviar.';
+    aviso.style.display = 'block';
+    aviso.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function buildTicketHtml(p) {
@@ -2535,6 +2605,7 @@ window.addEventListener('load', function () {
         e.preventDefault();
         e.stopPropagation();
         paymentRequestsRef.child(p.id).update({ status: 'concluido' });
+        enviarEmailConcluido(p);
       });
     }
 
