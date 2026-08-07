@@ -2308,6 +2308,10 @@ window.addEventListener('load', function () {
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
+  // Marca ocorrências mensais de compromissosFixos como pagas — a regra
+  // recorrente vive em compromissosFixos/{id}, mas não guarda instâncias
+  // por período. Chave: {compromissoId}_{ano}-{mes}, ex. "renda_2026-8".
+  var pagamentosConcluidosRef = db.ref('pagamentosConcluidos');
 
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
@@ -2326,6 +2330,7 @@ window.addEventListener('load', function () {
   var currentOrigemFilter = 'todos';
   var allPaymentRequests = {};
   var allCompromissos = {};
+  var allPagamentosConcluidos = {};
 
   // Flags de carregamento partilhadas com a central de notificações,
   // declaradas aqui para não serem repostas por declarações posteriores.
@@ -2436,6 +2441,16 @@ window.addEventListener('load', function () {
     }
 
     enviarEmailConcluidoLinha(p, linha);
+  }
+
+  // Compromissos fixos (renda, NOS, EPAL, salários…) nunca disparam email —
+  // ao contrário de paymentRequests, não são pedidos enviados a um
+  // fornecedor via este fluxo, só custos recorrentes cuja instância mensal
+  // se está a marcar como resolvida.
+  function marcarCompromissoConcluido(compromissoId, periodo){
+    var chave = compromissoId + '_' + periodo;
+    if (allPagamentosConcluidos[chave]) return;
+    pagamentosConcluidosRef.child(chave).set({ concluidoEm: Date.now() });
   }
 
   // Idênticos aos de pagamentos.html — páginas standalone, sem módulos
@@ -2583,11 +2598,15 @@ window.addEventListener('load', function () {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var line = (p.lines || [])[parseInt(btn.getAttribute('data-line'), 10)];
+        var lineIndex = parseInt(btn.getAttribute('data-line'), 10);
+        var line = (p.lines || [])[lineIndex];
         if (!line || !line.iban) return;
         var text = 'IBAN: ' + line.iban + (line.montante ? ' — Montante: ' + formatMontante(line.montante) + '€' : '');
         copyToClipboard(text, btn);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
+        if (confirm('Ficou pago?')) {
+          marcarLinhaConcluida(p.id, lineIndex);
+        }
       });
     });
 
@@ -2754,6 +2773,16 @@ window.addEventListener('load', function () {
     return out;
   }
 
+  // Identifica o período mensal de uma ocorrência de compromisso, no mesmo
+  // formato já usado por chaveLinha ("ano-mes", mes 1-indexado).
+  function periodoCompromisso(d){
+    return d.getFullYear() + '-' + (d.getMonth() + 1);
+  }
+
+  function compromissoPago(compromissoId, prazoDate){
+    return !!allPagamentosConcluidos[compromissoId + '_' + periodoCompromisso(prazoDate)];
+  }
+
   // Achata as ocorrências de compromissos fixos ativos do mês corrente e
   // do seguinte (horizonte suficiente para os filtros de período do
   // cartão de pagamentos) no mesmo formato de linha usado pelos pedidos,
@@ -2765,6 +2794,8 @@ window.addEventListener('load', function () {
       ocorrenciasCompromissos(ano, mes).forEach(function(o){
         var d = new Date(ano, mes - 1, o.dia);
         d.setHours(0, 0, 0, 0);
+        // Ocorrência já marcada como paga: não é dinheiro a sair.
+        if (compromissoPago(o.id, d)) return;
         var c = allCompromissos[o.id] || {};
         out.push({
           tipo: 'fixo',
@@ -2827,7 +2858,7 @@ window.addEventListener('load', function () {
   // ocorrência, já que o mesmo compromisso gera uma linha por mês.
   function chaveLinha(l){
     if (l.tipo === 'fixo'){
-      return 'fixo|' + l.compromissoId + '|' + l.prazoDate.getFullYear() + '-' + (l.prazoDate.getMonth() + 1);
+      return 'fixo|' + l.compromissoId + '|' + periodoCompromisso(l.prazoDate);
     }
     return l.ticketId + '|' + l.lineIdx;
   }
@@ -2879,7 +2910,7 @@ window.addEventListener('load', function () {
     if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
       h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
     }
-    h += '<button type="button" class="btn-small pay-detalhe-fechar">✕ Fechar</button>';
+    h += '<button type="button" class="btn-small pay-detalhe-marcar" title="Marcar como pago">✓ Pago</button>';
     h += '</div>';
     h += '</div>';
     return h;
@@ -2892,9 +2923,28 @@ window.addEventListener('load', function () {
     return '';
   }
 
-  // Trata cliques em 📋 e em '✕ Fechar' dentro de um bloco de detalhe.
-  // Devolve true se já consumiu o clique.
-  function tratarCliqueDetalhe(e, fecharFn){
+  // paymentRequests (com email) vs compromissosFixos (sem email) — a mesma
+  // distinção que já existe em chaveLinha.
+  function marcarConcluidoParaLinha(l){
+    if (l.tipo === 'fixo'){
+      marcarCompromissoConcluido(l.compromissoId, periodoCompromisso(l.prazoDate));
+    } else {
+      marcarLinhaConcluida(l.ticketId, l.lineIdx);
+    }
+  }
+
+  // A linha desaparece da lista assim que o Firebase confirmar a escrita
+  // (deixa de estar em linhasCombinadas); até lá, feedback imediato no
+  // próprio bloco.
+  function mostrarBlocoPago(bloco){
+    var acoes = bloco.querySelector('.pay-detalhe-actions');
+    if (acoes) acoes.innerHTML = '<span class="payment-line-paid">✓ Pago</span>';
+  }
+
+  // Trata cliques em 📋, '🏦 Pagar' e '✓ Pago' dentro de um bloco de
+  // detalhe. Fechar o bloco não tem botão próprio — é o mesmo clique na
+  // linha que o abriu. Devolve true se já consumiu o clique.
+  function tratarCliqueDetalhe(e){
     var btnCopiar = e.target.closest('.copy-icon-btn');
     if (btnCopiar){
       var bloco = btnCopiar.closest('.pay-detalhe');
@@ -2909,11 +2959,21 @@ window.addEventListener('load', function () {
       if (linhaPagar && linhaPagar.iban){
         copyToClipboard('IBAN: ' + linhaPagar.iban + ' — Montante: ' + linhaPagar.montante.toFixed(2) + '€', btnPagar);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
+        if (confirm('Ficou pago?')){
+          marcarConcluidoParaLinha(linhaPagar);
+          mostrarBlocoPago(blocoPagar);
+        }
       }
       return true;
     }
-    if (e.target.closest('.pay-detalhe-fechar')){
-      fecharFn();
+    var btnMarcar = e.target.closest('.pay-detalhe-marcar');
+    if (btnMarcar){
+      var blocoMarcar = btnMarcar.closest('.pay-detalhe');
+      var linhaMarcar = blocoMarcar && linhaPorChave(blocoMarcar.getAttribute('data-chave'));
+      if (linhaMarcar){
+        marcarConcluidoParaLinha(linhaMarcar);
+        mostrarBlocoPago(blocoMarcar);
+      }
       return true;
     }
     return false;
@@ -3006,7 +3066,7 @@ window.addEventListener('load', function () {
   // depender de closures de um render específico, porque a lista é
   // reconstruída a cada clique (expandir/recolher/copiar).
   payLinesEl.addEventListener('click', function(e){
-    if (tratarCliqueDetalhe(e, function(){ cartaoLinhaAberta = null; renderPagamentosCard(); })){
+    if (tratarCliqueDetalhe(e)){
       e.stopPropagation();
       return;
     }
@@ -3313,7 +3373,7 @@ window.addEventListener('load', function () {
   // Delegado uma única vez sobre o contentor (sobrevive à substituição do
   // innerHTML a cada render), procurando a linha pela chave estável.
   tesPendentesEl.addEventListener('click', function(e){
-    if (tratarCliqueDetalhe(e, function(){ tesLinhaAberta = null; renderTesPendentes(); })) return;
+    if (tratarCliqueDetalhe(e)) return;
     var tr = e.target.closest('.tes-linha');
     if (!tr) return;
     var chave = tr.getAttribute('data-chave');
@@ -3602,6 +3662,12 @@ window.addEventListener('load', function () {
     if (pagamentosCarregados) renderPagamentosCard();
   }, function(){
     tesCompromissosLista.innerHTML = '<p class="tes-empty">Erro de ligação à base de dados.</p>';
+  });
+
+  pagamentosConcluidosRef.on('value', function(snapshot){
+    allPagamentosConcluidos = snapshot.val() || {};
+    renderTesouraria();
+    if (pagamentosCarregados) renderPagamentosCard();
   });
 
   tabsEl.addEventListener('click', function (e) {
