@@ -1826,6 +1826,16 @@
     max-width:560px;
   }
 
+  .modal-narrow{
+    max-width:360px;
+  }
+
+  .modal-contexto{
+    margin:-8px 0 20px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
   select{
     font-family:'Inter', sans-serif;
     font-size:14px;
@@ -2290,6 +2300,21 @@
   </div>
 </div>
 
+<!-- Modal "Ficou pago?" — confirmação depois de abrir o banco a partir de um botão "🏦 Pagar" -->
+<div class="modal-overlay" id="ficouPagoModalOverlay">
+  <div class="modal modal-narrow">
+    <div class="modal-header">
+      <h2>Ficou pago?</h2>
+      <button class="modal-close" id="ficouPagoModalClose">×</button>
+    </div>
+    <p class="modal-contexto" id="ficouPagoContexto"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="ficouPagoNao">Ainda não</button>
+      <button type="button" class="btn btn-primary" id="ficouPagoSim">Sim, ficou pago</button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
 
@@ -2604,7 +2629,7 @@ window.addEventListener('load', function () {
         var text = 'IBAN: ' + line.iban + (line.montante ? ' — Montante: ' + formatMontante(line.montante) + '€' : '');
         copyToClipboard(text, btn);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
-        perguntarFicouPago(function () {
+        abrirModalFicouPago(line.fornecedor, parseMontante(line.montante), function () {
           marcarLinhaConcluida(p.id, lineIndex);
         });
       });
@@ -2923,26 +2948,39 @@ window.addEventListener('load', function () {
     return '';
   }
 
-  // Depois de abrir o banco numa aba nova, o foco desta aba é perdido — um
-  // confirm() imediato fica escondido atrás da aba nova (e alguns browsers
-  // nem sequer trazem a aba de volta para o mostrar). Em vez disso, espera
-  // que o utilizador regresse (evento 'focus') para perguntar. Se o foco
-  // nunca sair daqui (ex: aba do banco aberta em segundo plano, ou
-  // window.open bloqueado por um popup blocker), pergunta de qualquer
-  // forma passado um instante, sem ficar à espera de um focus que não vem.
-  function perguntarFicouPago(onConfirmado){
-    var perguntou = false;
-    function perguntar(){
-      if (perguntou) return;
-      perguntou = true;
-      window.removeEventListener('focus', perguntar);
-      if (confirm('Ficou pago?')) onConfirmado();
-    }
-    window.addEventListener('focus', perguntar);
-    setTimeout(function(){
-      if (document.hasFocus()) perguntar();
-    }, 400);
+  // Modal "Ficou pago?", partilhado por todos os botões "🏦 Pagar" do
+  // dashboard. É HTML normal da página — ao contrário de um confirm()
+  // nativo, não fica escondido atrás da aba do banco que window.open()
+  // acabou de abrir: está sempre ali, à espera, quando o utilizador voltar
+  // a esta aba.
+  var ficouPagoModalOverlay = document.getElementById('ficouPagoModalOverlay');
+  var ficouPagoContexto = document.getElementById('ficouPagoContexto');
+  var ficouPagoOnConfirmar = null;
+
+  function abrirModalFicouPago(nome, montante, onConfirmar){
+    ficouPagoContexto.textContent = nome + ' — ' + formatEuro(montante);
+    ficouPagoOnConfirmar = onConfirmar;
+    ficouPagoModalOverlay.classList.add('open');
   }
+
+  function fecharModalFicouPago(){
+    ficouPagoModalOverlay.classList.remove('open');
+    ficouPagoOnConfirmar = null;
+  }
+
+  document.getElementById('ficouPagoSim').addEventListener('click', function(){
+    var onConfirmar = ficouPagoOnConfirmar;
+    fecharModalFicouPago();
+    if (onConfirmar) onConfirmar();
+  });
+  document.getElementById('ficouPagoNao').addEventListener('click', fecharModalFicouPago);
+  document.getElementById('ficouPagoModalClose').addEventListener('click', fecharModalFicouPago);
+  ficouPagoModalOverlay.addEventListener('click', function(e){
+    if (e.target === ficouPagoModalOverlay) fecharModalFicouPago();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && ficouPagoModalOverlay.classList.contains('open')) fecharModalFicouPago();
+  });
 
   // paymentRequests (com email) vs compromissosFixos (sem email) — a mesma
   // distinção que já existe em chaveLinha.
@@ -2980,7 +3018,7 @@ window.addEventListener('load', function () {
       if (linhaPagar && linhaPagar.iban){
         copyToClipboard('IBAN: ' + linhaPagar.iban + ' — Montante: ' + linhaPagar.montante.toFixed(2) + '€', btnPagar);
         window.open('https://online.abanca.pt/pt-PT/#/login', '_blank');
-        perguntarFicouPago(function(){
+        abrirModalFicouPago(linhaPagar.fornecedor, linhaPagar.montante, function(){
           marcarConcluidoParaLinha(linhaPagar);
           mostrarBlocoPago(blocoPagar);
         });
