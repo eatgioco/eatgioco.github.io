@@ -22,7 +22,7 @@
     --muted:#6b6660;
     --green:#1E7A46;
     --amber:#B8860B;
-    --blue:#1D5C8A;
+    --orange:#D9480F;
   }
 
   *{box-sizing:border-box;}
@@ -682,8 +682,6 @@
   }
 
   .pedido-badge-novo{ background:var(--red); }
-  .pedido-badge-analise{ background:var(--amber); }
-  .pedido-badge-aprovado{ background:var(--blue); }
   .pedido-badge-feito{ background:var(--green); }
   .pedido-badge-naoavancar{ background:var(--muted); }
 
@@ -742,6 +740,179 @@
     background:var(--black);
     color:var(--white);
     cursor:pointer;
+    flex:1;
+  }
+
+  .pedido-edit-actions{
+    display:flex;
+    gap:8px;
+  }
+
+  .btn-apagar-pedido{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--red);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .btn-apagar-pedido:hover{
+    border-color:var(--red);
+    background:var(--red);
+    color:var(--white);
+  }
+
+  .pedido-badges{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .pedido-badge-cat{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:0.4px;
+    text-transform:uppercase;
+    padding:3px 7px;
+    background:var(--white);
+    color:var(--muted);
+    border:1px solid var(--line);
+    white-space:nowrap;
+  }
+
+  .pedido-badge-prioridade{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:0.4px;
+    text-transform:uppercase;
+    padding:3px 7px;
+    color:var(--white);
+    white-space:nowrap;
+  }
+
+  .pedido-badge-prioridade-alta{ background:var(--orange); }
+  .pedido-badge-prioridade-normal{ background:var(--muted); }
+  .pedido-badge-prioridade-baixa{ background:var(--line); color:var(--muted); }
+
+  .pedido-date-row{
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .pedido-age{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .pedido-age-amber{ color:var(--amber); font-weight:700; }
+  .pedido-age-red{ color:var(--red); font-weight:700; }
+
+  .pedido-collapsible{
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px dashed var(--line);
+  }
+
+  .pedido-collapsible-header{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    width:100%;
+    background:none;
+    border:none;
+    padding:2px 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--black);
+    cursor:pointer;
+    text-align:left;
+  }
+
+  .pedido-collapsible-header:hover{ color:var(--red); }
+
+  .pedido-collapsible-count{
+    color:var(--muted);
+    font-weight:400;
+  }
+
+  .pedido-collapsible-body{
+    margin-top:8px;
+  }
+
+  .pedido-comentario{
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .pedido-comentario:last-child{
+    border-bottom:none;
+  }
+
+  .pedido-comentario-head{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin-bottom:2px;
+  }
+
+  .pedido-comentario-texto{
+    font-size:13px;
+  }
+
+  .pedido-comentario-add{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+
+  .pedido-comentario-add select{
+    width:140px;
+    padding:8px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+  }
+
+  .pedido-comentario-add input[type="text"]{
+    flex:1;
+    min-width:120px;
+    padding:8px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+  }
+
+  .pedido-comentario-add button{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:0 12px;
+    border:2px solid var(--black);
+    background:var(--black);
+    color:var(--white);
+    cursor:pointer;
+  }
+
+  .pedidos-archive-toggle{
+    margin-top:14px;
+    font-size:12px;
   }
 
   /* ---------- Modal (shared pattern with compras.html / equipa.html) ---------- */
@@ -990,8 +1161,31 @@
       </div>
 
       <div class="field">
+        <label class="field-label" for="pedido-categoria">Categoria</label>
+        <select id="pedido-categoria">
+          <option value="Compras/Material" selected>Compras/Material</option>
+          <option value="Equipamento">Equipamento</option>
+          <option value="Manutenção/Avaria">Manutenção/Avaria</option>
+          <option value="Obrigação legal">Obrigação legal</option>
+          <option value="Processo">Processo</option>
+          <option value="Layout/Espaço">Layout/Espaço</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="pedido-prioridade">Prioridade</label>
+        <select id="pedido-prioridade">
+          <option value="Baixa">Baixa</option>
+          <option value="Normal" selected>Normal</option>
+          <option value="Alta">Alta</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label class="field-label" for="pedido-zona">Zona</label>
         <select id="pedido-zona">
+          <option value="">— (sem zona)</option>
           <option value="Sala">Sala</option>
           <option value="Cozinha">Cozinha</option>
           <option value="Bar/Balcão">Bar/Balcão</option>
@@ -1017,7 +1211,6 @@
       <div class="pedidos-filter-row" id="pedidosFilterRow">
         <button type="button" class="pedidos-filter-chip active" data-filter="todos">Todos</button>
         <button type="button" class="pedidos-filter-chip" data-filter="novo">Por responder</button>
-        <button type="button" class="pedidos-filter-chip" data-filter="curso">Em curso</button>
         <button type="button" class="pedidos-filter-chip" data-filter="fechados">Fechados</button>
       </div>
 
@@ -1631,33 +1824,76 @@
   var pedidosRef = db.ref('lojaPedidos');
   var pedidos = {};
   var pedidosFilterAtual = 'todos';
+  var pedidosArquivoAberto = false;
+  var pedidosSubitensAbertos = {};
+  var pedidosComentariosAbertos = {};
+
+  var ARQUIVO_DIAS = 30;
 
   var ESTADO_LABELS = {
     'novo': 'Novo',
-    'em análise': 'Em análise',
-    'aprovado': 'Aprovado',
     'feito': 'Feito',
     'não avançar': 'Não avançar'
   };
 
   var ESTADO_BADGE_CLASS = {
     'novo': 'pedido-badge-novo',
-    'em análise': 'pedido-badge-analise',
-    'aprovado': 'pedido-badge-aprovado',
     'feito': 'pedido-badge-feito',
     'não avançar': 'pedido-badge-naoavancar'
   };
 
+  var PRIORIDADE_BADGE_CLASS = {
+    'Alta': 'pedido-badge-prioridade-alta',
+    'Normal': 'pedido-badge-prioridade-normal',
+    'Baixa': 'pedido-badge-prioridade-baixa'
+  };
+
+  var PRIORIDADE_ORDEM = { 'Alta': 0, 'Normal': 1, 'Baixa': 2 };
+
+  function estadoNormalizado(estado){
+    if (estado === 'em análise' || estado === 'aprovado') return 'novo';
+    return estado || 'novo';
+  }
+
+  function getPrioridade(p){
+    return p.prioridade || 'Normal';
+  }
+
   function pedidoMatchesFilter(p, filtro){
+    var estado = estadoNormalizado(p.estado);
     if (filtro === 'todos') return true;
-    if (filtro === 'novo') return p.estado === 'novo';
-    if (filtro === 'curso') return p.estado === 'em análise' || p.estado === 'aprovado';
-    if (filtro === 'fechados') return p.estado === 'feito' || p.estado === 'não avançar';
+    if (filtro === 'novo') return estado === 'novo';
+    if (filtro === 'fechados') return estado === 'feito' || estado === 'não avançar';
     return true;
+  }
+
+  function pedidoIdadeDias(dataHora){
+    var diffMs = new Date() - new Date(dataHora);
+    return Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+  }
+
+  function pedidoIdadeLabel(dias){
+    if (dias === 0) return 'hoje';
+    if (dias === 1) return 'há 1 dia';
+    return 'há ' + dias + ' dias';
+  }
+
+  function pedidoIdadeClass(dias){
+    if (dias > 14) return 'pedido-age-red';
+    if (dias > 7) return 'pedido-age-amber';
+    return '';
+  }
+
+  function isOlderThanDays(iso, dias){
+    if (!iso) return false;
+    var diffMs = new Date() - new Date(iso);
+    return diffMs > dias * 24 * 60 * 60 * 1000;
   }
 
   document.getElementById('pedidoSubmitBtn').addEventListener('click', function(){
     var descricao = document.getElementById('pedido-descricao').value.trim();
+    var categoria = document.getElementById('pedido-categoria').value;
+    var prioridade = document.getElementById('pedido-prioridade').value;
     var zona = document.getElementById('pedido-zona').value;
     var pessoaSelecao = resolvePessoaSelecao(document.getElementById('pedido-pessoa'));
 
@@ -1673,6 +1909,8 @@
     pedidosRef.push({
       dataHora: new Date().toISOString(),
       descricao: descricao,
+      categoria: categoria,
+      prioridade: prioridade,
       zona: zona,
       pessoa: pessoaSelecao.pessoaNome,
       pessoaId: pessoaSelecao.pessoaId,
@@ -1681,6 +1919,9 @@
       respondidoEm: null
     }).then(function(){
       document.getElementById('pedido-descricao').value = '';
+      document.getElementById('pedido-categoria').value = 'Compras/Material';
+      document.getElementById('pedido-prioridade').value = 'Normal';
+      document.getElementById('pedido-zona').value = '';
       btn.disabled = false;
       btn.textContent = 'Enviar pedido';
     }).catch(function(err){
@@ -1719,10 +1960,180 @@
   }
   window.savePedido = savePedido;
 
+  function deletePedido(id){
+    var p = pedidos[id] || {};
+    var desc = p.descricao || '';
+    if (!confirm('Apagar pedido "' + desc + '"? Esta ação não pode ser desfeita.')){
+      return;
+    }
+    pedidosRef.child(id).remove().catch(function(err){
+      alert('Erro ao apagar: ' + err.message);
+    });
+  }
+  window.deletePedido = deletePedido;
+
+  function toggleArquivoPedidos(){
+    pedidosArquivoAberto = !pedidosArquivoAberto;
+    renderPedidos();
+  }
+  window.toggleArquivoPedidos = toggleArquivoPedidos;
+
+  function toggleSubitensSecao(id){
+    pedidosSubitensAbertos[id] = !pedidosSubitensAbertos[id];
+    renderPedidos();
+  }
+  window.toggleSubitensSecao = toggleSubitensSecao;
+
+  function toggleComentariosSecao(id){
+    pedidosComentariosAbertos[id] = !pedidosComentariosAbertos[id];
+    renderPedidos();
+  }
+  window.toggleComentariosSecao = toggleComentariosSecao;
+
+  function toggleSubitem(pedidoId, subId, feitoAtual){
+    pedidosRef.child(pedidoId).child('subitens').child(subId).child('feito').set(!feitoAtual);
+  }
+  window.toggleSubitem = toggleSubitem;
+
+  function addSubitem(pedidoId){
+    var input = document.getElementById('subitem-novo-' + pedidoId);
+    var texto = input.value.trim();
+    if (!texto) return;
+    pedidosRef.child(pedidoId).child('subitens').push({
+      texto: texto,
+      feito: false,
+      criadoEm: new Date().toISOString()
+    });
+    input.value = '';
+  }
+  window.addSubitem = addSubitem;
+
+  function addComentario(pedidoId){
+    var pessoaSelect = document.getElementById('comentario-pessoa-' + pedidoId);
+    var textoInput = document.getElementById('comentario-texto-' + pedidoId);
+    var texto = textoInput.value.trim();
+    if (!texto) return;
+    var pessoaSelecao = resolvePessoaSelecao(pessoaSelect);
+    pedidosRef.child(pedidoId).child('comentarios').push({
+      texto: texto,
+      pessoa: pessoaSelecao.pessoaNome,
+      pessoaId: pessoaSelecao.pessoaId,
+      dataHora: new Date().toISOString()
+    });
+    textoInput.value = '';
+  }
+  window.addComentario = addComentario;
+
+  function buildPedidoCardHtml(id, p){
+    var estado = estadoNormalizado(p.estado);
+    var prioridade = getPrioridade(p);
+    var dias = pedidoIdadeDias(p.dataHora);
+
+    var subitens = p.subitens || {};
+    var subitensIds = Object.keys(subitens);
+    var subitensFeitos = subitensIds.filter(function(sid){ return subitens[sid].feito; }).length;
+    var subitensAbertos = !!pedidosSubitensAbertos[id];
+
+    var comentarios = p.comentarios || {};
+    var comentariosIds = Object.keys(comentarios).sort(function(a, b){
+      return new Date(comentarios[a].dataHora) - new Date(comentarios[b].dataHora);
+    });
+    var comentariosAbertos = !!pedidosComentariosAbertos[id];
+
+    var html = '<div class="pedido-card">';
+    html += '  <div class="pedido-top">';
+    html += '    <div class="pedido-badges">';
+    html += '      <span class="pedido-badge ' + (ESTADO_BADGE_CLASS[estado] || 'pedido-badge-novo') + '">' + (ESTADO_LABELS[estado] || estado) + '</span>';
+    html += '      <span class="pedido-badge-prioridade ' + (PRIORIDADE_BADGE_CLASS[prioridade] || 'pedido-badge-prioridade-normal') + '">' + prioridade + '</span>';
+    if (p.categoria){
+      html += '      <span class="pedido-badge-cat">' + escapeHtml(p.categoria) + '</span>';
+    }
+    html += '    </div>';
+    html += '    <div class="pedido-date-row">';
+    html += '      <span class="pedido-data">' + formatDataHoraFull(p.dataHora) + '</span>';
+    if (estado === 'novo'){
+      html += '      <span class="pedido-age ' + pedidoIdadeClass(dias) + '">' + pedidoIdadeLabel(dias) + '</span>';
+    }
+    html += '    </div>';
+    html += '  </div>';
+    html += '  <p class="pedido-desc">' + escapeHtml(p.descricao) + '</p>';
+    html += '  <div class="pedido-meta">';
+    if (p.zona && p.zona !== '—'){
+      html += '<span>Zona: ' + escapeHtml(p.zona) + '</span>';
+    }
+    html += '<span>' + escapeHtml(p.pessoa) + '</span>';
+    html += '  </div>';
+    if (p.resposta){
+      html += '  <div class="pedido-resposta">Resposta: ' + escapeHtml(p.resposta) + '</div>';
+    }
+
+    html += '  <div class="pedido-collapsible">';
+    html += '    <button type="button" class="pedido-collapsible-header" onclick="toggleSubitensSecao(\'' + id + '\')">';
+    html += (subitensAbertos ? '▾' : '▸') + ' Sub-itens <span class="pedido-collapsible-count">(' + subitensFeitos + '/' + subitensIds.length + ' concluídos)</span>';
+    html += '    </button>';
+    if (subitensAbertos){
+      html += '    <div class="pedido-collapsible-body">';
+      subitensIds.forEach(function(sid){
+        var item = subitens[sid];
+        html += '<div class="checklist-item-row">';
+        html += '  <input type="checkbox" ' + (item.feito ? 'checked' : '') + ' onchange="toggleSubitem(\'' + id + '\',\'' + sid + '\',' + (!!item.feito) + ')">';
+        html += '  <span class="checklist-item-text' + (item.feito ? ' checked' : '') + '">' + escapeHtml(item.texto) + '</span>';
+        html += '</div>';
+      });
+      html += '    <div class="template-add-row">';
+      html += '      <input type="text" id="subitem-novo-' + id + '" placeholder="novo sub-item">';
+      html += '      <button type="button" onclick="addSubitem(\'' + id + '\')">+</button>';
+      html += '    </div>';
+      html += '    </div>';
+    }
+    html += '  </div>';
+
+    html += '  <div class="pedido-collapsible">';
+    html += '    <button type="button" class="pedido-collapsible-header" onclick="toggleComentariosSecao(\'' + id + '\')">';
+    html += (comentariosAbertos ? '▾' : '▸') + ' 💬 Comentários <span class="pedido-collapsible-count">(' + comentariosIds.length + ')</span>';
+    html += '    </button>';
+    if (comentariosAbertos){
+      html += '    <div class="pedido-collapsible-body">';
+      comentariosIds.forEach(function(cid){
+        var c = comentarios[cid];
+        html += '<div class="pedido-comentario">';
+        html += '  <div class="pedido-comentario-head"><span>' + escapeHtml(c.pessoa) + '</span><span>' + formatDataHoraFull(c.dataHora) + '</span></div>';
+        html += '  <div class="pedido-comentario-texto">' + escapeHtml(c.texto) + '</div>';
+        html += '</div>';
+      });
+      if (comentariosIds.length === 0){
+        html += '<p class="equip-temp-empty">Sem comentários ainda.</p>';
+      }
+      html += '    <div class="pedido-comentario-add">';
+      html += '      <select id="comentario-pessoa-' + id + '"' + (pessoasCarregadas ? '' : ' disabled') + '>' + buildPessoaOptionsHtml() + '</select>';
+      html += '      <input type="text" id="comentario-texto-' + id + '" placeholder="escrever comentário">';
+      html += '      <button type="button" onclick="addComentario(\'' + id + '\')">Enviar</button>';
+      html += '    </div>';
+      html += '    </div>';
+    }
+    html += '  </div>';
+
+    html += '  <div class="pedido-edit">';
+    html += '    <select id="pedido-estado-' + id + '">';
+    Object.keys(ESTADO_LABELS).forEach(function(key){
+      html += '<option value="' + key + '"' + (key === estado ? ' selected' : '') + '>' + ESTADO_LABELS[key] + '</option>';
+    });
+    html += '    </select>';
+    html += '    <input type="text" id="pedido-resposta-' + id + '" placeholder="resposta (opcional)" value="' + escapeHtml(p.resposta || '') + '">';
+    html += '    <div class="pedido-edit-actions">';
+    html += '      <button type="button" class="btn-guardar-pedido" onclick="savePedido(\'' + id + '\')">Guardar</button>';
+    html += '      <button type="button" class="btn-apagar-pedido" onclick="deletePedido(\'' + id + '\')" title="Apagar pedido">🗑</button>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+
+    return html;
+  }
+
   function renderPedidos(){
     var novosCount = 0;
     Object.keys(pedidos).forEach(function(id){
-      if (pedidos[id].estado === 'novo') novosCount++;
+      if (estadoNormalizado(pedidos[id].estado) === 'novo') novosCount++;
     });
 
     var counterEl = document.getElementById('pedidosCounter');
@@ -1739,6 +2150,9 @@
     });
 
     ids.sort(function(a, b){
+      var pa = PRIORIDADE_ORDEM[getPrioridade(pedidos[a])];
+      var pb = PRIORIDADE_ORDEM[getPrioridade(pedidos[b])];
+      if (pa !== pb) return pa - pb;
       return new Date(pedidos[b].dataHora) - new Date(pedidos[a].dataHora);
     });
 
@@ -1750,30 +2164,34 @@
     }
 
     var html = '';
-    ids.forEach(function(id){
-      var p = pedidos[id];
-      var estado = p.estado || 'novo';
-      html += '<div class="pedido-card">';
-      html += '  <div class="pedido-top">';
-      html += '    <span class="pedido-badge ' + (ESTADO_BADGE_CLASS[estado] || 'pedido-badge-novo') + '">' + (ESTADO_LABELS[estado] || estado) + '</span>';
-      html += '    <span class="pedido-data">' + formatDataHoraFull(p.dataHora) + '</span>';
-      html += '  </div>';
-      html += '  <p class="pedido-desc">' + escapeHtml(p.descricao) + '</p>';
-      html += '  <div class="pedido-meta"><span>Zona: ' + escapeHtml(p.zona) + '</span><span>' + escapeHtml(p.pessoa) + '</span></div>';
-      if (p.resposta){
-        html += '  <div class="pedido-resposta">Resposta: ' + escapeHtml(p.resposta) + '</div>';
-      }
-      html += '  <div class="pedido-edit">';
-      html += '    <select id="pedido-estado-' + id + '">';
-      Object.keys(ESTADO_LABELS).forEach(function(key){
-        html += '<option value="' + key + '"' + (key === estado ? ' selected' : '') + '>' + ESTADO_LABELS[key] + '</option>';
+
+    if (pedidosFilterAtual === 'fechados'){
+      var recentes = [];
+      var arquivo = [];
+      ids.forEach(function(id){
+        if (isOlderThanDays(pedidos[id].respondidoEm, ARQUIVO_DIAS)){
+          arquivo.push(id);
+        } else {
+          recentes.push(id);
+        }
       });
-      html += '    </select>';
-      html += '    <input type="text" id="pedido-resposta-' + id + '" placeholder="resposta (opcional)" value="' + escapeHtml(p.resposta || '') + '">';
-      html += '    <button type="button" class="btn-guardar-pedido" onclick="savePedido(\'' + id + '\')">Guardar</button>';
-      html += '  </div>';
-      html += '</div>';
-    });
+
+      recentes.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+
+      if (recentes.length === 0 && arquivo.length > 0){
+        html += '<p class="empty-state">Sem fechados recentes — ver arquivo abaixo.</p>';
+      }
+
+      if (arquivo.length > 0){
+        html += '<button type="button" class="link-btn pedidos-archive-toggle" onclick="toggleArquivoPedidos()">' +
+          (pedidosArquivoAberto ? '▾ Esconder arquivo' : '▸ Arquivo (' + arquivo.length + ')') + '</button>';
+        if (pedidosArquivoAberto){
+          arquivo.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+        }
+      }
+    } else {
+      ids.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+    }
 
     listEl.innerHTML = html;
   }
