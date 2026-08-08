@@ -182,6 +182,78 @@
     color:var(--muted);
   }
 
+  /* ---------- Equipment management ---------- */
+  .equip-manage-zona-title{
+    margin:24px 0 8px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .equip-manage-zona-title:first-child{
+    margin-top:0;
+  }
+
+  .equip-manage-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    width:100%;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:12px 14px;
+    margin-top:8px;
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    text-align:left;
+  }
+
+  .equip-manage-row:hover{
+    border-color:var(--red);
+  }
+
+  .equip-manage-nome{
+    flex:1;
+    font-size:14px;
+    font-weight:600;
+  }
+
+  .equip-manage-inativo{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    color:var(--muted);
+    border:1px solid var(--line);
+    padding:2px 6px;
+    margin-left:8px;
+  }
+
+  .equip-manage-tipo{
+    width:130px;
+    font-size:12px;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+  }
+
+  .equip-manage-limite{
+    width:70px;
+    text-align:right;
+    font-size:13px;
+    font-weight:700;
+    font-family:'Space Mono', monospace;
+  }
+
+  .equip-manage-panel{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+    margin-top:8px;
+  }
+
   /* ---------- Checklists ---------- */
   .checklist-buttons{
     display:flex;
@@ -1099,6 +1171,11 @@
     </div>
   </div>
 
+  <div class="section" id="equip-manage-section">
+    <p class="section-title">Equipamentos</p>
+    <div id="equipManageWrap"></div>
+  </div>
+
   <div class="section">
     <p class="section-title">Checklists</p>
     <div class="checklist-buttons" id="checklistButtons"></div>
@@ -1113,7 +1190,9 @@
       <form id="tempForm">
         <div class="field">
           <label class="field-label" for="temp-equipamento">Equipamento</label>
-          <select id="temp-equipamento"></select>
+          <select id="temp-equipamento" disabled>
+            <option>A carregar...</option>
+          </select>
         </div>
 
         <div class="field">
@@ -1249,6 +1328,27 @@
   </div>
 </div>
 
+<!-- Modal Apagar equipamento (bloqueado — oferece desativar) -->
+<div class="modal-overlay" id="equipApagarModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Não é possível apagar</h2>
+      <button class="modal-close" onclick="closeEquipApagarModal()">×</button>
+    </div>
+
+    <p style="font-size:14px;line-height:1.5;margin:0;">
+      Equipamentos não podem ser apagados porque há registos históricos de temperatura (HACCP)
+      que referenciam <strong id="equipApagarNome"></strong>. Podes desativá-lo — deixa de
+      aparecer no formulário e na lista, mas o histórico mantém-se intacto.
+    </p>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="closeEquipApagarModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="confirmarDesativarEquip()">Desativar equipamento</button>
+    </div>
+  </div>
+</div>
+
 <script>
   var firebaseConfig = {
     databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
@@ -1307,15 +1407,61 @@
     };
   }
 
-  var EQUIPAMENTOS = [
-    { id:'edenox',     nome:'Bancada Fria EDENOX MPS-250HC',        zona:'Cozinha',      tipo:'refrigeracao', num:1 },
-    { id:'amitek941',  nome:'Bancada Fria AMITEK AK941',            zona:'Cozinha',      tipo:'refrigeracao', num:2 },
-    { id:'amitek943t', nome:'Bancada Fria AMITEK AK943T',           zona:'Cozinha',      tipo:'refrigeracao', num:3 },
-    { id:'mll40',      nome:'MLL ECO 40',                           zona:'Cozinha',      tipo:'congelacao',   num:4 },
-    { id:'mll50',      nome:'MLL ECO 50',                           zona:'Cozinha',      tipo:'congelacao',   num:5 },
-    { id:'placafria',  nome:'Placa Fria Drop-in 3GN',                zona:'Sala (Bar)',   tipo:'refrigeracao', num:6 },
-    { id:'gelo',       nome:'Máquina de Gelo EURFRIGOR ECP25',      zona:'Sala (Bar)',   tipo:'outro',         num:7 }
-  ];
+  var equipamentosRef = db.ref('equipamentos');
+  var equipamentos = {};
+  var equipamentosCarregados = false;
+
+  var EQUIP_TIPO_LABELS = {
+    refrigeracao: 'Refrigeração',
+    congelacao: 'Congelação',
+    lavagem: 'Lavagem',
+    outro: 'Outro'
+  };
+
+  var EQUIP_TIPO_LIMITE_DEFAULT = {
+    refrigeracao: 5,
+    congelacao: -18,
+    lavagem: 82,
+    outro: null
+  };
+
+  var EQUIP_ZONAS = ['Cozinha', 'Bar/Sala', 'Arrumos', 'Pateo Exterior'];
+
+  var EQUIP_SEED = {
+    edenox:     { nome:'Bancada Fria EDENOX MPS-250HC',        zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:1, ativo:true },
+    amitek941:  { nome:'Bancada Fria AMITEK AK941',             zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:2, ativo:true },
+    amitek943t: { nome:'Bancada Fria AMITEK AK943T',            zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:3, ativo:true },
+    mll40:      { nome:'Máquina Lavar Loiça ECO 40',            zona:'Cozinha',  tipo:'lavagem',       limite:82,   ordem:4, ativo:true },
+    mll50:      { nome:'Máquina Lavar Loiça ECO 50',            zona:'Cozinha',  tipo:'lavagem',       limite:82,   ordem:5, ativo:true },
+    placafria:  { nome:'Placa Fria Drop-in 3GN',                zona:'Bar/Sala', tipo:'refrigeracao', limite:5,    ordem:6, ativo:true },
+    gelo:       { nome:'Máquina de Gelo EURFRIGOR ECP25',       zona:'Bar/Sala', tipo:'outro',         limite:null, ordem:7, ativo:true },
+    armario:    { nome:'Armário Refrigerado GN 2/1 HV10001',    zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:8, ativo:true },
+    congelador: { nome:'Congelador',                            zona:'Arrumos',  tipo:'congelacao',   limite:-18,  ordem:9, ativo:true }
+  };
+
+  function getEquipArray(){
+    return Object.keys(equipamentos).map(function(id){
+      return Object.assign({ id: id }, equipamentos[id]);
+    });
+  }
+
+  function getEquipAtivosOrdenados(){
+    return getEquipArray()
+      .filter(function(e){ return e.ativo !== false; })
+      .sort(function(a, b){ return (a.ordem || 0) - (b.ordem || 0); });
+  }
+
+  function slugify(str){
+    var s = String(str || '').toLowerCase();
+    var accents = 'áàãâäéèêëíìîïóòõôöúùûüçñ';
+    var plain   = 'aaaaaeeeeiiiiooooouuuucn';
+    var out = '';
+    for (var i = 0; i < s.length; i++){
+      var idx = accents.indexOf(s.charAt(i));
+      out += idx === -1 ? s.charAt(i) : plain.charAt(idx);
+    }
+    return out.replace(/[^a-z0-9]/g, '');
+  }
 
   var ABERTURA_DEFAULT = [
     'Ligar equipamentos de frio e verificar funcionamento',
@@ -1379,19 +1525,23 @@
   }
 
   function isOutOfRange(equipId, temp){
-    var eq = EQUIPAMENTOS.filter(function(e){ return e.id === equipId; })[0];
-    if (!eq) return false;
-    if (eq.tipo === 'refrigeracao') return temp > 5;
-    if (eq.tipo === 'congelacao') return temp > -18;
+    var eq = equipamentos[equipId];
+    if (!eq || eq.limite === null || eq.limite === undefined) return false;
+    if (eq.tipo === 'refrigeracao' || eq.tipo === 'congelacao') return temp > eq.limite;
+    if (eq.tipo === 'lavagem') return temp < eq.limite;
     return false;
   }
 
   /* ---------- Equipment list + floor plan click-through ---------- */
   function renderEquipList(){
+    if (!equipamentosCarregados){
+      document.getElementById('equipList').innerHTML = '';
+      return;
+    }
     var html = '';
-    EQUIPAMENTOS.forEach(function(eq){
+    getEquipAtivosOrdenados().forEach(function(eq){
       html += '<button type="button" class="equip-list-item" onclick="openTempForm(\'' + eq.id + '\')">';
-      html += '  <span class="equip-num-badge">' + eq.num + '</span>';
+      html += '  <span class="equip-num-badge">' + eq.ordem + '</span>';
       html += '  <span class="equip-list-text"><strong>' + escapeHtml(eq.nome) + '</strong><br><span class="equip-list-zone">' + escapeHtml(eq.zona) + '</span></span>';
       html += '</button>';
     });
@@ -1400,11 +1550,19 @@
 
   function populateEquipSelect(){
     var sel = document.getElementById('temp-equipamento');
+    if (!equipamentosCarregados){
+      sel.disabled = true;
+      sel.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    var currentVal = sel.value;
     var html = '';
-    EQUIPAMENTOS.forEach(function(eq){
-      html += '<option value="' + eq.id + '">' + eq.num + '. ' + escapeHtml(eq.nome) + '</option>';
+    getEquipAtivosOrdenados().forEach(function(eq){
+      html += '<option value="' + eq.id + '">' + eq.ordem + '. ' + escapeHtml(eq.nome) + '</option>';
     });
     sel.innerHTML = html;
+    sel.disabled = false;
+    if (currentVal && equipamentos[currentVal]) sel.value = currentVal;
   }
 
   function openTempForm(id){
@@ -1699,7 +1857,6 @@
 
   function renderTemps(){
     var byEquip = {};
-    EQUIPAMENTOS.forEach(function(eq){ byEquip[eq.id] = []; });
     var hasOlder = false;
     Object.keys(temps).forEach(function(key){
       var t = temps[key];
@@ -1711,15 +1868,24 @@
       if (!isWithinLastNDays(t.dataHora, 30)) hasOlder = true;
     });
 
+    var idsToShow = {};
+    getEquipAtivosOrdenados().forEach(function(eq){ idsToShow[eq.id] = true; });
+    Object.keys(byEquip).forEach(function(id){ idsToShow[id] = true; });
+
+    var equipList = Object.keys(idsToShow).map(function(id){
+      var eq = equipamentos[id];
+      return eq ? Object.assign({ id: id }, eq) : { id: id, nome: id, zona: '', ordem: 9999 };
+    }).sort(function(a, b){ return (a.ordem || 9999) - (b.ordem || 9999); });
+
     var html = '';
-    EQUIPAMENTOS.forEach(function(eq){
+    equipList.forEach(function(eq){
       var list = (byEquip[eq.id] || []).slice().sort(function(a, b){
         return new Date(b.dataHora) - new Date(a.dataHora);
       });
       var shown = temposMostrarTodos ? list : list.filter(function(r){ return isWithinLastNDays(r.dataHora, 30); });
 
       html += '<div class="equip-temp-card" id="equipcard_' + eq.id + '">';
-      html += '  <div class="equip-temp-header"><span class="equip-temp-name"><span class="equip-num-badge">' + eq.num + '</span>' + escapeHtml(eq.nome) + '</span><span class="equip-temp-zone">' + escapeHtml(eq.zona) + '</span></div>';
+      html += '  <div class="equip-temp-header"><span class="equip-temp-name"><span class="equip-num-badge">' + eq.ordem + '</span>' + escapeHtml(eq.nome) + '</span><span class="equip-temp-zone">' + escapeHtml(eq.zona) + '</span></div>';
 
       if (shown.length === 0){
         html += '  <p class="equip-temp-empty">' + (temposMostrarTodos ? 'Sem registos ainda.' : 'Sem registos nos últimos 30 dias.') + '</p>';
@@ -1790,9 +1956,265 @@
   }
   window.closeLightbox = closeLightbox;
 
+  /* ---------- Equipamentos (gestão) ---------- */
+  var equipOpenPanelId = null;
+  var equipDraft = null;
+  var equipApagarPendingId = null;
+
+  function seedEquipamentos(){
+    var btn = document.getElementById('btnSeedEquip');
+    if (btn){ btn.disabled = true; btn.textContent = 'A criar...'; }
+    var ids = Object.keys(EQUIP_SEED);
+    var writes = ids.map(function(id){
+      return equipamentosRef.child(id).set(EQUIP_SEED[id]);
+    });
+    Promise.all(writes).catch(function(err){
+      alert('Erro ao criar equipamentos iniciais: ' + err.message);
+      if (btn){ btn.disabled = false; btn.textContent = 'Criar equipamentos iniciais'; }
+    });
+  }
+  window.seedEquipamentos = seedEquipamentos;
+
+  function toggleEquipPanel(id){
+    if (equipOpenPanelId === id){
+      closeEquipPanel();
+      return;
+    }
+    equipOpenPanelId = id;
+    equipDraft = Object.assign({}, equipamentos[id]);
+    renderEquipManage();
+  }
+  window.toggleEquipPanel = toggleEquipPanel;
+
+  function openEquipNovo(){
+    if (equipOpenPanelId === '__novo__'){
+      closeEquipPanel();
+      return;
+    }
+    equipOpenPanelId = '__novo__';
+    equipDraft = {
+      nome: '',
+      zona: EQUIP_ZONAS[0],
+      tipo: 'refrigeracao',
+      limite: EQUIP_TIPO_LIMITE_DEFAULT.refrigeracao,
+      ordem: getEquipArray().length + 1,
+      ativo: true
+    };
+    renderEquipManage();
+  }
+  window.openEquipNovo = openEquipNovo;
+
+  function closeEquipPanel(){
+    equipOpenPanelId = null;
+    equipDraft = null;
+    renderEquipManage();
+  }
+  window.closeEquipPanel = closeEquipPanel;
+
+  function onEquipTipoChange(){
+    var tipo = document.getElementById('equipEdit-tipo').value;
+    var def = EQUIP_TIPO_LIMITE_DEFAULT[tipo];
+    document.getElementById('equipEdit-limite').value = (def === null || def === undefined) ? '' : def;
+  }
+  window.onEquipTipoChange = onEquipTipoChange;
+
+  function saveEquip(id){
+    var nome = document.getElementById('equipEdit-nome').value.trim();
+    var zona = document.getElementById('equipEdit-zona').value;
+    var tipo = document.getElementById('equipEdit-tipo').value;
+    var limiteRaw = document.getElementById('equipEdit-limite').value.trim();
+    var ordemRaw = document.getElementById('equipEdit-ordem').value.trim();
+    var ativo = document.getElementById('equipEdit-ativo').checked;
+
+    if (!nome){
+      alert('Indica o nome do equipamento.');
+      return;
+    }
+
+    var limite = null;
+    if (limiteRaw !== ''){
+      limite = parseFloat(limiteRaw);
+      if (isNaN(limite)){
+        alert('Limite inválido.');
+        return;
+      }
+    }
+
+    var ordem = ordemRaw === '' ? 0 : parseInt(ordemRaw, 10);
+    if (isNaN(ordem)){
+      alert('Ordem inválida.');
+      return;
+    }
+
+    var record = { nome: nome, zona: zona, tipo: tipo, limite: limite, ordem: ordem, ativo: ativo };
+
+    var targetId = id;
+    if (!targetId){
+      targetId = slugify(nome);
+      if (!targetId){
+        alert('Não foi possível gerar um identificador a partir do nome.');
+        return;
+      }
+      if (equipamentos[targetId]){
+        alert('Já existe um equipamento com este identificador ("' + targetId + '"). Escolhe um nome diferente.');
+        return;
+      }
+    }
+
+    equipamentosRef.child(targetId).set(record).then(function(){
+      closeEquipPanel();
+    }).catch(function(err){
+      alert('Erro ao guardar equipamento: ' + err.message);
+    });
+  }
+  window.saveEquip = saveEquip;
+
+  function tentarApagarEquip(id){
+    var eq = equipamentos[id];
+    if (!eq) return;
+    equipApagarPendingId = id;
+    document.getElementById('equipApagarNome').textContent = eq.nome;
+    document.getElementById('equipApagarModalOverlay').classList.add('open');
+  }
+  window.tentarApagarEquip = tentarApagarEquip;
+
+  function closeEquipApagarModal(){
+    equipApagarPendingId = null;
+    document.getElementById('equipApagarModalOverlay').classList.remove('open');
+  }
+  window.closeEquipApagarModal = closeEquipApagarModal;
+
+  function confirmarDesativarEquip(){
+    if (!equipApagarPendingId) return;
+    var id = equipApagarPendingId;
+    var eq = equipamentos[id];
+    if (!eq){ closeEquipApagarModal(); return; }
+    var record = {
+      nome: eq.nome,
+      zona: eq.zona,
+      tipo: eq.tipo,
+      limite: (eq.limite === undefined ? null : eq.limite),
+      ordem: eq.ordem,
+      ativo: false
+    };
+    equipamentosRef.child(id).set(record).then(function(){
+      closeEquipApagarModal();
+      closeEquipPanel();
+    }).catch(function(err){
+      alert('Erro ao desativar: ' + err.message);
+    });
+  }
+  window.confirmarDesativarEquip = confirmarDesativarEquip;
+
+  function buildEquipRowHtml(eq){
+    var tipoLabel = EQUIP_TIPO_LABELS[eq.tipo] || eq.tipo;
+    var limiteLabel = (eq.limite === null || eq.limite === undefined) ? '—' : eq.limite + '°C';
+    var inativoTag = eq.ativo === false ? '<span class="equip-manage-inativo">Inativo</span>' : '';
+    return '<button type="button" class="equip-manage-row" onclick="toggleEquipPanel(\'' + eq.id + '\')">' +
+      '<span class="equip-manage-nome">' + escapeHtml(eq.nome) + inativoTag + '</span>' +
+      '<span class="equip-manage-tipo">' + escapeHtml(tipoLabel) + '</span>' +
+      '<span class="equip-manage-limite">' + limiteLabel + '</span>' +
+      '</button>';
+  }
+
+  function buildEquipPanelHtml(eq){
+    var isNovo = !eq;
+    var d = equipDraft || {};
+    var html = '<div class="equip-manage-panel">';
+
+    html += '  <div class="field"><label class="field-label" for="equipEdit-nome">Nome</label><input type="text" id="equipEdit-nome" value="' + escapeHtml(d.nome || '') + '"></div>';
+
+    html += '  <div class="field"><label class="field-label" for="equipEdit-zona">Zona</label><select id="equipEdit-zona">';
+    EQUIP_ZONAS.forEach(function(z){
+      html += '<option value="' + z + '"' + (d.zona === z ? ' selected' : '') + '>' + z + '</option>';
+    });
+    html += '  </select></div>';
+
+    html += '  <div class="field"><label class="field-label" for="equipEdit-tipo">Tipo</label><select id="equipEdit-tipo" onchange="onEquipTipoChange()">';
+    Object.keys(EQUIP_TIPO_LABELS).forEach(function(t){
+      html += '<option value="' + t + '"' + (d.tipo === t ? ' selected' : '') + '>' + EQUIP_TIPO_LABELS[t] + '</option>';
+    });
+    html += '  </select></div>';
+
+    html += '  <div class="field"><label class="field-label" for="equipEdit-limite">Limite (°C) — vazio = sem validação ("Outro")</label><input type="number" id="equipEdit-limite" step="0.1" value="' + (d.limite === null || d.limite === undefined ? '' : d.limite) + '"></div>';
+
+    html += '  <div class="field"><label class="field-label" for="equipEdit-ordem">Ordem</label><input type="number" id="equipEdit-ordem" step="1" value="' + (d.ordem !== undefined ? d.ordem : '') + '"></div>';
+
+    html += '  <div class="field" style="display:flex;align-items:center;gap:8px;">';
+    html += '    <input type="checkbox" id="equipEdit-ativo" style="width:18px;height:18px;accent-color:var(--red);"' + (d.ativo !== false ? ' checked' : '') + '>';
+    html += '    <label class="field-label" style="margin:0;" for="equipEdit-ativo">Ativo</label>';
+    html += '  </div>';
+
+    html += '  <div class="modal-actions" style="justify-content:flex-start;margin-top:8px;">';
+    html += '    <button type="button" class="btn btn-primary" onclick="saveEquip(' + (isNovo ? 'null' : "'" + eq.id + "'") + ')">Guardar</button>';
+    html += '    <button type="button" class="btn" onclick="closeEquipPanel()">Cancelar</button>';
+    if (!isNovo){
+      html += '    <button type="button" class="btn" style="color:var(--red);" onclick="tentarApagarEquip(\'' + eq.id + '\')">🗑 Apagar</button>';
+    }
+    html += '  </div>';
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderEquipManage(){
+    var wrap = document.getElementById('equipManageWrap');
+    if (!wrap) return;
+
+    var html = '';
+
+    if (!equipamentosCarregados){
+      wrap.innerHTML = '<p class="empty-state">A carregar...</p>';
+      return;
+    }
+
+    var arr = getEquipArray();
+
+    if (arr.length === 0){
+      html += '<button type="button" class="btn-ver-mais" id="btnSeedEquip" onclick="seedEquipamentos()">Criar equipamentos iniciais</button>';
+    } else {
+      var byZona = {};
+      arr.forEach(function(eq){
+        var zona = eq.zona || 'Outro';
+        if (!byZona[zona]) byZona[zona] = [];
+        byZona[zona].push(eq);
+      });
+
+      var zonasPresentes = EQUIP_ZONAS.filter(function(z){ return byZona[z] && byZona[z].length > 0; });
+      Object.keys(byZona).forEach(function(z){
+        if (zonasPresentes.indexOf(z) === -1) zonasPresentes.push(z);
+      });
+
+      zonasPresentes.forEach(function(zona){
+        var list = byZona[zona].slice().sort(function(a, b){ return (a.ordem || 0) - (b.ordem || 0); });
+        html += '<p class="equip-manage-zona-title">' + escapeHtml(zona) + '</p>';
+        list.forEach(function(eq){
+          html += buildEquipRowHtml(eq);
+          if (equipOpenPanelId === eq.id){
+            html += buildEquipPanelHtml(eq);
+          }
+        });
+      });
+    }
+
+    html += '<button type="button" class="btn-ver-mais" id="btnNovoEquip" onclick="openEquipNovo()" style="margin-top:14px;">' +
+      (equipOpenPanelId === '__novo__' ? '✕ Cancelar' : '+ Adicionar equipamento') + '</button>';
+    if (equipOpenPanelId === '__novo__'){
+      html += buildEquipPanelHtml(null);
+    }
+
+    wrap.innerHTML = html;
+  }
+
   /* ---------- Init ---------- */
-  renderEquipList();
-  populateEquipSelect();
+  equipamentosRef.on('value', function(snapshot){
+    equipamentos = snapshot.val() || {};
+    equipamentosCarregados = true;
+    renderEquipList();
+    populateEquipSelect();
+    renderEquipManage();
+    renderTemps();
+  });
 
   carregarPessoas(function(){
     popularSelectPessoas(document.getElementById('temp-pessoa'));
@@ -2212,7 +2634,7 @@
   }
 
   function equipamentoNome(id){
-    var eq = EQUIPAMENTOS.filter(function(e){ return e.id === id; })[0];
+    var eq = equipamentos[id];
     return eq ? eq.nome : id;
   }
 
