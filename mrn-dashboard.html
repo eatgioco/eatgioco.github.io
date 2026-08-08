@@ -1575,6 +1575,22 @@
     color:var(--red);
   }
 
+  /* Dia com itens mas nada pendente — "está tudo tratado", distinto da
+     escala de urgência vermelha/normal. */
+  .tes-cal-cell.pago-total{
+    background:var(--green);
+  }
+
+  .tes-cal-cell.pago-total .tes-cal-day,
+  .tes-cal-cell.pago-total .tes-cal-amount{
+    color:var(--white);
+  }
+
+  .tes-cal-cell.pago-total.hoje .tes-cal-day{
+    background:var(--white);
+    color:var(--green);
+  }
+
   .tes-daydetail{
     margin-top:18px;
     padding-top:16px;
@@ -3342,15 +3358,22 @@ window.addEventListener('load', function () {
     }).join('');
   }
 
+  // A escala de vermelho reflete só o valor pendente do dia — um dia com
+  // tudo pago não deve competir por "urgência" com um dia por pagar. Um dia
+  // com itens mas pendente=0 fica verde ("está tudo tratado"), distinto da
+  // escala normal; um dia sem nenhum item fica sem destaque.
   function renderTesCalendario(itens){
     var nd = diasNoMes(anoAtivo, mesAtivo);
-    var porDia = {};
+    var porDiaPendente = {};
+    var porDiaTotal = {};
+
     itens.forEach(function(it){
-      porDia[it.dia] = (porDia[it.dia] || 0) + it.montante;
+      porDiaTotal[it.dia] = (porDiaTotal[it.dia] || 0) + it.montante;
+      if (!it.pago) porDiaPendente[it.dia] = (porDiaPendente[it.dia] || 0) + it.montante;
     });
 
     var max = 0;
-    Object.keys(porDia).forEach(function(d){ if (porDia[d] > max) max = porDia[d]; });
+    Object.keys(porDiaPendente).forEach(function(d){ if (porDiaPendente[d] > max) max = porDiaPendente[d]; });
 
     // Semana começa à segunda-feira (getDay(): 0 = domingo).
     var primeiro = new Date(anoAtivo, mesAtivo - 1, 1).getDay();
@@ -3367,16 +3390,24 @@ window.addEventListener('load', function () {
     }
 
     for (i = 1; i <= nd; i++){
-      var v = porDia[i] || 0;
+      var temItens = porDiaTotal[i] !== undefined;
+      var pendente = porDiaPendente[i] || 0;
+      var tudoPago = temItens && pendente === 0;
+
       var classes = 'tes-cal-cell';
       var style = '';
+      var valorMostrado = 0;
 
-      if (v > 0){
+      if (tudoPago){
+        classes += ' has-value pago-total';
+        valorMostrado = porDiaTotal[i];
+      } else if (pendente > 0){
         classes += ' has-value';
-        var ratio = max > 0 ? v / max : 0;
+        var ratio = max > 0 ? pendente / max : 0;
         var alpha = 0.10 + 0.75 * ratio;
         style = ' style="background:rgba(217,17,36,' + alpha.toFixed(2) + ');"';
         if (alpha > 0.5) classes += ' dark';
+        valorMostrado = pendente;
       }
 
       if (ehMesCorrente && i === hoje.getDate()) classes += ' hoje';
@@ -3384,7 +3415,7 @@ window.addEventListener('load', function () {
 
       html += '<div class="' + classes + '" data-dia="' + i + '"' + style + '>' +
         '<span class="tes-cal-day">' + i + '</span>' +
-        (v > 0 ? '<span class="tes-cal-amount">' + formatEuro(v) + '</span>' : '') +
+        (temItens ? '<span class="tes-cal-amount">' + (tudoPago ? '✓ ' : '') + formatEuro(valorMostrado) + '</span>' : '') +
         '</div>';
     }
 
