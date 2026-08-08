@@ -42,6 +42,8 @@ suppliers             — fornecedores
 paymentRequests       — pedidos de pagamento (status: pendente / concluido / anulado)
 caixaMovimentos       — movimentos de caixa física
 lojaChecklistTemplates / lojaChecklistRegistos — checklists abertura/fecho
+equipamentos          — equipamentos da loja (nome, zona, tipo, limite, ordem, ativo);
+                         nunca apagados, só desativados — lojaTemperaturas referencia-os por id
 lojaTemperaturas / lojaTemperaturasFotos      — registos HACCP (fotos em base64)
 lojaPedidos           — pedidos/sugestões do staff
 pessoas               — membros da equipa
