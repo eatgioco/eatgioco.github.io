@@ -1822,6 +1822,20 @@
     margin:8px 0;
   }
 
+  #tesDiaLista{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .tes-dia-total{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    text-align:right;
+    padding:6px 2px 0;
+  }
+
   .modal-wide{
     max-width:560px;
   }
@@ -2765,17 +2779,31 @@ window.addEventListener('load', function () {
     return isNaN(n) ? 0 : n;
   }
 
-  // Desdobra os pedidos pendentes num array plano de linhas individuais,
-  // ordenado por prazo ascendente. Linhas sem prazo legível ficam no fim.
-  function linhasPendentes(){
+  function ordenaPorPrazo(lista){
+    lista.sort(function(a, b){
+      if (!a.prazoDate && !b.prazoDate) return 0;
+      if (!a.prazoDate) return 1;
+      if (!b.prazoDate) return -1;
+      return a.prazoDate - b.prazoDate;
+    });
+    return lista;
+  }
+
+  // Desdobra TODOS os pedidos (pendentes e já pagos, exceto anulados) num
+  // array plano de linhas individuais, ordenado por prazo ascendente.
+  // 'pago' distingue o estado de cada linha; 'dia' é o dia-do-mês do prazo,
+  // para agrupar no calendário. Base comum para a lista de "todos os
+  // prazos" (só pendentes, via linhasPendentes) e para o calendário de
+  // Tesouraria (pendentes + pagos, via itensDoMes).
+  function linhasPaymentRequestsTodas(){
     var out = [];
     Object.keys(allPaymentRequests).forEach(function(id){
       var p = allPaymentRequests[id];
-      if ((p.status || 'pendente') !== 'pendente') return;
+      if ((p.status || 'pendente') === 'anulado') return;
       (p.lines || []).forEach(function(l, idx){
-        // Linha já paga dentro de um pedido ainda pendente: não é dinheiro a sair.
-        if (lineStatus(p, l) === 'concluido') return;
+        var prazoDate = ddmmyyyyToDate(l.prazo);
         out.push({
+          tipo: 'pedido',
           ticketId: id,
           lineIdx: idx,
           ticketNumero: p.numeroReferencia || '',
@@ -2783,19 +2811,21 @@ window.addEventListener('load', function () {
           fornecedor: l.fornecedor || 'Sem descrição',
           montante: parseMontante(l.montante),
           prazo: l.prazo || '',
-          prazoDate: ddmmyyyyToDate(l.prazo),
+          prazoDate: prazoDate,
+          dia: prazoDate ? prazoDate.getDate() : null,
           referencia: l.referencia || '',
-          iban: l.iban || ''
+          iban: l.iban || '',
+          pago: lineStatus(p, l) === 'concluido'
         });
       });
     });
-    out.sort(function(a, b){
-      if (!a.prazoDate && !b.prazoDate) return 0;
-      if (!a.prazoDate) return 1;
-      if (!b.prazoDate) return -1;
-      return a.prazoDate - b.prazoDate;
-    });
-    return out;
+    return ordenaPorPrazo(out);
+  }
+
+  // Só as linhas ainda por pagar — usada pelo cartão de Pagamentos e pela
+  // lista "todos os prazos".
+  function linhasPendentes(){
+    return linhasPaymentRequestsTodas().filter(function(l){ return !l.pago; });
   }
 
   // Identifica o período mensal de uma ocorrência de compromisso, no mesmo
@@ -2808,42 +2838,47 @@ window.addEventListener('load', function () {
     return !!allPagamentosConcluidos[compromissoId + '_' + periodoCompromisso(prazoDate)];
   }
 
-  // Achata as ocorrências de compromissos fixos ativos do mês corrente e
-  // do seguinte (horizonte suficiente para os filtros de período do
-  // cartão de pagamentos) no mesmo formato de linha usado pelos pedidos,
-  // para poderem aparecer misturadas na mesma lista.
+  // Achata as ocorrências de compromissos fixos ativos de um mês, no mesmo
+  // formato de linha usado pelos pedidos, para poderem aparecer misturadas
+  // na mesma lista. Inclui pagas e pendentes — 'pago' distingue o estado;
+  // quem só quer pendentes filtra depois (ver linhasCompromissosFixos).
+  function linhasCompromissosDoMes(ano, mes){
+    var out = [];
+    ocorrenciasCompromissos(ano, mes).forEach(function(o){
+      var d = new Date(ano, mes - 1, o.dia);
+      d.setHours(0, 0, 0, 0);
+      var c = allCompromissos[o.id] || {};
+      out.push({
+        tipo: 'fixo',
+        tipoCusto: tipoDe(c),
+        compromissoId: o.id,
+        fornecedor: o.nome,
+        montante: o.montante,
+        prazo: formatDateDDMMYYYY(d),
+        prazoDate: d,
+        dia: o.dia,
+        categoria: c.categoria || 'Outros',
+        referencia: '',
+        metodoPagamento: c.metodoPagamento || 'iban',
+        iban: c.iban || '',
+        pago: compromissoPago(o.id, d)
+      });
+    });
+    return out;
+  }
+
+  // Ocorrências pendentes do mês corrente e do seguinte (horizonte
+  // suficiente para os filtros de período do cartão de pagamentos) — usada
+  // pelo cartão de Pagamentos e pela lista "todos os prazos".
   function linhasCompromissosFixos(){
     var out = [];
-
-    function ocorrenciasDoMes(ano, mes){
-      ocorrenciasCompromissos(ano, mes).forEach(function(o){
-        var d = new Date(ano, mes - 1, o.dia);
-        d.setHours(0, 0, 0, 0);
-        // Ocorrência já marcada como paga: não é dinheiro a sair.
-        if (compromissoPago(o.id, d)) return;
-        var c = allCompromissos[o.id] || {};
-        out.push({
-          tipo: 'fixo',
-          compromissoId: o.id,
-          fornecedor: o.nome,
-          montante: o.montante,
-          prazo: formatDateDDMMYYYY(d),
-          prazoDate: d,
-          referencia: '',
-          metodoPagamento: c.metodoPagamento || 'iban',
-          iban: c.iban || ''
-        });
-      });
-    }
-
     var hoje = new Date();
     var ano1 = hoje.getFullYear(), mes1 = hoje.getMonth() + 1;
     var ano2 = ano1, mes2 = mes1 + 1;
     if (mes2 > 12){ mes2 = 1; ano2++; }
-    ocorrenciasDoMes(ano1, mes1);
-    ocorrenciasDoMes(ano2, mes2);
-
-    return out;
+    out = out.concat(linhasCompromissosDoMes(ano1, mes1));
+    out = out.concat(linhasCompromissosDoMes(ano2, mes2));
+    return out.filter(function(l){ return !l.pago; });
   }
 
   // Pedidos pendentes + ocorrências de compromissos fixos, todos juntos e
@@ -2888,8 +2923,13 @@ window.addEventListener('load', function () {
     return l.ticketId + '|' + l.lineIdx;
   }
 
+  // itensTesourariaAtual guarda o resultado do último itensDoMes() — inclui
+  // linhas já pagas que linhasCombinadas() (só pendentes) não tem, para que
+  // os blocos abertos a partir do calendário consigam resolver a sua linha.
+  var itensTesourariaAtual = [];
+
   function linhaPorChave(chave){
-    var lista = linhasCombinadas();
+    var lista = linhasCombinadas().concat(itensTesourariaAtual);
     for (var i = 0; i < lista.length; i++){
       if (chaveLinha(lista[i]) === chave) return lista[i];
     }
@@ -2897,8 +2937,10 @@ window.addEventListener('load', function () {
   }
 
   // Bloco de apoio ao pagamento, no mesmo formato dos tickets de
-  // pagamentos.html. Campos vazios são omitidos em silêncio.
-  function blocoDetalhePagamento(l, incluirPedido){
+  // pagamentos.html. Campos vazios são omitidos em silêncio. 'pago' troca
+  // as ações (Pagar/Marcar) pelo indicador ✓ Pago, sem ação — usada pelo
+  // calendário de Tesouraria, onde pendentes e já pagos aparecem juntos.
+  function blocoDetalhePagamento(l, incluirPedido, pago){
     var h = '<div class="pay-detalhe" data-chave="' + escapeHtml(chaveLinha(l)) + '">';
     h += '<div class="pay-detalhe-info">';
 
@@ -2932,10 +2974,14 @@ window.addEventListener('load', function () {
     h += '</div>'; // .pay-detalhe-info
 
     h += '<div class="pay-detalhe-actions">';
-    if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
-      h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
+    if (pago){
+      h += '<span class="payment-line-paid">✓ Pago</span>';
+    } else {
+      if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
+        h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
+      }
+      h += '<button type="button" class="btn-small pay-detalhe-marcar" title="Marcar como pago">✓ Pago</button>';
     }
-    h += '<button type="button" class="btn-small pay-detalhe-marcar" title="Marcar como pago">✓ Pago</button>';
     h += '</div>';
     h += '</div>';
     return h;
@@ -3220,25 +3266,21 @@ window.addEventListener('load', function () {
     return out;
   }
 
-  // Pedidos pendentes + compromissos fixos do mês, ordenados por dia.
+  // Pedidos (pendentes + pagos) e compromissos fixos (pendentes + pagos)
+  // do mês, ordenados por dia. Alimenta o calendário (heatmap e lista de
+  // dia) — ao contrário de linhasCombinadas(), não exclui os já pagos: o
+  // calendário reflete tudo o que se passa nesse dia, não só o que falta.
   function itensDoMes(ano, mes){
     var out = [];
 
-    linhasPendentes().forEach(function(l){
+    linhasPaymentRequestsTodas().forEach(function(l){
       if (!l.prazoDate) return;
       if (l.prazoDate.getFullYear() !== ano) return;
       if (l.prazoDate.getMonth() + 1 !== mes) return;
-      out.push({
-        tipo: 'pedido',
-        nome: l.fornecedor,
-        montante: l.montante,
-        dia: l.prazoDate.getDate(),
-        referencia: l.referencia,
-        ticketNumero: l.ticketNumero
-      });
+      out.push(l);
     });
 
-    ocorrenciasCompromissos(ano, mes).forEach(function(o){ out.push(o); });
+    out = out.concat(linhasCompromissosDoMes(ano, mes));
 
     out.sort(function(a, b){ return a.dia - b.dia; });
     return out;
@@ -3255,7 +3297,10 @@ window.addEventListener('load', function () {
     return item.tipo === 'pedido' || item.tipoCusto === 'variavel';
   }
 
-  function renderTesTotal(itens){
+  // "Total a pagar" / semanas representam o que ainda falta pagar — só o
+  // calendário (heatmap + lista de dia) mostra pendentes e pagos juntos.
+  function renderTesTotal(itensTodos){
+    var itens = itensTodos.filter(function(i){ return !i.pago; });
     var total = itens.reduce(function(acc, i){ return acc + i.montante; }, 0);
     var nPedidos = itens.filter(function(i){ return i.tipo === 'pedido'; }).length;
     var nFixos = itens.filter(function(i){ return i.tipo === 'fixo'; }).length;
@@ -3271,7 +3316,8 @@ window.addEventListener('load', function () {
       ' · ' + nFixos + ' ' + (nFixos === 1 ? 'compromisso fixo' : 'compromissos fixos');
   }
 
-  function renderTesSemanas(itens){
+  function renderTesSemanas(itensTodos){
+    var itens = itensTodos.filter(function(i){ return !i.pago; });
     var nSemanas = Math.ceil(diasNoMes(anoAtivo, mesAtivo) / 7);
     var totais = [];
     var i;
@@ -3345,6 +3391,16 @@ window.addEventListener('load', function () {
     tesCalendarioEl.innerHTML = html;
   }
 
+  // chave da linha expandida na lista de um dia do calendário, ou null.
+  // Estado próprio, independente de cartaoLinhaAberta/tesLinhaAberta: são
+  // vistas diferentes e podem estar abertas em simultâneo.
+  var tesDiaLinhaAberta = null;
+
+  // Lista de todos os itens (pendentes e já pagos) do dia selecionado,
+  // reaproveitando blocoDetalhePagamento — os pagos mostram só ✓ Pago, sem
+  // ação; os pendentes mostram 🏦 Pagar / ✓ Pago, tal como no cartão e na
+  // lista "todos os prazos". Marcar como pago aqui não fecha a lista: o
+  // bloco atualiza-se otimisticamente e o Firebase confirma por trás.
   function renderTesDiaDetalhe(itens){
     if (diaSelecionado === null){
       tesDiaDetalhe.style.display = 'none';
@@ -3361,24 +3417,37 @@ window.addEventListener('load', function () {
       return;
     }
 
-    var total = doDia.reduce(function(acc, i){ return acc + i.montante; }, 0);
+    // Pendentes primeiro (é o que precisa de ação), pagos depois.
+    var ordenados = doDia.slice().sort(function(a, b){
+      if (a.pago !== b.pago) return a.pago ? 1 : -1;
+      return 0;
+    });
 
-    tesDiaLista.innerHTML = '<table class="tes-table"><thead><tr>' +
-      '<th>Tipo</th><th>Descrição</th><th>Referência</th><th style="text-align:right;">Valor</th>' +
-      '</tr></thead><tbody>' +
-      doDia.map(function(it){
-        return '<tr>' +
-          '<td><span class="tes-tag ' + (it.tipo === 'fixo' ? 'tes-tag-fixo' : 'tes-tag-pedido') + '">' +
-          (it.tipo === 'fixo' ? 'Fixo' : 'Pedido') + '</span></td>' +
-          '<td>' + escapeHtml(it.nome) + '</td>' +
-          '<td class="mono">' + escapeHtml(it.tipo === 'fixo' ? (it.categoria || '') : (it.referencia || '')) + '</td>' +
-          '<td class="num">' + formatEuro(it.montante) + '</td>' +
-          '</tr>';
-      }).join('') +
-      '</tbody><tfoot><tr>' +
-      '<td colspan="3" class="mono"><strong>Total do dia</strong></td>' +
-      '<td class="num">' + formatEuro(total) + '</td>' +
-      '</tr></tfoot></table>';
+    var hoje = hojeMeiaNoite();
+    var total = doDia.reduce(function(acc, i){ return acc + i.montante; }, 0);
+    var totalPendente = doDia.reduce(function(acc, i){ return acc + (i.pago ? 0 : i.montante); }, 0);
+
+    tesDiaLista.innerHTML = ordenados.map(function(l){
+      var chave = chaveLinha(l);
+      var aberta = tesDiaLinhaAberta === chave;
+      // Um item já pago não fica "vencido" só porque o prazo já passou.
+      var vencido = !l.pago && l.prazoDate && l.prazoDate <= hoje;
+      var html = '<div class="pay-line-wrap' + (vencido ? ' vencido' : '') + '" data-chave="' + escapeHtml(chave) + '">' +
+        '<div class="pay-line">' +
+        '<span class="pay-line-caret">' + (aberta ? '▾' : '▸') + '</span>' +
+        '<span class="tes-tag ' + (l.tipo === 'fixo' ? 'tes-tag-fixo' : 'tes-tag-pedido') + '">' +
+        (l.tipo === 'fixo' ? 'Fixo' : 'Pedido') + '</span>' +
+        '<span class="pay-line-nome">' + escapeHtml(l.fornecedor) + '</span>' +
+        (l.pago ? '<span class="payment-line-paid">✓ Pago</span>' : '') +
+        '<span class="pay-line-valor">' + formatEuro(l.montante) + '</span>' +
+        '</div>';
+      if (aberta) html += blocoDetalhePagamento(l, true, l.pago);
+      html += '</div>';
+      return html;
+    }).join('') +
+      '<div class="tes-dia-total">Total do dia: <strong>' + formatEuro(total) + '</strong>' +
+      (totalPendente !== total ? ' · Pendente: <strong>' + formatEuro(totalPendente) + '</strong>' : '') +
+      '</div>';
   }
 
   tesCalendarioEl.addEventListener('click', function(e){
@@ -3386,7 +3455,20 @@ window.addEventListener('load', function () {
     if (!cell || cell.classList.contains('empty')) return;
     var dia = parseInt(cell.getAttribute('data-dia'), 10);
     diaSelecionado = (diaSelecionado === dia) ? null : dia;
+    tesDiaLinhaAberta = null;
     renderTesouraria();
+  });
+
+  // Delegado uma única vez: trata cópia/Pagar/✓ Pago (via
+  // tratarCliqueDetalhe, partilhado com o cartão e a lista "todos os
+  // prazos") e o expandir/recolher de cada linha do dia.
+  tesDiaLista.addEventListener('click', function(e){
+    if (tratarCliqueDetalhe(e)) return;
+    var wrap = e.target.closest('.pay-line-wrap');
+    if (!wrap) return;
+    var chave = wrap.getAttribute('data-chave');
+    tesDiaLinhaAberta = (tesDiaLinhaAberta === chave) ? null : chave;
+    renderTesDiaDetalhe(itensTesourariaAtual);
   });
 
   // Lista completa dos pendentes, sem filtro de período, com as acções de
@@ -3442,6 +3524,7 @@ window.addEventListener('load', function () {
 
   function renderTesouraria(){
     var itens = itensDoMes(anoAtivo, mesAtivo);
+    itensTesourariaAtual = itens;
     tesMesLabel.textContent = MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
     renderTesTotal(itens);
     renderTesSemanas(itens);
@@ -3456,6 +3539,7 @@ window.addEventListener('load', function () {
     if (mesAtivo > 12){ mesAtivo = 1; anoAtivo++; }
     if (mesAtivo < 1){ mesAtivo = 12; anoAtivo--; }
     diaSelecionado = null;
+    tesDiaLinhaAberta = null;
     renderTesouraria();
   }
 
