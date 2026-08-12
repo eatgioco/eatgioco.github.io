@@ -570,6 +570,11 @@
       <input type="text" id="editReferencia">
     </div>
 
+    <div class="field">
+      <label class="field-label" for="editPrazoPagamento">Prazo de Pagamento</label>
+      <input type="date" id="editPrazoPagamento">
+    </div>
+
     <div class="modal-actions">
       <button type="button" class="btn" id="editFaturaModalCancel">Cancelar</button>
       <div class="modal-actions-right">
@@ -956,6 +961,7 @@ window.addEventListener('load', function () {
       var montante = fieldAmount(fields, 'InvoiceTotal');
       var referencia = fieldText(fields, 'InvoiceId');
       var data = fieldDateIso(fields, 'InvoiceDate');
+      var prazoPagamento = fieldDateIso(fields, 'DueDate');
       var linhas = extrairLinhas(fields);
 
       var matchId = findMatchingSupplier(fornecedorTexto);
@@ -966,6 +972,7 @@ window.addEventListener('load', function () {
         montante: montante,
         referencia: referencia || null,
         data: data || null,
+        prazoPagamento: prazoPagamento || null,
         linhas: linhas,
         criadoEm: Date.now(),
         criadoPor: resolvePessoaSelecao(document.getElementById('carregadoPorSelect')).criadoPor
@@ -1008,6 +1015,7 @@ window.addEventListener('load', function () {
     html += '<div class="card-row"><strong>Montante</strong><span>' + formatMontante(f.montante) + '</span></div>';
     html += '<div class="card-row"><strong>Data</strong><span>' + escapeHtml(isoToDDMMYYYY(f.data) || 'n/d') + '</span></div>';
     html += '<div class="card-row"><strong>Referência</strong><span>' + escapeHtml(f.referencia || 'n/d') + '</span></div>';
+    html += '<div class="card-row"><strong>Prazo Pag.</strong><span>' + escapeHtml(isoToDDMMYYYY(f.prazoPagamento) || 'n/d') + '</span></div>';
 
     if (f.linhas && f.linhas.length) {
       html += '<div class="card-lines">';
@@ -1107,8 +1115,15 @@ window.addEventListener('load', function () {
       if (prefill.fornecedorId) select.value = prefill.fornecedorId;
       if (prefill.montante !== null && prefill.montante !== undefined) row.querySelector('.payment-montante').value = prefill.montante;
       if (prefill.referencia) row.querySelector('.payment-referencia').value = prefill.referencia;
-      var supplier = allSuppliers[select.value];
-      prazoInput.value = supplier ? prazoDateFromCondicoes(supplier.condicoesPagamento) : "";
+      // O prazo da própria fatura (ex: DueDate lido pelo Azure) é mais fiável
+      // do que as condições gerais do fornecedor — só recorre a estas últimas
+      // quando a fatura não trouxer um prazo próprio.
+      if (prefill.prazoIso) {
+        prazoInput.value = prefill.prazoIso;
+      } else {
+        var supplier = allSuppliers[select.value];
+        prazoInput.value = supplier ? prazoDateFromCondicoes(supplier.condicoesPagamento) : "";
+      }
     }
 
     return row;
@@ -1127,7 +1142,8 @@ window.addEventListener('load', function () {
     paymentLines.appendChild(createPaymentLineRow({
       fornecedorId: f.fornecedorIdEncontrado || '',
       montante: f.montante,
-      referencia: f.referencia
+      referencia: f.referencia,
+      prazoIso: f.prazoPagamento || ''
     }));
 
     document.getElementById('paymentCriadoPor').parentElement.style.display = '';
@@ -1235,6 +1251,7 @@ window.addEventListener('load', function () {
     document.getElementById('editMontante').value = (f.montante === null || f.montante === undefined) ? '' : f.montante;
     document.getElementById('editData').value = f.data || '';
     document.getElementById('editReferencia').value = f.referencia || '';
+    document.getElementById('editPrazoPagamento').value = f.prazoPagamento || '';
 
     editFaturaModalOverlay.classList.add('open');
   }
@@ -1259,7 +1276,8 @@ window.addEventListener('load', function () {
       fornecedorIdEncontrado: editFornecedorId.value || null,
       montante: montanteVal === '' ? null : parseFloat(montanteVal),
       data: document.getElementById('editData').value || null,
-      referencia: document.getElementById('editReferencia').value.trim() || null
+      referencia: document.getElementById('editReferencia').value.trim() || null,
+      prazoPagamento: document.getElementById('editPrazoPagamento').value || null
     };
 
     // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
