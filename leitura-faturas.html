@@ -336,6 +336,44 @@
     text-decoration:underline;
   }
 
+  .btn-danger{
+    border-color:var(--red);
+    color:var(--red);
+    background:var(--white);
+  }
+
+  .btn-danger:hover{
+    background:var(--red);
+    color:var(--white);
+  }
+
+  .drop-zone{
+    border:2px dashed var(--black);
+    background:var(--white);
+    padding:36px 20px;
+    text-align:center;
+    margin-bottom:24px;
+    cursor:pointer;
+    transition:background-color .15s ease, border-color .15s ease;
+  }
+
+  .drop-zone-title{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+  }
+
+  .drop-zone-sub{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .drop-zone.drop-zone-active{
+    background:#eef6f1;
+    border-color:var(--green);
+  }
+
   /* Modal */
   .modal-overlay{
     display:none;
@@ -461,6 +499,11 @@
 <div class="status-msg" id="statusMsg"></div>
 
 <main>
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-zone-title">Arrasta aqui o PDF ou foto da fatura</div>
+    <div class="drop-zone-sub">ou clica para escolher um ficheiro</div>
+  </div>
+
   <div class="empty-state" id="faturasEmpty" style="display:none;">Nenhuma fatura processada ainda.</div>
   <div class="grid" id="faturasGrid"></div>
 </main>
@@ -489,6 +532,48 @@
       <button type="button" class="btn" id="paymentModalCancel">Cancelar</button>
       <div class="modal-actions-right">
         <button type="button" class="btn btn-primary" id="btnEnviarPagamento">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Edição de Fatura -->
+<div class="modal-overlay" id="editFaturaModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Editar Fatura</h2>
+      <button class="modal-close" id="editFaturaModalClose">×</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="editFornecedorTexto">Fornecedor (texto extraído)</label>
+      <input type="text" id="editFornecedorTexto">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="editFornecedorId">Fornecedor correspondido</label>
+      <select id="editFornecedorId"></select>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="editMontante">Montante</label>
+      <input type="number" step="0.01" min="0" id="editMontante">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="editData">Data</label>
+      <input type="date" id="editData">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="editReferencia">Referência</label>
+      <input type="text" id="editReferencia">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="editFaturaModalCancel">Cancelar</button>
+      <div class="modal-actions-right">
+        <button type="button" class="btn btn-primary" id="btnGuardarEdicaoFatura">Guardar</button>
       </div>
     </div>
   </div>
@@ -736,6 +821,38 @@ window.addEventListener('load', function () {
     processarFatura(file);
   });
 
+  var dropZone = document.getElementById('dropZone');
+
+  dropZone.addEventListener('click', function () {
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  ['dragenter', 'dragover'].forEach(function (evtName) {
+    dropZone.addEventListener(evtName, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('drop-zone-active');
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(function (evtName) {
+    dropZone.addEventListener(evtName, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('drop-zone-active');
+    });
+  });
+
+  dropZone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove('drop-zone-active');
+    var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    processarFatura(file);
+  });
+
   function fileToBase64(file) {
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
@@ -909,6 +1026,8 @@ window.addEventListener('load', function () {
     } else {
       html += '<button type="button" class="btn-small btn-criar-pagamento">💰 Criar Pedido de Pagamento</button>';
     }
+    html += '<button type="button" class="btn-small btn-editar-fatura">✏ Editar</button>';
+    html += '<button type="button" class="btn-small btn-danger btn-apagar-fatura">🗑 Apagar</button>';
     html += '</div>';
 
     card.innerHTML = html;
@@ -919,6 +1038,16 @@ window.addEventListener('load', function () {
         openPaymentModalFromFatura(f);
       });
     }
+
+    card.querySelector('.btn-editar-fatura').addEventListener('click', function () {
+      openEditFaturaModal(f);
+    });
+
+    card.querySelector('.btn-apagar-fatura').addEventListener('click', function () {
+      if (confirm('Apagar esta fatura processada? Esta ação não pode ser desfeita.')) {
+        faturasRef.child(f.id).remove();
+      }
+    });
 
     return card;
   }
@@ -1086,6 +1215,60 @@ window.addEventListener('load', function () {
     aviso.style.display = 'block';
     btnEnviarPagamento.style.display = 'none';
     paymentModalCancel.textContent = 'Fechar';
+  });
+
+  // ===== Modal "Editar Fatura" =====
+  var editFaturaModalOverlay = document.getElementById('editFaturaModalOverlay');
+  var editFaturaModalClose = document.getElementById('editFaturaModalClose');
+  var editFaturaModalCancel = document.getElementById('editFaturaModalCancel');
+  var btnGuardarEdicaoFatura = document.getElementById('btnGuardarEdicaoFatura');
+  var editFornecedorId = document.getElementById('editFornecedorId');
+
+  var currentEditFaturaId = null;
+
+  function openEditFaturaModal(f) {
+    currentEditFaturaId = f.id;
+
+    document.getElementById('editFornecedorTexto').value = f.fornecedorTexto || '';
+    editFornecedorId.innerHTML = '<option value="">Sem correspondência</option>' + supplierOptionsHtml().replace('<option value="">Selecionar fornecedor...</option>', '');
+    editFornecedorId.value = f.fornecedorIdEncontrado || '';
+    document.getElementById('editMontante').value = (f.montante === null || f.montante === undefined) ? '' : f.montante;
+    document.getElementById('editData').value = f.data || '';
+    document.getElementById('editReferencia').value = f.referencia || '';
+
+    editFaturaModalOverlay.classList.add('open');
+  }
+
+  function closeEditFaturaModal() {
+    editFaturaModalOverlay.classList.remove('open');
+    currentEditFaturaId = null;
+  }
+
+  editFaturaModalClose.addEventListener('click', closeEditFaturaModal);
+  editFaturaModalCancel.addEventListener('click', closeEditFaturaModal);
+  editFaturaModalOverlay.addEventListener('click', function (e) {
+    if (e.target === editFaturaModalOverlay) closeEditFaturaModal();
+  });
+
+  btnGuardarEdicaoFatura.addEventListener('click', function () {
+    if (!currentEditFaturaId) return;
+
+    var montanteVal = document.getElementById('editMontante').value.trim();
+    var changes = {
+      fornecedorTexto: document.getElementById('editFornecedorTexto').value.trim() || null,
+      fornecedorIdEncontrado: editFornecedorId.value || null,
+      montante: montanteVal === '' ? null : parseFloat(montanteVal),
+      data: document.getElementById('editData').value || null,
+      referencia: document.getElementById('editReferencia').value.trim() || null
+    };
+
+    // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
+    var faturaRef = faturasRef.child(currentEditFaturaId);
+    Object.keys(changes).forEach(function (key) {
+      faturaRef.child(key).set(changes[key]);
+    });
+
+    closeEditFaturaModal();
   });
 
 });
