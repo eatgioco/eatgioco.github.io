@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>GIOCO — Leitura de Faturas</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono,button,.card-title,.tag,.field-label{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    padding:32px 24px 16px;
+    border-bottom:3px solid var(--black);
+    background:var(--bg);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+
+  .header-inner{
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+
+  .header-left{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+
+  .header-actions{
+    display:flex;
+    align-items:flex-end;
+    gap:10px;
+  }
+
+  .header-actions .field{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+
+  .header-actions select{
+    width:200px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--black);
+    text-decoration:none;
+    border:2px solid var(--black);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+
+  .brand .tag{
+    color:var(--red);
+    font-size:12px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  h1{
+    margin:0;
+    font-size:28px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .btn{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:12px 20px;
+    cursor:pointer;
+    transition:all .15s ease;
+    letter-spacing:0.5px;
+  }
+
+  .btn:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn:disabled{
+    opacity:0.5;
+    cursor:default;
+  }
+
+  .btn:disabled:hover{
+    background:var(--white);
+    color:var(--black);
+  }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  .btn-primary:hover{
+    background:var(--black);
+    border-color:var(--black);
+  }
+
+  .btn-primary:disabled:hover{
+    background:var(--red);
+    color:var(--white);
+  }
+
+  .field-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  input, select, textarea{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    width:100%;
+  }
+
+  input:focus, select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .status-msg{
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 24px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .status-msg.status-loading{
+    color:var(--black);
+    font-weight:700;
+  }
+
+  .status-msg.status-error{
+    color:var(--red);
+    font-weight:700;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:24px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+    gap:18px;
+  }
+
+  .card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    height:100%;
+    position:relative;
+  }
+
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+
+  .card-title{
+    font-size:16px;
+    font-weight:700;
+    margin:0;
+    line-height:1.3;
+  }
+
+  .card-row{
+    font-size:13px;
+    color:var(--muted);
+    display:flex;
+    gap:6px;
+  }
+
+  .card-row strong{
+    color:var(--black);
+    font-weight:600;
+    min-width:70px;
+  }
+
+  .badge{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    padding:4px 8px;
+    background:var(--black);
+    color:var(--white);
+    white-space:nowrap;
+  }
+
+  .badge-matched{
+    background:var(--green);
+  }
+
+  .badge-unmatched{
+    background:var(--white);
+    color:var(--red);
+    box-shadow:inset 0 0 0 2px var(--red);
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+  }
+
+  .card-lines{
+    font-size:12px;
+    color:var(--black);
+    border-top:1px solid var(--line);
+    padding-top:8px;
+    margin-top:2px;
+  }
+
+  .card-lines-item{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    padding:2px 0;
+  }
+
+  .card-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:auto;
+    border-top:1px solid var(--line);
+    padding-top:10px;
+  }
+
+  .btn-small{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 10px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    letter-spacing:0.3px;
+  }
+
+  .btn-small:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn-small:disabled{
+    opacity:0.6;
+    cursor:default;
+  }
+
+  .btn-small:disabled:hover{
+    background:var(--white);
+    color:var(--black);
+  }
+
+  .paid-link{
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    color:var(--muted);
+    text-decoration:underline;
+  }
+
+  /* Modal */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{
+    display:flex;
+  }
+
+  .modal{
+    background:var(--bg);
+    border:3px solid var(--black);
+    max-width:560px;
+    width:100%;
+    padding:28px;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  .modal-header h2{
+    margin:0;
+    font-size:20px;
+  }
+
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    line-height:1;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .field + .field{
+    margin-top:14px;
+  }
+
+  .modal-actions{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:22px;
+    gap:12px;
+  }
+
+  .modal-actions-right{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:10px;
+  }
+
+  .payment-line{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    flex-wrap:wrap;
+  }
+
+  .payment-line select{
+    flex:1 1 180px;
+  }
+
+  .payment-montante{
+    width:110px;
+    flex:0 0 110px;
+  }
+
+  .payment-referencia{
+    flex:1 1 140px;
+  }
+
+  .payment-prazo{
+    flex:1 1 160px;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <a href="index.html" class="home-link">🏠 Home</a>
+      <div class="brand">
+        <span class="tag">GIOCO · Focaccia · Lisboa</span>
+        <h1>Leitura de Faturas</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="field">
+        <label class="field-label" for="carregadoPorSelect">Carregado por</label>
+        <select id="carregadoPorSelect" disabled>
+          <option>A carregar...</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="btnCarregarFatura">📸 Carregar Fatura</button>
+      <input type="file" id="fileInput" accept="application/pdf,image/*" style="display:none;">
+    </div>
+  </div>
+</header>
+
+<div class="status-msg" id="statusMsg"></div>
+
+<main>
+  <div class="empty-state" id="faturasEmpty" style="display:none;">Nenhuma fatura processada ainda.</div>
+  <div class="grid" id="faturasGrid"></div>
+</main>
+
+<!-- Modal de Pedido de Pagamento (versão mínima, reaproveitada de pagamentos.html) -->
+<div class="modal-overlay" id="paymentModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Pedido de Pagamento</h2>
+      <button class="modal-close" id="paymentModalClose">×</button>
+    </div>
+
+    <div class="field-label" style="margin-bottom:8px;">Linha de pagamento</div>
+    <div id="paymentLines"></div>
+
+    <div class="field" style="margin-top:18px;">
+      <label class="field-label" for="paymentCriadoPor">Criado por</label>
+      <select id="paymentCriadoPor" disabled>
+        <option>A carregar...</option>
+      </select>
+    </div>
+
+    <p id="paymentEnviadoAviso" style="display:none; margin:16px 0 0; padding:12px 14px; border:2px solid var(--green); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="paymentModalCancel">Cancelar</button>
+      <div class="modal-actions-right">
+        <button type="button" class="btn btn-primary" id="btnEnviarPagamento">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  // ===== Azure Document Intelligence =====
+  var AZURE_ENDPOINT = "https://gioco-faturas.cognitiveservices.azure.com/";
+  var AZURE_KEY = "1n7yHYxafKNvjqTWi7nya9frEjoaB6SlVgwFTUbrAY3g6dC2dhrAJQQJ99CHACgEuAYXJ3w3AAALACOGXRF1";
+  var AZURE_API_VERSION = "2024-11-30";
+  var AZURE_MODEL_ID = "prebuilt-invoice";
+  var POLL_INTERVAL_MS = 1500;
+  var POLL_TIMEOUT_MS = 30000;
+
+  // ===== Firebase =====
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var suppliersRef = db.ref('suppliers');
+  var paymentRequestsRef = db.ref('paymentRequests');
+  var pessoasRef = db.ref('pessoas');
+  var faturasRef = db.ref('faturasProcessadas');
+
+  var allSuppliers = {};
+  var allPaymentRequests = {};
+  var allFaturas = {};
+
+  var pessoasAtivas = [];
+  var pessoasCarregadas = false;
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function pad2(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function formatDateDDMMYYYY(d) {
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
+  var MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+  function formatSubjectDate(d) {
+    return d.getDate() + " / " + MONTHS_PT[d.getMonth()] + " / " + d.getFullYear();
+  }
+
+  function toISODate(d) {
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  function isoToDDMMYYYY(iso) {
+    if (!iso) return "";
+    var parts = String(iso).split("-");
+    if (parts.length !== 3) return "";
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function ddmmyyyyToIso(ddmmyyyy) {
+    if (!ddmmyyyy) return "";
+    var parts = ddmmyyyy.split("/");
+    if (parts.length !== 3) return "";
+    return parts[2] + "-" + parts[1] + "-" + parts[0];
+  }
+
+  var ACCENT_MAP = {
+    "a":"a","à":"a","á":"a","â":"a","ã":"a","ä":"a",
+    "e":"e","è":"e","é":"e","ê":"e","ë":"e",
+    "i":"i","ì":"i","í":"i","î":"i","ï":"i",
+    "o":"o","ò":"o","ó":"o","ô":"o","õ":"o","ö":"o",
+    "u":"u","ù":"u","ú":"u","û":"u","ü":"u",
+    "ç":"c","ñ":"n"
+  };
+
+  function normalizeNome(s) {
+    var lower = String(s || "").toLowerCase();
+    var out = "";
+    for (var i = 0; i < lower.length; i++) {
+      var ch = lower.charAt(i);
+      out += ACCENT_MAP[ch] || ch;
+    }
+    return out.trim();
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  // ===== Pessoas (para "Carregado por" / "Criado por") =====
+  function carregarPessoas() {
+    pessoasRef.on('value', function (snapshot) {
+      var val = snapshot.val() || {};
+      pessoasAtivas = Object.keys(val)
+        .map(function (id) { return Object.assign({ id: id }, val[id]); })
+        .filter(function (p) { return p.ativo !== false; })
+        .sort(function (a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
+      pessoasCarregadas = true;
+      popularSelectPessoas(document.getElementById('carregadoPorSelect'));
+      popularSelectPessoas(document.getElementById('paymentCriadoPor'));
+    });
+  }
+
+  function popularSelectPessoas(selectEl) {
+    if (!selectEl) return;
+    var previous = selectEl.value;
+    if (!pessoasCarregadas) {
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    selectEl.disabled = false;
+    var html = '';
+    pessoasAtivas.forEach(function (p) {
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro">Outro</option>';
+    selectEl.innerHTML = html;
+    if (previous) selectEl.value = previous;
+  }
+
+  function resolvePessoaSelecao(selectEl) {
+    var val = selectEl ? selectEl.value : null;
+    var found = pessoasAtivas.filter(function (p) { return p.id === val; })[0];
+    return {
+      criadoPorId: found ? found.id : null,
+      criadoPor: found ? found.nome : 'Outro'
+    };
+  }
+
+  carregarPessoas();
+
+  // ===== Suppliers =====
+  suppliersRef.on('value', function (snapshot) {
+    allSuppliers = snapshot.val() || {};
+  }, function (error) {
+    showStatus("Erro de ligação à base de dados: " + error.message, 'error');
+  });
+
+  function supplierOptionsHtml() {
+    var entries = Object.keys(allSuppliers).map(function (id) {
+      return { id: id, nome: allSuppliers[id].nome };
+    }).sort(function (a, b) {
+      return (a.nome || "").localeCompare(b.nome || "");
+    });
+
+    var html = '<option value="">Selecionar fornecedor...</option>';
+    entries.forEach(function (s) {
+      html += '<option value="' + s.id + '">' + escapeHtml(s.nome) + '</option>';
+    });
+    return html;
+  }
+
+  function parsePrazoDays(text) {
+    if (!text) return null;
+    var match = String(text).match(/(\d+)\s*dias?/i);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  function prazoDateFromCondicoes(condicoesPagamento) {
+    var days = parsePrazoDays(condicoesPagamento);
+    if (days === null) return "";
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    return toISODate(d);
+  }
+
+  function findMatchingSupplier(vendorName) {
+    var norm = normalizeNome(vendorName);
+    if (!norm) return null;
+    var candidates = Object.keys(allSuppliers).filter(function (id) {
+      var sNorm = normalizeNome(allSuppliers[id].nome);
+      if (!sNorm) return false;
+      return norm.indexOf(sNorm) !== -1 || sNorm.indexOf(norm) !== -1;
+    });
+    if (candidates.length === 0) return null;
+    // O candidato com o nome mais longo é o match mais específico.
+    candidates.sort(function (a, b) {
+      return normalizeNome(allSuppliers[b].nome).length - normalizeNome(allSuppliers[a].nome).length;
+    });
+    return candidates[0];
+  }
+
+  // ===== paymentRequests (numeração + criação, igual a pagamentos.html) =====
+  paymentRequestsRef.on('value', function (snapshot) {
+    allPaymentRequests = snapshot.val() || {};
+  });
+
+  function nextNumeroReferencia(d) {
+    var mm = pad2(d.getMonth() + 1);
+    var aa = String(d.getFullYear()).slice(-2);
+    var count = 0;
+    Object.keys(allPaymentRequests).forEach(function (id) {
+      var nr = allPaymentRequests[id].numeroReferencia;
+      if (!nr) return;
+      var parts = String(nr).split("/");
+      if (parts.length === 3 && parts[1] === mm && parts[2] === aa) count++;
+    });
+    return (count + 1) + "/" + mm + "/" + aa;
+  }
+
+  function buildPaymentLinesBlock(lines) {
+    var bodyLines = [];
+    lines.forEach(function (l, idx) {
+      if (idx > 0) bodyLines.push("");
+      bodyLines.push("Fornecedor: " + l.fornecedor);
+      if (l.referencia) bodyLines.push("Referência: " + l.referencia);
+      bodyLines.push("Montante: " + l.montante + "€");
+      bodyLines.push("Prazo: " + (l.prazo || "n/d"));
+      bodyLines.push("IBAN: " + (l.iban || "n/d") + (l.banco ? " (" + l.banco + ")" : ""));
+    });
+    return bodyLines;
+  }
+
+  // ===== Estado / UI geral =====
+  var statusMsg = document.getElementById('statusMsg');
+
+  function showStatus(text, kind) {
+    statusMsg.textContent = text || "";
+    statusMsg.className = 'status-msg' + (kind ? ' status-' + kind : '');
+  }
+
+  // ===== Upload + análise da fatura =====
+  var btnCarregarFatura = document.getElementById('btnCarregarFatura');
+  var fileInput = document.getElementById('fileInput');
+
+  btnCarregarFatura.addEventListener('click', function () {
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    processarFatura(file);
+  });
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var result = reader.result || "";
+        var comma = result.indexOf(',');
+        resolve(comma === -1 ? result : result.substring(comma + 1));
+      };
+      reader.onerror = function () { reject(new Error('Não foi possível ler o ficheiro.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function analyzeInvoice(file) {
+    var base64 = await fileToBase64(file);
+    var analyzeUrl = AZURE_ENDPOINT + "documentintelligence/documentModels/" + AZURE_MODEL_ID +
+      ":analyze?api-version=" + AZURE_API_VERSION;
+
+    var postResp = await fetch(analyzeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Ocp-Apim-Subscription-Key': AZURE_KEY
+      },
+      body: JSON.stringify({ base64Source: base64 })
+    });
+
+    if (postResp.status !== 202) {
+      throw new Error('Pedido inicial ao Azure falhou (HTTP ' + postResp.status + ')');
+    }
+
+    var operationLocation = postResp.headers.get('Operation-Location') || postResp.headers.get('operation-location');
+    if (!operationLocation) {
+      throw new Error('Resposta do Azure sem Operation-Location.');
+    }
+
+    var start = Date.now();
+    while (true) {
+      if (Date.now() - start > POLL_TIMEOUT_MS) {
+        throw new Error('Tempo limite excedido a ler a fatura.');
+      }
+      await sleep(POLL_INTERVAL_MS);
+
+      var pollResp = await fetch(operationLocation, {
+        headers: { 'Ocp-Apim-Subscription-Key': AZURE_KEY }
+      });
+      if (!pollResp.ok) {
+        throw new Error('Erro a consultar o resultado (HTTP ' + pollResp.status + ')');
+      }
+      var pollJson = await pollResp.json();
+      if (pollJson.status === 'succeeded') return pollJson.analyzeResult;
+      if (pollJson.status === 'failed') throw new Error('A análise da fatura falhou no Azure.');
+      // running / notStarted -> continua a fazer polling
+    }
+  }
+
+  function fieldText(fields, name) {
+    var f = fields && fields[name];
+    if (!f) return "";
+    return f.valueString || f.content || "";
+  }
+
+  function fieldDateIso(fields, name) {
+    var f = fields && fields[name];
+    if (!f) return "";
+    return f.valueDate || "";
+  }
+
+  function fieldAmount(fields, name) {
+    var f = fields && fields[name];
+    if (!f) return null;
+    if (f.valueCurrency && typeof f.valueCurrency.amount === 'number') return f.valueCurrency.amount;
+    if (typeof f.valueNumber === 'number') return f.valueNumber;
+    return null;
+  }
+
+  function extrairLinhas(fields) {
+    var itemsField = fields && fields.Items;
+    if (!itemsField || !itemsField.valueArray) return [];
+    return itemsField.valueArray.map(function (item) {
+      var obj = item.valueObject || {};
+      return {
+        descricao: fieldText(obj, 'Description'),
+        quantidade: (obj.Quantity && typeof obj.Quantity.valueNumber === 'number') ? obj.Quantity.valueNumber : null,
+        precoUnitario: fieldAmount(obj, 'UnitPrice'),
+        montante: fieldAmount(obj, 'Amount')
+      };
+    });
+  }
+
+  async function processarFatura(file) {
+    btnCarregarFatura.disabled = true;
+    showStatus('A ler fatura...', 'loading');
+
+    try {
+      var analyzeResult = await analyzeInvoice(file);
+      var doc = analyzeResult && analyzeResult.documents && analyzeResult.documents[0];
+      var fields = (doc && doc.fields) || (analyzeResult && analyzeResult.fields) || {};
+
+      var fornecedorTexto = fieldText(fields, 'VendorName');
+      var montante = fieldAmount(fields, 'InvoiceTotal');
+      var referencia = fieldText(fields, 'InvoiceId');
+      var data = fieldDateIso(fields, 'InvoiceDate');
+      var linhas = extrairLinhas(fields);
+
+      var matchId = findMatchingSupplier(fornecedorTexto);
+
+      var registo = {
+        fornecedorTexto: fornecedorTexto || null,
+        fornecedorIdEncontrado: matchId || null,
+        montante: montante,
+        referencia: referencia || null,
+        data: data || null,
+        linhas: linhas,
+        criadoEm: Date.now(),
+        criadoPor: resolvePessoaSelecao(document.getElementById('carregadoPorSelect')).criadoPor
+      };
+
+      faturasRef.push(registo);
+      showStatus('Fatura lida com sucesso.', '');
+    } catch (err) {
+      showStatus('Não foi possível ler a fatura — tenta novamente ou verifica se o ficheiro está legível. (' + err.message + ')', 'error');
+    } finally {
+      btnCarregarFatura.disabled = false;
+    }
+  }
+
+  // ===== Lista de faturas processadas =====
+  var faturasGrid = document.getElementById('faturasGrid');
+  var faturasEmpty = document.getElementById('faturasEmpty');
+
+  function formatMontante(v) {
+    var n = parseFloat(v);
+    return isNaN(n) ? '—' : n.toFixed(2) + '€';
+  }
+
+  function buildFaturaCard(f) {
+    var card = document.createElement('div');
+    card.className = 'card';
+
+    var matched = !!f.fornecedorIdEncontrado && !!allSuppliers[f.fornecedorIdEncontrado];
+
+    var html = '';
+    html += '<div class="card-top">';
+    html += '<h3 class="card-title">' + escapeHtml(f.fornecedorTexto || 'Fornecedor desconhecido') + '</h3>';
+    if (matched) {
+      html += '<span class="badge badge-matched">✓ Fornecedor encontrado</span>';
+    } else {
+      html += '<span class="badge badge-unmatched">Sem correspondência</span>';
+    }
+    html += '</div>';
+
+    html += '<div class="card-row"><strong>Montante</strong><span>' + formatMontante(f.montante) + '</span></div>';
+    html += '<div class="card-row"><strong>Data</strong><span>' + escapeHtml(isoToDDMMYYYY(f.data) || 'n/d') + '</span></div>';
+    html += '<div class="card-row"><strong>Referência</strong><span>' + escapeHtml(f.referencia || 'n/d') + '</span></div>';
+
+    if (f.linhas && f.linhas.length) {
+      html += '<div class="card-lines">';
+      f.linhas.slice(0, 5).forEach(function (l) {
+        html += '<div class="card-lines-item"><span>' + escapeHtml(l.descricao || '—') + '</span><span>' + formatMontante(l.montante) + '</span></div>';
+      });
+      if (f.linhas.length > 5) {
+        html += '<div class="card-lines-item"><span>+ ' + (f.linhas.length - 5) + ' linha(s)</span></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<div class="card-actions">';
+    if (f.paymentRequestId) {
+      html += '<a class="paid-link" href="pagamentos.html#pagamento-' + f.paymentRequestId + '">✓ Pedido de pagamento criado — ver</a>';
+    } else {
+      html += '<button type="button" class="btn-small btn-criar-pagamento">💰 Criar Pedido de Pagamento</button>';
+    }
+    html += '</div>';
+
+    card.innerHTML = html;
+
+    var btnCriar = card.querySelector('.btn-criar-pagamento');
+    if (btnCriar) {
+      btnCriar.addEventListener('click', function () {
+        openPaymentModalFromFatura(f);
+      });
+    }
+
+    return card;
+  }
+
+  function renderFaturas() {
+    var entries = Object.keys(allFaturas).map(function (id) {
+      return Object.assign({ id: id }, allFaturas[id]);
+    });
+    entries.sort(function (a, b) {
+      return (b.criadoEm || 0) - (a.criadoEm || 0);
+    });
+
+    faturasGrid.innerHTML = '';
+    if (entries.length === 0) {
+      faturasEmpty.style.display = 'block';
+      return;
+    }
+    faturasEmpty.style.display = 'none';
+    entries.forEach(function (f) {
+      faturasGrid.appendChild(buildFaturaCard(f));
+    });
+  }
+
+  faturasRef.on('value', function (snapshot) {
+    allFaturas = snapshot.val() || {};
+    renderFaturas();
+  }, function (error) {
+    showStatus("Erro de ligação à base de dados: " + error.message, 'error');
+  });
+
+  // ===== Modal "Pedir Pagamento" (versão mínima) =====
+  var paymentModalOverlay = document.getElementById('paymentModalOverlay');
+  var paymentModalClose = document.getElementById('paymentModalClose');
+  var paymentModalCancel = document.getElementById('paymentModalCancel');
+  var paymentLines = document.getElementById('paymentLines');
+  var btnEnviarPagamento = document.getElementById('btnEnviarPagamento');
+
+  var currentFaturaId = null;
+
+  function createPaymentLineRow(prefill) {
+    var row = document.createElement('div');
+    row.className = 'payment-line';
+    row.innerHTML =
+      '<select class="payment-fornecedor">' + supplierOptionsHtml() + '</select>' +
+      '<input type="number" class="payment-montante" min="0" step="0.01" placeholder="€">' +
+      '<input type="text" class="payment-referencia" placeholder="Referência">' +
+      '<input type="date" class="payment-prazo">';
+
+    var select = row.querySelector('.payment-fornecedor');
+    var prazoInput = row.querySelector('.payment-prazo');
+    select.addEventListener('change', function () {
+      var supplier = allSuppliers[select.value];
+      prazoInput.value = supplier ? prazoDateFromCondicoes(supplier.condicoesPagamento) : "";
+    });
+
+    if (prefill) {
+      if (prefill.fornecedorId) select.value = prefill.fornecedorId;
+      if (prefill.montante !== null && prefill.montante !== undefined) row.querySelector('.payment-montante').value = prefill.montante;
+      if (prefill.referencia) row.querySelector('.payment-referencia').value = prefill.referencia;
+      var supplier = allSuppliers[select.value];
+      prazoInput.value = supplier ? prazoDateFromCondicoes(supplier.condicoesPagamento) : "";
+    }
+
+    return row;
+  }
+
+  function openPaymentModalFromFatura(f) {
+    currentFaturaId = f.id;
+
+    var aviso = document.getElementById('paymentEnviadoAviso');
+    aviso.style.display = 'none';
+    aviso.textContent = '';
+    btnEnviarPagamento.style.display = '';
+    paymentModalCancel.textContent = 'Cancelar';
+
+    paymentLines.innerHTML = '';
+    paymentLines.appendChild(createPaymentLineRow({
+      fornecedorId: f.fornecedorIdEncontrado || '',
+      montante: f.montante,
+      referencia: f.referencia
+    }));
+
+    document.getElementById('paymentCriadoPor').parentElement.style.display = '';
+    paymentModalOverlay.classList.add('open');
+  }
+
+  function closePaymentModal() {
+    paymentModalOverlay.classList.remove('open');
+    currentFaturaId = null;
+  }
+
+  paymentModalClose.addEventListener('click', closePaymentModal);
+  paymentModalCancel.addEventListener('click', closePaymentModal);
+  paymentModalOverlay.addEventListener('click', function (e) {
+    if (e.target === paymentModalOverlay) closePaymentModal();
+  });
+
+  function getValidPaymentLines() {
+    var rows = paymentLines.querySelectorAll('.payment-line');
+    var lines = [];
+    rows.forEach(function (row) {
+      var fornecedorId = row.querySelector('.payment-fornecedor').value;
+      var montante = row.querySelector('.payment-montante').value.trim();
+      var referencia = row.querySelector('.payment-referencia').value.trim();
+      var prazoIso = row.querySelector('.payment-prazo').value;
+      if (fornecedorId && montante) {
+        var supplier = allSuppliers[fornecedorId] || {};
+        lines.push({
+          fornecedor: supplier.nome || "",
+          montante: montante,
+          prazo: isoToDDMMYYYY(prazoIso),
+          referencia: referencia,
+          iban: supplier.iban || "",
+          banco: supplier.banco || ""
+        });
+      }
+    });
+    return lines;
+  }
+
+  btnEnviarPagamento.addEventListener('click', function () {
+    var lines = getValidPaymentLines();
+    if (lines.length === 0) {
+      alert('Selecione o fornecedor e o montante.');
+      return;
+    }
+
+    var dateStr = formatDateDDMMYYYY(new Date());
+    var numeroReferencia = nextNumeroReferencia(new Date());
+    var autor = resolvePessoaSelecao(document.getElementById('paymentCriadoPor'));
+    var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("Boa tarde,");
+    bodyLines.push("");
+    bodyLines.push("Segue pedido de pagamento:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
+    bodyLines.push("");
+    bodyLines.push("Pedido criado por: " + autor.criadoPor);
+    bodyLines.push("");
+    bodyLines.push("Obrigado,");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var novoPagamentoRef = paymentRequestsRef.push({
+      date: dateStr,
+      status: "pendente",
+      origem: "fornecedor",
+      numeroReferencia: numeroReferencia,
+      criadoPor: autor.criadoPor,
+      criadoPorId: autor.criadoPorId,
+      lines: lines
+    });
+
+    if (currentFaturaId) {
+      faturasRef.child(currentFaturaId).child('paymentRequestId').set(novoPagamentoRef.key);
+    }
+
+    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    var aviso = document.getElementById('paymentEnviadoAviso');
+    aviso.textContent = '✅ Pedido criado. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado — ou avisa o Manel diretamente.';
+    aviso.style.display = 'block';
+    btnEnviarPagamento.style.display = 'none';
+    paymentModalCancel.textContent = 'Fechar';
+  });
+
+});
+</script>
+
+</body>
+</html>
