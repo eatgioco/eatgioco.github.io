@@ -1109,6 +1109,42 @@
     color:var(--muted);
   }
 
+  /* ---------- Depósitos Bancários ---------- */
+  .card-depositos{
+    margin-top:20px;
+  }
+
+  .dep-total{
+    font-family:'Space Mono', monospace;
+    font-size:32px;
+    font-weight:700;
+    margin:18px 0 0;
+    line-height:1.1;
+  }
+
+  .dep-count{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    margin:6px 0 0;
+  }
+
+  .dep-card-hint{
+    margin:18px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--red);
+    letter-spacing:0.3px;
+  }
+
+  .depositos-detalhe{
+    display:none;
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 24px 80px;
+  }
+
   /* ---------- Pagamentos: totais + filtro de período ---------- */
   .card-pagamentos{
     cursor:pointer;
@@ -2082,6 +2118,22 @@
     <a href="loja-sao-bento.html" class="link-view-loja">→ Ver na página da loja</a>
   </div>
 
+  <div class="card card-depositos" id="cardDepositos">
+    <div class="card-icon">🏦</div>
+    <h3 class="card-title">Depósitos Bancários</h3>
+
+    <p class="loading-state" id="depositosLoading">A carregar...</p>
+
+    <div id="depositosBody" style="display:none;">
+      <div class="dep-total" id="depositosTotalValue">0.00€</div>
+      <p class="dep-count" id="depositosCount"></p>
+    </div>
+
+    <p class="empty-state-inline" id="depositosEmptyInline" style="display:none;">Tudo depositado ✓</p>
+
+    <p class="dep-card-hint">→ Ver detalhe</p>
+  </div>
+
   <div class="card card-storage" id="cardStorage">
     <div class="card-icon">💾</div>
     <h3 class="card-title">Armazenamento</h3>
@@ -2204,6 +2256,32 @@
         <button type="button" class="btn btn-primary" id="btnNovoCompromisso">+ Novo compromisso</button>
       </div>
       <div id="tesCompromissosLista"></div>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Depósitos Bancários (detalhe) ============ -->
+<section class="depositos-detalhe" id="depositosDetalhe">
+  <div class="tes-header">
+    <button type="button" class="btn" id="btnFecharDepositos">← Voltar</button>
+    <h2>🏦 Depósitos Bancários</h2>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title">Total por depositar</p>
+    <div class="tes-bigtotal" id="depDetalheTotal">0.00€</div>
+    <p class="tes-bigtotal-sub" id="depDetalheSub">—</p>
+  </div>
+
+  <div class="tes-block">
+    <p class="tes-block-title">Pendentes por depositar</p>
+    <div id="depPendentesLista"></div>
+  </div>
+
+  <details class="tes-details" id="depHistoricoDetails">
+    <summary>Histórico</summary>
+    <div class="tes-details-body">
+      <div id="depHistoricoLista"></div>
     </div>
   </details>
 </section>
@@ -2340,6 +2418,22 @@
     <div class="modal-actions">
       <button type="button" class="btn" id="ficouPagoNao">Ainda não</button>
       <button type="button" class="btn btn-primary" id="ficouPagoSim">Sim, ficou pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal "Marcar como depositado?" — confirmação ao marcar um levantamento
+     de "Depósito bancário" (caixa.html) como já depositado no banco. -->
+<div class="modal-overlay" id="depositadoModalOverlay">
+  <div class="modal modal-narrow">
+    <div class="modal-header">
+      <h2>Marcar como depositado?</h2>
+      <button class="modal-close" id="depositadoModalClose">×</button>
+    </div>
+    <p class="modal-contexto" id="depositadoContexto"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="depositadoNao">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="depositadoSim">✓ Marcar como depositado</button>
     </div>
   </div>
 </div>
@@ -4819,6 +4913,7 @@ window.addEventListener('load', function () {
     allCaixaMovs = snapshot.val() || {};
     caixaCarregada = true;
     agendarNotificacoes();
+    renderDepositosCard();
   });
 
   tempsRef.on('value', function(snapshot){
@@ -4844,6 +4939,190 @@ window.addEventListener('load', function () {
     pessoasNotifCarregadas = true;
     agendarNotificacoes();
   });
+
+  /* ---------- Depósitos Bancários ----------
+     Reaproveita allCaixaMovs (já carregado acima para as notificações) —
+     não abre uma ref nova. Uma saída de caixa com motivo "Depósito
+     bancário" fica por depositar até o campo 'depositado' ser true; não se
+     mexe em caixa.html, só se lê e escreve de volta no mesmo registo. */
+  var MOTIVO_DEPOSITO_BANCARIO = 'Depósito bancário';
+
+  function formatDataCurta(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+
+  function listaMovimentosDeposito(){
+    return Object.keys(allCaixaMovs)
+      .map(function(id){ return Object.assign({ id: id }, allCaixaMovs[id]); })
+      .filter(function(m){ return m.tipo === 'saida' && m.motivo === MOTIVO_DEPOSITO_BANCARIO; });
+  }
+
+  function depositosPendentes(){
+    return listaMovimentosDeposito()
+      .filter(function(m){ return !m.depositado; })
+      .sort(function(a, b){ return new Date(a.dataHora) - new Date(b.dataHora); });
+  }
+
+  function depositosHistorico(){
+    return listaMovimentosDeposito()
+      .filter(function(m){ return !!m.depositado; })
+      .sort(function(a, b){ return new Date(b.depositadoEm || b.dataHora) - new Date(a.depositadoEm || a.dataHora); });
+  }
+
+  function renderDepositosCard(){
+    if (!caixaCarregada) return;
+
+    var pendentes = depositosPendentes();
+    var total = pendentes.reduce(function(acc, m){ return acc + (parseFloat(m.valor) || 0); }, 0);
+
+    document.getElementById('depositosLoading').style.display = 'none';
+
+    var bodyEl = document.getElementById('depositosBody');
+    var emptyEl = document.getElementById('depositosEmptyInline');
+
+    if (pendentes.length === 0){
+      bodyEl.style.display = 'none';
+      emptyEl.style.display = 'block';
+    } else {
+      bodyEl.style.display = 'block';
+      emptyEl.style.display = 'none';
+      document.getElementById('depositosTotalValue').textContent = formatEuro(total);
+      document.getElementById('depositosCount').textContent =
+        pendentes.length + (pendentes.length === 1 ? ' levantamento' : ' levantamentos');
+    }
+
+    renderDepositosDetalhe();
+  }
+
+  function renderDepositosDetalhe(){
+    var pendentes = depositosPendentes();
+    var historico = depositosHistorico();
+    var total = pendentes.reduce(function(acc, m){ return acc + (parseFloat(m.valor) || 0); }, 0);
+
+    document.getElementById('depDetalheTotal').textContent = formatEuro(total);
+    document.getElementById('depDetalheSub').textContent = pendentes.length === 0
+      ? 'Tudo depositado ✓'
+      : pendentes.length + (pendentes.length === 1 ? ' levantamento por depositar' : ' levantamentos por depositar');
+
+    var pendentesEl = document.getElementById('depPendentesLista');
+    if (pendentes.length === 0){
+      pendentesEl.innerHTML = '<p class="tes-empty">Sem levantamentos por depositar ✓</p>';
+    } else {
+      pendentesEl.innerHTML = '<table class="tes-table"><thead><tr>' +
+        '<th>Data</th><th>Pessoa</th><th style="text-align:right;">Valor</th><th></th>' +
+        '</tr></thead><tbody>' +
+        pendentes.map(function(m){
+          return '<tr>' +
+            '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
+            '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
+            '<td class="num">' + formatEuro(parseFloat(m.valor) || 0) + '</td>' +
+            '<td><button type="button" class="btn-small btn-marcar-depositado" data-id="' +
+              escapeHtml(m.id) + '">✓ Marcar como depositado</button></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody><tfoot><tr>' +
+        '<td colspan="2" class="mono"><strong>Total pendente</strong></td>' +
+        '<td class="num">' + formatEuro(total) + '</td><td></td>' +
+        '</tr></tfoot></table>';
+    }
+
+    var historicoEl = document.getElementById('depHistoricoLista');
+    if (historico.length === 0){
+      historicoEl.innerHTML = '<p class="tes-empty">Ainda sem depósitos confirmados.</p>';
+    } else {
+      historicoEl.innerHTML = '<table class="tes-table"><thead><tr>' +
+        '<th>Levantamento</th><th>Pessoa</th><th style="text-align:right;">Valor</th><th>Depositado em</th>' +
+        '</tr></thead><tbody>' +
+        historico.map(function(m){
+          return '<tr>' +
+            '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
+            '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
+            '<td class="num">' + formatEuro(parseFloat(m.valor) || 0) + '</td>' +
+            '<td class="mono">' + formatDataCurta(m.depositadoEm) + '</td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    }
+  }
+
+  // Delegado uma única vez sobre o contentor — sobrevive à substituição do
+  // innerHTML a cada render (mesmo padrão de tesPendentesEl).
+  document.getElementById('depPendentesLista').addEventListener('click', function(e){
+    var btn = e.target.closest('.btn-marcar-depositado');
+    if (!btn) return;
+    var id = btn.getAttribute('data-id');
+    var mov = allCaixaMovs[id];
+    if (!mov) return;
+    abrirModalMarcarDepositado(mov, id);
+  });
+
+  // Modal de confirmação — mesmo padrão do "Ficou pago?" acima: HTML normal
+  // da página, não confirm() nativo.
+  var depositadoModalOverlay = document.getElementById('depositadoModalOverlay');
+  var depositadoContexto = document.getElementById('depositadoContexto');
+  var depositadoIdAtual = null;
+
+  function abrirModalMarcarDepositado(mov, id){
+    depositadoContexto.textContent =
+      formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' + formatEuro(parseFloat(mov.valor) || 0);
+    depositadoIdAtual = id;
+    depositadoModalOverlay.classList.add('open');
+  }
+
+  function fecharModalMarcarDepositado(){
+    depositadoModalOverlay.classList.remove('open');
+    depositadoIdAtual = null;
+  }
+
+  document.getElementById('depositadoSim').addEventListener('click', function(){
+    var id = depositadoIdAtual;
+    fecharModalMarcarDepositado();
+    if (!id) return;
+    // Duas escritas de chave única cada, nunca um update() multi-chave —
+    // PATCHes multi-chave já corromperam registos noutros nós deste projeto.
+    caixaRef.child(id).child('depositado').set(true).catch(function(err){
+      alert('Erro ao marcar como depositado: ' + err.message);
+    });
+    setTimeout(function(){
+      caixaRef.child(id).child('depositadoEm').set(new Date().toISOString()).catch(function(err){
+        alert('Erro ao gravar a data do depósito: ' + err.message);
+      });
+    }, 150);
+  });
+  document.getElementById('depositadoNao').addEventListener('click', fecharModalMarcarDepositado);
+  document.getElementById('depositadoModalClose').addEventListener('click', fecharModalMarcarDepositado);
+  depositadoModalOverlay.addEventListener('click', function(e){
+    if (e.target === depositadoModalOverlay) fecharModalMarcarDepositado();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && depositadoModalOverlay.classList.contains('open')) fecharModalMarcarDepositado();
+  });
+
+  // Secção de detalhe: vive no fim da página, escondida por defeito — ao
+  // contrário da Tesouraria, não substitui o dashboard, só faz scroll até
+  // lá (o cartão de Pagamentos é a referência visual, não o comportamento
+  // de clique, que aqui é mais leve).
+  var depositosDetalheEl = document.getElementById('depositosDetalhe');
+
+  function abrirDepositosDetalhe(){
+    depositosDetalheEl.style.display = 'block';
+    renderDepositosDetalhe();
+    depositosDetalheEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function fecharDepositosDetalhe(){
+    depositosDetalheEl.style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.getElementById('cardDepositos').addEventListener('click', function(e){
+    if (e.target.closest('button')) return;
+    abrirDepositosDetalhe();
+  });
+
+  document.getElementById('btnFecharDepositos').addEventListener('click', fecharDepositosDetalhe);
 
   /* ---------- Indicador de armazenamento ---------- */
   var DB_URL = firebaseConfig.databaseURL;
