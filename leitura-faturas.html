@@ -606,6 +606,7 @@ window.addEventListener('load', function () {
   var paymentRequestsRef = db.ref('paymentRequests');
   var pessoasRef = db.ref('pessoas');
   var faturasRef = db.ref('faturasProcessadas');
+  var faturasArquivoRef = db.ref('faturasArquivo');
 
   var allSuppliers = {};
   var allPaymentRequests = {};
@@ -871,6 +872,78 @@ window.addEventListener('load', function () {
     });
   }
 
+  // ===== Arquivo do ficheiro original (faturasArquivo/{id}) =====
+  var ARQUIVO_MAX_WIDTH = 1600;
+  var ARQUIVO_JPEG_QUALITY = 0.8;
+
+  function fileToDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('Não foi possível ler o ficheiro.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function compressImageDataUrl(file, maxWidth, quality) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var w = img.width;
+          var h = img.height;
+          if (w > maxWidth) {
+            h = Math.round(h * maxWidth / w);
+            w = maxWidth;
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = function () { reject(new Error('Não foi possível processar a imagem.')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { reject(new Error('Não foi possível ler o ficheiro.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function prepararArquivoFatura(file) {
+    if (file.type && file.type.indexOf('image/') === 0) {
+      return compressImageDataUrl(file, ARQUIVO_MAX_WIDTH, ARQUIVO_JPEG_QUALITY);
+    }
+    return fileToDataUrl(file);
+  }
+
+  function abrirArquivoFatura(dataUrl) {
+    var match = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl || "");
+    if (!match) {
+      alert('Ficheiro original em formato inesperado.');
+      return;
+    }
+    var mime = match[1];
+    var byteChars = atob(match[2]);
+    var byteNumbers = new Array(byteChars.length);
+    for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    var blob = new Blob([new Uint8Array(byteNumbers)], { type: mime });
+    var blobUrl = URL.createObjectURL(blob);
+
+    if (mime === 'application/pdf') {
+      window.open(blobUrl, '_blank');
+    } else {
+      var a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = 'fatura-original.jpg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+  }
+
   async function analyzeInvoice(file) {
     var base64 = await fileToBase64(file);
     var analyzeUrl = AZURE_ENDPOINT + "documentintelligence/documentModels/" + AZURE_MODEL_ID +
@@ -978,8 +1051,14 @@ window.addEventListener('load', function () {
         criadoPor: resolvePessoaSelecao(document.getElementById('carregadoPorSelect')).criadoPor
       };
 
-      faturasRef.push(registo);
+      var novaFaturaRef = faturasRef.push(registo);
       showStatus('Fatura lida com sucesso.', '');
+
+      prepararArquivoFatura(file).then(function (dataUrl) {
+        return faturasArquivoRef.child(novaFaturaRef.key).set(dataUrl);
+      }).catch(function (err) {
+        console.error('Erro ao arquivar o ficheiro original da fatura:', err);
+      });
     } catch (err) {
       showStatus('Não foi possível ler a fatura — tenta novamente ou verifica se o ficheiro está legível. (' + err.message + ')', 'error');
     } finally {
@@ -1034,6 +1113,7 @@ window.addEventListener('load', function () {
     } else {
       html += '<button type="button" class="btn-small btn-criar-pagamento">💰 Criar Pedido de Pagamento</button>';
     }
+    html += '<button type="button" class="btn-small btn-ver-arquivo">📄 Ver fatura original</button>';
     html += '<button type="button" class="btn-small btn-editar-fatura">✏ Editar</button>';
     html += '<button type="button" class="btn-small btn-danger btn-apagar-fatura">🗑 Apagar</button>';
     html += '</div>';
@@ -1047,6 +1127,27 @@ window.addEventListener('load', function () {
       });
     }
 
+    var btnVerArquivo = card.querySelector('.btn-ver-arquivo');
+    btnVerArquivo.addEventListener('click', function () {
+      var original = btnVerArquivo.textContent;
+      btnVerArquivo.disabled = true;
+      btnVerArquivo.textContent = 'A carregar...';
+      faturasArquivoRef.child(f.id).once('value').then(function (snapshot) {
+        btnVerArquivo.disabled = false;
+        btnVerArquivo.textContent = original;
+        var val = snapshot.val();
+        if (!val) {
+          alert('Ficheiro original não encontrado para esta fatura.');
+          return;
+        }
+        abrirArquivoFatura(val);
+      }).catch(function (err) {
+        btnVerArquivo.disabled = false;
+        btnVerArquivo.textContent = original;
+        alert('Erro ao carregar o ficheiro original: ' + err.message);
+      });
+    });
+
     card.querySelector('.btn-editar-fatura').addEventListener('click', function () {
       openEditFaturaModal(f);
     });
@@ -1054,6 +1155,7 @@ window.addEventListener('load', function () {
     card.querySelector('.btn-apagar-fatura').addEventListener('click', function () {
       if (confirm('Apagar esta fatura processada? Esta ação não pode ser desfeita.')) {
         faturasRef.child(f.id).remove();
+        faturasArquivoRef.child(f.id).remove();
       }
     });
 
