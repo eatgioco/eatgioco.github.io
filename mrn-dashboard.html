@@ -4946,6 +4946,10 @@ window.addEventListener('load', function () {
      bancário" fica por depositar até o campo 'depositado' ser true; não se
      mexe em caixa.html, só se lê e escreve de volta no mesmo registo. */
   var MOTIVO_DEPOSITO_BANCARIO = 'Depósito bancário';
+  // Comparação tolerante a acentos/maiúsculas (normalizarTexto já existe mais
+  // acima, partilhada com a deteção de datas de tarefas.html) — cobre
+  // registos antigos ou escritos por outro caminho sem o texto exato.
+  var MOTIVO_DEPOSITO_BANCARIO_NORM = normalizarTexto(MOTIVO_DEPOSITO_BANCARIO);
 
   function formatDataCurta(iso){
     var d = new Date(iso);
@@ -4956,7 +4960,7 @@ window.addEventListener('load', function () {
   function listaMovimentosDeposito(){
     return Object.keys(allCaixaMovs)
       .map(function(id){ return Object.assign({ id: id }, allCaixaMovs[id]); })
-      .filter(function(m){ return m.tipo === 'saida' && m.motivo === MOTIVO_DEPOSITO_BANCARIO; });
+      .filter(function(m){ return m.tipo === 'saida' && normalizarTexto(m.motivo) === MOTIVO_DEPOSITO_BANCARIO_NORM; });
   }
 
   function depositosPendentes(){
