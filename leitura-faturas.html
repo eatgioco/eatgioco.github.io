@@ -293,6 +293,146 @@
     padding:2px 0;
   }
 
+  .card-lines-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+  }
+
+  .card-lines-label{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .fatura-linha{
+    padding:6px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .fatura-linha:last-child{
+    border-bottom:none;
+  }
+
+  .linha-ing{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:4px;
+  }
+
+  .linha-ing-nome{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--green);
+  }
+
+  .linha-ing-sug{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .btn-mini{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    padding:4px 7px;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    letter-spacing:0.3px;
+  }
+
+  .btn-mini:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .btn-mini-ok{
+    border-color:var(--green);
+    color:var(--green);
+  }
+
+  .btn-mini-ok:hover{
+    background:var(--green);
+    border-color:var(--green);
+    color:var(--white);
+  }
+
+  .btn-linhas-mais{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    background:none;
+    border:none;
+    padding:6px 0 0;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+
+  /* Seletor de ingrediente */
+  .ing-select-linha{
+    font-size:13px;
+    border:2px solid var(--black);
+    background:var(--white);
+    padding:10px 12px;
+    margin-bottom:14px;
+  }
+
+  .ing-select-list{
+    max-height:280px;
+    overflow-y:auto;
+    border:2px solid var(--black);
+    background:var(--white);
+    margin-top:10px;
+  }
+
+  .ing-select-item{
+    display:block;
+    width:100%;
+    text-align:left;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    padding:10px 12px;
+    background:var(--white);
+    border:none;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+
+  .ing-select-item:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .ing-select-novo{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    color:var(--red);
+    border-bottom:none;
+  }
+
+  .ing-select-novo:hover{
+    background:var(--red);
+    color:var(--white);
+  }
+
+  .ing-select-vazio{
+    padding:14px 12px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    border-bottom:1px solid var(--line);
+  }
+
   .card-actions{
     display:flex;
     gap:8px;
@@ -584,6 +724,29 @@
   </div>
 </div>
 
+<!-- Modal de Seleção de Ingrediente -->
+<div class="modal-overlay" id="ingSelectOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Ligar ingrediente</h2>
+      <button class="modal-close" id="ingSelectClose">×</button>
+    </div>
+
+    <div class="ing-select-linha" id="ingSelectLinha"></div>
+
+    <div class="field">
+      <label class="field-label" for="ingSelectSearch">Pesquisar ingrediente</label>
+      <input type="text" id="ingSelectSearch" placeholder="Escreve o nome do ingrediente...">
+    </div>
+
+    <div class="ing-select-list" id="ingSelectList"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="ingSelectCancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.addEventListener('load', function () {
 
@@ -607,10 +770,12 @@ window.addEventListener('load', function () {
   var pessoasRef = db.ref('pessoas');
   var faturasRef = db.ref('faturasProcessadas');
   var faturasArquivoRef = db.ref('faturasArquivo');
+  var ingredientesRef = db.ref('ingredientes');
 
   var allSuppliers = {};
   var allPaymentRequests = {};
   var allFaturas = {};
+  var allIngredientes = {};
 
   var pessoasAtivas = [];
   var pessoasCarregadas = false;
@@ -771,6 +936,94 @@ window.addEventListener('load', function () {
       return normalizeNome(allSuppliers[b].nome).length - normalizeNome(allSuppliers[a].nome).length;
     });
     return candidates[0];
+  }
+
+  // ===== Ingredientes =====
+  ingredientesRef.on('value', function (snapshot) {
+    allIngredientes = snapshot.val() || {};
+    renderFaturas();
+  }, function (error) {
+    showStatus("Erro de ligação à base de dados: " + error.message, 'error');
+  });
+
+  // Mesma lógica do findMatchingSupplier, mas o match também vale contra
+  // qualquer um dos nomes alternativos (aliases) do ingrediente.
+  function findMatchingIngrediente(descricao) {
+    var norm = normalizeNome(descricao);
+    if (!norm) return null;
+
+    var candidates = [];
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id] || {};
+      var nomes = [ing.nome].concat(Array.isArray(ing.aliases) ? ing.aliases : []);
+      var melhor = 0;
+      nomes.forEach(function (nome) {
+        var iNorm = normalizeNome(nome);
+        if (!iNorm) return;
+        if (norm.indexOf(iNorm) !== -1 || iNorm.indexOf(norm) !== -1) {
+          if (iNorm.length > melhor) melhor = iNorm.length;
+        }
+      });
+      if (melhor > 0) candidates.push({ id: id, tamanho: melhor });
+    });
+
+    if (candidates.length === 0) return null;
+    // O candidato com o nome (ou alias) mais longo é o match mais específico.
+    candidates.sort(function (a, b) { return b.tamanho - a.tamanho; });
+    return candidates[0].id;
+  }
+
+  // Acrescenta a descrição da fatura aos aliases e atualiza o preço/data da
+  // última compra. Nunca apaga nada: só acrescenta ou atualiza campos.
+  function atualizarIngredienteComLinha(ingredienteId, linha, dataFatura) {
+    var ing = allIngredientes[ingredienteId];
+    if (!ing) return;
+    var ingRef = ingredientesRef.child(ingredienteId);
+
+    var descricao = String(linha.descricao || '').trim();
+    var descNorm = normalizeNome(descricao);
+    if (descNorm && descNorm !== normalizeNome(ing.nome)) {
+      var aliases = Array.isArray(ing.aliases) ? ing.aliases.slice() : [];
+      var jaExiste = aliases.some(function (a) { return normalizeNome(a) === descNorm; });
+      if (!jaExiste) {
+        aliases.push(descricao);
+        ingRef.child('aliases').set(aliases);
+      }
+    }
+
+    if (typeof linha.precoUnitario !== 'number') return;
+    // Uma fatura antiga reprocessada não pode sobrescrever um preço mais recente.
+    var maisRecente = !ing.dataUltimaCompra || (dataFatura && String(dataFatura) >= String(ing.dataUltimaCompra));
+    if (!maisRecente) return;
+    ingRef.child('precoUltimaCompra').set(linha.precoUnitario);
+    if (dataFatura) ingRef.child('dataUltimaCompra').set(dataFatura);
+  }
+
+  function ligarLinhaIngrediente(fatura, index, ingredienteId) {
+    var linha = (fatura.linhas || [])[index];
+    if (!linha || !ingredienteId) return;
+    faturasRef.child(fatura.id).child('linhas').child(String(index)).child('ingredienteId').set(ingredienteId);
+    atualizarIngredienteComLinha(ingredienteId, linha, fatura.data || null);
+  }
+
+  function criarIngredienteDaLinha(fatura, index) {
+    var linha = (fatura.linhas || [])[index];
+    if (!linha) return;
+    var nome = String(linha.descricao || '').trim();
+    if (!nome) {
+      alert('Esta linha não tem descrição — não é possível criar o ingrediente automaticamente.');
+      return;
+    }
+    var novoRef = ingredientesRef.push({
+      nome: nome,
+      categoria: null,
+      fornecedor: null,
+      unidade: null,
+      precoUltimaCompra: (typeof linha.precoUnitario === 'number') ? linha.precoUnitario : null,
+      dataUltimaCompra: fatura.data || null,
+      aliases: []
+    });
+    faturasRef.child(fatura.id).child('linhas').child(String(index)).child('ingredienteId').set(novoRef.key);
   }
 
   // ===== paymentRequests (numeração + criação, igual a pagamentos.html) =====
@@ -1016,7 +1269,8 @@ window.addEventListener('load', function () {
         descricao: fieldText(obj, 'Description'),
         quantidade: (obj.Quantity && typeof obj.Quantity.valueNumber === 'number') ? obj.Quantity.valueNumber : null,
         precoUnitario: fieldAmount(obj, 'UnitPrice'),
-        montante: fieldAmount(obj, 'Amount')
+        montante: fieldAmount(obj, 'Amount'),
+        ingredienteId: null
       };
     });
   }
@@ -1075,6 +1329,26 @@ window.addEventListener('load', function () {
     return isNaN(n) ? '—' : n.toFixed(2) + '€';
   }
 
+  var LINHAS_VISIVEIS = 5;
+  var linhasExpandidas = {};
+
+  function linhaIngredienteHtml(l) {
+    var ligado = l.ingredienteId && allIngredientes[l.ingredienteId];
+    if (ligado) {
+      return '<span class="linha-ing-nome">✓ ' + escapeHtml(allIngredientes[l.ingredienteId].nome || 'Ingrediente') + '</span>' +
+        '<button type="button" class="btn-mini btn-linha-trocar" title="Trocar ingrediente">✎</button>';
+    }
+
+    var sugestaoId = findMatchingIngrediente(l.descricao);
+    if (sugestaoId) {
+      return '<span class="linha-ing-sug">Sugestão: ' + escapeHtml(allIngredientes[sugestaoId].nome || '') + '</span>' +
+        '<button type="button" class="btn-mini btn-mini-ok btn-linha-confirmar" data-sugestao="' + escapeHtml(sugestaoId) + '">✓ Confirmar</button>' +
+        '<button type="button" class="btn-mini btn-linha-escolher">Escolher outro</button>';
+    }
+
+    return '<button type="button" class="btn-mini btn-linha-ligar">Ligar ingrediente</button>';
+  }
+
   function buildFaturaCard(f) {
     var card = document.createElement('div');
     card.className = 'card';
@@ -1096,13 +1370,33 @@ window.addEventListener('load', function () {
     html += '<div class="card-row"><strong>Referência</strong><span>' + escapeHtml(f.referencia || 'n/d') + '</span></div>';
     html += '<div class="card-row"><strong>Prazo Pag.</strong><span>' + escapeHtml(isoToDDMMYYYY(f.prazoPagamento) || 'n/d') + '</span></div>';
 
-    if (f.linhas && f.linhas.length) {
+    var linhas = f.linhas || [];
+    var expandido = !!linhasExpandidas[f.id];
+    var visiveis = (expandido || linhas.length <= LINHAS_VISIVEIS) ? linhas.length : LINHAS_VISIVEIS;
+
+    if (linhas.length) {
+      var ligadas = linhas.filter(function (l) {
+        return l.ingredienteId && allIngredientes[l.ingredienteId];
+      }).length;
+      var todasLigadas = ligadas === linhas.length;
+
       html += '<div class="card-lines">';
-      f.linhas.slice(0, 5).forEach(function (l) {
+      html += '<div class="card-lines-head">';
+      html += '<span class="card-lines-label">Linhas</span>';
+      html += '<span class="badge' + (todasLigadas ? ' badge-matched' : '') + '">' + ligadas + '/' + linhas.length + ' linhas ligadas</span>';
+      html += '</div>';
+
+      linhas.slice(0, visiveis).forEach(function (l, idx) {
+        html += '<div class="fatura-linha" data-idx="' + idx + '">';
         html += '<div class="card-lines-item"><span>' + escapeHtml(l.descricao || '—') + '</span><span>' + formatMontante(l.montante) + '</span></div>';
+        html += '<div class="linha-ing">' + linhaIngredienteHtml(l) + '</div>';
+        html += '</div>';
       });
-      if (f.linhas.length > 5) {
-        html += '<div class="card-lines-item"><span>+ ' + (f.linhas.length - 5) + ' linha(s)</span></div>';
+
+      if (linhas.length > LINHAS_VISIVEIS) {
+        html += '<button type="button" class="btn-linhas-mais">' +
+          (expandido ? 'mostrar menos' : '+ ' + (linhas.length - LINHAS_VISIVEIS) + ' linha(s) — mostrar todas') +
+          '</button>';
       }
       html += '</div>';
     }
@@ -1119,6 +1413,32 @@ window.addEventListener('load', function () {
     html += '</div>';
 
     card.innerHTML = html;
+
+    card.querySelectorAll('.fatura-linha').forEach(function (linhaEl) {
+      var idx = parseInt(linhaEl.getAttribute('data-idx'), 10);
+
+      var btnConfirmar = linhaEl.querySelector('.btn-linha-confirmar');
+      if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', function () {
+          ligarLinhaIngrediente(f, idx, btnConfirmar.getAttribute('data-sugestao'));
+        });
+      }
+
+      ['.btn-linha-escolher', '.btn-linha-ligar', '.btn-linha-trocar'].forEach(function (sel) {
+        var btn = linhaEl.querySelector(sel);
+        if (btn) {
+          btn.addEventListener('click', function () { openIngSelectModal(f, idx); });
+        }
+      });
+    });
+
+    var btnLinhasMais = card.querySelector('.btn-linhas-mais');
+    if (btnLinhasMais) {
+      btnLinhasMais.addEventListener('click', function () {
+        linhasExpandidas[f.id] = !linhasExpandidas[f.id];
+        renderFaturas();
+      });
+    }
 
     var btnCriar = card.querySelector('.btn-criar-pagamento');
     if (btnCriar) {
@@ -1163,6 +1483,7 @@ window.addEventListener('load', function () {
   }
 
   function renderFaturas() {
+    if (!faturasGrid) return;
     var entries = Object.keys(allFaturas).map(function (id) {
       return Object.assign({ id: id }, allFaturas[id]);
     });
@@ -1180,6 +1501,76 @@ window.addEventListener('load', function () {
       faturasGrid.appendChild(buildFaturaCard(f));
     });
   }
+
+  // ===== Modal "Ligar ingrediente" =====
+  var ingSelectOverlay = document.getElementById('ingSelectOverlay');
+  var ingSelectClose = document.getElementById('ingSelectClose');
+  var ingSelectCancel = document.getElementById('ingSelectCancel');
+  var ingSelectSearch = document.getElementById('ingSelectSearch');
+  var ingSelectList = document.getElementById('ingSelectList');
+  var ingSelectLinha = document.getElementById('ingSelectLinha');
+
+  var ingSelectFatura = null;
+  var ingSelectIndex = null;
+
+  function renderIngSelectList() {
+    var termo = normalizeNome(ingSelectSearch.value);
+    var items = Object.keys(allIngredientes).map(function (id) {
+      return { id: id, nome: allIngredientes[id].nome || '' };
+    }).filter(function (ing) {
+      return !termo || normalizeNome(ing.nome).indexOf(termo) !== -1;
+    }).sort(function (a, b) {
+      return a.nome.localeCompare(b.nome);
+    });
+
+    var html = '';
+    if (items.length === 0) {
+      html += '<div class="ing-select-vazio">Nenhum ingrediente encontrado.</div>';
+    }
+    items.forEach(function (ing) {
+      html += '<button type="button" class="ing-select-item" data-id="' + escapeHtml(ing.id) + '">' +
+        escapeHtml(ing.nome) + '</button>';
+    });
+    html += '<button type="button" class="ing-select-item ing-select-novo" id="ingSelectCriarNovo">+ Criar novo ingrediente</button>';
+
+    ingSelectList.innerHTML = html;
+
+    ingSelectList.querySelectorAll('.ing-select-item[data-id]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        ligarLinhaIngrediente(ingSelectFatura, ingSelectIndex, btn.getAttribute('data-id'));
+        closeIngSelectModal();
+      });
+    });
+
+    document.getElementById('ingSelectCriarNovo').addEventListener('click', function () {
+      criarIngredienteDaLinha(ingSelectFatura, ingSelectIndex);
+      closeIngSelectModal();
+    });
+  }
+
+  function openIngSelectModal(f, index) {
+    ingSelectFatura = f;
+    ingSelectIndex = index;
+    var linha = (f.linhas || [])[index] || {};
+    ingSelectLinha.innerHTML = '<strong>' + escapeHtml(linha.descricao || '—') + '</strong> — ' + formatMontante(linha.montante);
+    ingSelectSearch.value = '';
+    renderIngSelectList();
+    ingSelectOverlay.classList.add('open');
+    ingSelectSearch.focus();
+  }
+
+  function closeIngSelectModal() {
+    ingSelectOverlay.classList.remove('open');
+    ingSelectFatura = null;
+    ingSelectIndex = null;
+  }
+
+  ingSelectSearch.addEventListener('input', renderIngSelectList);
+  ingSelectClose.addEventListener('click', closeIngSelectModal);
+  ingSelectCancel.addEventListener('click', closeIngSelectModal);
+  ingSelectOverlay.addEventListener('click', function (e) {
+    if (e.target === ingSelectOverlay) closeIngSelectModal();
+  });
 
   faturasRef.on('value', function (snapshot) {
     allFaturas = snapshot.val() || {};
