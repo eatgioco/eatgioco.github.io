@@ -773,7 +773,8 @@
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:6px;
+    flex-wrap:wrap;
+    gap:8px 6px;
   }
 
   .ing-supplier-tag{
@@ -785,7 +786,8 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    max-width:105px;
+    max-width:100%;
+    flex:1 1 100%;
   }
 
   .ing-supplier-tag.missing{
@@ -983,6 +985,517 @@
 
   .cat-manage-add input{
     flex:1;
+  }
+
+  /* ===== Carrinho — botão flutuante ===== */
+  #carrinhoFab{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    z-index:900;
+    width:60px;
+    height:60px;
+    border:2px solid var(--black);
+    border-radius:0;
+    background:var(--red);
+    color:var(--bg);
+    font-size:24px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:opacity .15s ease;
+  }
+
+  #carrinhoFab.empty{
+    opacity:0.45;
+  }
+
+  #carrinhoBadge{
+    position:absolute;
+    top:-10px;
+    right:-10px;
+    min-width:24px;
+    height:24px;
+    padding:0 5px;
+    background:var(--black);
+    color:var(--bg);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  /* ===== Carrinho — stepper no cartão ===== */
+  .ing-cart-add{
+    flex:0 0 auto;
+    width:36px;
+    height:36px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .ing-cart-add:hover{
+    background:var(--red);
+    color:var(--bg);
+  }
+
+  .ing-cart-stepper{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:stretch;
+    height:36px;
+    border:2px solid var(--black);
+    background:var(--red);
+    color:var(--bg);
+  }
+
+  .ing-cart-stepper button{
+    width:32px;
+    min-width:32px;
+    min-height:32px;
+    padding:0;
+    border:none;
+    background:transparent;
+    color:var(--bg);
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .ing-cart-stepper button:hover{
+    background:var(--black);
+  }
+
+  .stp-qtd{
+    min-width:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 2px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  /* ===== Ficha — bloco de compra ===== */
+  .sheet-buy{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .sheet-buy input[type="number"]{
+    width:76px;
+  }
+
+  #ingSheetQtdUnidade{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .btn-ghost{
+    background:transparent;
+  }
+
+  .btn:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+  }
+
+  .btn:disabled:hover{
+    background:var(--white);
+    color:var(--black);
+    border-color:var(--black);
+  }
+
+  /* ===== Modais largos (carrinho / checkout) ===== */
+  .modal-wide{
+    max-width:720px;
+  }
+
+  /* ===== Modal do carrinho ===== */
+  .cart-group{
+    border:2px solid var(--black);
+    background:var(--white);
+    margin-bottom:14px;
+  }
+
+  .cart-group.no-supplier{
+    border-color:var(--red);
+  }
+
+  .cart-group-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border-bottom:2px solid var(--black);
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .cart-group.no-supplier .cart-group-header{
+    border-bottom-color:var(--red);
+    color:var(--red);
+  }
+
+  .cart-group-meta{
+    font-size:11px;
+    font-weight:400;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .cart-warning{
+    padding:8px 12px;
+    border-bottom:1px solid var(--line);
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    color:var(--red);
+  }
+
+  .cart-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 12px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .cart-item:last-child{
+    border-bottom:none;
+  }
+
+  .cart-item-nome{
+    flex:1;
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .cart-item-unidade{
+    min-width:38px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .cart-item-preco{
+    min-width:70px;
+    text-align:right;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+  }
+
+  .cart-item-remove{
+    width:32px;
+    height:32px;
+    border:none;
+    background:none;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .cart-item-remove:hover{
+    color:var(--red);
+  }
+
+  .cart-done{
+    margin-top:18px;
+    border-top:1px solid var(--line);
+    padding-top:12px;
+  }
+
+  .cart-done summary{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  .cart-done-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .cart-done-nome{
+    flex:1;
+  }
+
+  .cart-empty{
+    padding:36px 0;
+    text-align:center;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .cart-bar{
+    position:sticky;
+    bottom:0;
+    z-index:2;
+    margin-top:18px;
+    padding:12px 0;
+    background:var(--bg);
+    border-top:2px solid var(--black);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+
+  .cart-bar-info{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .cart-bar-sub{
+    display:block;
+    margin-top:3px;
+    font-size:10px;
+    font-weight:400;
+    color:var(--muted);
+  }
+
+  /* ===== Checkout ===== */
+  .ck-block{
+    border:2px solid var(--black);
+    background:var(--white);
+    padding:12px;
+    margin-bottom:14px;
+  }
+
+  .ck-block.off{
+    opacity:0.5;
+  }
+
+  .ck-block-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .ck-block-head input[type="checkbox"]{
+    flex:0 0 auto;
+    width:18px;
+    height:18px;
+  }
+
+  .ck-block-nome{
+    flex:1;
+  }
+
+  .ck-canal{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:400;
+    color:var(--muted);
+  }
+
+  .ck-canal-select{
+    width:auto;
+    padding:5px 7px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+  }
+
+  .ck-items{
+    margin-top:10px;
+  }
+
+  .ck-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:6px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .ck-item:last-child{
+    border-bottom:none;
+  }
+
+  .ck-item-nome{
+    flex:1;
+    font-size:13px;
+  }
+
+  .ck-item input[type="number"]{
+    width:78px;
+    min-height:32px;
+    padding:6px 8px;
+  }
+
+  .ck-item-unidade{
+    min-width:38px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .ck-meta{
+    margin-top:10px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .ck-minimo{
+    margin-top:10px;
+    padding:8px 10px;
+    border:2px solid var(--red);
+    color:var(--red);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+  }
+
+  .ck-notas{
+    margin-top:10px;
+  }
+
+  .ck-progress{
+    height:10px;
+    border:2px solid var(--black);
+    background:var(--white);
+  }
+
+  .ck-progress-fill{
+    height:100%;
+    background:var(--red);
+  }
+
+  .ck-step-label{
+    margin:6px 0 16px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .ck-send-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+  }
+
+  .ck-preview{
+    margin-top:12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    padding:12px;
+  }
+
+  .ck-preview-subject{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:8px;
+  }
+
+  .ck-preview pre{
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    line-height:1.5;
+  }
+
+  .ck-confirm-q{
+    flex:1;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  .ck-resumo-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+
+  .ck-resumo-nome{
+    flex:1;
+    font-weight:600;
+  }
+
+  .ck-resumo-meta{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .ck-resumo-title{
+    margin:18px 0 6px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .ck-nota-topo{
+    margin-bottom:14px;
+    padding:10px 12px;
+    border:2px solid var(--black);
+    background:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+  }
+
+  .ck-footer{
+    position:sticky;
+    bottom:0;
+    z-index:2;
+    margin-top:18px;
+    padding:12px 0;
+    background:var(--bg);
+    border-top:2px solid var(--black);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
   }
 
 </style>
@@ -1268,7 +1781,13 @@
     <div class="modal-actions">
       <button type="button" class="btn" id="ingSheetCloseBtn">Fechar</button>
       <div class="modal-actions-right">
-        <button type="button" class="btn btn-primary" id="ingSheetEditBtn">Editar</button>
+        <button type="button" class="btn btn-ghost" id="ingSheetEditBtn">Editar</button>
+        <div class="sheet-buy">
+          <input type="number" id="ingSheetQtd" min="1" step="1" value="1">
+          <span id="ingSheetQtdUnidade"></span>
+          <button type="button" class="btn" id="ingSheetAddCarrinho">🛒 Adicionar ao carrinho</button>
+          <button type="button" class="btn btn-primary" id="ingSheetComprar">Comprar agora</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1291,6 +1810,31 @@
         <button type="button" class="btn" id="catManageCloseBtn">Fechar</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Carrinho — botão flutuante -->
+<button type="button" id="carrinhoFab" class="empty" title="Carrinho">🛒<span id="carrinhoBadge">0</span></button>
+
+<!-- Modal do Carrinho -->
+<div class="modal-overlay" id="carrinhoOverlay">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>Carrinho</h2>
+      <button class="modal-close" id="carrinhoClose">×</button>
+    </div>
+    <div id="carrinhoBody"></div>
+  </div>
+</div>
+
+<!-- Modal de Checkout -->
+<div class="modal-overlay" id="checkoutOverlay">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="checkoutTitle">Revisão da encomenda</h2>
+      <button class="modal-close" id="checkoutClose">×</button>
+    </div>
+    <div id="checkoutBody"></div>
   </div>
 </div>
 
@@ -1453,6 +1997,7 @@ window.addEventListener('load', function () {
   var ingCurrentCategoria = "Todas";
   var ingCurrentSearch = "";
   var currentSheetId = null;
+  var currentSheetSupplier = null;
 
   var tabFornecedor = document.getElementById('tabFornecedor');
   var tabIngrediente = document.getElementById('tabIngrediente');
@@ -1493,6 +2038,10 @@ window.addEventListener('load', function () {
   var ingSheetCloseBtn = document.getElementById('ingSheetCloseBtn');
   var ingSheetEditBtn = document.getElementById('ingSheetEditBtn');
   var ingSheetBody = document.getElementById('ingSheetBody');
+  var ingSheetQtd = document.getElementById('ingSheetQtd');
+  var ingSheetQtdUnidade = document.getElementById('ingSheetQtdUnidade');
+  var ingSheetAddCarrinho = document.getElementById('ingSheetAddCarrinho');
+  var ingSheetComprar = document.getElementById('ingSheetComprar');
 
   var btnCatManage = document.getElementById('btnCatManage');
   var catManageOverlay = document.getElementById('catManageOverlay');
@@ -1558,6 +2107,7 @@ window.addEventListener('load', function () {
     ingredientesView.style.display = '';
     fornecedoresView.style.display = 'none';
     btnNovo.style.display = 'none';
+    renderIngGrid();
   });
 
   function renderIngStats() {
@@ -1602,12 +2152,21 @@ window.addEventListener('load', function () {
       ? '<span class="ing-supplier-tag" title="' + escapeHtml(ing.fornecedor) + '">' + escapeHtml(ing.fornecedor) + '</span>'
       : '<span class="ing-supplier-tag missing">Sem fornecedor</span>';
 
+    var qtdCar = qtdNoCarrinho(ing.id);
+    var cartHtml = qtdCar > 0
+      ? '<span class="ing-cart-stepper">' +
+          '<button type="button" class="stp-minus" title="Remover uma unidade">−</button>' +
+          '<span class="stp-qtd">' + qtdCar + '</span>' +
+          '<button type="button" class="stp-plus" title="Adicionar uma unidade">+</button>' +
+        '</span>'
+      : '<span class="ing-cart-add" title="Adicionar ao carrinho">+</span>';
+
     return '<div class="ing-card" data-id="' + escapeHtml(ing.id) + '">' +
       '<div class="ing-card-image">🖼</div>' +
       '<div class="ing-card-body">' +
         '<span class="ing-card-cat' + catClass + '">' + escapeHtml(catLabel) + '</span>' +
         '<div class="ing-card-name">' + escapeHtml(ing.nome) + '</div>' +
-        '<div class="ing-card-footer">' + fornecedorHtml + '<span class="ing-edit-icon">✎</span></div>' +
+        '<div class="ing-card-footer">' + fornecedorHtml + cartHtml + '<span class="ing-edit-icon">✎</span></div>' +
       '</div>' +
     '</div>';
   }
@@ -1669,6 +2228,32 @@ window.addEventListener('load', function () {
         e.stopPropagation();
         openIngModal(card.getAttribute('data-id'));
       });
+
+      var cartAdd = card.querySelector('.ing-cart-add');
+      if (cartAdd) {
+        cartAdd.addEventListener('click', function (e) {
+          e.stopPropagation();
+          addAoCarrinho(card.getAttribute('data-id'), 1);
+        });
+      }
+
+      var stpPlus = card.querySelector('.stp-plus');
+      if (stpPlus) {
+        stpPlus.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var cid = card.getAttribute('data-id');
+          setQtdCarrinho(cid, qtdNoCarrinho(cid) + 1);
+        });
+      }
+
+      var stpMinus = card.querySelector('.stp-minus');
+      if (stpMinus) {
+        stpMinus.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var cid = card.getAttribute('data-id');
+          setQtdCarrinho(cid, qtdNoCarrinho(cid) - 1);
+        });
+      }
     });
   }
 
@@ -1898,6 +2483,8 @@ window.addEventListener('load', function () {
       '<div class="sheet-row"><strong>Armazenamento</strong><span>' + armazenamentoHtml + '</span></div>' +
       '<div class="sheet-row"><strong>Alergénios</strong><span>' + alergeniosHtml + '</span></div>' +
       aliasesHtml;
+
+    ingSheetAplicarCompra(ing);
   }
 
   function openIngSheet(id) {
@@ -1909,6 +2496,7 @@ window.addEventListener('load', function () {
   function closeIngSheet() {
     ingSheetOverlay.classList.remove('open');
     currentSheetId = null;
+    currentSheetSupplier = null;
   }
 
   ingSheetClose.addEventListener('click', closeIngSheet);
@@ -1922,6 +2510,865 @@ window.addEventListener('load', function () {
     closeIngSheet();
     openIngModal(id);
   });
+
+
+  // ===== Ficha — comprar / adicionar ao carrinho =====
+  function ingSheetAplicarCompra(ing) {
+    ingSheetQtd.value = 1;
+    ingSheetQtdUnidade.textContent = ing.unidade || '';
+
+    currentSheetSupplier = ing.fornecedor ? findSupplierByNome(ing.fornecedor) : null;
+
+    if (!ing.fornecedor) {
+      ingSheetComprar.disabled = true;
+      ingSheetComprar.title = 'Este ingrediente não tem fornecedor associado.';
+    } else if (!currentSheetSupplier) {
+      ingSheetComprar.disabled = true;
+      ingSheetComprar.title = 'Fornecedor "' + ing.fornecedor + '" não está na lista de fornecedores.';
+    } else {
+      ingSheetComprar.disabled = false;
+      ingSheetComprar.title = 'Encomendar a ' + currentSheetSupplier.nome;
+    }
+  }
+
+  function lerQtdFicha() {
+    var q = parseInt(ingSheetQtd.value, 10);
+    if (isNaN(q) || q < 1) {
+      alert('Indica uma quantidade de pelo menos 1.');
+      return null;
+    }
+    return q;
+  }
+
+  ingSheetAddCarrinho.addEventListener('click', function () {
+    if (!currentSheetId) return;
+    var q = lerQtdFicha();
+    if (q === null) return;
+    addAoCarrinho(currentSheetId, q);
+    closeIngSheet();
+  });
+
+  ingSheetComprar.addEventListener('click', function () {
+    if (!currentSheetId || !currentSheetSupplier) return;
+    var q = lerQtdFicha();
+    if (q === null) return;
+
+    var ing = allIngredientes[currentSheetId];
+    if (!ing) return;
+
+    var supplier = currentSheetSupplier;
+    if (!canaisDisponiveis(supplier).length) {
+      alert('O fornecedor "' + supplier.nome + '" não tem canal de encomenda (WhatsApp, plataforma ou email) configurado.');
+      return;
+    }
+    var idDireto = currentSheetId;
+    var preco = parseFloat(ing.precoUltimaCompra);
+
+    // Itens deste fornecedor que já estavam no carrinho — juntam-se à encomenda.
+    var grupos = agruparCarrinhoPorFornecedor(true);
+    var grupo = null;
+    grupos.forEach(function (g) {
+      if (g.supplier && g.supplier.id === supplier.id) grupo = g;
+    });
+
+    var itensCarrinho = grupo ? grupo.itens.slice() : [];
+    var nJuntados = itensCarrinho.length;
+
+    // O item do "Comprar agora" nunca entra no carrinho. Se o mesmo
+    // ingrediente já lá estiver, somamos a quantidade só nesta encomenda.
+    var jaNaLista = null;
+    itensCarrinho.forEach(function (it) {
+      if (it.id === idDireto) jaNaLista = it;
+    });
+
+    if (jaNaLista) {
+      jaNaLista.qtd = jaNaLista.qtd + q;
+    } else {
+      itensCarrinho.push({
+        id: idDireto,
+        nome: ing.nome || '',
+        unidade: ing.unidade || '',
+        qtd: q,
+        precoUnit: isNaN(preco) ? null : preco,
+        noCarrinho: false
+      });
+    }
+
+    closeIngSheet();
+
+    checkoutSemFornecedor = 0;
+    checkoutFila = [criarEntradaCheckout(supplier, itensCarrinho)];
+
+    if (nJuntados > 0) {
+      checkoutNotaTopo = 'Juntámos ' + nJuntados + ' ' + (nJuntados === 1 ? 'item' : 'itens') +
+        ' deste fornecedor que já tinhas no carrinho.';
+      abrirCheckout(1);
+    } else {
+      checkoutNotaTopo = '';
+      abrirCheckout(2);
+    }
+  });
+
+  // ===== Carrinho de compras =====
+  var carrinhoRef = db.ref('carrinho');
+  var allCarrinho = {};
+
+  var carrinhoFab = document.getElementById('carrinhoFab');
+  var carrinhoBadge = document.getElementById('carrinhoBadge');
+  var carrinhoOverlay = document.getElementById('carrinhoOverlay');
+  var carrinhoClose = document.getElementById('carrinhoClose');
+  var carrinhoBody = document.getElementById('carrinhoBody');
+
+  var CANAL_LABEL = {
+    whatsapp: '💬 WhatsApp',
+    email: '✉️ Email',
+    plataforma: '🔗 Plataforma'
+  };
+
+  var CANAL_VIA = {
+    whatsapp: 'WhatsApp',
+    email: 'Email',
+    plataforma: 'Plataforma'
+  };
+
+  function findSupplierByNome(nome) {
+    if (!nome) return null;
+    var alvo = String(nome).trim().toLowerCase();
+    var todos = allSuppliers || {};
+    var ids = Object.keys(todos);
+    for (var i = 0; i < ids.length; i++) {
+      var s = todos[ids[i]];
+      if (s && String(s.nome || '').trim().toLowerCase() === alvo) {
+        return Object.assign({ id: ids[i] }, s);
+      }
+    }
+    return null;
+  }
+
+  // Lê sempre o ingrediente real; os snapshots do carrinho são só fallback
+  // para o caso de o ingrediente ter sido apagado entretanto.
+  function carrinhoItemInfo(id) {
+    var reg = allCarrinho[id] || {};
+    var ing = allIngredientes[id];
+    var preco = ing ? parseFloat(ing.precoUltimaCompra) : NaN;
+    return {
+      id: id,
+      nome: (ing && ing.nome) || reg.nome || '(ingrediente apagado)',
+      fornecedor: ing ? (ing.fornecedor || '') : (reg.fornecedor || ''),
+      unidade: (ing ? ing.unidade : reg.unidade) || '',
+      qtd: Number(reg.qtd) || 0,
+      precoUnit: isNaN(preco) ? null : preco,
+      noCarrinho: true
+    };
+  }
+
+  function carrinhoPendentesIds() {
+    return Object.keys(allCarrinho).filter(function (id) {
+      return allCarrinho[id] && !allCarrinho[id].encomendado;
+    });
+  }
+
+  function qtdNoCarrinho(id) {
+    var reg = allCarrinho[id];
+    if (!reg || reg.encomendado) return 0;
+    return Number(reg.qtd) || 0;
+  }
+
+  function addAoCarrinho(id, qtd) {
+    var ing = allIngredientes[id];
+    if (!ing) return;
+    var q = Number(qtd) || 0;
+    if (q <= 0) return;
+    var existente = allCarrinho[id];
+    var base = (existente && !existente.encomendado) ? (Number(existente.qtd) || 0) : 0;
+    carrinhoRef.child(id).set({
+      nome: ing.nome || '',
+      fornecedor: ing.fornecedor || '',
+      unidade: ing.unidade || '',
+      qtd: base + q,
+      addedAt: new Date().toISOString(),
+      encomendado: false,
+      encomendadoEm: null,
+      encomendadoVia: null
+    });
+  }
+
+  function setQtdCarrinho(id, qtd) {
+    var q = Number(qtd) || 0;
+    if (q <= 0) {
+      removerDoCarrinho(id);
+      return;
+    }
+    if (!allCarrinho[id]) {
+      addAoCarrinho(id, q);
+      return;
+    }
+    carrinhoRef.child(id).update({
+      qtd: q,
+      encomendado: false,
+      encomendadoEm: null,
+      encomendadoVia: null
+    });
+  }
+
+  function removerDoCarrinho(id) {
+    carrinhoRef.child(id).remove();
+  }
+
+  function agruparCarrinhoPorFornecedor(apenasPendentes) {
+    var grupos = {};
+    var semFornecedor = { fornecedorNome: 'Sem fornecedor', supplier: null, itens: [] };
+
+    Object.keys(allCarrinho).forEach(function (id) {
+      var reg = allCarrinho[id];
+      if (!reg) return;
+      if (apenasPendentes && reg.encomendado) return;
+
+      var info = carrinhoItemInfo(id);
+      var supplier = info.fornecedor ? findSupplierByNome(info.fornecedor) : null;
+      if (!supplier) {
+        semFornecedor.itens.push(info);
+        return;
+      }
+      if (!grupos[supplier.id]) {
+        grupos[supplier.id] = { fornecedorNome: supplier.nome, supplier: supplier, itens: [] };
+      }
+      grupos[supplier.id].itens.push(info);
+    });
+
+    function porNome(a, b) { return (a.nome || '').localeCompare(b.nome || ''); }
+
+    var arr = Object.keys(grupos).map(function (k) { return grupos[k]; });
+    arr.sort(function (a, b) { return a.fornecedorNome.localeCompare(b.fornecedorNome); });
+    arr.forEach(function (g) { g.itens.sort(porNome); });
+
+    if (semFornecedor.itens.length) {
+      semFornecedor.itens.sort(porNome);
+      arr.push(semFornecedor);
+    }
+    return arr;
+  }
+
+  function estimarGrupo(itens) {
+    var total = 0;
+    var completo = true;
+    (itens || []).forEach(function (it) {
+      if (it.precoUnit === null || it.precoUnit === undefined || isNaN(it.precoUnit)) {
+        completo = false;
+        return;
+      }
+      total += it.precoUnit * (Number(it.qtd) || 0);
+    });
+    return { total: total, completo: completo };
+  }
+
+  function formatEstimativa(est) {
+    return '~' + (formatPrecoEuros(est.total) || '0,00€') + (est.completo ? '' : ' (parcial)');
+  }
+
+  function parseValorMinimo(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    var txt = String(raw).replace(/[^\d,.-]/g, '').replace(',', '.');
+    var n = parseFloat(txt);
+    return isNaN(n) ? null : n;
+  }
+
+  function renderCarrinhoBadge() {
+    if (!carrinhoBadge) return;
+    var n = carrinhoPendentesIds().length;
+    carrinhoBadge.textContent = n;
+    carrinhoBadge.style.display = n ? 'flex' : 'none';
+    carrinhoFab.classList.toggle('empty', n === 0);
+  }
+
+  carrinhoRef.on('value', function (snapshot) {
+    allCarrinho = snapshot.val() || {};
+    renderCarrinhoBadge();
+    if (ingredientesView && ingredientesView.style.display !== 'none') {
+      renderIngGrid();
+    }
+    if (carrinhoOverlay.classList.contains('open')) {
+      renderCarrinhoModal();
+    }
+  });
+
+  // ===== Modal do carrinho =====
+  function cartStepperHtml(id, qtd) {
+    return '<span class="ing-cart-stepper" data-id="' + escapeHtml(id) + '">' +
+      '<button type="button" class="stp-minus" title="Remover uma unidade">−</button>' +
+      '<span class="stp-qtd">' + qtd + '</span>' +
+      '<button type="button" class="stp-plus" title="Adicionar uma unidade">+</button>' +
+    '</span>';
+  }
+
+  function renderCarrinhoModal() {
+    var grupos = agruparCarrinhoPorFornecedor(true);
+    var encomendadosIds = Object.keys(allCarrinho).filter(function (id) {
+      return allCarrinho[id] && allCarrinho[id].encomendado;
+    });
+
+    var html = '';
+
+    if (grupos.length === 0) {
+      html += '<div class="cart-empty">O carrinho está vazio. Adiciona ingredientes a partir da grelha.</div>';
+    }
+
+    var totalItens = 0;
+    var totalFornecedores = 0;
+    var totalEstimado = 0;
+    var estimativaCompleta = true;
+    var itensSemFornecedor = 0;
+    var temGrupoValido = false;
+
+    grupos.forEach(function (g) {
+      var est = estimarGrupo(g.itens);
+      var semSupplier = !g.supplier;
+
+      if (semSupplier) {
+        itensSemFornecedor += g.itens.length;
+      } else {
+        temGrupoValido = true;
+        totalItens += g.itens.length;
+        totalFornecedores += 1;
+        totalEstimado += est.total;
+        if (!est.completo) estimativaCompleta = false;
+      }
+
+      html += '<div class="cart-group' + (semSupplier ? ' no-supplier' : '') + '">';
+      html += '<div class="cart-group-header"><span>' + escapeHtml(g.fornecedorNome) + '</span>' +
+        '<span class="cart-group-meta">' + g.itens.length + ' ' + (g.itens.length === 1 ? 'item' : 'itens') +
+        ' · ' + escapeHtml(formatEstimativa(est)) + '</span></div>';
+
+      if (semSupplier) {
+        html += '<div class="cart-warning">Estes ingredientes não têm um fornecedor válido associado (sem fornecedor, ou com um nome que não existe na lista de fornecedores). Não serão encomendados — corrige o fornecedor na ficha do ingrediente.</div>';
+      }
+
+      g.itens.forEach(function (it) {
+        var linha = (it.precoUnit === null)
+          ? '—'
+          : (formatPrecoEuros(it.precoUnit * it.qtd) || '—');
+        html += '<div class="cart-item" data-id="' + escapeHtml(it.id) + '">' +
+          '<span class="cart-item-nome">' + escapeHtml(it.nome) + '</span>' +
+          cartStepperHtml(it.id, it.qtd) +
+          '<span class="cart-item-unidade">' + escapeHtml(it.unidade || '—') + '</span>' +
+          '<span class="cart-item-preco">' + escapeHtml(linha) + '</span>' +
+          '<button type="button" class="cart-item-remove" title="Remover do carrinho">×</button>' +
+        '</div>';
+      });
+
+      html += '</div>';
+    });
+
+    if (encomendadosIds.length) {
+      html += '<details class="cart-done"><summary>Já encomendados (' + encomendadosIds.length + ')</summary>';
+      encomendadosIds.sort(function (a, b) {
+        return (allCarrinho[a].encomendadoEm || '').localeCompare(allCarrinho[b].encomendadoEm || '');
+      }).forEach(function (id) {
+        var reg = allCarrinho[id];
+        var info = carrinhoItemInfo(id);
+        var via = reg.encomendadoVia || 'encomendado';
+        var quando = reg.encomendadoEm ? isoToDDMMYYYY(String(reg.encomendadoEm).slice(0, 10)) : '';
+        html += '<div class="cart-done-item" data-id="' + escapeHtml(id) + '">' +
+          '<span class="cart-done-nome">' + escapeHtml(info.nome) + ' — ' + info.qtd + (info.unidade ? ' ' + escapeHtml(info.unidade) : '') + '</span>' +
+          '<span>' + escapeHtml('Enviado por ' + via + (quando ? ' em ' + quando : '')) + '</span>' +
+          '<button type="button" class="btn-small cart-readd">Voltar a adicionar</button>' +
+        '</div>';
+      });
+      html += '<div style="margin-top:12px;"><button type="button" class="btn-small" id="cartLimparEncomendados">Limpar encomendados</button></div>';
+      html += '</details>';
+    }
+
+    var partes = [
+      totalItens + ' ' + (totalItens === 1 ? 'item' : 'itens'),
+      totalFornecedores + ' ' + (totalFornecedores === 1 ? 'fornecedor' : 'fornecedores'),
+      '~' + (formatPrecoEuros(totalEstimado) || '0,00€') + (estimativaCompleta ? '' : ' (parcial)') + ' estimado'
+    ];
+    var infoTxt = partes.join(' · ');
+    if (itensSemFornecedor) {
+      infoTxt += ' · ' + itensSemFornecedor + ' ' + (itensSemFornecedor === 1 ? 'item sem fornecedor' : 'itens sem fornecedor') + ' (não serão encomendados)';
+    }
+
+    html += '<div class="cart-bar">' +
+      '<div class="cart-bar-info">' + escapeHtml(infoTxt) +
+        '<span class="cart-bar-sub">estimativa a último preço</span>' +
+      '</div>' +
+      '<button type="button" class="btn btn-primary" id="cartFinalizar"' + (temGrupoValido ? '' : ' disabled') + '>Finalizar encomendas →</button>' +
+    '</div>';
+
+    carrinhoBody.innerHTML = html;
+
+    carrinhoBody.querySelectorAll('.cart-item').forEach(function (row) {
+      var id = row.getAttribute('data-id');
+      row.querySelector('.stp-minus').addEventListener('click', function () {
+        setQtdCarrinho(id, qtdNoCarrinho(id) - 1);
+      });
+      row.querySelector('.stp-plus').addEventListener('click', function () {
+        setQtdCarrinho(id, qtdNoCarrinho(id) + 1);
+      });
+      row.querySelector('.cart-item-remove').addEventListener('click', function () {
+        removerDoCarrinho(id);
+      });
+    });
+
+    carrinhoBody.querySelectorAll('.cart-done-item').forEach(function (row) {
+      var id = row.getAttribute('data-id');
+      row.querySelector('.cart-readd').addEventListener('click', function () {
+        addAoCarrinho(id, Number((allCarrinho[id] || {}).qtd) || 1);
+      });
+    });
+
+    var limparBtn = document.getElementById('cartLimparEncomendados');
+    if (limparBtn) {
+      limparBtn.addEventListener('click', function () {
+        if (!confirm('Limpar todos os itens já encomendados do carrinho?')) return;
+        var updates = {};
+        encomendadosIds.forEach(function (id) { updates[id] = null; });
+        carrinhoRef.update(updates);
+      });
+    }
+
+    var finalizarBtn = document.getElementById('cartFinalizar');
+    if (finalizarBtn && temGrupoValido) {
+      finalizarBtn.addEventListener('click', function () {
+        abrirCheckoutDoCarrinho();
+      });
+    }
+  }
+
+  function abrirCarrinho() {
+    renderCarrinhoModal();
+    carrinhoOverlay.classList.add('open');
+  }
+
+  function fecharCarrinho() {
+    carrinhoOverlay.classList.remove('open');
+  }
+
+  carrinhoFab.addEventListener('click', abrirCarrinho);
+  carrinhoClose.addEventListener('click', fecharCarrinho);
+  carrinhoOverlay.addEventListener('click', function (e) {
+    if (e.target === carrinhoOverlay) fecharCarrinho();
+  });
+
+  // ===== Checkout sequencial =====
+  var checkoutOverlay = document.getElementById('checkoutOverlay');
+  var checkoutClose = document.getElementById('checkoutClose');
+  var checkoutTitle = document.getElementById('checkoutTitle');
+  var checkoutBody = document.getElementById('checkoutBody');
+
+  var checkoutFila = [];
+  var checkoutIndex = 0;
+  var checkoutEcra = 1;
+  var checkoutEnviados = [];
+  var checkoutSemFornecedor = 0;
+  var checkoutNotaTopo = '';
+
+  function canaisDisponiveis(supplier) {
+    var arr = [];
+    if (parseWhatsappTarget(supplier.whatsappEncomenda)) arr.push('whatsapp');
+    if ((supplier.plataformaEncomenda || '').trim()) arr.push('plataforma');
+    if ((supplier.emailord || supplier.email || '').trim()) arr.push('email');
+    return arr;
+  }
+
+  function criarEntradaCheckout(supplier, itens) {
+    var canais = canaisDisponiveis(supplier);
+    return {
+      supplier: supplier,
+      itens: itens,
+      notas: '',
+      canais: canais,
+      canal: canais.length ? canais[0] : null,
+      incluir: canais.length > 0,
+      estado: 'pendente',
+      aguardaConfirmacao: false
+    };
+  }
+
+  function entradaLinhas(entry) {
+    return entry.itens.map(function (it) {
+      return { qtd: String(it.qtd), produto: it.nome };
+    });
+  }
+
+  function entradaMensagem(entry) {
+    return buildOrderMessage(entradaLinhas(entry), entry.notas || '');
+  }
+
+  function abrirCheckout(ecra) {
+    checkoutEcra = ecra;
+    checkoutIndex = 0;
+    checkoutEnviados = [];
+    renderCheckout();
+    checkoutOverlay.classList.add('open');
+  }
+
+  function abrirCheckoutDoCarrinho() {
+    var grupos = agruparCarrinhoPorFornecedor(true);
+    checkoutSemFornecedor = 0;
+    checkoutNotaTopo = '';
+    checkoutFila = [];
+
+    grupos.forEach(function (g) {
+      if (!g.supplier) {
+        checkoutSemFornecedor += g.itens.length;
+        return;
+      }
+      checkoutFila.push(criarEntradaCheckout(g.supplier, g.itens.slice()));
+    });
+
+    if (!checkoutFila.length) return;
+    fecharCarrinho();
+    abrirCheckout(1);
+  }
+
+  function renderCheckout() {
+    if (checkoutEcra === 1) renderCheckoutRevisao();
+    else if (checkoutEcra === 2) renderCheckoutEnvio();
+    else renderCheckoutResumo();
+  }
+
+  function renderCheckoutRevisao() {
+    checkoutTitle.textContent = 'Revisão da encomenda';
+
+    var html = '';
+    if (checkoutNotaTopo) {
+      html += '<div class="ck-nota-topo">' + escapeHtml(checkoutNotaTopo) + '</div>';
+    }
+
+    checkoutFila.forEach(function (entry, idx) {
+      var est = estimarGrupo(entry.itens);
+      var semCanal = !entry.canal;
+
+      html += '<div class="ck-block' + (entry.incluir ? '' : ' off') + '" data-idx="' + idx + '">';
+      html += '<div class="ck-block-head">';
+      html += '<input type="checkbox" class="ck-incluir"' + (entry.incluir ? ' checked' : '') + (semCanal ? ' disabled' : '') + '>';
+      html += '<span class="ck-block-nome">' + escapeHtml(entry.supplier.nome) + '</span>';
+
+      if (semCanal) {
+        html += '<span class="ck-canal">Sem canal de encomenda</span>';
+      } else if (entry.canais.length > 1) {
+        html += '<select class="ck-canal-select">' + entry.canais.map(function (c) {
+          return '<option value="' + c + '"' + (c === entry.canal ? ' selected' : '') + '>' + CANAL_LABEL[c] + '</option>';
+        }).join('') + '</select>';
+      } else {
+        html += '<span class="ck-canal">' + CANAL_LABEL[entry.canal] + '</span>';
+      }
+      html += '</div>';
+
+      html += '<div class="ck-items">';
+      entry.itens.forEach(function (it, itIdx) {
+        html += '<div class="ck-item" data-it="' + itIdx + '">' +
+          '<span class="ck-item-nome">' + escapeHtml(it.nome) + '</span>' +
+          '<input type="number" class="ck-qtd" min="1" step="1" value="' + it.qtd + '">' +
+          '<span class="ck-item-unidade">' + escapeHtml(it.unidade || '—') + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+
+      var meta = 'Estimativa: ' + formatEstimativa(est);
+      if (entry.supplier.prazoEntrega) meta += ' · Entrega ' + entry.supplier.prazoEntrega;
+      html += '<div class="ck-meta">' + escapeHtml(meta) + '</div>';
+
+      var minimo = parseValorMinimo(entry.supplier.valorMinimo);
+      if (minimo !== null) {
+        if (!est.completo) {
+          html += '<div class="ck-minimo">' + escapeHtml('Mínimo de ' + (formatPrecoEuros(minimo) || '') + ' — sem preços suficientes para estimar.') + '</div>';
+        } else if (est.total < minimo) {
+          html += '<div class="ck-minimo">' + escapeHtml('Abaixo do mínimo de ' + (formatPrecoEuros(minimo) || '') + ' — faltam ~' + (formatPrecoEuros(minimo - est.total) || '') + '.') + '</div>';
+        }
+      }
+
+      html += '<div class="field full ck-notas"><label class="field-label">Observações para ' + escapeHtml(entry.supplier.nome) + '</label>' +
+        '<textarea class="ck-notas-input">' + escapeHtml(entry.notas || '') + '</textarea></div>';
+
+      html += '</div>';
+    });
+
+    var nIncluidos = checkoutFila.filter(function (e) { return e.incluir; }).length;
+
+    html += '<div class="ck-footer">' +
+      '<button type="button" class="btn" id="ckVoltarCarrinho">← Voltar ao carrinho</button>' +
+      '<button type="button" class="btn btn-primary" id="ckIniciarEnvio"' + (nIncluidos ? '' : ' disabled') + '>' +
+        'Iniciar envio (' + nIncluidos + ' ' + (nIncluidos === 1 ? 'fornecedor' : 'fornecedores') + ') →' +
+      '</button>' +
+    '</div>';
+
+    checkoutBody.innerHTML = html;
+
+    checkoutBody.querySelectorAll('.ck-block').forEach(function (block) {
+      var idx = parseInt(block.getAttribute('data-idx'), 10);
+      var entry = checkoutFila[idx];
+
+      var cb = block.querySelector('.ck-incluir');
+      cb.addEventListener('change', function () {
+        entry.incluir = cb.checked;
+        renderCheckoutRevisao();
+      });
+
+      var sel = block.querySelector('.ck-canal-select');
+      if (sel) {
+        sel.addEventListener('change', function () { entry.canal = sel.value; });
+      }
+
+      var notas = block.querySelector('.ck-notas-input');
+      notas.addEventListener('input', function () { entry.notas = notas.value; });
+
+      block.querySelectorAll('.ck-item').forEach(function (row) {
+        var itIdx = parseInt(row.getAttribute('data-it'), 10);
+        var input = row.querySelector('.ck-qtd');
+        input.addEventListener('change', function () {
+          var q = parseInt(input.value, 10);
+          if (isNaN(q) || q < 1) {
+            q = 1;
+            input.value = 1;
+          }
+          entry.itens[itIdx].qtd = q;
+          if (entry.itens[itIdx].noCarrinho) {
+            setQtdCarrinho(entry.itens[itIdx].id, q);
+          }
+          renderCheckoutRevisao();
+        });
+      });
+    });
+
+    document.getElementById('ckVoltarCarrinho').addEventListener('click', function () {
+      checkoutOverlay.classList.remove('open');
+      abrirCarrinho();
+    });
+
+    var iniciar = document.getElementById('ckIniciarEnvio');
+    if (nIncluidos) {
+      iniciar.addEventListener('click', function () {
+        checkoutFila = checkoutFila.filter(function (e) { return e.incluir; });
+        checkoutIndex = 0;
+        checkoutEcra = 2;
+        renderCheckout();
+      });
+    }
+  }
+
+  function renderCheckoutEnvio() {
+    var entry = checkoutFila[checkoutIndex];
+    if (!entry) {
+      checkoutEcra = 3;
+      renderCheckout();
+      return;
+    }
+
+    checkoutTitle.textContent = 'Enviar encomendas';
+
+    var total = checkoutFila.length;
+    var pct = Math.round((checkoutIndex / total) * 100);
+    var order = entradaMensagem(entry);
+
+    var html = '';
+    html += '<div class="ck-progress"><div class="ck-progress-fill" style="width:' + pct + '%;"></div></div>';
+    html += '<div class="ck-step-label">Fornecedor ' + (checkoutIndex + 1) + ' de ' + total + '</div>';
+
+    html += '<div class="ck-send-head"><span>' + escapeHtml(entry.supplier.nome) + '</span>' +
+      '<span class="ck-canal">' + CANAL_LABEL[entry.canal] + '</span></div>';
+
+    html += '<div class="ck-preview">' +
+      '<div class="field-label">Assunto</div>' +
+      '<div class="ck-preview-subject">' + escapeHtml(order.subject) + '</div>' +
+      '<div class="field-label">Mensagem</div>' +
+      '<pre>' + escapeHtml(order.body) + '</pre>' +
+    '</div>';
+
+    html += '<div style="margin-top:12px;"><button type="button" class="btn" id="ckCopiar">Copiar mensagem</button></div>';
+
+    if (entry.aguardaConfirmacao) {
+      html += '<div class="ck-footer">' +
+        '<span class="ck-confirm-q">' + escapeHtml('Conseguiste enviar a encomenda a ' + entry.supplier.nome + '?') + '</span>' +
+        '<span style="display:flex;gap:10px;flex-wrap:wrap;">' +
+          '<button type="button" class="btn" id="ckNao">Não, tentar outra vez</button>' +
+          '<button type="button" class="btn btn-primary" id="ckSim">Sim, enviada →</button>' +
+        '</span>' +
+      '</div>';
+    } else {
+      var labelAccao = entry.canal === 'whatsapp' ? '💬 Abrir WhatsApp'
+        : entry.canal === 'email' ? '✉️ Abrir email'
+        : '🔗 Abrir plataforma';
+      html += '<div class="ck-footer">' +
+        '<button type="button" class="btn" id="ckSaltar">Saltar este →</button>' +
+        '<button type="button" class="btn btn-primary" id="ckAccao">' + labelAccao + '</button>' +
+      '</div>';
+    }
+
+    checkoutBody.innerHTML = html;
+
+    document.getElementById('ckCopiar').addEventListener('click', function () {
+      copyTextToClipboard(order.subject + '\n\n' + order.body);
+    });
+
+    if (entry.aguardaConfirmacao) {
+      document.getElementById('ckNao').addEventListener('click', function () {
+        entry.aguardaConfirmacao = false;
+        renderCheckout();
+      });
+      document.getElementById('ckSim').addEventListener('click', function () {
+        confirmarEnvio(entry);
+      });
+    } else {
+      document.getElementById('ckSaltar').addEventListener('click', function () {
+        entry.estado = 'saltado';
+        checkoutIndex++;
+        if (checkoutIndex >= checkoutFila.length) checkoutEcra = 3;
+        renderCheckout();
+      });
+      document.getElementById('ckAccao').addEventListener('click', function () {
+        executarEnvio(entry, order);
+      });
+    }
+  }
+
+  function executarEnvio(entry, order) {
+    var supplier = entry.supplier;
+    var texto = '*' + order.subject + '*\n\n' + order.body;
+
+    if (entry.canal === 'whatsapp') {
+      var target = parseWhatsappTarget(supplier.whatsappEncomenda);
+      if (!target) {
+        alert('Sem WhatsApp de encomendas registado.');
+        return;
+      }
+      if (target.type === 'grupo') {
+        // Os links de convite de grupo não aceitam mensagem pré-preenchida:
+        // copiamos o texto e abrimos o grupo para colar.
+        copyTextToClipboard(texto);
+        window.open(target.url, '_blank');
+        alert('Os grupos de WhatsApp não aceitam mensagem pré-preenchida.\n\nA mensagem foi copiada — cole no grupo e envie.');
+      } else {
+        window.open('https://wa.me/' + target.numero + '?text=' + encodeURIComponent(texto), '_blank');
+      }
+    } else if (entry.canal === 'email') {
+      var to = (supplier.emailord || supplier.email || '').trim();
+      if (!to) {
+        alert('Sem email de encomendas registado.');
+        return;
+      }
+      var link = document.createElement('a');
+      link.href = 'mailto:' + to + '?subject=' + encodeURIComponent(order.subject) + '&body=' + encodeURIComponent(order.body);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      var url = (supplier.plataformaEncomenda || '').trim();
+      if (!url) {
+        alert('Sem plataforma de encomendas registada.');
+        return;
+      }
+      copyTextToClipboard(texto);
+      window.open(url, '_blank');
+      alert('A lista foi copiada — cola na plataforma.');
+    }
+
+    entry.aguardaConfirmacao = true;
+    renderCheckout();
+  }
+
+  function confirmarEnvio(entry) {
+    var order = entradaMensagem(entry);
+    var via = CANAL_VIA[entry.canal] || 'Encomenda';
+
+    registarUltimaEncomenda(entry.supplier, order, via);
+
+    var agora = new Date();
+    var iso = agora.toISOString();
+    var updates = {};
+    entry.itens.forEach(function (it) {
+      if (!it.noCarrinho) return;
+      if (!allCarrinho[it.id]) return;
+      updates[it.id + '/encomendado'] = true;
+      updates[it.id + '/encomendadoEm'] = iso;
+      updates[it.id + '/encomendadoVia'] = via;
+    });
+    if (Object.keys(updates).length) carrinhoRef.update(updates);
+
+    checkoutEnviados.push({
+      nome: entry.supplier.nome,
+      nItens: entry.itens.length,
+      canal: via,
+      hora: pad2(agora.getHours()) + ':' + pad2(agora.getMinutes())
+    });
+
+    entry.estado = 'enviado';
+    entry.aguardaConfirmacao = false;
+    checkoutIndex++;
+    if (checkoutIndex >= checkoutFila.length) checkoutEcra = 3;
+    renderCheckout();
+  }
+
+  function renderCheckoutResumo() {
+    checkoutTitle.textContent = 'Encomendas enviadas';
+
+    var html = '';
+
+    if (checkoutEnviados.length) {
+      html += '<div class="ck-resumo-title">Enviadas</div>';
+      checkoutEnviados.forEach(function (e) {
+        html += '<div class="ck-resumo-item">' +
+          '<span class="ck-resumo-nome">' + escapeHtml(e.nome) + '</span>' +
+          '<span class="ck-resumo-meta">' + e.nItens + ' ' + (e.nItens === 1 ? 'item' : 'itens') + ' · ' + escapeHtml(e.canal) + ' · ' + escapeHtml(e.hora) + '</span>' +
+        '</div>';
+      });
+    } else {
+      html += '<div class="cart-empty">Não foi enviada nenhuma encomenda.</div>';
+    }
+
+    var naoEnviados = checkoutFila.filter(function (e) { return e.estado !== 'enviado'; });
+    if (naoEnviados.length) {
+      html += '<div class="ck-resumo-title">Não enviadas</div>';
+      naoEnviados.forEach(function (e) {
+        html += '<div class="ck-resumo-item">' +
+          '<span class="ck-resumo-nome">' + escapeHtml(e.supplier.nome) + '</span>' +
+          '<span class="ck-resumo-meta">continuam no carrinho</span>' +
+        '</div>';
+      });
+    }
+
+    if (checkoutSemFornecedor) {
+      html += '<div class="ck-resumo-title">Sem fornecedor</div>' +
+        '<div class="ck-resumo-item"><span class="ck-resumo-nome">' +
+        escapeHtml(checkoutSemFornecedor + ' ' + (checkoutSemFornecedor === 1 ? 'item' : 'itens') + ' — resolve o fornecedor destes ingredientes na ficha') +
+        '</span></div>';
+    }
+
+    html += '<div class="ck-footer">' +
+      '<span></span>' +
+      '<button type="button" class="btn btn-primary" id="ckConcluir">Concluir</button>' +
+    '</div>';
+
+    checkoutBody.innerHTML = html;
+
+    document.getElementById('ckConcluir').addEventListener('click', function () {
+      checkoutOverlay.classList.remove('open');
+      checkoutFila = [];
+      checkoutEnviados = [];
+      abrirCarrinho();
+    });
+  }
+
+  function tentarFecharCheckout() {
+    if (checkoutEcra !== 3 && checkoutEnviados.length) {
+      var msg = 'Já enviaste ' + checkoutEnviados.length + ' ' +
+        (checkoutEnviados.length === 1 ? 'encomenda' : 'encomendas') +
+        '. As restantes continuam no carrinho. Fechar?';
+      if (!confirm(msg)) return;
+    }
+    checkoutOverlay.classList.remove('open');
+    checkoutFila = [];
+    checkoutEnviados = [];
+  }
+
+  checkoutClose.addEventListener('click', tentarFecharCheckout);
+  checkoutOverlay.addEventListener('click', function (e) {
+    if (e.target === checkoutOverlay) tentarFecharCheckout();
+  });
+
+  renderCarrinhoBadge();
 
   // ===== Gestão de categorias =====
   function renderCatManageList() {
@@ -2538,8 +3985,10 @@ window.addEventListener('load', function () {
     return lines;
   }
 
-  function buildOrderEmail() {
-    var lines = getValidOrderLines();
+  // Lógica pura de composição da mensagem, partilhada pelo fluxo dos cartões
+  // de fornecedor e pelo checkout do carrinho.
+  function buildOrderMessage(linhas, notas) {
+    var lines = linhas || [];
     var dateStr = formatDateDDMMYYYY(new Date());
     var subject = "Encomenda GIOCO — " + dateStr;
 
@@ -2552,10 +4001,10 @@ window.addEventListener('load', function () {
       bodyLines.push("— " + l.qtd + "x " + l.produto);
     });
 
-    var notas = orderNotas.value.trim();
-    if (notas) {
+    var obs = (notas || "").trim();
+    if (obs) {
       bodyLines.push("");
-      bodyLines.push("Observações: " + notas);
+      bodyLines.push("Observações: " + obs);
     }
 
     bodyLines.push("");
@@ -2563,6 +4012,10 @@ window.addEventListener('load', function () {
     bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
 
     return { subject: subject, body: bodyLines.join("\n"), dateStr: dateStr, lines: lines };
+  }
+
+  function buildOrderEmail() {
+    return buildOrderMessage(getValidOrderLines(), orderNotas.value);
   }
 
   function openOrderModal(supplier, canal) {
