@@ -1866,6 +1866,206 @@
     margin-left:6px;
   }
 
+  /* ---------- Tesouraria › Análise ---------- */
+  /* Sem @media: os painéis partem-se por flex-wrap com base mínima de
+     280px, por isso a 375px empilham sozinhos. */
+  .ana-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    margin-bottom:20px;
+  }
+
+  .ana-panel{
+    flex:1 1 280px;
+    min-width:0;
+    background:var(--bg);
+    border:2px solid var(--black);
+    padding:18px;
+  }
+
+  .ana-panel-title{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1.2px;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+
+  .ana-total-line{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    gap:10px;
+    padding-bottom:14px;
+    margin-bottom:14px;
+    border-bottom:2px solid var(--black);
+  }
+
+  .ana-total-value{
+    font-family:'Space Mono', monospace;
+    font-size:28px;
+    font-weight:700;
+    color:var(--black);
+  }
+
+  .ana-total-label{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .ana-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .ana-row-label{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--black);
+    width:120px;
+    flex-shrink:0;
+  }
+
+  .ana-row-track{
+    display:block;
+    flex:1 1 90px;
+    height:16px;
+    background:var(--white);
+    border:1px solid var(--line);
+  }
+
+  .ana-row-fill{
+    display:block;
+    height:100%;
+    width:0;
+    background:var(--red);
+  }
+
+  .ana-row-value{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--black);
+    width:96px;
+    text-align:right;
+    flex-shrink:0;
+  }
+
+  .ana-row-pct{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    width:48px;
+    text-align:right;
+    flex-shrink:0;
+  }
+
+  .ana-rank{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .ana-rank:last-child{
+    border-bottom:none;
+  }
+
+  .ana-rank-pos{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--red);
+    width:22px;
+    flex-shrink:0;
+  }
+
+  .ana-rank-nome{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--black);
+    flex:1 1 120px;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .ana-rank-valor{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    color:var(--black);
+    flex-shrink:0;
+  }
+
+  .ana-bars{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:14px;
+  }
+
+  .ana-bar{
+    flex:1 1 80px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+
+  .ana-bar-value{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--black);
+  }
+
+  .ana-bar-track{
+    width:100%;
+    height:130px;
+    display:flex;
+    align-items:flex-end;
+    background:var(--white);
+    border:1px solid var(--line);
+  }
+
+  .ana-bar-fill{
+    width:100%;
+    background:var(--red);
+    min-height:2px;
+  }
+
+  .ana-bar-fill.ana-bar-atual{
+    background:var(--black);
+  }
+
+  .ana-bar-label{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .ana-note{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin:14px 0 0;
+  }
+
   .tes-empty{
     font-family:'Space Mono', monospace;
     font-size:13px;
@@ -2258,6 +2458,33 @@
       <div id="tesCompromissosLista"></div>
     </div>
   </details>
+
+  <details class="tes-details" id="tesAnaliseDetails">
+    <summary>Análise</summary>
+    <div class="tes-details-body">
+      <div class="ana-grid">
+        <div class="ana-panel">
+          <p class="ana-panel-title">Pago por categoria — <span id="anaMesLabel">—</span></p>
+          <div class="ana-total-line">
+            <span class="ana-total-value" id="anaTotalPeriodo">0.00€</span>
+            <span class="ana-total-label">Total pago no período</span>
+          </div>
+          <div id="anaCategorias"></div>
+          <p class="ana-note" id="anaNotaSemData" style="display:none;"></p>
+        </div>
+
+        <div class="ana-panel">
+          <p class="ana-panel-title">Top 5 saídas — <span id="anaTopMesLabel">—</span></p>
+          <div id="anaTop5"></div>
+        </div>
+      </div>
+
+      <div class="ana-panel">
+        <p class="ana-panel-title">Evolução do total pago — últimos 6 meses</p>
+        <div id="anaEvolucao"></div>
+      </div>
+    </div>
+  </details>
 </section>
 
 <!-- ============ Depósitos Bancários (detalhe) ============ -->
@@ -2460,6 +2687,10 @@ window.addEventListener('load', function () {
   // recorrente vive em compromissosFixos/{id}, mas não guarda instâncias
   // por período. Chave: {compromissoId}_{ano}-{mes}, ex. "renda_2026-8".
   var pagamentosConcluidosRef = db.ref('pagamentosConcluidos');
+  // Fornecedores — usado só pela secção Análise, para mapear o nome escrito
+  // na linha do pedido à categoria do fornecedor. Nome exato, sem fuzzy:
+  // as linhas são criadas a partir do próprio registo de suppliers/.
+  var suppliersRef = db.ref('suppliers');
 
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
@@ -2479,6 +2710,7 @@ window.addEventListener('load', function () {
   var allPaymentRequests = {};
   var allCompromissos = {};
   var allPagamentosConcluidos = {};
+  var allSuppliers = {};
 
   // Flags de carregamento partilhadas com a central de notificações,
   // declaradas aqui para não serem repostas por declarações posteriores.
@@ -3646,6 +3878,241 @@ window.addEventListener('load', function () {
     renderTesPendentes();
   });
 
+  /* ---------- Análise (dentro da Tesouraria) ----------
+     Só olha para dinheiro que JÁ SAIU: linhas de paymentRequests com
+     concluidoEm, e ocorrências em pagamentosConcluidos. Nada aqui altera
+     dados — é leitura pura sobre os nodes existentes. */
+
+  var anaMesLabel = document.getElementById('anaMesLabel');
+  var anaTopMesLabel = document.getElementById('anaTopMesLabel');
+  var anaTotalPeriodo = document.getElementById('anaTotalPeriodo');
+  var anaCategoriasEl = document.getElementById('anaCategorias');
+  var anaTop5El = document.getElementById('anaTop5');
+  var anaEvolucaoEl = document.getElementById('anaEvolucao');
+  var anaNotaSemData = document.getElementById('anaNotaSemData');
+
+  // Ordem fixa de apresentação, usada como desempate para buckets com o
+  // mesmo valor — evita que a lista salte entre renders quando empatam.
+  var ANA_BUCKETS = ['Food & Beverage', 'Packaging', 'Serviços', 'Pessoal', 'Espaço', 'Utilities', 'Estado', 'Outros'];
+
+  // Índice nome→categoria de suppliers/, reconstruído quando o node muda.
+  var anaSupplierIndex = null;
+
+  function anaIndexarSuppliers(){
+    anaSupplierIndex = {};
+    Object.keys(allSuppliers).forEach(function(id){
+      var s = allSuppliers[id];
+      if (!s || !s.nome) return;
+      var cats = s.categoria;
+      if (!cats) cats = [];
+      if (!Array.isArray(cats)) cats = Object.keys(cats).map(function(k){ return cats[k]; });
+      anaSupplierIndex[String(s.nome).trim()] = cats;
+    });
+  }
+
+  // Fornecedor → bucket. Alimentar e Bebidas colapsam num único bucket, por
+  // isso um fornecedor ["Alimentar","Bebidas"] conta UMA vez em F&B. A
+  // ordem dos ifs é a precedência: F&B > Packaging > Serviços.
+  function anaBucketFornecedor(nomeFornecedor){
+    if (anaSupplierIndex === null) anaIndexarSuppliers();
+    var cats = anaSupplierIndex[String(nomeFornecedor == null ? '' : nomeFornecedor).trim()];
+    if (!cats || !cats.length) return 'Outros'; // avulsos e nomes livres
+    if (cats.indexOf('Alimentar') !== -1 || cats.indexOf('Bebidas') !== -1) return 'Food & Beverage';
+    if (cats.indexOf('Packaging') !== -1) return 'Packaging';
+    if (cats.indexOf('Serviços') !== -1) return 'Serviços';
+    return 'Outros';
+  }
+
+  // Compromisso fixo → bucket. 'Serviços' cai no mesmo bucket que os
+  // fornecedores de serviços, de propósito: somam juntos.
+  function anaBucketCompromisso(categoria){
+    switch (categoria) {
+      case 'Espaço':    return 'Espaço';
+      case 'Utilities': return 'Utilities';
+      case 'Pessoal':   return 'Pessoal';
+      case 'Estado':    return 'Estado';
+      case 'Serviços':  return 'Serviços';
+      default:          return 'Outros';
+    }
+  }
+
+  // A chave de pagamentosConcluidos é {compromissoId}_{ano}-{mes} e o id
+  // pode ele próprio conter '_' (push ids, ex. "-Oz7_9bbHmqmRKcadnm1"),
+  // por isso corta-se no ÚLTIMO underscore.
+  function anaParseChaveConcluido(chave){
+    var i = String(chave).lastIndexOf('_');
+    if (i === -1) return null;
+    var id = String(chave).slice(0, i);
+    var periodo = String(chave).slice(i + 1).split('-');
+    if (periodo.length !== 2) return null;
+    var ano = parseInt(periodo[0], 10);
+    var mes = parseInt(periodo[1], 10);
+    if (isNaN(ano) || isNaN(mes)) return null;
+    return { id: id, ano: ano, mes: mes };
+  }
+
+  // Todos os pagamentos efetivamente saídos num mês, das duas fontes, já
+  // com bucket atribuído. Cada linha/ocorrência entra exatamente uma vez.
+  function anaPagamentosDoMes(ano, mes){
+    var out = [];
+
+    Object.keys(allPaymentRequests).forEach(function(pedidoId){
+      var p = allPaymentRequests[pedidoId];
+      if (!p || (p.status || 'pendente') === 'anulado') return;
+      (p.lines || []).forEach(function(l){
+        if (!l || !l.concluidoEm) return;
+        var d = new Date(l.concluidoEm);
+        if (d.getFullYear() !== ano || d.getMonth() + 1 !== mes) return;
+        out.push({
+          nome: l.fornecedor || '(sem nome)',
+          montante: parseMontante(l.montante),
+          bucket: anaBucketFornecedor(l.fornecedor)
+        });
+      });
+    });
+
+    Object.keys(allPagamentosConcluidos).forEach(function(chave){
+      var parsed = anaParseChaveConcluido(chave);
+      if (!parsed || parsed.ano !== ano || parsed.mes !== mes) return;
+      var c = allCompromissos[parsed.id];
+      if (!c) return; // compromisso apagado: sem valor, não dá para contar
+      out.push({
+        nome: c.nome || parsed.id,
+        montante: parseMontante(c.valor),
+        bucket: anaBucketCompromisso(c.categoria)
+      });
+    });
+
+    return out;
+  }
+
+  function anaTotalDoMes(ano, mes){
+    return anaPagamentosDoMes(ano, mes).reduce(function(acc, it){ return acc + it.montante; }, 0);
+  }
+
+  // Linhas fechadas antes de concluidoEm existir: não há como as colocar
+  // num mês, ficam de fora e só contam para a nota de rodapé.
+  function anaLinhasSemData(){
+    var n = 0;
+    Object.keys(allPaymentRequests).forEach(function(pedidoId){
+      var p = allPaymentRequests[pedidoId];
+      if (!p || (p.status || 'pendente') === 'anulado') return;
+      (p.lines || []).forEach(function(l){
+        if (!l) return;
+        if (lineStatus(p, l) === 'concluido' && !l.concluidoEm) n++;
+      });
+    });
+    return n;
+  }
+
+  function renderAnaliseCategorias(pagamentos){
+    var totais = {};
+    pagamentos.forEach(function(it){
+      totais[it.bucket] = (totais[it.bucket] || 0) + it.montante;
+    });
+
+    var total = 0;
+    Object.keys(totais).forEach(function(b){ total += totais[b]; });
+    anaTotalPeriodo.textContent = formatEuro(total);
+
+    var linhas = Object.keys(totais).filter(function(b){ return totais[b] > 0; });
+    linhas.sort(function(a, b){
+      if (totais[b] !== totais[a]) return totais[b] - totais[a];
+      return ANA_BUCKETS.indexOf(a) - ANA_BUCKETS.indexOf(b);
+    });
+
+    if (!linhas.length){
+      anaCategoriasEl.innerHTML = '<p class="tes-empty">Sem pagamentos registados neste mês.</p>';
+      return;
+    }
+
+    var max = totais[linhas[0]];
+    anaCategoriasEl.innerHTML = linhas.map(function(b){
+      var v = totais[b];
+      var pct = max > 0 ? (v / max) * 100 : 0;
+      var share = total > 0 ? (v / total) * 100 : 0;
+      return '<div class="ana-row">' +
+        '<span class="ana-row-label">' + escapeHtml(b) + '</span>' +
+        '<span class="ana-row-track"><span class="ana-row-fill" style="width:' + pct.toFixed(1) + '%;"></span></span>' +
+        '<span class="ana-row-value">' + formatEuro(v) + '</span>' +
+        '<span class="ana-row-pct">' + share.toFixed(0) + '%</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Fornecedores e compromissos no mesmo ranking: o objetivo é ver as
+  // maiores saídas reais, e a renda ou um salário pesam mais do que
+  // qualquer fornecedor.
+  function renderAnaliseTop5(pagamentos){
+    var porNome = {};
+    pagamentos.forEach(function(it){
+      porNome[it.nome] = (porNome[it.nome] || 0) + it.montante;
+    });
+
+    var nomes = Object.keys(porNome).filter(function(n){ return porNome[n] > 0; });
+    nomes.sort(function(a, b){ return porNome[b] - porNome[a]; });
+    nomes = nomes.slice(0, 5);
+
+    if (!nomes.length){
+      anaTop5El.innerHTML = '<p class="tes-empty">Sem pagamentos registados neste mês.</p>';
+      return;
+    }
+
+    anaTop5El.innerHTML = nomes.map(function(n, i){
+      return '<div class="ana-rank">' +
+        '<span class="ana-rank-pos">' + (i + 1) + '.</span>' +
+        '<span class="ana-rank-nome">' + escapeHtml(n) + '</span>' +
+        '<span class="ana-rank-valor">' + formatEuro(porNome[n]) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Seis meses a terminar no mês selecionado — a janela acompanha o
+  // navegador mensal em vez de estar presa ao mês corrente.
+  function renderAnaliseEvolucao(){
+    var meses = [];
+    var i;
+    for (i = 5; i >= 0; i--){
+      var d = new Date(anoAtivo, mesAtivo - 1 - i, 1);
+      var ano = d.getFullYear();
+      var mes = d.getMonth() + 1;
+      meses.push({ ano: ano, mes: mes, total: anaTotalDoMes(ano, mes) });
+    }
+
+    var max = meses.reduce(function(m, x){ return x.total > m ? x.total : m; }, 0);
+
+    anaEvolucaoEl.innerHTML = '<div class="ana-bars">' + meses.map(function(m){
+      var h = max > 0 ? (m.total / max) * 100 : 0;
+      var atual = (m.ano === anoAtivo && m.mes === mesAtivo) ? ' ana-bar-atual' : '';
+      return '<div class="ana-bar">' +
+        '<span class="ana-bar-value">' + formatEuro(m.total) + '</span>' +
+        '<span class="ana-bar-track"><span class="ana-bar-fill' + atual + '" style="height:' + h.toFixed(1) + '%;"></span></span>' +
+        '<span class="ana-bar-label">' + MESES_PT[m.mes - 1].slice(0, 3) + ' ' + String(m.ano).slice(2) + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  function renderAnalise(){
+    var label = MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
+    anaMesLabel.textContent = label;
+    anaTopMesLabel.textContent = label;
+
+    var pagamentos = anaPagamentosDoMes(anoAtivo, mesAtivo);
+    renderAnaliseCategorias(pagamentos);
+    renderAnaliseTop5(pagamentos);
+    renderAnaliseEvolucao();
+
+    var semData = anaLinhasSemData();
+    if (semData > 0){
+      anaNotaSemData.textContent = semData + (semData === 1
+        ? ' pagamento antigo sem data não incluído'
+        : ' pagamentos antigos sem data não incluídos');
+      anaNotaSemData.style.display = '';
+    } else {
+      anaNotaSemData.style.display = 'none';
+    }
+  }
+
   function renderTesouraria(){
     var itens = itensDoMes(anoAtivo, mesAtivo);
     itensTesourariaAtual = itens;
@@ -3656,6 +4123,7 @@ window.addEventListener('load', function () {
     renderTesDiaDetalhe(itens);
     renderTesPendentes();
     renderCompromissos();
+    renderAnalise();
   }
 
   function mudarMes(delta){
@@ -3935,6 +4403,14 @@ window.addEventListener('load', function () {
     allPagamentosConcluidos = snapshot.val() || {};
     renderTesouraria();
     if (pagamentosCarregados) renderPagamentosCard();
+  });
+
+  // suppliers/ só alimenta a categorização da Análise — nenhuma outra
+  // parte do dashboard depende dele, por isso basta reindexar e redesenhar.
+  suppliersRef.on('value', function(snapshot){
+    allSuppliers = snapshot.val() || {};
+    anaSupplierIndex = null;
+    renderAnalise();
   });
 
   tabsEl.addEventListener('click', function (e) {
