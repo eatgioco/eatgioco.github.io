@@ -1075,6 +1075,100 @@
     background:var(--black);
     border-color:var(--black);
   }
+
+  /* ---------- Compras Físicas ---------- */
+  .gioco-tabs{
+    display:flex;
+    gap:4px;
+    margin-bottom:-2px;
+    position:relative;
+    z-index:1;
+  }
+  .gioco-tab{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    padding:10px 20px 8px;
+    margin-top:6px;
+    border:2px solid var(--black);
+    border-bottom:none;
+    background:var(--line);
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .gioco-tab.active{
+    background:var(--white);
+    color:var(--black);
+    margin-top:0;
+    padding-top:14px;
+  }
+  .gioco-tab-panel{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+  }
+  .cf-add-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .cf-add-row input[type="text"]{
+    flex:1;
+    min-width:180px;
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+  }
+  .cf-add-row select{
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+  }
+  .cf-add-btn{ width:auto; padding:10px 18px; }
+  .cf-counter{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    margin:0 0 10px;
+  }
+  .cf-item-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  .cf-item-row input[type="checkbox"]{
+    width:18px; height:18px; flex-shrink:0; accent-color:var(--red);
+  }
+  .cf-item-nome{ flex:1; font-size:14px; }
+  .cf-item-nome.checked{ text-decoration:line-through; color:var(--muted); }
+  .cf-item-loja{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    border:1.5px solid var(--line);
+    padding:2px 6px;
+    white-space:nowrap;
+  }
+  .cf-item-remove{
+    background:none; border:none; color:var(--muted);
+    font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0;
+  }
+  .cf-item-remove:hover{ color:var(--red); }
+  .cf-empty{
+    padding:20px 4px; font-family:'Space Mono', monospace;
+    font-size:12px; color:var(--muted); text-align:center;
+  }
 </style>
 </head>
 <body>
@@ -1297,6 +1391,30 @@
     </div>
     </div>
   </div>
+
+  <div class="section" id="compras-fisicas-section">
+    <p class="section-title">Compras Físicas</p>
+
+    <div class="gioco-tabs" id="cfTabs">
+      <button type="button" class="gioco-tab active" data-cat="Food">Food</button>
+      <button type="button" class="gioco-tab" data-cat="Não-Food">Não-Food</button>
+    </div>
+
+    <div class="gioco-tab-panel">
+      <div class="cf-add-row">
+        <input type="text" id="cfNome" placeholder="O que precisas de comprar?">
+        <select id="cfLoja">
+          <option value="Supermercado">Supermercado</option>
+          <option value="Cash &amp; Carry">Cash &amp; Carry</option>
+          <option value="Loja de Materiais">Loja de Materiais</option>
+        </select>
+        <select id="cfPessoa" disabled><option>A carregar...</option></select>
+        <button type="button" class="btn-registar cf-add-btn" id="cfAddBtn">+ Adicionar</button>
+      </div>
+      <p class="cf-counter" id="cfCounter"></p>
+      <div id="cfList"></div>
+    </div>
+  </div>
 </main>
 
 <div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox()">
@@ -1406,6 +1524,121 @@
       pessoaNome: found ? found.nome : 'Outro'
     };
   }
+
+  var comprasFisicasRef = db.ref('comprasFisicas');
+  var allComprasFisicas = {};
+  var cfActiveCat = 'Food';
+
+  comprasFisicasRef.on('value', function(snapshot){
+    allComprasFisicas = snapshot.val() || {};
+    renderComprasFisicas();
+  });
+
+  document.getElementById('cfTabs').addEventListener('click', function(e){
+    var btn = e.target.closest('.gioco-tab');
+    if(!btn) return;
+    cfActiveCat = btn.dataset.cat;
+    document.querySelectorAll('#cfTabs .gioco-tab').forEach(function(b){
+      b.classList.toggle('active', b === btn);
+    });
+    renderComprasFisicas();
+  });
+
+  function renderComprasFisicas(){
+    var cfPessoaEl = document.getElementById('cfPessoa');
+    var pessoaEscolhida = cfPessoaEl.value;
+    popularSelectPessoas(cfPessoaEl);
+    if (pessoaEscolhida && cfPessoaEl.querySelector('option[value="' + pessoaEscolhida + '"]')){
+      cfPessoaEl.value = pessoaEscolhida;
+    }
+
+    var itens = Object.keys(allComprasFisicas)
+      .map(function(id){ return Object.assign({ id: id }, allComprasFisicas[id]); })
+      .filter(function(i){ return i.categoria === cfActiveCat; })
+      .sort(function(a, b){
+        if (!!a.comprado !== !!b.comprado) return a.comprado ? 1 : -1;
+        return (b.adicionadoEm || '').localeCompare(a.adicionadoEm || '');
+      });
+
+    document.getElementById('cfCounter').textContent =
+      itens.filter(function(i){ return !i.comprado; }).length + ' por comprar';
+
+    if (!itens.length){
+      document.getElementById('cfList').innerHTML = '<p class="cf-empty">Lista vazia.</p>';
+      return;
+    }
+
+    var html = '';
+    itens.forEach(function(i){
+      html += '<div class="cf-item-row">';
+      html += '  <input type="checkbox" ' + (i.comprado ? 'checked' : '') + ' onchange="toggleCompraFisica(\'' + i.id + '\',' + (!!i.comprado) + ')">';
+      html += '  <span class="cf-item-nome' + (i.comprado ? ' checked' : '') + '">' + escapeHtml(i.nome) + '</span>';
+      html += '  <span class="cf-item-loja">' + escapeHtml(i.loja || '') + '</span>';
+      html += '  <button type="button" class="cf-item-remove" onclick="removerCompraFisica(\'' + i.id + '\')">✕</button>';
+      html += '</div>';
+    });
+    document.getElementById('cfList').innerHTML = html;
+  }
+  window.renderComprasFisicas = renderComprasFisicas;
+
+  function toggleCompraFisica(id, estavaComprado){
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('cfPessoa'));
+    var itemRef = comprasFisicasRef.child(id);
+    var campos;
+    if (!estavaComprado){
+      campos = [
+        ['compradoPor', pessoaSelecao.pessoaNome],
+        ['compradoPorId', pessoaSelecao.pessoaId],
+        ['compradoEm', new Date().toISOString()],
+        ['comprado', true]
+      ];
+    } else {
+      campos = [
+        ['compradoPor', null],
+        ['compradoPorId', null],
+        ['compradoEm', null],
+        ['comprado', false]
+      ];
+    }
+    // escritas uma a uma: update() multi-chave no RTDB do GIOCO nao e de confianca
+    (function escreverProximo(idx){
+      if (idx >= campos.length) return;
+      itemRef.child(campos[idx][0]).set(campos[idx][1]).then(function(){
+        escreverProximo(idx + 1);
+      });
+    })(0);
+  }
+  window.toggleCompraFisica = toggleCompraFisica;
+
+  function removerCompraFisica(id){
+    if (!confirm('Remover este item da lista?')) return;
+    comprasFisicasRef.child(id).remove();
+  }
+  window.removerCompraFisica = removerCompraFisica;
+
+  document.getElementById('cfAddBtn').addEventListener('click', function(){
+    var nomeEl = document.getElementById('cfNome');
+    var nome = nomeEl.value.trim();
+    if (!nome){ nomeEl.focus(); return; }
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('cfPessoa'));
+    comprasFisicasRef.push({
+      nome: nome,
+      categoria: cfActiveCat,
+      loja: document.getElementById('cfLoja').value,
+      adicionadoPor: pessoaSelecao.pessoaNome,
+      adicionadoPorId: pessoaSelecao.pessoaId,
+      adicionadoEm: new Date().toISOString(),
+      comprado: false,
+      compradoPor: null,
+      compradoPorId: null,
+      compradoEm: null
+    });
+    nomeEl.value = '';
+    nomeEl.focus();
+  });
+  document.getElementById('cfNome').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') document.getElementById('cfAddBtn').click();
+  });
 
   var equipamentosRef = db.ref('equipamentos');
   var equipamentos = {};
@@ -2219,6 +2452,7 @@
   carregarPessoas(function(){
     popularSelectPessoas(document.getElementById('temp-pessoa'));
     popularSelectPessoas(document.getElementById('pedido-pessoa'));
+    renderComprasFisicas();
     renderChecklists();
   });
 
