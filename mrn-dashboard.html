@@ -1925,6 +1925,15 @@
     align-items:center;
     gap:10px;
     margin-bottom:10px;
+    cursor:pointer;
+  }
+
+  .ana-row.ana-row-open{
+    margin-bottom:6px;
+  }
+
+  .ana-row:hover .ana-row-label{
+    color:var(--red);
   }
 
   .ana-row-label{
@@ -1968,6 +1977,75 @@
     color:var(--muted);
     width:48px;
     text-align:right;
+    flex-shrink:0;
+  }
+
+  .ana-drill{
+    border-left:2px solid var(--red);
+    background:var(--white);
+    padding:10px 12px;
+    margin:0 0 14px;
+  }
+
+  .ana-drill-item,
+  .ana-drill-total{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    gap:10px;
+    padding:6px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .ana-drill-item:last-of-type{
+    border-bottom:none;
+  }
+
+  .ana-drill-total{
+    border-bottom:none;
+    border-top:2px solid var(--black);
+    margin-top:4px;
+    padding-top:8px;
+  }
+
+  .ana-drill-data{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    width:74px;
+    flex-shrink:0;
+  }
+
+  .ana-drill-nome{
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    color:var(--black);
+    flex:1 1 120px;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .ana-drill-total .ana-drill-nome{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+  }
+
+  .ana-drill-ref{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .ana-drill-valor{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--black);
     flex-shrink:0;
   }
 
@@ -3898,6 +3976,10 @@ window.addEventListener('load', function () {
   // Índice nome→categoria de suppliers/, reconstruído quando o node muda.
   var anaSupplierIndex = null;
 
+  // Bucket com a discriminação aberta, ou null. Só um de cada vez, como na
+  // lista detalhada da Tesouraria.
+  var anaCatAberta = null;
+
   function anaIndexarSuppliers(){
     anaSupplierIndex = {};
     Object.keys(allSuppliers).forEach(function(id){
@@ -3966,7 +4048,10 @@ window.addEventListener('load', function () {
         out.push({
           nome: l.fornecedor || '(sem nome)',
           montante: parseMontante(l.montante),
-          bucket: anaBucketFornecedor(l.fornecedor)
+          bucket: anaBucketFornecedor(l.fornecedor),
+          data: l.concluidoEm,
+          detalhe: l.referencia || '',
+          fonte: 'pedido'
         });
       });
     });
@@ -3976,10 +4061,14 @@ window.addEventListener('load', function () {
       if (!parsed || parsed.ano !== ano || parsed.mes !== mes) return;
       var c = allCompromissos[parsed.id];
       if (!c) return; // compromisso apagado: sem valor, não dá para contar
+      var reg = allPagamentosConcluidos[chave];
       out.push({
         nome: c.nome || parsed.id,
         montante: parseMontante(c.valor),
-        bucket: anaBucketCompromisso(c.categoria)
+        bucket: anaBucketCompromisso(c.categoria),
+        data: reg && reg.concluidoEm ? reg.concluidoEm : null,
+        detalhe: 'Compromisso fixo',
+        fonte: 'fixo'
       });
     });
 
@@ -4026,18 +4115,49 @@ window.addEventListener('load', function () {
       return;
     }
 
+    // A categoria escolhida é pegajosa entre meses: se não existir no mês
+    // seguinte não se desenha drill nenhum, mas ao voltar atrás reabre —
+    // navegar no tempo não deve custar o sítio onde se estava a olhar.
     var max = totais[linhas[0]];
     anaCategoriasEl.innerHTML = linhas.map(function(b){
       var v = totais[b];
       var pct = max > 0 ? (v / max) * 100 : 0;
       var share = total > 0 ? (v / total) * 100 : 0;
-      return '<div class="ana-row">' +
-        '<span class="ana-row-label">' + escapeHtml(b) + '</span>' +
+      var aberta = (anaCatAberta === b);
+      return '<div class="ana-row' + (aberta ? ' ana-row-open' : '') + '" data-bucket="' + escapeHtml(b) + '">' +
+        '<span class="ana-row-label">' + (aberta ? '▾ ' : '▸ ') + escapeHtml(b) + '</span>' +
         '<span class="ana-row-track"><span class="ana-row-fill" style="width:' + pct.toFixed(1) + '%;"></span></span>' +
         '<span class="ana-row-value">' + formatEuro(v) + '</span>' +
         '<span class="ana-row-pct">' + share.toFixed(0) + '%</span>' +
-        '</div>';
+        '</div>' +
+        (aberta ? renderAnaliseDrill(pagamentos, b, v) : '');
     }).join('');
+  }
+
+  // Discriminação de uma categoria: os pagamentos individuais que perfazem
+  // o total da barra, do maior para o menor. Cada item é uma linha de
+  // pedido ou uma ocorrência de compromisso — os mesmos objetos que
+  // somaram para o total, por isso o rodapé fecha sempre com a barra.
+  function renderAnaliseDrill(pagamentos, bucket, totalBucket){
+    var itens = pagamentos.filter(function(it){ return it.bucket === bucket; });
+    itens.sort(function(a, b){ return b.montante - a.montante; });
+
+    if (!itens.length) return '';
+
+    return '<div class="ana-drill">' + itens.map(function(it){
+      var data = it.data ? formatDateDDMMYYYY(new Date(it.data)) : '—';
+      return '<div class="ana-drill-item">' +
+        '<span class="ana-drill-data">' + data + '</span>' +
+        '<span class="ana-drill-nome">' + escapeHtml(it.nome) +
+          (it.detalhe ? '<span class="ana-drill-ref">' + escapeHtml(it.detalhe) + '</span>' : '') +
+        '</span>' +
+        '<span class="ana-drill-valor">' + formatEuro(it.montante) + '</span>' +
+        '</div>';
+    }).join('') +
+    '<div class="ana-drill-total">' +
+      '<span class="ana-drill-nome">' + itens.length + (itens.length === 1 ? ' pagamento' : ' pagamentos') + '</span>' +
+      '<span class="ana-drill-valor">' + formatEuro(totalBucket) + '</span>' +
+    '</div></div>';
   }
 
   // Fornecedores e compromissos no mesmo ranking: o objetivo é ver as
@@ -4112,6 +4232,14 @@ window.addEventListener('load', function () {
       anaNotaSemData.style.display = 'none';
     }
   }
+
+  anaCategoriasEl.addEventListener('click', function(e){
+    var row = e.target.closest('.ana-row');
+    if (!row) return;
+    var bucket = row.getAttribute('data-bucket');
+    anaCatAberta = (anaCatAberta === bucket) ? null : bucket;
+    renderAnalise();
+  });
 
   function renderTesouraria(){
     var itens = itensDoMes(anoAtivo, mesAtivo);
