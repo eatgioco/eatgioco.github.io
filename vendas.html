@@ -602,7 +602,8 @@
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  // As chaves do Firebase não aceitem . # $ / [ ]
+  // As chaves do Firebase não aceitam . # $ / [ ] — a conversão é feita uma só vez,
+  // no parse, e é essa chave que serve para gravar e para consultar o catálogo.
   function keyFor(code){
     var k = String(code == null ? '' : code).trim().replace(/[.#$/\[\]]/g, '_');
     return k === '' ? 'SEM_CODIGO' : k;
@@ -786,18 +787,26 @@
 
     var meses = {};
     var anuladas = 0;
+    var anuladasPorMes = {};
     var total = invoices.length;
 
     for (var i = 0; i < total; i++){
       var inv = invoices[i];
 
-      var status = kid(inv, 'DocumentStatus');
-      var invStatus = status ? txt(status, 'InvoiceStatus') : '';
-      if (invStatus === 'A'){ anuladas++; continue; }
-
       var invoiceType = txt(inv, 'InvoiceType') || 'OU';
       var invoiceDate = txt(inv, 'InvoiceDate');
       var systemEntry = txt(inv, 'SystemEntryDate');
+
+      var status = kid(inv, 'DocumentStatus');
+      var invStatus = status ? txt(status, 'InvoiceStatus') : '';
+      if (invStatus === 'A'){
+        anuladas++;
+        var mesAnulada = (invoiceDate || systemEntry.slice(0, 10)).slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(mesAnulada)){
+          anuladasPorMes[mesAnulada] = (anuladasPorMes[mesAnulada] || 0) + 1;
+        }
+        continue;
+      }
 
       var dia = (invoiceDate || systemEntry.slice(0, 10)).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) continue;
@@ -893,7 +902,8 @@
       throw new Error('Não foi possível agregar nenhuma fatura (todas anuladas ou sem data válida).');
     }
 
-    return { meses: meses, anuladas: anuladas, totalFaturas: total, header: headerInfo };
+    return { meses: meses, anuladas: anuladas, anuladasPorMes: anuladasPorMes,
+             totalFaturas: total, header: headerInfo };
   }
 
   /* =========================================================
@@ -1247,6 +1257,7 @@
         estado.pendente = {
           meses: parsed.meses,
           anuladas: parsed.anuladas,
+          anuladasPorMes: parsed.anuladasPorMes,
           header: parsed.header,
           ficheiro: file.name,
           novos: novos
@@ -1262,9 +1273,13 @@
           mesesLista.map(nomeMes).join(', ') + '.');
 
         if (parsed.anuladas > 0){
+          var detalhe = Object.keys(parsed.anuladasPorMes).sort().map(function(mes){
+            return nomeMes(mes) + ': ' + intFmt(parsed.anuladasPorMes[mes]);
+          }).join(' · ');
           mostrarMsg('msgAviso',
             'Excluídas ' + intFmt(parsed.anuladas) + ' fatura' + (parsed.anuladas === 1 ? '' : 's') +
-            ' anulada' + (parsed.anuladas === 1 ? '' : 's') + ' (InvoiceStatus = A). Não contam para nenhum total.');
+            ' anulada' + (parsed.anuladas === 1 ? '' : 's') + ' (InvoiceStatus = A) — ' + detalhe +
+            '. Não contam para nenhum total.');
         }
 
         if (novos.length){
