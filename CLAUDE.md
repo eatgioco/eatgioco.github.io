@@ -53,7 +53,9 @@ ferias                — períodos de férias por pessoa
 fechados              — loja encerrada por data: { diaTodo, turnos:{t1,t3,t2} }
 notificacoes          — central de notificações (lida: bool, tipo, criadoEm)
 tasks                 — tarefas do dashboard
-compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância
+compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância;
+                         com valorDiario preenchido o montante é calculado por mês
+                         (dias úteis seg-sex × valorDiario) e o campo valor é ignorado
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 ```

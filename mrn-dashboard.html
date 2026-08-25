@@ -1850,9 +1850,16 @@
   .tes-comp-valor{
     font-family:'Space Mono', monospace;
     font-weight:700;
-    width:100px;
+    width:150px;
     flex-shrink:0;
     text-align:right;
+  }
+
+  .tes-comp-calc{
+    display:block;
+    font-size:10px;
+    font-weight:400;
+    color:var(--muted);
   }
 
   .tes-comp-inativo-tag{
@@ -2653,6 +2660,11 @@
       <div class="field">
         <label class="field-label">Valor (€)</label>
         <input type="number" id="cfValor" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label class="field-label">Valor diário (€)</label>
+        <input type="number" id="cfValorDiario" min="0" step="0.01">
+        <span class="field-hint">Opcional, para valores tipo subsídio de refeição calculados por dias úteis do mês. Preenchido, substitui o «Valor (€)».</span>
       </div>
       <div class="field">
         <label class="field-label">Periodicidade</label>
@@ -3638,6 +3650,32 @@ window.addEventListener('load', function () {
     return new Date(ano, mes, 0).getDate();
   }
 
+  // Dias de segunda a sexta do mês. Não exclui feriados — é a base de
+  // cálculo de compromissos tipo subsídio de refeição, que variam com o
+  // número de dias úteis e por isso não podem ter um valor fixo no registo.
+  function diasUteis(ano, mes){
+    var total = 0;
+    var nd = diasNoMes(ano, mes);
+    for (var d = 1; d <= nd; d++){
+      var dow = new Date(ano, mes - 1, d).getDay();
+      if (dow >= 1 && dow <= 5) total++;
+    }
+    return total;
+  }
+
+  // Valor de um compromisso num mês concreto. Com 'valorDiario' preenchido
+  // o valor é calculado (dias úteis × valor diário) e o campo 'valor' é
+  // ignorado; sem ele, comporta-se como sempre e usa 'valor'. Ponto único
+  // de leitura do montante de um compromisso.
+  function valorCompromisso(c, ano, mes){
+    if (!c) return 0;
+    var diario = parseMontante(c.valorDiario);
+    if (c.valorDiario !== undefined && c.valorDiario !== null && c.valorDiario !== '' && diario > 0){
+      return diasUteis(ano, mes) * diario;
+    }
+    return parseMontante(c.valor);
+  }
+
   // Firebase devolve arrays contíguos como array, mas com buracos devolve
   // um objeto indexado — daí normalizar sempre antes de usar.
   function mesesArray(m){
@@ -3678,7 +3716,7 @@ window.addEventListener('load', function () {
         id: id,
         nome: c.nome || id,
         categoria: c.categoria || 'Outros',
-        montante: parseMontante(c.valor),
+        montante: valorCompromisso(c, ano, mes),
         dia: dia
       });
     });
@@ -4064,7 +4102,7 @@ window.addEventListener('load', function () {
       var reg = allPagamentosConcluidos[chave];
       out.push({
         nome: c.nome || parsed.id,
-        montante: parseMontante(c.valor),
+        montante: valorCompromisso(c, parsed.ano, parsed.mes),
         bucket: anaBucketCompromisso(c.categoria),
         data: reg && reg.concluidoEm ? reg.concluidoEm : null,
         detalhe: 'Compromisso fixo',
@@ -4304,10 +4342,11 @@ window.addEventListener('load', function () {
     return (c && c.tipo) || 'fixo';
   }
 
-  function equivalenteMensal(c){
+  function equivalenteMensal(c, ano, mes){
+    var valor = valorCompromisso(c, ano, mes);
     var ocorrencias = OCORRENCIAS_POR_ANO[c.periodicidade];
-    if (!ocorrencias) return parseMontante(c.valor); // periodicidade desconhecida: conta como está
-    return parseMontante(c.valor) * ocorrencias / 12;
+    if (!ocorrencias) return valor; // periodicidade desconhecida: conta como está
+    return valor * ocorrencias / 12;
   }
 
   // Só os ativos e do tipo 'fixo'. Os 'variavel' continuam a contar em
@@ -4318,7 +4357,9 @@ window.addEventListener('load', function () {
       .map(function(id){ return allCompromissos[id]; })
       .filter(function(c){ return c && c.ativo && tipoDe(c) === 'fixo'; });
 
-    var total = incluidos.reduce(function(acc, c){ return acc + equivalenteMensal(c); }, 0);
+    var hoje = new Date();
+    var anoC = hoje.getFullYear(), mesC = hoje.getMonth() + 1;
+    var total = incluidos.reduce(function(acc, c){ return acc + equivalenteMensal(c, anoC, mesC); }, 0);
 
     var nVariaveis = Object.keys(allCompromissos).filter(function(id){
       var c = allCompromissos[id];
@@ -4357,6 +4398,9 @@ window.addEventListener('load', function () {
       return;
     }
 
+    var hojeC = new Date();
+    var anoC = hojeC.getFullYear(), mesC = hojeC.getMonth() + 1;
+
     var porCategoria = {};
     ids.forEach(function(id){
       var c = allCompromissos[id];
@@ -4386,7 +4430,10 @@ window.addEventListener('load', function () {
             (tipoDe(c) === 'variavel' ? '<span class="tes-comp-tipo-tag">variável</span>' : '') +
             (c.ativo ? '' : '<span class="tes-comp-inativo-tag">inativo</span>') + '</span>' +
             '<span class="tes-comp-meta">' + escapeHtml(descreveCompromisso(c)) + '</span>' +
-            '<span class="tes-comp-valor">' + formatEuro(parseMontante(c.valor)) + '</span>' +
+            '<span class="tes-comp-valor">' + formatEuro(valorCompromisso(c, anoC, mesC)) +
+              (parseMontante(c.valorDiario) > 0
+                ? '<span class="tes-comp-calc">' + diasUteis(anoC, mesC) + ' dias × ' + formatEuro(parseMontante(c.valorDiario)) + '</span>'
+                : '') + '</span>' +
             '<button type="button" class="btn-small btn-editar-comp" data-id="' + escapeHtml(c.id) + '">✎ Editar</button>' +
             '</div>';
         }).join('') +
@@ -4420,6 +4467,7 @@ window.addEventListener('load', function () {
     document.getElementById('cfNome').value = c.nome || '';
     document.getElementById('cfCategoria').value = c.categoria || 'Outros';
     document.getElementById('cfValor').value = (c.valor === undefined || c.valor === null) ? '' : c.valor;
+    document.getElementById('cfValorDiario').value = (c.valorDiario === undefined || c.valorDiario === null) ? '' : c.valorDiario;
     document.getElementById('cfPeriodicidade').value = c.periodicidade || 'mensal';
     document.getElementById('cfTipo').value = tipoDe(c);
     document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
@@ -4485,6 +4533,7 @@ window.addEventListener('load', function () {
     });
 
     var valorRaw = document.getElementById('cfValor').value.trim();
+    var valorDiarioRaw = document.getElementById('cfValorDiario').value.trim();
     var notas = document.getElementById('cfNotas').value.trim();
     var metodoPagamento = document.getElementById('cfMetodoPagamento').value;
     var ibanRaw = document.getElementById('cfIban').value.trim();
@@ -4500,6 +4549,11 @@ window.addEventListener('load', function () {
       metodoPagamento: metodoPagamento,
       ativo: document.getElementById('cfAtivo').checked
     };
+    // Só grava 'valorDiario' quando tem valor útil — assim os compromissos
+    // normais mantêm exactamente a forma que já tinham no nó.
+    if (valorDiarioRaw !== '' && parseMontante(valorDiarioRaw) > 0){
+      registo.valorDiario = parseMontante(valorDiarioRaw);
+    }
     if (notas) registo.notas = notas;
     if (metodoPagamento === 'iban' && ibanRaw) registo.iban = ibanRaw;
 
