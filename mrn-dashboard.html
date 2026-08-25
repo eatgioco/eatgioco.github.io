@@ -114,7 +114,7 @@
 
   .grid-quick{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
+    grid-template-columns:repeat(4, 1fr);
     gap:16px;
   }
 
@@ -244,6 +244,40 @@
   .status-badge-warning{
     background:var(--amber);
   }
+
+  /* Cartão Vendas (Vista Rápida) — números do mês mais recente importado */
+  .vendas-metrics{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:12px;
+  }
+
+  .vendas-metric{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .vendas-metric-label{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .vendas-metric-value{
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    line-height:1.1;
+  }
+
+  .vendas-metric-value.positiva{ color:var(--green); }
+  .vendas-metric-value.negativa{ color:var(--red); }
+
+  .vendas-oculto{ display:none; }
 
   .card-header-row{
     display:flex;
@@ -2297,6 +2331,27 @@
 
   <h2 class="section-heading">Vista Rápida</h2>
   <div class="grid-quick">
+    <a class="card card-compact card-vendas" id="cardVendas" href="vendas.html">
+      <div class="card-icon">📊</div>
+      <h3 class="card-title">Vendas</h3>
+      <p class="card-subtitle" id="cardVendasSubtitulo">A carregar…</p>
+      <div class="vendas-metrics vendas-oculto" id="cardVendasMetrics">
+        <div class="vendas-metric">
+          <span class="vendas-metric-label">Bruto</span>
+          <span class="vendas-metric-value" id="cardVendasBruto">—</span>
+        </div>
+        <div class="vendas-metric">
+          <span class="vendas-metric-label">Ticket</span>
+          <span class="vendas-metric-value" id="cardVendasTicket">—</span>
+        </div>
+        <div class="vendas-metric vendas-oculto" id="cardVendasVariacaoBloco">
+          <span class="vendas-metric-label">vs. mês ant.</span>
+          <span class="vendas-metric-value" id="cardVendasVariacao">—</span>
+        </div>
+      </div>
+      <span class="status-badge status-badge-warning vendas-oculto" id="cardVendasBadge">Em configuração</span>
+    </a>
+
     <div class="card card-compact card-calendario" id="cardCalendario">
       <div class="card-icon">📅</div>
       <h3 class="card-title">Calendário</h3>
@@ -5862,6 +5917,85 @@ window.addEventListener('load', function () {
   }
 
   calcularArmazenamento();
+
+  /* ================================================================
+     CARTÃO VENDAS (Vista Rápida)
+     Lê só vendas/{YYYY-MM}/resumo — nunca produtos, porDia, porHora
+     ou pares, que são pesados e não fazem falta aqui. Sonda os últimos
+     24 meses em paralelo e usa o mais recente que exista.
+     ================================================================ */
+  function carregarCartaoVendas() {
+    var subtituloEl = document.getElementById('cardVendasSubtitulo');
+    var metricsEl = document.getElementById('cardVendasMetrics');
+    var badgeEl = document.getElementById('cardVendasBadge');
+    var brutoEl = document.getElementById('cardVendasBruto');
+    var ticketEl = document.getElementById('cardVendasTicket');
+    var variacaoEl = document.getElementById('cardVendasVariacao');
+    var variacaoBlocoEl = document.getElementById('cardVendasVariacaoBloco');
+    if (!subtituloEl || !metricsEl) return;
+
+    function mostrarVazio() {
+      subtituloEl.textContent = 'Sem dados — importar SAF-T';
+      metricsEl.classList.add('vendas-oculto');
+      badgeEl.classList.remove('vendas-oculto');
+    }
+
+    function euros(n) {
+      return (Number(n) || 0).toLocaleString('pt-PT', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+      }) + ' €';
+    }
+
+    function nomeMesAno(chave) {
+      var partes = chave.split('-');
+      return MESES_PT[parseInt(partes[1], 10) - 1] + ' ' + partes[0];
+    }
+
+    // chaves dos últimos 24 meses, da mais recente para a mais antiga
+    var hoje = new Date();
+    var chaves = [];
+    for (var i = 0; i < 24; i++) {
+      var d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      var mes = d.getMonth() + 1;
+      chaves.push(d.getFullYear() + '-' + (mes < 10 ? '0' : '') + mes);
+    }
+
+    Promise.all(chaves.map(function (chave) {
+      return db.ref('vendas/' + chave + '/resumo').once('value')
+        .then(function (snap) { return snap.val(); })
+        .catch(function () { return null; });
+    })).then(function (resumos) {
+      var idx = -1;
+      for (var i = 0; i < resumos.length; i++) {
+        if (resumos[i] && typeof resumos[i].bruto === 'number') { idx = i; break; }
+      }
+      if (idx === -1) { mostrarVazio(); return; }
+
+      var actual = resumos[idx];
+      var anterior = resumos[idx + 1];
+
+      subtituloEl.textContent = nomeMesAno(chaves[idx]);
+      brutoEl.textContent = euros(actual.bruto);
+      ticketEl.textContent = euros(actual.ticket);
+
+      if (anterior && Number(anterior.bruto)) {
+        var variacao = (actual.bruto - anterior.bruto) / anterior.bruto * 100;
+        variacaoEl.textContent = (variacao > 0 ? '+' : '') +
+          variacao.toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        variacaoEl.classList.remove('positiva', 'negativa');
+        if (variacao > 0) variacaoEl.classList.add('positiva');
+        else if (variacao < 0) variacaoEl.classList.add('negativa');
+        variacaoBlocoEl.classList.remove('vendas-oculto');
+      } else {
+        variacaoBlocoEl.classList.add('vendas-oculto');
+      }
+
+      metricsEl.classList.remove('vendas-oculto');
+      badgeEl.classList.add('vendas-oculto');
+    }).catch(mostrarVazio);
+  }
+
+  carregarCartaoVendas();
 
 });
 </script>
