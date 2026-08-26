@@ -823,7 +823,7 @@
       m.docs += 1;
 
       // --- por dia
-      var d = m.porDia[dia] || (m.porDia[dia] = { bruto:0, docs:0 });
+      var d = m.porDia[dia] || (m.porDia[dia] = { bruto:0, docs:0, porPagamento:{} });
       d.bruto += bruto; d.docs += 1;
 
       // --- por hora (SystemEntryDate traz hora; InvoiceDate não)
@@ -850,9 +850,18 @@
       for (var p = 0; p < pagamentos.length; p++){
         var mec = txt(pagamentos[p], 'PaymentMechanism') || 'OU';
         var valorPag = numTxt(pagamentos[p], 'PaymentAmount');
+
         var pg = m.porPagamento[mec] || (m.porPagamento[mec] = { bruto:0, docs:0 });
         pg.bruto += valorPag;
-        if (!mecanismosVistos[mec]){ pg.docs += 1; mecanismosVistos[mec] = true; }
+
+        var pgDia = d.porPagamento[mec] || (d.porPagamento[mec] = { bruto:0, docs:0 });
+        pgDia.bruto += valorPag;
+
+        if (!mecanismosVistos[mec]){
+          pg.docs += 1;
+          pgDia.docs += 1;
+          mecanismosVistos[mec] = true;
+        }
       }
 
       // --- linhas
@@ -996,7 +1005,15 @@
 
     var porDia = {};
     Object.keys(m.porDia).forEach(function(dia){
-      porDia[dia] = { bruto: round(m.porDia[dia].bruto, 2), docs: m.porDia[dia].docs };
+      var diaOrig = m.porDia[dia];
+      var pagamentosDia = {};
+      Object.keys(diaOrig.porPagamento || {}).forEach(function(mec){
+        pagamentosDia[mec] = {
+          bruto: round(diaOrig.porPagamento[mec].bruto, 2),
+          docs: diaOrig.porPagamento[mec].docs
+        };
+      });
+      porDia[dia] = { bruto: round(diaOrig.bruto, 2), docs: diaOrig.docs, porPagamento: pagamentosDia };
     });
 
     var porHora = {};
