@@ -189,6 +189,91 @@
     color:var(--white);
   }
 
+  /* ---------- Resumo de food cost ---------- */
+  .resumo{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    align-items:stretch;
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:20px;
+    margin-top:24px;
+  }
+
+  .resumo-geral{
+    flex:1 1 240px;
+  }
+
+  .resumo-valor{
+    font-family:'Space Mono', monospace;
+    font-size:38px;
+    font-weight:700;
+    line-height:1;
+    margin:0;
+  }
+
+  .resumo-base{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    margin:8px 0 0;
+    line-height:1.5;
+  }
+
+  .resumo-excluidos{
+    font-size:12px;
+    color:var(--muted);
+    margin:6px 0 0;
+    line-height:1.5;
+  }
+
+  .resumo-cats{
+    flex:2 1 320px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:2px;
+  }
+
+  .resumo-cat{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:baseline;
+    padding:7px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .resumo-cat:last-child{
+    border-bottom:none;
+  }
+
+  .resumo-cat-nome{
+    flex:1 1 100px;
+    min-width:0;
+    font-size:14px;
+  }
+
+  .resumo-cat-n{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .resumo-cat-valor{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    min-width:70px;
+    text-align:right;
+  }
+
+  .resumo-cat-valor.alto{
+    color:var(--red);
+  }
+
   /* ---------- Cards ---------- */
   .cards{
     display:grid;
@@ -1036,6 +1121,11 @@ window.addEventListener('load', function () {
     return valor.toFixed(casas === undefined ? 2 : casas).replace('.', ',') + ' €';
   }
 
+  function formatPct(valor, casas) {
+    if (typeof valor !== 'number' || isNaN(valor)) return '—';
+    return valor.toFixed(casas === undefined ? 1 : casas).replace('.', ',') + '%';
+  }
+
   function formatQtd(qtd, unidade) {
     if (typeof qtd !== 'number' || isNaN(qtd)) return '—';
     var u = normalizarTexto(unidade);
@@ -1213,7 +1303,8 @@ window.addEventListener('load', function () {
     };
   }
 
-  // Custo total de um artigo, com o detalhe de cada componente.
+  // Custo total de um artigo, com o detalhe de cada componente. O food cost
+  // sai daqui e não do render, para o card e o resumo usarem o mesmo número.
   function custoDoArtigo(receita) {
     var componentes = Array.isArray(receita.componentes) ? receita.componentes : [];
     var linhas = [];
@@ -1226,7 +1317,15 @@ window.addEventListener('load', function () {
       if (res.ok) total += res.custo; else completo = false;
     });
 
-    return { linhas: linhas, total: total, completo: completo };
+    var pvp = typeof receita.pvp === 'number' ? receita.pvp : parseFloat(receita.pvp);
+    if (isNaN(pvp)) pvp = null;
+    var liquido = pvpSemIva(pvp);
+    var foodCost = (completo && liquido) ? (total / liquido * 100) : null;
+
+    return {
+      linhas: linhas, total: total, completo: completo,
+      pvp: pvp, pvpLiquido: liquido, foodCost: foodCost
+    };
   }
 
   // ===================================================================
@@ -1280,10 +1379,9 @@ window.addEventListener('load', function () {
     return '<p class="notas">' + escapeHtml(notas) + '</p>';
   }
 
-  function cardArtigoHtml(id, receita) {
-    var calc = custoDoArtigo(receita);
-    var pvp = typeof receita.pvp === 'number' ? receita.pvp : parseFloat(receita.pvp);
-    if (isNaN(pvp)) pvp = null;
+  function cardArtigoHtml(id, receita, calc) {
+    calc = calc || custoDoArtigo(receita);
+    var pvp = calc.pvp;
 
     var html = '<div class="card">';
     html += '<div class="card-head">';
@@ -1312,12 +1410,10 @@ window.addEventListener('load', function () {
     html += '<div class="total-box"><p class="total-label">PVP</p><p class="total-value">' +
             escapeHtml(pvp === null ? '—' : formatEuros(pvp, 2)) + '</p></div>';
 
-    var liquido = pvpSemIva(pvp);
-    if (calc.completo && liquido) {
-      var fc = calc.total / liquido * 100;
-      html += '<div class="total-box' + (fc > 30 ? ' fc-alto' : '') + '"><p class="total-label">Food cost s/ IVA</p>' +
-              '<p class="total-value">' + fc.toFixed(1).replace('.', ',') + '%</p>' +
-              '<p class="total-nota">s/ ' + escapeHtml(formatEuros(liquido, 2)) + '</p></div>';
+    if (calc.foodCost !== null) {
+      html += '<div class="total-box' + (calc.foodCost > 30 ? ' fc-alto' : '') + '"><p class="total-label">Food cost s/ IVA</p>' +
+              '<p class="total-value">' + formatPct(calc.foodCost) + '</p>' +
+              '<p class="total-nota">s/ ' + escapeHtml(formatEuros(calc.pvpLiquido, 2)) + '</p></div>';
     } else {
       html += '<div class="total-box incompleto"><p class="total-label">Food cost s/ IVA</p>' +
               '<p class="total-value small">incompleto</p></div>';
@@ -1393,6 +1489,88 @@ window.addEventListener('load', function () {
     html += notasHtml(prep.notas);
     html += '</div>';
     return html;
+  }
+
+  // Média simples do food cost dos artigos completos. Os incompletos ficam
+  // de fora — entrariam com um custo subavaliado e puxavam a média para baixo.
+  function resumoFoodCost(calculos) {
+    var geral = [];
+    var porCategoria = {};
+    var excluidos = [];
+    var totalArtigos = 0;
+
+    Object.keys(calculos).forEach(function (id) {
+      var receita = allReceitas[id];
+      if (!receita) return;
+      totalArtigos++;
+      var calc = calculos[id];
+      var cat = receita.categoria || 'Sem categoria';
+
+      if (calc.foodCost === null) {
+        excluidos.push(receita.nome || 'Sem nome');
+        return;
+      }
+      geral.push(calc.foodCost);
+      if (!porCategoria[cat]) porCategoria[cat] = [];
+      porCategoria[cat].push(calc.foodCost);
+    });
+
+    function media(lista) {
+      if (!lista.length) return null;
+      return lista.reduce(function (a, b) { return a + b; }, 0) / lista.length;
+    }
+
+    var categorias = Object.keys(porCategoria).sort(function (a, b) {
+      var ia = ORDEM_CATEGORIAS.indexOf(a);
+      var ib = ORDEM_CATEGORIAS.indexOf(b);
+      if (ia === -1) ia = 99;
+      if (ib === -1) ib = 99;
+      if (ia !== ib) return ia - ib;
+      return a.localeCompare(b);
+    }).map(function (cat) {
+      return { categoria: cat, media: media(porCategoria[cat]), n: porCategoria[cat].length };
+    });
+
+    return {
+      media: media(geral),
+      completos: geral.length,
+      total: totalArtigos,
+      excluidos: excluidos.sort(),
+      categorias: categorias
+    };
+  }
+
+  function resumoHtml(calculos) {
+    var r = resumoFoodCost(calculos);
+    if (!r.total) return '';
+
+    var html = '<div class="resumo">';
+    html += '<div class="resumo-geral">';
+    html += '<p class="total-label">Food cost médio s/ IVA</p>';
+    html += '<p class="resumo-valor">' + (r.media === null ? '—' : formatPct(r.media)) + '</p>';
+    html += '<p class="resumo-base">' + r.completos + ' de ' + r.total + ' artigos' +
+            (r.excluidos.length
+              ? ', ' + r.excluidos.length + (r.excluidos.length === 1 ? ' excluído' : ' excluídos') + ' por dados incompletos'
+              : '') + '</p>';
+    if (r.excluidos.length) {
+      html += '<p class="resumo-excluidos">Fora da conta: ' + escapeHtml(r.excluidos.join(', ')) + '</p>';
+    }
+    html += '</div>';
+
+    html += '<div class="resumo-cats">';
+    if (!r.categorias.length) {
+      html += '<p class="rel-empty">Nenhum artigo com custo completo — sem médias por categoria.</p>';
+    }
+    r.categorias.forEach(function (c) {
+      html += '<div class="resumo-cat">';
+      html += '<span class="resumo-cat-nome">' + escapeHtml(c.categoria) + '</span>';
+      html += '<span class="resumo-cat-n">' + c.n + (c.n === 1 ? ' artigo' : ' artigos') + '</span>';
+      html += '<span class="resumo-cat-valor' + (c.media > 30 ? ' alto' : '') + '">' + formatPct(c.media) + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    return html + '</div>';
   }
 
   function usadaEmQuantosArtigos(prepId) {
@@ -1472,11 +1650,18 @@ window.addEventListener('load', function () {
         if (ia !== ib) return ia - ib;
         return String(ra.nome || '').localeCompare(String(rb.nome || ''));
       });
+      // Um cálculo por artigo, partilhado pelo resumo e pelos cards.
+      var calculos = {};
+      Object.keys(allReceitas).forEach(function (id) {
+        calculos[id] = custoDoArtigo(allReceitas[id]);
+      });
+
+      html = resumoHtml(calculos);
       if (!ids.length) {
-        html = vazioHtml('artigo');
+        html += vazioHtml('artigo');
       } else {
-        html = '<div class="cards">';
-        ids.forEach(function (id) { html += cardArtigoHtml(id, allReceitas[id]); });
+        html += '<div class="cards">';
+        ids.forEach(function (id) { html += cardArtigoHtml(id, allReceitas[id], calculos[id]); });
         html += '</div>';
       }
     } else {
