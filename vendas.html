@@ -519,6 +519,25 @@
     color:var(--muted);
   }
 
+  /* Mix por categoria: linha de topo clicável que abre as subcategorias.
+     Alvo de toque generoso — o mesmo ecrã é consultado ao telemóvel. */
+  .cat-expansivel{
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .cat-expansivel:hover{ background:var(--bg); }
+  .cat-expansivel td{ padding-top:12px; padding-bottom:12px; }
+
+  .cat-seta{
+    display:inline-block;
+    width:12px;
+    color:var(--muted);
+    font-size:10px;
+  }
+
+  .cat-sub td{ font-size:12px; }
+
   .tag{
     font-family:'Space Mono', monospace;
     font-size:10px;
@@ -603,6 +622,35 @@
     <div class="msg ok" id="msgOk"></div>
   </div>
 
+  <!-- ============ MIGRAÇÃO DO CATÁLOGO ============ -->
+  <div class="card hidden" id="migracaoCard">
+    <p class="card-title">Migrar catálogo para categoria + subcategoria</p>
+    <p class="card-note">
+      O catálogo tem produtos classificados no esquema antigo (lista plana). Isto mostra
+      exactamente o que vai mudar. Nada é gravado até carregares em Migrar.
+    </p>
+    <div id="migracaoResumo"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Antiga</th>
+            <th>Categoria</th>
+            <th>Subcategoria</th>
+            <th>Nota</th>
+          </tr>
+        </thead>
+        <tbody id="migracaoDetalhe"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnMigrar">Migrar catálogo</button>
+      <button class="btn btn-ghost" id="btnMigrarDepois">Agora não</button>
+    </div>
+  </div>
+
   <!-- ============ CATÁLOGO ============ -->
   <div class="card hidden" id="catalogoCard">
     <p class="card-title">Classificar produtos novos</p>
@@ -620,6 +668,7 @@
             <th class="num">Qtd</th>
             <th class="num">Valor</th>
             <th>Categoria</th>
+            <th>Subcategoria</th>
           </tr>
         </thead>
         <tbody id="catalogoBody"></tbody>
@@ -662,7 +711,14 @@
   /* =========================================================
      Utilitários
      ========================================================= */
-  var CATEGORIAS = ['Focaccia','Bebida','Café','Extra','Doce','Outro'];
+  /* Taxonomia de dois níveis, alinhada com as secções dos menus oficiais.
+     'Outro' é o balde de revisão manual e por isso não tem subcategorias. */
+  var TAXONOMIA = {
+    'Comida': ['Focaccia', 'Maritozzo Salgado', 'Maritozzo Doce', 'Side', 'Extra'],
+    'Bebida': ['Soft', 'Cerveja e Cidra', 'Vinho', 'Aperitif', 'Hot'],
+    'Outro':  []
+  };
+  var CATEGORIAS = Object.keys(TAXONOMIA);
 
   // Único texto de erro para "este ficheiro não é um SAF-T" — usado tanto pelo parser
   // (XML ilegível) como pela validação de extensão à entrada.
@@ -748,43 +804,69 @@
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   }
 
-  /* Maritozzo é o formato do pão, não o tipo de prato: há dois salgados e dois
-     doces. Comparados sem acentos ("AL RAGÚ" -> "al ragu"). Qualquer outro
-     maritozzo cai em 'Outro' de propósito, para forçar revisão manual. */
-  var MARITOZZI_SALGADOS = ['maritozzo mortadella', 'maritozzo al ragu'];
-  var MARITOZZI_DOCES    = ['maritozzo nutella', 'maritozzo panna', 'panna e albicocca'];
+  /* Regras de sugestão, por ordem: a primeira que bate ganha. São nomes de
+     produto concretos, não palavras genéricas — regras genéricas já nos
+     enganaram nos Maritozzi (o "maritozzo" é o formato do pão, não o tipo de
+     prato: há dois salgados e dois doces).
 
+     Cada regra tem `cat`/`sub` e uma de:
+       prefixo — o nome tem de COMEÇAR por este texto
+       termos  — o nome contém qualquer um destes textos
+       regex   — testado contra o nome já sem acentos
+
+     Tudo é comparado sem acentos e em minúsculas ("AL RAGÚ" -> "al ragu"),
+     porque o ZoneSoft escreve "Caffe", "Caffé", "Agua" e "Água". */
+  var REGRAS_SUGESTAO = [
+    /* Variantes de happy-hour primeiro, com correspondência exacta. Têm de vir
+       ANTES das genéricas: "happy somersby" bateria em 'somersby' (Cerveja e
+       Cidra por acaso certo, mas por acidente), e "happy imperial"/"happy wine"
+       não bateriam em regra nenhuma. "imperial" é o termo PT para copo de
+       cerveja de pressão. */
+    { termos:['happy imperial', 'happy somersby'], cat:'Bebida', sub:'Cerveja e Cidra' },
+    { termos:['happy wine'],                       cat:'Bebida', sub:'Vinho' },
+
+    /* Comida */
+    { prefixo:'focaccia',                          cat:'Comida', sub:'Focaccia' },
+    { termos:['maritozzo mortadella',
+              'maritozzo al ragu'],                cat:'Comida', sub:'Maritozzo Salgado' },
+    { termos:['maritozzo nutella', 'maritozzo panna',
+              'panna e albicocca'],                cat:'Comida', sub:'Maritozzo Doce' },
+    { termos:['polenta fritta', 'olive verdi'],    cat:'Comida', sub:'Side' },
+    { termos:['extra'],                            cat:'Comida', sub:'Extra' },
+
+    /* Bebida. "Chá da Casa" está no menu na secção SOFTS, ao lado da Coca-Cola:
+       é bebida fria, não bebida quente. Fronteira de palavra para não apanhar
+       "chinotto" nem "macchiato". */
+    { termos:['agua', 'coca cola', 'coca-cola', 'aranciata',
+              'limonata', 'limonada', 'chinotto'], cat:'Bebida', sub:'Soft' },
+    { regex:/\bcha\b/,                             cat:'Bebida', sub:'Soft' },
+    { termos:['cerveja', 'sidra', 'somersby'],     cat:'Bebida', sub:'Cerveja e Cidra' },
+    { termos:['vinho', 'prosecco', 'lambrusco'],   cat:'Bebida', sub:'Vinho' },
+    { termos:['bellini', 'aperol', 'amaro',
+              'limoncello', 'spritz'],             cat:'Bebida', sub:'Aperitif' },
+    { termos:['caffe', 'cafe', 'cappuccino',
+              'americano', 'macchiato'],           cat:'Bebida', sub:'Hot' }
+  ];
+
+  /* Devolve sempre { categoria, subcategoria }. Sem correspondência -> Outro,
+     de propósito: mais vale forçar revisão manual do que arriscar errado. */
   function sugerirCategoria(desc){
-    // Comparar sem acentos: o ZoneSoft escreve "Caffe", "Caffé", "Agua" e "Água".
     var d = semAcentos(desc);
-    if (d.indexOf('focaccia') === 0) return 'Focaccia';
-    if (d.indexOf('extra') !== -1) return 'Extra';
-
-    for (var s = 0; s < MARITOZZI_SALGADOS.length; s++){
-      if (d.indexOf(MARITOZZI_SALGADOS[s]) !== -1) return 'Focaccia';
+    for (var i = 0; i < REGRAS_SUGESTAO.length; i++){
+      var r = REGRAS_SUGESTAO[i];
+      var bate = false;
+      if (r.prefixo){
+        bate = d.indexOf(r.prefixo) === 0;
+      } else if (r.regex){
+        bate = r.regex.test(d);
+      } else {
+        for (var t = 0; t < r.termos.length; t++){
+          if (d.indexOf(r.termos[t]) !== -1){ bate = true; break; }
+        }
+      }
+      if (bate) return { categoria: r.cat, subcategoria: r.sub };
     }
-    for (var t = 0; t < MARITOZZI_DOCES.length; t++){
-      if (d.indexOf(MARITOZZI_DOCES[t]) !== -1) return 'Doce';
-    }
-    if (d.indexOf('maritozzo') !== -1) return 'Outro';
-
-    var cafes = ['caffe', 'cafe', 'cappuccino', 'americano', 'macchiato'];
-    for (var i = 0; i < cafes.length; i++){
-      if (d.indexOf(cafes[i]) !== -1) return 'Café';
-    }
-
-    // "Chá da Casa" está no menu na secção SOFTS, ao lado da Coca-Cola: bebida fria.
-    // Fica com fronteira de palavra para não apanhar "chinotto"/"macchiato".
-    if (/\bcha\b/.test(d)) return 'Bebida';
-
-    var bebidas = ['cerveja', 'sidra', 'vinho', 'lambrusco', 'spritz', 'prosecco', 'agua',
-                   'coca', 'limonata', 'limonada', 'aranciata', 'chinotto', 'somersby',
-                   'bellini', 'amaro', 'limoncello'];
-    for (var j = 0; j < bebidas.length; j++){
-      if (d.indexOf(bebidas[j]) !== -1) return 'Bebida';
-    }
-
-    return 'Outro';
+    return { categoria: 'Outro', subcategoria: null };
   }
 
   /* =========================================================
@@ -1068,16 +1150,28 @@
     var payload = {};
 
     // --- produtos + categorias
+    // O catálogo manda; a sugestão só entra para produtos que ainda não foram
+    // classificados à mão.
+    function classificarDe(k, desc){
+      var c = catalogo[k];
+      if (c && c.categoria) return { categoria: c.categoria, subcategoria: c.subcategoria || null };
+      return sugerirCategoria(desc);
+    }
+
     var produtos = {};
     var porCategoria = {};
+    var porSubcategoria = {};
     var keys = Object.keys(m.produtos);
     for (var i = 0; i < keys.length; i++){
       var k = keys[i];
       var p = m.produtos[k];
-      var cat = (catalogo[k] && catalogo[k].categoria) || sugerirCategoria(p.desc);
+      var cls = classificarDe(k, p.desc);
+      var cat = cls.categoria;
+      var sub = cls.subcategoria || null;
       produtos[k] = {
         desc: p.desc,
         categoria: cat,
+        subcategoria: sub,
         qtd: round(p.qtd, 3),
         valor: round(p.valor, 2),
         pvpMedio: round(p.qtd ? (p.valor / p.qtd) : (p.pvpTabela || 0), 4)
@@ -1086,25 +1180,36 @@
       var c = porCategoria[cat] || (porCategoria[cat] = { valor:0, qtd:0 });
       c.valor += p.valor;
       c.qtd += p.qtd;
+      if (sub){
+        var mapaSub = porSubcategoria[cat] || (porSubcategoria[cat] = {});
+        var s = mapaSub[sub] || (mapaSub[sub] = { valor:0, qtd:0 });
+        s.valor += p.valor;
+        s.qtd += p.qtd;
+      }
     }
     Object.keys(porCategoria).forEach(function(cat){
       porCategoria[cat].valor = round(porCategoria[cat].valor, 2);
       porCategoria[cat].qtd = round(porCategoria[cat].qtd, 3);
+      var mapaSub = porSubcategoria[cat] || {};
+      Object.keys(mapaSub).forEach(function(sub){
+        mapaSub[sub].valor = round(mapaSub[sub].valor, 2);
+        mapaSub[sub].qtd = round(mapaSub[sub].qtd, 3);
+      });
     });
 
     // --- attach rate de bebida
-    function catDe(k){
-      if (catalogo[k] && catalogo[k].categoria) return catalogo[k].categoria;
-      return m.produtos[k] ? sugerirCategoria(m.produtos[k].desc) : 'Outro';
-    }
+    // Lado da focaccia: categoria Comida E subcategoria Focaccia (os maritozzi
+    // salgados são Comida mas não contam como focaccia). Lado da bebida:
+    // categoria Bebida, que já inclui os cafés (subcategoria Hot).
     var comFocaccia = 0, comFocacciaEBebida = 0;
     for (var t = 0; t < m.taloes.length; t++){
       var codes = m.taloes[t];
       var temF = false, temB = false;
       for (var c2 = 0; c2 < codes.length; c2++){
-        var cat2 = catDe(codes[c2]);
-        if (cat2 === 'Focaccia') temF = true;
-        else if (cat2 === 'Bebida' || cat2 === 'Café') temB = true;
+        var prod = m.produtos[codes[c2]];
+        var cls2 = prod ? classificarDe(codes[c2], prod.desc) : { categoria:'Outro', subcategoria:null };
+        if (cls2.categoria === 'Comida' && cls2.subcategoria === 'Focaccia') temF = true;
+        else if (cls2.categoria === 'Bebida') temB = true;
       }
       if (temF){
         comFocaccia++;
@@ -1161,6 +1266,7 @@
     payload.porTipo = porTipo;
     payload.porPagamento = porPagamento;
     payload.porCategoria = porCategoria;
+    payload.porSubcategoria = porSubcategoria;
     payload.attach = {
       taloesComFocaccia: comFocaccia,
       taloesComFocacciaEBebida: comFocacciaEBebida,
@@ -1187,7 +1293,7 @@
     var out = {
       resumo:{ bruto:0, liquido:0, docs:0, dias:0, ticket:0, artigosPorTalao:0, valorPorArtigo:0 },
       produtos:{}, porDia:{}, porHora:{}, porDiaSemana:{}, porTipo:{},
-      porPagamento:{}, porCategoria:{},
+      porPagamento:{}, porCategoria:{}, porSubcategoria:{},
       attach:{ taloesComFocaccia:0, taloesComFocacciaEBebida:0, taxa:0 },
       pares:[]
     };
@@ -1205,11 +1311,13 @@
 
       Object.keys(p.produtos || {}).forEach(function(k){
         var src = p.produtos[k];
-        var d = out.produtos[k] || (out.produtos[k] = { desc: src.desc, categoria: src.categoria, qtd:0, valor:0 });
+        var d = out.produtos[k] || (out.produtos[k] = { desc: src.desc, categoria: src.categoria,
+                                                       subcategoria: src.subcategoria || null, qtd:0, valor:0 });
         d.qtd += Number(src.qtd) || 0;
         d.valor += Number(src.valor) || 0;
         if (src.desc) d.desc = src.desc;
         if (src.categoria) d.categoria = src.categoria;
+        if (src.subcategoria) d.subcategoria = src.subcategoria;
       });
 
       somaMapa(out.porDia, p.porDia, ['bruto','docs']);
@@ -1218,6 +1326,12 @@
       somaMapa(out.porTipo, p.porTipo, ['bruto','docs']);
       somaMapa(out.porPagamento, p.porPagamento, ['bruto','docs']);
       somaMapa(out.porCategoria, p.porCategoria, ['valor','qtd']);
+
+      // porSubcategoria tem dois níveis, o somaMapa só soma um.
+      Object.keys(p.porSubcategoria || {}).forEach(function(cat){
+        var destino = out.porSubcategoria[cat] || (out.porSubcategoria[cat] = {});
+        somaMapa(destino, p.porSubcategoria[cat], ['valor','qtd']);
+      });
 
       var a = p.attach || {};
       out.attach.taloesComFocaccia += Number(a.taloesComFocaccia) || 0;
@@ -1298,6 +1412,186 @@
   /* =========================================================
      Catalogo
      ========================================================= */
+  /* =========================================================
+     Migração do catálogo plano (Focaccia/Bebida/Café/Extra/Doce/Outro)
+     para o esquema de dois níveis. Corre uma vez; entradas que já estão
+     no esquema novo são deixadas em paz.
+     ========================================================= */
+
+  // Mapa directo das categorias antigas que não dependem do nome do produto.
+  var MIGRACAO_DIRECTA = {
+    'Extra': { categoria:'Comida', subcategoria:'Extra' },
+    'Outro': { categoria:'Outro',  subcategoria:null },
+    // 'Salgado' nunca chegou a existir no código — a correcção anterior pôs os
+    // dois maritozzi salgados em 'Focaccia'. Fica mapeado à mesma, para o caso
+    // de alguma entrada ter sido gravada à mão com este valor.
+    'Salgado': { categoria:'Comida', subcategoria:'Maritozzo Salgado' }
+  };
+
+  function migrarEntrada(entrada){
+    var antiga = entrada && entrada.categoria;
+    var desc = semAcentos(entrada && entrada.desc);
+    var ehMaritozzo = desc.indexOf('maritozzo') !== -1;
+
+    if (MIGRACAO_DIRECTA[antiga]) {
+      return { nova: MIGRACAO_DIRECTA[antiga], rever:false, nota:'' };
+    }
+
+    if (antiga === 'Focaccia') {
+      // A regra anterior metia os maritozzi salgados em Focaccia. Separá-los.
+      return ehMaritozzo
+        ? { nova:{ categoria:'Comida', subcategoria:'Maritozzo Salgado' }, rever:false, nota:'' }
+        : { nova:{ categoria:'Comida', subcategoria:'Focaccia' }, rever:false, nota:'' };
+    }
+
+    if (antiga === 'Doce') {
+      if (ehMaritozzo) return { nova:{ categoria:'Comida', subcategoria:'Maritozzo Doce' }, rever:false, nota:'' };
+      // Doce que não é maritozzo: pode ser qualquer coisa. Vai para Side, mas
+      // sinalizado — é um palpite, não uma certeza.
+      return { nova:{ categoria:'Comida', subcategoria:'Side' }, rever:true,
+               nota:'Era "Doce" mas não tem "maritozzo" no nome — confirmar se é mesmo Side.' };
+    }
+
+    /* 'Café' antiga NÃO é sempre Hot: a regra antiga metia o "Chá da Casa" em
+       Café, e chá é bebida fria (secção SOFTS do menu). Re-derivar pelo nome e
+       só cair em Hot quando o nome não diz nada — assim a migração não
+       reintroduz o bug que a correcção anterior tirou. */
+    if (antiga === 'Café' || antiga === 'Cafe') {
+      var sugC = sugerirCategoria(entrada.desc);
+      if (sugC.categoria === 'Bebida') return { nova:sugC, rever:false, nota:'' };
+      return { nova:{ categoria:'Bebida', subcategoria:'Hot' }, rever:false, nota:'' };
+    }
+
+    if (antiga === 'Bebida') {
+      var sug = sugerirCategoria(entrada.desc);
+      if (sug.categoria === 'Bebida') return { nova:sug, rever:false, nota:'' };
+      // O nome não resolve para nenhuma subcategoria de bebida. Mantém-se
+      // Bebida (é o que o attach rate lê) mas sem subcategoria, e sinalizado.
+      return { nova:{ categoria:'Bebida', subcategoria:null }, rever:true,
+               nota:'Bebida sem subcategoria dedutível do nome — escolher à mão.' };
+    }
+
+    // Categoria desconhecida (ou entrada sem categoria): não inventar.
+    return { nova:{ categoria:'Outro', subcategoria:null }, rever:true,
+             nota:'Categoria antiga não reconhecida (' + (antiga || '—') + ').' };
+  }
+
+  // Uma entrada já está migrada se a categoria é uma das três novas e, quando
+  // a categoria tem subcategorias, o campo está preenchido e é válido.
+  function jaMigrada(entrada){
+    var c = entrada && entrada.categoria;
+    if (!TAXONOMIA.hasOwnProperty(c)) return false;
+    var subs = TAXONOMIA[c];
+    if (!subs.length) return true;
+    return !!entrada.subcategoria && subs.indexOf(entrada.subcategoria) !== -1;
+  }
+
+  function planearMigracao(catalogo){
+    var plano = { mudancas:[], rever:[], jaOk:0, total:0 };
+    Object.keys(catalogo || {}).forEach(function(k){
+      var entrada = catalogo[k];
+      plano.total++;
+      if (jaMigrada(entrada)){ plano.jaOk++; return; }
+      var r = migrarEntrada(entrada);
+      var linha = {
+        key: k,
+        desc: entrada && entrada.desc ? entrada.desc : '(sem descrição)',
+        antiga: (entrada && entrada.categoria) || '—',
+        categoria: r.nova.categoria,
+        subcategoria: r.nova.subcategoria,
+        nota: r.nota
+      };
+      plano.mudancas.push(linha);
+      if (r.rever) plano.rever.push(linha);
+    });
+    return plano;
+  }
+
+  function mostrarRelatorioMigracao(plano){
+    var destino = {};
+    plano.mudancas.forEach(function(x){
+      var alvo = x.categoria + (x.subcategoria ? ' / ' + x.subcategoria : '');
+      var de = x.antiga + ' → ' + alvo;
+      destino[de] = (destino[de] || 0) + 1;
+    });
+
+    var resumo = Object.keys(destino).sort().map(function(de){
+      return '<tr><td>' + esc(de) + '</td><td class="num">' + intFmt(destino[de]) + '</td></tr>';
+    }).join('');
+
+    var detalhe = plano.mudancas.map(function(x){
+      return '<tr>' +
+        '<td class="mono" style="font-size:11px;">' + esc(x.key) + '</td>' +
+        '<td>' + esc(x.desc) + '</td>' +
+        '<td><span class="tag">' + esc(x.antiga) + '</span></td>' +
+        '<td><span class="tag">' + esc(x.categoria) + '</span></td>' +
+        '<td>' + (x.subcategoria ? esc(x.subcategoria) : '<span style="color:var(--muted);">—</span>') + '</td>' +
+        '<td style="color:var(--red);font-size:12px;">' + esc(x.nota) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    el('migracaoResumo').innerHTML =
+      '<p class="card-note">' +
+        intFmt(plano.mudancas.length) + ' de ' + intFmt(plano.total) + ' produtos vão mudar de classificação. ' +
+        intFmt(plano.jaOk) + (plano.jaOk === 1 ? ' já está' : ' já estão') +
+        ' no esquema novo e não ' + (plano.jaOk === 1 ? 'é tocado' : 'são tocados') + '.' +
+        (plano.rever.length
+          ? ' <strong style="color:var(--red);">' + intFmt(plano.rever.length) +
+            ' precisam de revisão manual depois (marcados a vermelho).</strong>'
+          : '') +
+      '</p>' +
+      '<div class="table-wrap"><table><thead><tr><th>Mudança</th><th class="num">Produtos</th></tr></thead><tbody>' +
+      resumo + '</tbody></table></div>';
+
+    el('migracaoDetalhe').innerHTML = detalhe;
+    el('migracaoCard').className = 'card';
+  }
+
+  // Escrita registo a registo. Um update() multi-chave neste RTDB já substituiu
+  // registos em vez de fazer merge — nunca agrupar escritas aqui.
+  function aplicarMigracao(plano){
+    el('btnMigrar').disabled = true;
+    progresso(0.05, 'A migrar catálogo…');
+
+    var i = 0;
+    return plano.mudancas.reduce(function(cadeia, x){
+      return cadeia.then(function(){
+        var entrada = {
+          desc: estado.catalogo[x.key] ? estado.catalogo[x.key].desc : x.desc,
+          categoria: x.categoria,
+          subcategoria: x.subcategoria || null
+        };
+        return catalogoRef.child(x.key).set(entrada).then(function(){
+          estado.catalogo[x.key] = entrada;
+          i++;
+          progresso(0.05 + 0.9 * (i / plano.mudancas.length),
+                    'A migrar catálogo… ' + i + '/' + plano.mudancas.length);
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      esconderProgresso();
+      el('migracaoCard').className = 'card hidden';
+      mostrarMsg('msgOk', 'Catálogo migrado: ' + intFmt(plano.mudancas.length) +
+        ' produto' + (plano.mudancas.length === 1 ? '' : 's') + ' reclassificado' +
+        (plano.mudancas.length === 1 ? '' : 's') + '.' +
+        (plano.rever.length ? ' ' + intFmt(plano.rever.length) + ' ficaram marcados para revisão manual.' : ''));
+    }).catch(function(err){
+      esconderProgresso();
+      el('btnMigrar').disabled = false;
+      mostrarMsg('msgErro', 'Migração interrompida: ' + (err && err.message ? err.message : err) +
+        ' — os produtos já escritos ficaram migrados, os restantes não.');
+    });
+  }
+
+  function verificarMigracao(){
+    return carregarCatalogo().then(function(catalogo){
+      var plano = planearMigracao(catalogo);
+      estado.planoMigracao = plano;
+      if (plano.mudancas.length) mostrarRelatorioMigracao(plano);
+      return plano;
+    });
+  }
+
   function carregarCatalogo(){
     return catalogoRef.once('value').then(function(snap){
       estado.catalogo = snap.val() || {};
@@ -1306,20 +1600,52 @@
     });
   }
 
+  // Opções do segundo dropdown para uma categoria. 'Outro' não tem nenhuma,
+  // e nesse caso o select fica vazio e desactivado.
+  function opcoesSub(categoria, seleccionada){
+    var subs = TAXONOMIA[categoria] || [];
+    if (!subs.length) return '<option value="">—</option>';
+    return subs.map(function(s){
+      return '<option value="' + esc(s) + '"' + (s === seleccionada ? ' selected' : '') + '>' + esc(s) + '</option>';
+    }).join('');
+  }
+
+  // Mantém o segundo dropdown coerente com o primeiro. Chamado no arranque e
+  // sempre que a categoria muda.
+  function sincronizarSub(selCat, selSub, seleccionada){
+    var cat = selCat.value;
+    var temSubs = (TAXONOMIA[cat] || []).length > 0;
+    selSub.innerHTML = opcoesSub(cat, seleccionada);
+    selSub.disabled = !temSubs;
+  }
+
   function mostrarCatalogo(novos){
     var body = el('catalogoBody');
     body.innerHTML = novos.map(function(p){
-      var opcoes = CATEGORIAS.map(function(c){
-        return '<option value="' + c + '"' + (c === p.sugestao ? ' selected' : '') + '>' + c + '</option>';
+      var opcoesCat = CATEGORIAS.map(function(c){
+        return '<option value="' + c + '"' + (c === p.sugestao.categoria ? ' selected' : '') + '>' + c + '</option>';
       }).join('');
+      var k = esc(p.key);
       return '<tr>' +
         '<td class="mono" style="font-size:11px;">' + esc(p.codigo) + '</td>' +
         '<td>' + esc(p.desc) + '</td>' +
         '<td class="num">' + dec(p.qtd, 0) + '</td>' +
         '<td class="num">' + eur(p.valor) + '</td>' +
-        '<td><select data-key="' + esc(p.key) + '">' + opcoes + '</select></td>' +
+        '<td><select class="sel-cat" data-key="' + k + '">' + opcoesCat + '</select></td>' +
+        '<td><select class="sel-sub" data-key="' + k + '"></select></td>' +
         '</tr>';
     }).join('');
+
+    // Preencher as subcategorias depois de o HTML existir, para que cada linha
+    // arranque já na sugestão automática.
+    novos.forEach(function(p){
+      var selCat = body.querySelector('select.sel-cat[data-key="' + p.key.replace(/"/g, '\\"') + '"]');
+      var selSub = body.querySelector('select.sel-sub[data-key="' + p.key.replace(/"/g, '\\"') + '"]');
+      if (!selCat || !selSub) return;
+      sincronizarSub(selCat, selSub, p.sugestao.subcategoria);
+      selCat.addEventListener('change', function(){ sincronizarSub(selCat, selSub, null); });
+    });
+
     el('catalogoCard').className = 'card';
   }
 
@@ -1329,10 +1655,18 @@
   }
 
   function lerCatalogoDoFormulario(){
-    var selects = el('catalogoBody').querySelectorAll('select[data-key]');
+    var body = el('catalogoBody');
+    var cats = body.querySelectorAll('select.sel-cat[data-key]');
     var out = {};
-    for (var i = 0; i < selects.length; i++){
-      out[selects[i].getAttribute('data-key')] = selects[i].value;
+    for (var i = 0; i < cats.length; i++){
+      var key = cats[i].getAttribute('data-key');
+      var selSub = body.querySelector('select.sel-sub[data-key="' + key.replace(/"/g, '\\"') + '"]');
+      var cat = cats[i].value;
+      var temSubs = (TAXONOMIA[cat] || []).length > 0;
+      out[key] = {
+        categoria: cat,
+        subcategoria: (temSubs && selSub && selSub.value) ? selSub.value : null
+      };
     }
     return out;
   }
@@ -1449,9 +1783,14 @@
     var escolhas = lerCatalogoDoFormulario();
     var novasEntradas = {};
     pend.novos.forEach(function(p){
-      var cat = escolhas[p.key] || p.sugestao;
-      estado.catalogo[p.key] = { desc: p.desc, categoria: cat };
-      novasEntradas[p.key] = { desc: p.desc, categoria: cat };
+      var cls = escolhas[p.key] || p.sugestao;
+      var entrada = {
+        desc: p.desc,
+        categoria: cls.categoria,
+        subcategoria: cls.subcategoria || null
+      };
+      estado.catalogo[p.key] = entrada;
+      novasEntradas[p.key] = entrada;
     });
 
     el('btnGravar').disabled = true;
@@ -1734,6 +2073,7 @@
     var prods = p.produtos || {};
     var lista = Object.keys(prods).map(function(k){
       return { key:k, desc:prods[k].desc, categoria:prods[k].categoria,
+               subcategoria:prods[k].subcategoria || null,
                qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0,
                pvpMedio:Number(prods[k].pvpMedio) || 0 };
     });
@@ -1747,6 +2087,7 @@
         '<td class="num" style="color:var(--muted);">' + (i + 1) + '</td>' +
         '<td>' + esc(x.desc) + '</td>' +
         '<td><span class="tag">' + esc(x.categoria || 'Outro') + '</span></td>' +
+        '<td style="font-size:12px;color:var(--muted);">' + (x.subcategoria ? esc(x.subcategoria) : '—') + '</td>' +
         '<td class="num">' + dec(x.qtd, 0) + '</td>' +
         '<td class="num">' + eur(x.valor) + '</td>' +
         '<td class="num">' + (totalValor ? dec(x.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
@@ -1756,7 +2097,7 @@
 
     return seccao('Top produtos', lista.length + ' produtos vendidos. Clica nos cabeçalhos para ordenar (mostra os 60 primeiros).',
       '<div class="table-wrap"><table><thead><tr>' +
-        '<th class="num">#</th><th>Produto</th><th>Categoria</th>' +
+        '<th class="num">#</th><th>Produto</th><th>Categoria</th><th>Subcategoria</th>' +
         '<th class="num sortable' + (campo === 'qtd' ? ' sorted' : '') + '" data-ordem="qtd">Qtd ↓</th>' +
         '<th class="num sortable' + (campo === 'valor' ? ' sorted' : '') + '" data-ordem="valor">Valor ↓</th>' +
         '<th class="num">% do total</th>' +
@@ -1824,6 +2165,7 @@
 
   function vistaCategorias(p){
     var cats = p.porCategoria || {};
+    var subs = p.porSubcategoria || {};
     var lista = Object.keys(cats).map(function(c){
       return { cat:c, valor:Number(cats[c].valor) || 0, qtd:Number(cats[c].qtd) || 0 };
     }).sort(function(a, b){ return b.valor - a.valor; });
@@ -1831,23 +2173,46 @@
 
     var total = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
     var max = lista[0].valor;
+
+    // Nível de topo: Comida vs Bebida é o número que mais importa.
     var barras = lista.map(function(x){
       return barra(x.cat, x.valor, max,
         eur(x.valor) + ' <span style="color:var(--muted);font-weight:400;">· ' + (total ? dec(x.valor / total * 100, 1) : '0') + '%</span>',
-        undefined, x.cat !== 'Focaccia');
+        undefined, x.cat !== 'Comida');
     }).join('');
 
+    // Tabela: uma linha por categoria, expansível para as subcategorias.
     var linhas = lista.map(function(x){
-      return '<tr><td>' + esc(x.cat) + '</td>' +
+      var mapaSub = subs[x.cat] || {};
+      var chaves = Object.keys(mapaSub).sort(function(a, b){
+        return (Number(mapaSub[b].valor) || 0) - (Number(mapaSub[a].valor) || 0);
+      });
+
+      var linhaCat = '<tr class="cat-linha' + (chaves.length ? ' cat-expansivel' : '') + '"' +
+        (chaves.length ? ' data-cat="' + esc(x.cat) + '"' : '') + '>' +
+        '<td>' + (chaves.length ? '<span class="cat-seta">▸</span> ' : '') + '<strong>' + esc(x.cat) + '</strong></td>' +
         '<td class="num">' + dec(x.qtd, 0) + '</td>' +
         '<td class="num">' + eur(x.valor) + '</td>' +
         '<td class="num">' + (total ? dec(x.valor / total * 100, 1) + '%' : '—') + '</td>' +
         '<td class="num">' + (x.qtd ? eur(x.valor / x.qtd) : '—') + '</td></tr>';
+
+      var linhasSub = chaves.map(function(s){
+        var v = Number(mapaSub[s].valor) || 0;
+        var q = Number(mapaSub[s].qtd) || 0;
+        return '<tr class="cat-sub" data-cat="' + esc(x.cat) + '" hidden>' +
+          '<td style="padding-left:28px;color:var(--muted);">' + esc(s) + '</td>' +
+          '<td class="num">' + dec(q, 0) + '</td>' +
+          '<td class="num">' + eur(v) + '</td>' +
+          '<td class="num">' + (total ? dec(v / total * 100, 1) + '%' : '—') + '</td>' +
+          '<td class="num">' + (q ? eur(v / q) : '—') + '</td></tr>';
+      }).join('');
+
+      return linhaCat + linhasSub;
     }).join('');
 
-    return seccao('Mix por categoria', 'Classificação vem do catálogo de produtos, não do IVA (água e cafés estão a 13% tal como as focaccias).',
+    return seccao('Mix por categoria', 'Classificação vem do catálogo de produtos, não do IVA (água e cafés estão a 13% tal como as focaccias). Clica numa categoria para abrir as subcategorias.',
       '<div class="bars">' + barras + '</div>' +
-      '<div class="table-wrap"><table><thead><tr><th>Categoria</th><th class="num">Qtd</th><th class="num">Valor</th><th class="num">% do valor</th><th class="num">PVP médio</th></tr></thead><tbody>' +
+      '<div class="table-wrap"><table id="tabelaCategorias"><thead><tr><th>Categoria</th><th class="num">Qtd</th><th class="num">Valor</th><th class="num">% do valor</th><th class="num">PVP médio</th></tr></thead><tbody>' +
       linhas + '</tbody></table></div>');
   }
 
@@ -1955,6 +2320,19 @@
       cabecalhos[i].addEventListener('click', function(){
         estado.ordemProdutos = this.getAttribute('data-ordem');
         renderVistas();
+      });
+    }
+
+    // Abrir/fechar as subcategorias de uma categoria no Mix por categoria.
+    var expansiveis = alvo.querySelectorAll('tr.cat-expansivel[data-cat]');
+    for (var j = 0; j < expansiveis.length; j++){
+      expansiveis[j].addEventListener('click', function(){
+        var cat = this.getAttribute('data-cat');
+        var aberta = this.classList.toggle('cat-aberta');
+        var seta = this.querySelector('.cat-seta');
+        if (seta) seta.textContent = aberta ? '▾' : '▸';
+        var filhas = alvo.querySelectorAll('tr.cat-sub[data-cat="' + cat.replace(/"/g, '\\"') + '"]');
+        for (var n = 0; n < filhas.length; n++) filhas[n].hidden = !aberta;
       });
     }
   }
@@ -2208,6 +2586,14 @@
 
   el('btnGravar').addEventListener('click', gravar);
 
+  el('btnMigrar').addEventListener('click', function(){
+    if (estado.planoMigracao) aplicarMigracao(estado.planoMigracao);
+  });
+
+  el('btnMigrarDepois').addEventListener('click', function(){
+    el('migracaoCard').className = 'card hidden';
+  });
+
   el('btnCancelar').addEventListener('click', function(){
     estado.pendente = null;
     esconderCatalogo();
@@ -2228,12 +2614,21 @@
     mostrarMsg('msgErro', 'Não foi possível ler os dados do Firebase: ' + (err && err.message ? err.message : err));
   });
 
+  // Se o catálogo ainda estiver no esquema plano, mostrar o relatório de
+  // migração. Só lê — a escrita depende do botão.
+  verificarMigracao().catch(function(){});
+
   // Exposto para testes automatizados (nao usado pela pagina).
   window.__vendas = {
     parseSaft: parseSaft,
     construirPayload: construirPayload,
     mergePayloads: mergePayloads,
     sugerirCategoria: sugerirCategoria,
+    TAXONOMIA: TAXONOMIA,
+    planearMigracao: planearMigracao,
+    mostrarRelatorioMigracao: mostrarRelatorioMigracao,
+    migrarEntrada: migrarEntrada,
+    jaMigrada: jaMigrada,
     descodificar: descodificar,
     lerFicheiro: lerFicheiro,
     keyFor: keyFor,
