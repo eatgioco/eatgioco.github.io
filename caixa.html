@@ -289,6 +289,30 @@
     color:var(--white);
   }
 
+  .filter-extra{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+
+  .filter-extra input[type="month"],
+  .filter-extra select{
+    padding:9px 12px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--black);
+  }
+
+  .filter-summary{
+    margin-top:10px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
   /* ---------- List ---------- */
   .list{
     margin-top:16px;
@@ -520,8 +544,24 @@
     <div class="filter-tabs">
       <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
       <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
+      <button type="button" class="filter-tab" data-filter="mes">Mês</button>
       <button type="button" class="filter-tab" data-filter="tudo">Tudo</button>
     </div>
+
+    <div class="filter-extra">
+      <input type="month" id="mesFiltroInput" style="display:none;">
+      <select id="motivoFiltroSelect">
+        <option value="">Todos os motivos</option>
+        <option value="Compra">Compra</option>
+        <option value="Pagamento a fornecedor">Pagamento a fornecedor</option>
+        <option value="Depósito bancário">Depósito bancário</option>
+        <option value="Troco de compra/saída">Troco de compra/saída</option>
+        <option value="Reforço de caixa">Reforço de caixa</option>
+        <option value="Outro">Outro</option>
+      </select>
+    </div>
+
+    <div class="filter-summary" id="filterSummary"></div>
 
     <div class="list" id="movList">
       <div class="empty-state">A carregar movimentos…</div>
@@ -594,6 +634,15 @@
 
   var allMovs = {};
   var activeFilter = 'hoje';
+  var mesFiltroInput = document.getElementById('mesFiltroInput');
+  var motivoFiltroSelect = document.getElementById('motivoFiltroSelect');
+  var filterSummaryEl = document.getElementById('filterSummary');
+  // valor default do mês = mês atual, formato YYYY-MM
+  (function(){
+    var d = new Date();
+    var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    mesFiltroInput.value = ym;
+  })();
   var acertarOpenId = null;
   var formState = { tipo: null };
 
@@ -741,11 +790,15 @@
   document.querySelectorAll('.filter-tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeFilter = btn.getAttribute('data-filter');
+      mesFiltroInput.style.display = (activeFilter === 'mes') ? 'inline-block' : 'none';
       document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
       renderList();
     });
   });
+
+  mesFiltroInput.addEventListener('change', renderList);
+  motivoFiltroSelect.addEventListener('change', renderList);
 
   function openAcertar(id){
     acertarOpenId = id;
@@ -822,12 +875,27 @@
     pendingCardEl.classList.toggle('pending-active', pendingCount > 0);
   }
 
+  // motivo é gravado como "Label" (ex: Depósito bancário) ou "Label: detalhe"
+  // (ex: "Compra: rúcula Pingo Doce") — por isso a comparação usa prefixo.
+  function motivoCorrespondeFiltro(motivoTexto, labelFiltro){
+    if (!labelFiltro) return true;
+    if (!motivoTexto) return false;
+    if (motivoTexto === labelFiltro) return true;
+    return motivoTexto.indexOf(labelFiltro + ':') === 0;
+  }
+
   function renderList(){
     var ids = Object.keys(allMovs).filter(function(id){
       var m = allMovs[id];
-      if (activeFilter === 'hoje') return isToday(m.dataHora);
-      if (activeFilter === '7dias') return isWithinLast7Days(m.dataHora);
-      return true;
+      var passaPeriodo = true;
+      if (activeFilter === 'hoje') passaPeriodo = isToday(m.dataHora);
+      else if (activeFilter === '7dias') passaPeriodo = isWithinLast7Days(m.dataHora);
+      else if (activeFilter === 'mes'){
+        var ym = mesFiltroInput.value;
+        passaPeriodo = !!ym && (m.dataHora || '').slice(0, 7) === ym;
+      }
+      if (!passaPeriodo) return false;
+      return motivoCorrespondeFiltro(m.motivo, motivoFiltroSelect.value);
     });
 
     ids.sort(function(a, b){
@@ -835,6 +903,7 @@
     });
 
     if (ids.length === 0){
+      filterSummaryEl.textContent = '';
       movListEl.innerHTML = '<div class="empty-state">Sem movimentos neste período.</div>';
       return;
     }
@@ -887,6 +956,14 @@
 
       html += '</div>';
     });
+
+    var totalValor = 0;
+    ids.forEach(function(id){ totalValor += allMovs[id].valor; });
+    if (ids.length === 0){
+      filterSummaryEl.textContent = '';
+    } else {
+      filterSummaryEl.textContent = ids.length + (ids.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValor);
+    }
 
     movListEl.innerHTML = html;
   }
