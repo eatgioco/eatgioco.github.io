@@ -23,6 +23,14 @@
     --muted:#6b6660;
     --green:#1E7A46;
     --amber:#B8860B;
+    /* Fatias do donut: vermelho e preto da marca mais tons intermédios
+       (vermelho suave, vermelho escuro, cinzas quentes) na mesma paleta. */
+    --fatia-1:#D91124;
+    --fatia-2:#141414;
+    --fatia-3:#E4694E;
+    --fatia-4:#8C857B;
+    --fatia-5:#A6202C;
+    --fatia-6:#C9C2B4;
   }
 
   *{box-sizing:border-box;}
@@ -572,6 +580,196 @@
 
   .curve-wrap{ margin-top:16px; }
   .curve-wrap svg{ width:100%; height:auto; display:block; border:2px solid var(--black); background:var(--white); }
+
+  /* ---------- Secções colapsáveis ---------- */
+  .sec-global{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+    margin-top:28px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .sec-link{
+    background:none;
+    border:0;
+    padding:0;
+    font-family:inherit;
+    font-size:inherit;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+
+  .sec-link:hover{ color:var(--red); }
+
+  .sec-head{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    border-bottom:2px solid var(--black);
+    padding-bottom:6px;
+    user-select:none;
+  }
+
+  .sec-head .section-title{ margin:0; }
+  .sec-head:hover .section-title{ color:var(--red); }
+
+  .sec-seta{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--red);
+    flex:0 0 12px;
+  }
+
+  .sec-ctrl{
+    margin-left:auto;
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+  }
+
+  .sec-corpo .section-sub{ margin:12px 0 14px; }
+
+  .vista-btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    line-height:1;
+    padding:5px 7px;
+    background:var(--white);
+    border:2px solid var(--line);
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  .vista-btn:hover{ border-color:var(--black); color:var(--black); }
+  .vista-btn.activo{ border-color:var(--black); background:var(--black); color:var(--white); }
+
+  /* ---------- Barras verticais ---------- */
+  .vbars{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:6px 4px;
+    margin-top:16px;
+    padding:8px 0 0;
+  }
+
+  .vbar-col{
+    flex:1 1 46px;
+    min-width:46px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    min-height:0;
+  }
+
+  .vbar-valor{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .vbar-track{
+    width:100%;
+    height:150px;
+    display:flex;
+    align-items:flex-end;
+    background:var(--white);
+    border:2px solid var(--line);
+    border-top:0;
+  }
+
+  .vbar-fill{
+    display:block;
+    width:100%;
+    background:var(--red);
+  }
+
+  .vbar-fill.alt{ background:var(--black); }
+
+  .vbar-label{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    color:var(--muted);
+    text-align:center;
+    line-height:1.2;
+    overflow-wrap:anywhere;
+  }
+
+  /* ---------- Donut ---------- */
+  .donut-wrap{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:24px;
+    margin-top:16px;
+  }
+
+  .donut{
+    position:relative;
+    flex:0 0 auto;
+    width:200px;
+    height:200px;
+    border-radius:50%;
+    border:2px solid var(--black);
+  }
+
+  .donut::after{
+    content:'';
+    position:absolute;
+    inset:30%;
+    background:var(--bg);
+    border:2px solid var(--black);
+    border-radius:50%;
+  }
+
+  .donut-legenda{
+    flex:1 1 240px;
+    min-width:0;
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .donut-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+  }
+
+  .donut-chip{
+    flex:0 0 12px;
+    width:12px;
+    height:12px;
+    border:2px solid var(--black);
+  }
+
+  .donut-nome{
+    flex:1 1 auto;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .donut-valor{
+    flex:0 0 auto;
+    font-weight:700;
+    white-space:nowrap;
+  }
 </style>
 </head>
 <body>
@@ -1368,6 +1566,27 @@
   /* =========================================================
      Estado da pagina
      ========================================================= */
+  /* =========================================================
+     Preferências de visualização (localStorage)
+     Só afectam o desenho — nada disto toca nos dados nem no Firebase.
+     ========================================================= */
+  var LS_SECCOES = 'gioco.vendas.seccoes';        // { slug: true|false }  (ausente = aberta)
+  var LS_VISTAS  = 'gioco.vendas.vistasGrafico';  // { horas:'linha', ... } (ausente = horizontal)
+
+  function lerPrefs(chave){
+    try {
+      var txt = localStorage.getItem(chave);
+      var obj = txt ? JSON.parse(txt) : null;
+      return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e){
+      return {};
+    }
+  }
+
+  function escreverPrefs(chave, obj){
+    try { localStorage.setItem(chave, JSON.stringify(obj)); } catch (e){}
+  }
+
   var estado = {
     catalogo: {},          // key -> { desc, categoria, subcategoria }
     catalogoCarregado: false,
@@ -1376,7 +1595,9 @@
     mesActivo: '',
     ordemProdutos: 'valor',
     planoMigracao: null,   // plano calculado por verificarMigracao()
-    escritorCatalogo: null // só os testes preenchem, para simular falhas de escrita
+    escritorCatalogo: null, // só os testes preenchem, para simular falhas de escrita
+    seccoes: lerPrefs(LS_SECCOES),        // estado aberto/fechado por secção
+    vistasGrafico: lerPrefs(LS_VISTAS)    // tipo de gráfico escolhido por secção
   };
 
   /* =========================================================
@@ -2016,9 +2237,51 @@
       (sub ? '<p class="kpi-sub">' + sub + '</p>' : '') + '</div>';
   }
 
-  function seccao(titulo, sub, corpo){
-    return '<div class="section"><h2 class="section-title">' + esc(titulo) + '</h2>' +
-      (sub ? '<p class="section-sub">' + esc(sub) + '</p>' : '') + corpo + '</div>';
+  /* Id de secção a partir do título: "Vendas por hora" -> "vendas-por-hora".
+     Só [a-z0-9-], por isso é seguro em querySelector sem escapar. */
+  function slugSeccao(titulo){
+    return semAcentos(String(titulo)).toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function seccaoAberta(id){
+    return estado.seccoes[id] !== false;   // por omissão aberta
+  }
+
+  function vistaDe(chave){
+    return estado.vistasGrafico[chave] || 'horizontal';
+  }
+
+  /* corpo fica dentro de um wrapper com id próprio, escondido quando colapsada.
+     ctrl (opcional) são os botões de troca de vista, colocados no cabeçalho. */
+  function seccao(titulo, sub, corpo, ctrl){
+    var id = slugSeccao(titulo);
+    var aberta = seccaoAberta(id);
+    return '<div class="section" data-sec="' + id + '">' +
+      '<div class="sec-head' + (aberta ? '' : ' fechada') + '" data-sec-toggle="' + id + '">' +
+        '<span class="sec-seta">' + (aberta ? '▾' : '▸') + '</span>' +
+        '<h2 class="section-title">' + esc(titulo) + '</h2>' +
+        (ctrl ? '<span class="sec-ctrl">' + ctrl + '</span>' : '') +
+      '</div>' +
+      '<div class="sec-corpo" data-sec-corpo="' + id + '"' + (aberta ? '' : ' hidden') + '>' +
+        (sub ? '<p class="section-sub">' + esc(sub) + '</p>' : '') + corpo +
+      '</div></div>';
+  }
+
+  var VISTAS_BARRAS = [
+    { id:'horizontal', icone:'▤', titulo:'Barras horizontais' },
+    { id:'vertical',   icone:'▥', titulo:'Barras verticais' }
+  ];
+  var VISTAS_TEMPO = VISTAS_BARRAS.concat([{ id:'linha', icone:'∿', titulo:'Linha' }]);
+  var VISTAS_MIX   = VISTAS_BARRAS.concat([{ id:'donut', icone:'◕', titulo:'Donut' }]);
+
+  function botoesVista(chave, opcoes, activa){
+    return '<span class="vista-btns">' + opcoes.map(function(o){
+      return '<button type="button" class="vista-btn' + (o.id === activa ? ' activo' : '') + '"' +
+        ' data-vista-chave="' + esc(chave) + '" data-vista="' + o.id + '"' +
+        ' title="' + esc(o.titulo) + '" aria-label="' + esc(o.titulo) + '">' + o.icone + '</button>';
+    }).join('') + '</span>';
   }
 
   function barra(label, valor, max, texto, delta, alt){
@@ -2029,6 +2292,127 @@
       '<span class="bar-value">' + texto + '</span>' +
       (delta === undefined ? '' : '<span class="bar-delta">' + delta + '</span>') +
       '</div>';
+  }
+
+  /* Vistas alternativas — todas recebem itens = [{ label, valor, texto, curto }].
+     `texto` é o HTML usado na vista horizontal; `curto` é a versão compacta
+     para a etiqueta em cima da barra vertical / do ponto máximo da linha. */
+
+  function barrasVerticais(itens, opts){
+    opts = opts || {};
+    var max = 0;
+    itens.forEach(function(x){ max = Math.max(max, Number(x.valor) || 0); });
+    var colunas = itens.map(function(x){
+      var v = Number(x.valor) || 0;
+      // 1% de altura mínima para uma barra não nula não desaparecer.
+      var altura = max > 0 ? (v > 0 ? Math.max(v / max * 100, 1) : 0) : 0;
+      var alt = (x.alt === undefined) ? opts.alt : x.alt;
+      return '<div class="vbar-col">' +
+        '<span class="vbar-valor">' + (x.curto || '') + '</span>' +
+        '<span class="vbar-track"><span class="vbar-fill' + (alt ? ' alt' : '') +
+          '" style="height:' + altura.toFixed(2) + '%"></span></span>' +
+        '<span class="vbar-label">' + esc(x.label) + '</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="vbars">' + colunas + '</div>';
+  }
+
+  function graficoLinha(itens, opts){
+    opts = opts || {};
+    if (!itens.length) return '';
+    var fmtY = opts.fmtY || function(v){ return intFmt(Math.round(v)) + '€'; };
+
+    var W = 720, H = 240, PADL = 60, PADR = 18, PADT = 24, PADB = 46;
+    var n = itens.length;
+    var max = 0, iMax = 0;
+    itens.forEach(function(x, i){
+      var v = Number(x.valor) || 0;
+      if (v > max){ max = v; iMax = i; }
+    });
+    var escala = max > 0 ? max : 1;
+
+    var passo = n > 1 ? (W - PADL - PADR) / (n - 1) : 0;
+    function px(i){ return n > 1 ? PADL + i * passo : PADL + (W - PADL - PADR) / 2; }
+    function py(v){ return H - PADB - (Number(v) || 0) / escala * (H - PADT - PADB); }
+
+    var caminho = itens.map(function(x, i){
+      return (i === 0 ? 'M' : 'L') + px(i).toFixed(1) + ' ' + py(x.valor).toFixed(1);
+    }).join(' ');
+
+    // Eixo Y: 0, metade e máximo.
+    var marcasY = [0, 0.5, 1].map(function(f){
+      var v = escala * f;
+      var y = py(v);
+      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) +
+          '" stroke="' + (f === 0 ? '#141414' : '#E2DDD1') + '" stroke-width="' + (f === 0 ? 2 : 1) + '"/>' +
+        '<text x="' + (PADL - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" ' +
+          'font-family="Space Mono, monospace" font-size="10" fill="#6b6660">' + esc(fmtY(v)) + '</text>';
+    }).join('');
+
+    // Com muitos pontos (31 dias) só se escrevem alguns labels, para não sobreporem.
+    var salto = Math.max(1, Math.ceil(n / 12));
+    var marcasX = itens.map(function(x, i){
+      if (i % salto !== 0 && i !== n - 1) return '';
+      return '<text x="' + px(i).toFixed(1) + '" y="' + (H - PADB + 16) + '" text-anchor="middle" ' +
+        'font-family="Space Mono, monospace" font-size="10" fill="#6b6660">' + esc(x.label) + '</text>';
+    }).join('');
+
+    var destaque = max > 0 ?
+      '<circle cx="' + px(iMax).toFixed(1) + '" cy="' + py(max).toFixed(1) + '" r="5" fill="#D91124" stroke="#141414" stroke-width="2"/>' +
+      '<text x="' + px(iMax).toFixed(1) + '" y="' + Math.max(PADT - 6, py(max) - 12).toFixed(1) + '" text-anchor="middle" ' +
+        'font-family="Space Mono, monospace" font-size="11" fill="#D91124">' +
+        esc((itens[iMax].curto || fmtY(max)) + ' · ' + itens[iMax].label) + '</text>' : '';
+
+    return '<div class="curve-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+        esc(opts.aria || 'Gráfico de linha') + '">' +
+      marcasY +
+      '<line x1="' + PADL + '" y1="' + PADT + '" x2="' + PADL + '" y2="' + (H - PADB) + '" stroke="#141414" stroke-width="2"/>' +
+      '<path d="' + caminho + '" fill="none" stroke="#D91124" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
+      destaque + marcasX +
+      '</svg></div>';
+  }
+
+  var CORES_FATIA = ['var(--fatia-1)','var(--fatia-2)','var(--fatia-3)','var(--fatia-4)','var(--fatia-5)','var(--fatia-6)'];
+
+  function donut(itens, opts){
+    opts = opts || {};
+    if (!itens.length) return '';
+
+    // Nunca mais fatias do que cores: o excedente junta-se em "Outros".
+    // Assim não há duas fatias adjacentes (nem a primeira com a última) da mesma cor.
+    var lista = itens.slice();
+    if (lista.length > CORES_FATIA.length){
+      var cabeca = lista.slice(0, CORES_FATIA.length - 1);
+      var resto = lista.slice(CORES_FATIA.length - 1);
+      cabeca.push({
+        label: 'Outros (' + resto.length + ')',
+        valor: resto.reduce(function(acc, x){ return acc + (Number(x.valor) || 0); }, 0)
+      });
+      lista = cabeca;
+    }
+
+    var total = lista.reduce(function(acc, x){ return acc + (Number(x.valor) || 0); }, 0);
+    var angulo = 0;
+    var paradas = [];
+    var legenda = lista.map(function(x, i){
+      var v = Number(x.valor) || 0;
+      var cor = CORES_FATIA[i % CORES_FATIA.length];
+      var fim = (i === lista.length - 1) ? 360 : angulo + (total ? v / total * 360 : 0);
+      paradas.push(cor + ' ' + angulo.toFixed(3) + 'deg ' + fim.toFixed(3) + 'deg');
+      angulo = fim;
+      return '<li class="donut-item">' +
+        '<span class="donut-chip" style="background:' + cor + '"></span>' +
+        '<span class="donut-nome">' + esc(x.label) + '</span>' +
+        '<span class="donut-valor">' + (x.curto || eur(v)) +
+          ' · ' + (total ? dec(v / total * 100, 1) : '0,0') + '%</span>' +
+      '</li>';
+    }).join('');
+
+    return '<div class="donut-wrap">' +
+      '<div class="donut" role="img" aria-label="' + esc(opts.aria || 'Distribuição') +
+        '" style="background:conic-gradient(' + paradas.join(',') + ')"></div>' +
+      '<ul class="donut-legenda">' + legenda + '</ul>' +
+    '</div>';
   }
 
   function deltaTexto(actual, anterior){
@@ -2097,21 +2481,26 @@
 
     var min = chaves[0], fim = chaves[chaves.length - 1];
     var linhas = [];
+    var itens = [];
     var anterior = null;
     for (var h = min; h <= fim; h++){
       var v = horas[h] ? (horas[h].bruto || 0) : 0;
       var docs = horas[h] ? (horas[h].docs || 0) : 0;
-      linhas.push(barra(
-        (h < 10 ? '0' : '') + h + ':00',
-        v, max,
-        eur(v) + ' <span style="color:var(--muted);font-weight:400;">· ' + intFmt(docs) + '</span>',
-        deltaTexto(v, anterior)
-      ));
+      var rotulo = (h < 10 ? '0' : '') + h + ':00';
+      var texto = eur(v) + ' <span style="color:var(--muted);font-weight:400;">· ' + intFmt(docs) + '</span>';
+      linhas.push(barra(rotulo, v, max, texto, deltaTexto(v, anterior)));
+      itens.push({ label:rotulo, valor:v, texto:texto, curto:eur(v) });
       anterior = v;
     }
 
+    var vista = vistaDe('horas');
+    var corpo;
+    if (vista === 'vertical') corpo = barrasVerticais(itens);
+    else if (vista === 'linha') corpo = graficoLinha(itens, { aria:'Vendas por hora' });
+    else corpo = '<div class="bars">' + linhas.join('') + '</div>';
+
     return seccao('Vendas por hora', 'Bruto e nº de documentos por hora; a coluna da direita é a variação face à hora anterior — onde o serviço acelera e onde colapsa.',
-      '<div class="bars">' + linhas.join('') + '</div>');
+      corpo, botoesVista('horas', VISTAS_TEMPO, vista));
   }
 
   function vistaDiaSemana(p){
@@ -2122,16 +2511,28 @@
       var v = ds[d];
       if (v && v.dias) max = Math.max(max, v.bruto / v.dias);
     });
-    var linhas = ordem.map(function(d){
+    var itens = ordem.map(function(d){
       var v = ds[d];
-      if (!v || !v.dias) return barra(DIAS_SEMANA[d], 0, max, '<span style="color:var(--muted);">fechado</span>');
-      var media = v.bruto / v.dias;
-      return barra(DIAS_SEMANA[d], media, max,
-        eur(media) + ' <span style="color:var(--muted);font-weight:400;">· ' + v.dias + 'd</span>');
-    }).join('');
+      var media = (v && v.dias) ? v.bruto / v.dias : 0;
+      return {
+        label: DIAS_SEMANA[d],
+        valor: media,
+        texto: (v && v.dias)
+          ? eur(media) + ' <span style="color:var(--muted);font-weight:400;">· ' + v.dias + 'd</span>'
+          : '<span style="color:var(--muted);">fechado</span>',
+        curto: (v && v.dias) ? eur(media) : '—'
+      };
+    });
+
+    var vista = vistaDe('diaSemana');
+    var corpo;
+    if (vista === 'vertical') corpo = barrasVerticais(itens);
+    else corpo = '<div class="bars">' + itens.map(function(x){
+      return barra(x.label, x.valor, max, x.texto);
+    }).join('') + '</div>';
 
     return seccao('Vendas por dia da semana', 'Média por dia aberto (não a soma) — para não penalizar semanas com feriados.',
-      '<div class="bars">' + linhas + '</div>');
+      corpo, botoesVista('diaSemana', VISTAS_BARRAS, vista));
   }
 
   function vistaProdutos(p){
@@ -2240,11 +2641,23 @@
     var max = lista[0].valor;
 
     // Nível de topo: Comida vs Bebida é o número que mais importa.
-    var barras = lista.map(function(x){
-      return barra(x.cat, x.valor, max,
-        eur(x.valor) + ' <span style="color:var(--muted);font-weight:400;">· ' + (total ? dec(x.valor / total * 100, 1) : '0') + '%</span>',
-        undefined, x.cat !== 'Comida');
-    }).join('');
+    var itens = lista.map(function(x){
+      return {
+        label: x.cat,
+        valor: x.valor,
+        texto: eur(x.valor) + ' <span style="color:var(--muted);font-weight:400;">· ' + (total ? dec(x.valor / total * 100, 1) : '0') + '%</span>',
+        curto: eur(x.valor),
+        alt: x.cat !== 'Comida'
+      };
+    });
+
+    var vista = vistaDe('categorias');
+    var grafico;
+    if (vista === 'vertical') grafico = barrasVerticais(itens);
+    else if (vista === 'donut') grafico = donut(itens, { aria:'Mix por categoria' });
+    else grafico = '<div class="bars">' + itens.map(function(x){
+      return barra(x.label, x.valor, max, x.texto, undefined, x.alt);
+    }).join('') + '</div>';
 
     // Tabela: uma linha por categoria, expansível para as subcategorias.
     var linhas = lista.map(function(x){
@@ -2276,9 +2689,10 @@
     }).join('');
 
     return seccao('Mix por categoria', 'Classificação vem do catálogo de produtos, não do IVA (água e cafés estão a 13% tal como as focaccias). Clica numa categoria para abrir as subcategorias.',
-      '<div class="bars">' + barras + '</div>' +
+      grafico +
       '<div class="table-wrap"><table id="tabelaCategorias"><thead><tr><th>Categoria</th><th class="num">Qtd</th><th class="num">Valor</th><th class="num">% do valor</th><th class="num">PVP médio</th></tr></thead><tbody>' +
-      linhas + '</tbody></table></div>');
+      linhas + '</tbody></table></div>',
+      botoesVista('categorias', VISTAS_MIX, vista));
   }
 
   function vistaTipos(p){
@@ -2307,20 +2721,32 @@
     if (!lista.length) return '';
     var total = lista.reduce(function(acc, x){ return acc + x.bruto; }, 0);
     var max = lista[0].bruto;
-    var barras = lista.map(function(x){
-      return barra(x.mec, x.bruto, max,
-        eur(x.bruto) + ' <span style="color:var(--muted);font-weight:400;">· ' + (total ? dec(x.bruto / total * 100, 1) : '0') + '%</span>',
-        undefined, true);
-    }).join('');
+    var itens = lista.map(function(x){
+      return {
+        label: x.mec,
+        valor: x.bruto,
+        texto: eur(x.bruto) + ' <span style="color:var(--muted);font-weight:400;">· ' + (total ? dec(x.bruto / total * 100, 1) : '0') + '%</span>',
+        curto: eur(x.bruto)
+      };
+    });
+
+    var vista = vistaDe('pagamentos');
+    var grafico;
+    if (vista === 'vertical') grafico = barrasVerticais(itens, { alt:true });
+    else if (vista === 'donut') grafico = donut(itens, { aria:'Meios de pagamento' });
+    else grafico = '<div class="bars">' + itens.map(function(x){
+      return barra(x.label, x.valor, max, x.texto, undefined, true);
+    }).join('') + '</div>';
     var linhas = lista.map(function(x){
       return '<tr><td class="mono">' + esc(x.mec) + '</td><td>' + esc(MEIOS_PAGAMENTO[x.mec] || '—') + '</td>' +
         '<td class="num">' + intFmt(x.docs) + '</td><td class="num">' + eur(x.bruto) + '</td>' +
         '<td class="num">' + (total ? dec(x.bruto / total * 100, 1) + '%' : '—') + '</td></tr>';
     }).join('');
     return seccao('Meios de pagamento', 'Valor recebido por mecanismo (um talão pode ter mais do que um).',
-      '<div class="bars">' + barras + '</div>' +
+      grafico +
       '<div class="table-wrap"><table><thead><tr><th>Código</th><th>Meio</th><th class="num">Talões</th><th class="num">Valor</th><th class="num">% do valor</th></tr></thead><tbody>' +
-      linhas + '</tbody></table></div>');
+      linhas + '</tbody></table></div>',
+      botoesVista('pagamentos', VISTAS_MIX, vista));
   }
 
   function vistaPares(p){
@@ -2345,15 +2771,45 @@
     if (!chaves.length) return '';
     var max = 0;
     chaves.forEach(function(d){ max = Math.max(max, dias[d].bruto || 0); });
-    var barras = chaves.map(function(d){
+    var itens = chaves.map(function(d){
       var v = dias[d];
       var dow = new Date(d + 'T12:00:00').getDay();
-      return barra(d.slice(8) + '/' + d.slice(5, 7) + ' ' + DIAS_SEMANA[dow].slice(0, 3),
-        v.bruto, max,
-        eur(v.bruto) + ' <span style="color:var(--muted);font-weight:400;">· ' + intFmt(v.docs) + '</span>');
-    }).join('');
+      return {
+        label: d.slice(8) + '/' + d.slice(5, 7) + ' ' + DIAS_SEMANA[dow].slice(0, 3),
+        valor: v.bruto,
+        texto: eur(v.bruto) + ' <span style="color:var(--muted);font-weight:400;">· ' + intFmt(v.docs) + '</span>',
+        curto: eur(v.bruto)
+      };
+    });
+
+    var vista = vistaDe('dias');
+    var corpo;
+    if (vista === 'vertical') corpo = barrasVerticais(itens);
+    else if (vista === 'linha') corpo = graficoLinha(itens, { aria:'Vendas por dia' });
+    else corpo = '<div class="bars">' + itens.map(function(x){
+      return barra(x.label, x.valor, max, x.texto);
+    }).join('') + '</div>';
+
     return seccao('Vendas por dia', 'Bruto e nº de talões em cada dia aberto.',
-      '<div class="bars">' + barras + '</div>');
+      corpo, botoesVista('dias', VISTAS_TEMPO, vista));
+  }
+
+  /* Abre/fecha uma secção directamente no DOM — não há re-render, por isso
+     o que já estava aberto lá dentro (subcategorias, ordenação) mantém-se.
+     O id é um slug [a-z0-9-], seguro dentro do selector. */
+  function alternarSeccao(id){
+    var cab = document.querySelector('[data-sec-toggle="' + id + '"]');
+    var corpo = document.querySelector('[data-sec-corpo="' + id + '"]');
+    if (!cab || !corpo) return;
+
+    var aberta = corpo.hidden;   // estava escondida, portanto passa a aberta
+    corpo.hidden = !aberta;
+    cab.className = 'sec-head' + (aberta ? '' : ' fechada');
+    var seta = cab.querySelector('.sec-seta');
+    if (seta) seta.textContent = aberta ? '▾' : '▸';
+
+    estado.seccoes[id] = aberta;
+    escreverPrefs(LS_SECCOES, estado.seccoes);
   }
 
   function renderVistas(){
@@ -2365,7 +2821,14 @@
     var rodape = '<p class="legend">Importado em ' + esc(dataHora(r.importadoEm)) +
       (r.ficheiro ? ' · ficheiro <span class="mono">' + esc(r.ficheiro) + '</span>' : '') + '</p>';
 
+    var barraGlobal = '<div class="sec-global">' +
+      '<button type="button" class="sec-link" data-sec-todas="abrir">Expandir tudo</button>' +
+      '<span>·</span>' +
+      '<button type="button" class="sec-link" data-sec-todas="fechar">Colapsar tudo</button>' +
+      '</div>';
+
     alvo.innerHTML =
+      barraGlobal +
       vistaResumo(p) +
       (estado.mesActivo === '__todos' ? '' : rodape) +
       vistaTicket(p) +
@@ -2380,9 +2843,43 @@
       vistaPagamentos(p) +
       vistaPares(p);
 
+    // Cabeçalho de secção: abre/fecha o corpo e guarda o estado.
+    var cabsSeccao = alvo.querySelectorAll('[data-sec-toggle]');
+    for (var s = 0; s < cabsSeccao.length; s++){
+      cabsSeccao[s].addEventListener('click', function(){
+        alternarSeccao(this.getAttribute('data-sec-toggle'));
+      });
+    }
+
+    // Expandir/colapsar tudo de uma vez.
+    var globais = alvo.querySelectorAll('[data-sec-todas]');
+    for (var g = 0; g < globais.length; g++){
+      globais[g].addEventListener('click', function(){
+        var abrir = this.getAttribute('data-sec-todas') === 'abrir';
+        var todas = alvo.querySelectorAll('[data-sec]');
+        for (var k = 0; k < todas.length; k++){
+          estado.seccoes[todas[k].getAttribute('data-sec')] = abrir;
+        }
+        escreverPrefs(LS_SECCOES, estado.seccoes);
+        renderVistas();
+      });
+    }
+
+    // Troca de vista de gráfico. stopPropagation para não fechar a secção.
+    var botoes = alvo.querySelectorAll('button[data-vista]');
+    for (var b = 0; b < botoes.length; b++){
+      botoes[b].addEventListener('click', function(ev){
+        ev.stopPropagation();
+        estado.vistasGrafico[this.getAttribute('data-vista-chave')] = this.getAttribute('data-vista');
+        escreverPrefs(LS_VISTAS, estado.vistasGrafico);
+        renderVistas();
+      });
+    }
+
     var cabecalhos = alvo.querySelectorAll('th[data-ordem]');
     for (var i = 0; i < cabecalhos.length; i++){
-      cabecalhos[i].addEventListener('click', function(){
+      cabecalhos[i].addEventListener('click', function(ev){
+        ev.stopPropagation();
         estado.ordemProdutos = this.getAttribute('data-ordem');
         renderVistas();
       });
@@ -2391,7 +2888,8 @@
     // Abrir/fechar as subcategorias de uma categoria no Mix por categoria.
     var expansiveis = alvo.querySelectorAll('tr.cat-expansivel[data-cat]');
     for (var j = 0; j < expansiveis.length; j++){
-      expansiveis[j].addEventListener('click', function(){
+      expansiveis[j].addEventListener('click', function(ev){
+        ev.stopPropagation();
         var cat = this.getAttribute('data-cat');
         var aberta = this.classList.toggle('cat-aberta');
         var seta = this.querySelector('.cat-seta');
