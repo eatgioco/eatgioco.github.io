@@ -32,6 +32,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
 | `equipa.html` | Pessoas e turnos (escala semanal) | Equipa |
+| `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `mrn-dashboard.html` | Dashboard privado: pagamentos, tarefas, Instagram, pedidos espelhados | Só Manel |
 
@@ -53,6 +54,11 @@ ferias                — períodos de férias por pessoa
 fechados              — loja encerrada por data: { diaTodo, turnos:{t1,t3,t2} }
 notificacoes          — central de notificações (lida: bool, tipo, criadoEm)
 tasks                 — tarefas do dashboard
+preparacoes           — fichas técnicas de preparações internas (molhos, pestos…);
+                         custo/kg = soma dos ingredientes ÷ rendimento, ou
+                         custoManualPorUnidade quando custoManual=true
+receitas              — fichas técnicas dos artigos vendidos (componentes =
+                         ingredientes + preparações, pvp, avisos por confirmar)
 compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância;
                          com valorDiario preenchido o montante é calculado por mês
                          (dias úteis seg-sex × valorDiario) e o campo valor é ignorado

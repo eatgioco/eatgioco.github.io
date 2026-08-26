@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Receitas</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+    --warn-bg:#FDF6D8;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:8px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--red);
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  .status-msg{
+    margin:20px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:28px;
+  }
+
+  .tab-btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--white);
+    color:var(--black);
+    border:2px solid var(--black);
+    padding:10px 16px;
+    cursor:pointer;
+  }
+
+  .tab-btn.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .tab-count{
+    font-weight:400;
+    opacity:0.7;
+    margin-left:6px;
+  }
+
+  /* ---------- Filtros ---------- */
+  .filter-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    margin-top:22px;
+  }
+
+  .search-input{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:9px 12px;
+    width:280px;
+    max-width:100%;
+  }
+
+  .chip{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.5px;
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:7px 11px;
+    cursor:pointer;
+  }
+
+  .chip.active{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  /* ---------- Cards ---------- */
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(420px,100%), 1fr));
+    gap:20px;
+    margin-top:24px;
+    align-items:start;
+  }
+
+  .card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:20px;
+  }
+
+  .card-head{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:2px solid var(--black);
+    padding-bottom:12px;
+  }
+
+  .card-nome{
+    font-family:'Space Mono', monospace;
+    font-size:18px;
+    font-weight:700;
+    margin:0;
+  }
+
+  .card-tag{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    border:1px solid var(--muted);
+    padding:3px 6px;
+    white-space:nowrap;
+  }
+
+  .card-sub{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    margin:10px 0 0;
+    letter-spacing:0.5px;
+  }
+
+  .block-label{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:18px 0 8px;
+  }
+
+  /* ---------- Linhas de componentes ---------- */
+  .comp-line{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+  }
+
+  .comp-nome{
+    flex:1 1 180px;
+    min-width:0;
+  }
+
+  .comp-qtd{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .comp-custo{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+    min-width:74px;
+    text-align:right;
+  }
+
+  .comp-custo.missing{
+    color:var(--red);
+    font-weight:400;
+  }
+
+  .comp-prep-badge{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    border:1px solid var(--muted);
+    color:var(--muted);
+    padding:1px 4px;
+    margin-left:6px;
+    white-space:nowrap;
+  }
+
+  /* ---------- Totais ---------- */
+  .totais{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .total-box{
+    flex:1 1 110px;
+    border:2px solid var(--black);
+    padding:10px 12px;
+  }
+
+  .total-box.incompleto{
+    border-color:var(--amber);
+    background:var(--warn-bg);
+  }
+
+  .total-box.fc-alto{
+    border-color:var(--red);
+  }
+
+  .total-label{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 4px;
+  }
+
+  .total-value{
+    font-family:'Space Mono', monospace;
+    font-size:19px;
+    font-weight:700;
+    margin:0;
+  }
+
+  .total-value.small{
+    font-size:14px;
+  }
+
+  /* ---------- Avisos ---------- */
+  .avisos{
+    background:var(--warn-bg);
+    border:2px solid var(--amber);
+    padding:12px 14px;
+    margin-top:16px;
+  }
+
+  .avisos-label{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--amber);
+    margin:0 0 6px;
+  }
+
+  .avisos ul{
+    margin:0;
+    padding-left:18px;
+  }
+
+  .avisos li{
+    font-size:13px;
+    line-height:1.5;
+    margin-bottom:4px;
+  }
+
+  .avisos li:last-child{
+    margin-bottom:0;
+  }
+
+  /* ---------- Passos e notas ---------- */
+  details.bloco{
+    margin-top:16px;
+    border-top:1px solid var(--line);
+    padding-top:12px;
+  }
+
+  details.bloco summary{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  details.bloco ol{
+    margin:10px 0 0;
+    padding-left:20px;
+  }
+
+  details.bloco li{
+    font-size:13px;
+    line-height:1.6;
+    margin-bottom:5px;
+  }
+
+  .notas{
+    font-size:13px;
+    line-height:1.6;
+    margin:12px 0 0;
+    padding-left:12px;
+    border-left:3px solid var(--line);
+    color:var(--muted);
+  }
+
+  .empty{
+    background:var(--white);
+    border:2px dashed var(--black);
+    padding:28px;
+    margin-top:24px;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    line-height:1.7;
+  }
+
+  .empty code{
+    background:var(--bg);
+    padding:2px 5px;
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.55);
+    z-index:50;
+    padding:40px 20px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{display:block;}
+
+  .modal{
+    background:var(--white);
+    border:2px solid var(--black);
+    max-width:640px;
+    margin:0 auto;
+    padding:24px;
+  }
+
+  .modal-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border-bottom:2px solid var(--black);
+    padding-bottom:12px;
+    margin-bottom:16px;
+  }
+
+  .modal-title{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    margin:0;
+  }
+
+  .modal-close{
+    background:none;
+    border:2px solid var(--black);
+    font-size:18px;
+    line-height:1;
+    padding:4px 9px;
+    cursor:pointer;
+  }
+
+  .rel-group{margin-bottom:16px;}
+
+  .rel-group h4{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+
+  .rel-group ul{
+    margin:0;
+    padding-left:18px;
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  .rel-empty{
+    font-size:13px;
+    color:var(--muted);
+    margin:0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">GIOCO · Receitas</h1>
+  <p class="page-subtitle">Fichas técnicas e custo</p>
+
+  <p class="status-msg" id="statusMsg">A carregar…</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabArtigos" data-tab="artigos">Artigos<span class="tab-count" id="countArtigos"></span></button>
+    <button class="tab-btn" id="tabPreparacoes" data-tab="preparacoes">Preparações<span class="tab-count" id="countPreparacoes"></span></button>
+  </div>
+
+  <div class="filter-row">
+    <input type="text" class="search-input" id="searchInput" placeholder="Procurar por nome…">
+    <div id="categoriaChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+
+  <div id="conteudo"></div>
+</main>
+
+<div class="modal-overlay" id="seedOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 class="modal-title" id="seedTitle">Relatório da migração</h3>
+      <button class="modal-close" id="seedClose">×</button>
+    </div>
+    <div id="seedBody"></div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  var firebaseConfig = {
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var ingredientesRef = db.ref('ingredientes');
+  var preparacoesRef = db.ref('preparacoes');
+  var receitasRef = db.ref('receitas');
+  var suppliersRef = db.ref('suppliers');
+  var categoriasIngredientesRef = db.ref('categoriasIngredientes');
+
+  // ===================================================================
+  // SEED — dados do levantamento inicial. Só correm uma vez (?seed=1 ou
+  // pela consola); nunca sobrescrevem o que já existe na base de dados.
+  // ===================================================================
+
+  var INGREDIENTES_SEED = [
+    {nome:"Base Focaccia", unidade:"un", precoUltimaCompra:0.89, fornecedor:null, categoria:"Base"},
+    {nome:"Pão Maritozzo", unidade:"un", precoUltimaCompra:0.91, fornecedor:null, categoria:"Base"},
+    {nome:"Tomate pelado", unidade:"kg", precoUltimaCompra:1.41, fornecedor:"Il Bocconcino"},
+    {nome:"Tomate seco (peso escorrido)", unidade:"kg", precoUltimaCompra:5.789473684, fornecedor:"Il Bocconcino"},
+    {nome:"Ventricina piccante (peso netto)", unidade:"kg", precoUltimaCompra:9.421052632, fornecedor:"Il Bocconcino"},
+    {nome:"Provolone dolce", unidade:"kg", precoUltimaCompra:8.6, fornecedor:"Il Bocconcino"},
+    {nome:"Manjericão", unidade:"kg", precoUltimaCompra:20.6, fornecedor:"BidFood"},
+    {nome:"Rúcula", unidade:"kg", precoUltimaCompra:7.36, fornecedor:"BidFood"},
+    {nome:"Tomate seco", unidade:"kg", precoUltimaCompra:5.5, fornecedor:"Il Bocconcino"},
+    {nome:"Stracciatella", unidade:"kg", precoUltimaCompra:10.48, fornecedor:"Il Bocconcino"},
+    {nome:"Mortadella", unidade:"kg", precoUltimaCompra:7.55, fornecedor:"Il Bocconcino"},
+    {nome:"Mortadella (peso netto)", unidade:"kg", precoUltimaCompra:7.947368421, fornecedor:"Il Bocconcino"},
+    {nome:"Granella di Pistacchio", unidade:"kg", precoUltimaCompra:30.9, fornecedor:"Il Bocconcino"},
+    {nome:"Pistacchio inteiro c/pele", unidade:"kg", precoUltimaCompra:29.49, fornecedor:"Sogenave"},
+    {nome:"Grana da grattuggia", unidade:"kg", precoUltimaCompra:10.75, fornecedor:"TGT"},
+    {nome:"Azeite EVO", unidade:"kg", precoUltimaCompra:4.87, fornecedor:"Il Bocconcino"},
+    {nome:"Gema Ovo pasteurizada", unidade:"kg", precoUltimaCompra:9.44, fornecedor:"BidFood"},
+    {nome:"Natas culinária vegetal", unidade:"kg", precoUltimaCompra:2.15, fornecedor:"PackFilm"},
+    {nome:"Leite", unidade:"kg", precoUltimaCompra:0.65, fornecedor:"Makro"},
+    {nome:"Sal fino", unidade:"kg", precoUltimaCompra:0.23, fornecedor:"Makro"},
+    {nome:"Pimenta preta moída", unidade:"kg", precoUltimaCompra:7.96, fornecedor:"Sogenave"},
+    {nome:"Maple Syrup", unidade:"kg", precoUltimaCompra:20.76, fornecedor:"Sogenave"},
+    {nome:"Guanciale crocante (cubos)", unidade:"kg", precoUltimaCompra:21.452631579, fornecedor:"Il Bocconcino"},
+    {nome:"Guanciale (peso netto, tiras finas)", unidade:"kg", precoUltimaCompra:10.726315789, fornecedor:"Il Bocconcino"},
+    {nome:"Pecorino Romano ralado", unidade:"kg", precoUltimaCompra:15.99, fornecedor:"Il Bocconcino"},
+    {nome:"Fior di Latte", unidade:"kg", precoUltimaCompra:6.7, fornecedor:"Il Bocconcino"},
+    {nome:"Prosciutto crudo (peso netto)", unidade:"kg", precoUltimaCompra:12.6, fornecedor:"Il Bocconcino"},
+    {nome:"Glassa di Aceto Balsamico", unidade:"kg", precoUltimaCompra:4.92, fornecedor:"Sogenave"},
+    {nome:"Alcachofras al naturale (escorrido)", unidade:"kg", precoUltimaCompra:4.9375, fornecedor:"Il Bocconcino"},
+    {nome:"Azeitona Kalamata", unidade:"kg", precoUltimaCompra:6, fornecedor:"Il Bocconcino"},
+    {nome:"Cebola roxa caramelizada", unidade:"kg", precoUltimaCompra:5, fornecedor:null},
+    {nome:"Abacate fresco HASS", unidade:"kg", precoUltimaCompra:4.5, fornecedor:"BidFood"},
+    {nome:"Salmão fumado (aparas)", unidade:"kg", precoUltimaCompra:12.55, fornecedor:"Sogenave"},
+    {nome:"Creme Fraîche", unidade:"kg", precoUltimaCompra:5.68, fornecedor:"BidFood"},
+    {nome:"Cebolinho", unidade:"kg", precoUltimaCompra:20.6, fornecedor:"BidFood"},
+    {nome:"Limão", unidade:"kg", precoUltimaCompra:1.16, fornecedor:"BidFood"},
+    {nome:"Limas", unidade:"kg", precoUltimaCompra:3.55, fornecedor:"BidFood"},
+    {nome:"Pastrami (peso netto)", unidade:"kg", precoUltimaCompra:20.094736842, fornecedor:"Il Bocconcino"},
+    {nome:"Pepino rodelas em bolsa", unidade:"kg", precoUltimaCompra:2.4, fornecedor:"BidFood"},
+    {nome:"Mostarda de Dijon", unidade:"kg", precoUltimaCompra:3.6, fornecedor:"BidFood"},
+    {nome:"Porchetta (peso netto)", unidade:"kg", precoUltimaCompra:8.888888889, fornecedor:"Gusto Ital"},
+    {nome:"Stracchino", unidade:"kg", precoUltimaCompra:8.08, fornecedor:"Il Bocconcino"},
+    {nome:"Aceto balsamico (spray)", unidade:"kg", precoUltimaCompra:1.97, fornecedor:"Makro"},
+    {nome:"Sémola de milho (polenta)", unidade:"kg", precoUltimaCompra:1.04, fornecedor:"Makro"},
+    {nome:"Olive Dolci Siciliane", unidade:"kg", precoUltimaCompra:5.92, fornecedor:"Il Bocconcino"},
+    {nome:"Grana Padano (Maritozzo)", unidade:"kg", precoUltimaCompra:10.75, fornecedor:"TGT"},
+    {nome:"Ricotta", unidade:"kg", precoUltimaCompra:4.21, fornecedor:"TGT"},
+    {nome:"Coco ralado", unidade:"kg", precoUltimaCompra:4.54, fornecedor:"Sogenave"},
+    {nome:"Nutella (bag 1kg)", unidade:"kg", precoUltimaCompra:7.73, fornecedor:"Sogenave"},
+    {nome:"Miolo avelã s/pele (granella nocciola)", unidade:"kg", precoUltimaCompra:13.78, fornecedor:"Sogenave"},
+    {nome:"Natas bater vegetal (panna montata)", unidade:"kg", precoUltimaCompra:2.15, fornecedor:"PackFilm"},
+    {nome:"Confettura di Albicocca", unidade:"kg", precoUltimaCompra:3.2, fornecedor:"Sogenave"},
+    {nome:"Gelo", unidade:"kg", precoUltimaCompra:0.5, fornecedor:null},
+    // gaps sinalizados — preço a confirmar, entram com precoUltimaCompra:null
+    {nome:"Salsa", unidade:"kg", precoUltimaCompra:null, fornecedor:"BidFood"},
+    {nome:"Grão de bico", unidade:"kg", precoUltimaCompra:null, fornecedor:"Sogenave"},
+    {nome:"Miolo de nozes", unidade:"kg", precoUltimaCompra:7.36, fornecedor:"Sogenave"},
+    {nome:"Vinagre", unidade:"kg", precoUltimaCompra:0.51, fornecedor:"Makro"}
+  ];
+
+  var PREPARACOES_SEED = [
+    {
+      nome:"Molho Carbo Cream", codigo:"SA01", custoManual:false,
+      rendimento:{qtd:0.154, unidade:"kg"},
+      ingredientes:[
+        {nome:"Gema Ovo pasteurizada", qtd:0.1, unidade:"kg"},
+        {nome:"Natas culinária vegetal", qtd:0.025, unidade:"kg"},
+        {nome:"Leite", qtd:0.025, unidade:"kg"},
+        {nome:"Grana da grattuggia", qtd:0.003, unidade:"kg"},
+        {nome:"Pimenta preta moída", qtd:0.001, unidade:"kg"}
+      ],
+      passos:[
+        "Adicionar todos os ingredientes numa tigela e bater bem até ficar liso (Bimby ou varinha).",
+        "Levar ao lume médio, reduzindo depois de pouco tempo.",
+        "Mexer sempre com espátula até engrossar. Temperatura final ~80°C.",
+        "Arrefecer rápido em abatedor.",
+        "Guardar em recipiente fechado no frio, 0–4°C, máximo 3–4 dias."
+      ],
+      notas:"Não sobreaquecer. Antes de usar: aquecer 15s no forno; guanciale crocante aquecer 30s à parte."
+    },
+    {
+      nome:"Pesto di Pistacchio", codigo:"SA02", custoManual:false,
+      rendimento:{qtd:0.306, unidade:"kg"},
+      ingredientes:[
+        {nome:"Manjericão", qtd:0.05, unidade:"kg"},
+        {nome:"Pistacchio inteiro c/pele", qtd:0.05, unidade:"kg"},
+        {nome:"Grana da grattuggia", qtd:0.05, unidade:"kg"},
+        {nome:"Azeite EVO", qtd:0.1, unidade:"kg"},
+        {nome:"Gelo", qtd:0.05, unidade:"kg"},
+        {nome:"Limão", qtd:0.005, unidade:"kg"}
+      ],
+      passos:["Triturar tudo até ficar liso.", "Guardar no frio."],
+      notas:"AVISO: falta um ingrediente por confirmar (linha residual de 1g no ficheiro original, ~0.0225€/kg — provavelmente sal)."
+    },
+    {
+      nome:"Azeite Aromático", codigo:"SA03", custoManual:false,
+      rendimento:{qtd:0.47, unidade:"kg"},
+      ingredientes:[
+        {nome:"Azeite EVO", qtd:0.1, unidade:"kg"},
+        {nome:"Limão", qtd:0.15, unidade:"kg"},
+        {nome:"Limas", qtd:0.2, unidade:"kg"},
+        {nome:"Manjericão", qtd:0.01, unidade:"kg"},
+        {nome:"Pimenta preta moída", qtd:0.01, unidade:"kg"}
+      ],
+      passos:["Juntar azeite, raspas de limão e lima, manjericão e pimenta cortados finos.", "Deixar infusionar no frio."],
+      notas:null
+    },
+    {
+      nome:"Pesto Vegan", codigo:"SA04", custoManual:false,
+      rendimento:{qtd:0.221, unidade:"kg"},
+      ingredientes:[
+        {nome:"Azeite EVO", qtd:0.045, unidade:"kg"},
+        {nome:"Manjericão", qtd:0.06, unidade:"kg"},
+        {nome:"Salsa", qtd:0.025, unidade:"kg"},
+        {nome:"Grão de bico", qtd:0.02, unidade:"kg"},
+        {nome:"Miolo de nozes", qtd:0.02, unidade:"kg"},
+        {nome:"Vinagre", qtd:0.008, unidade:"kg"},
+        {nome:"Gelo", qtd:0.04, unidade:"kg"}
+      ],
+      passos:["Triturar tudo até liso.", "Ajustar tempero.", "Embalar a vácuo para durar mais tempo."],
+      notas:"Salsa e Grão de bico sem preço confirmado — custo desta preparação está subavaliado até isso ser resolvido."
+    },
+    {
+      nome:"Polenta Frita (massa)", codigo:"SA08", custoManual:false,
+      rendimento:{qtd:1.048, unidade:"kg"},
+      ingredientes:[
+        {nome:"Sémola de milho (polenta)", qtd:1, unidade:"kg"},
+        {nome:"Sal fino", qtd:0.04, unidade:"kg"}
+      ],
+      passos:["Cozinhar sticks a 255°C durante 20 minutos, com óleo generoso, sticks a 1cm de distância, virar a meio da cozedura.", "Regenerar: forno à temperatura da focaccia, 3-4 minutos."],
+      notas:null
+    },
+    {
+      nome:"Cebola Pickles", codigo:"SA05", custoManual:true, custoManualPorUnidade:4,
+      rendimento:null, ingredientes:[],
+      passos:["Fatiar cebola roxa fina.", "Refogar em azeite 10 min.", "Adicionar sal, açúcar e água, cozinhar 20-25 min em lume baixo.", "2 min antes do fim, adicionar vinagre balsâmico."],
+      notas:"Custo importado como valor fixo (4€/kg) — falta o breakdown de ingredientes desta preparação para calcular ao vivo."
+    },
+    {
+      nome:"Ragù alla Bolognese", codigo:"SA07", custoManual:true, custoManualPorUnidade:8.8,
+      rendimento:null, ingredientes:[], passos:[],
+      notas:"Custo importado como valor fixo (8.8€/kg) — sem breakdown de ingredientes nem passos no material recebido."
+    },
+    {
+      nome:"Molho Tomate Cozido", codigo:"SA09", custoManual:true, custoManualPorUnidade:null,
+      rendimento:null, ingredientes:[],
+      passos:["Passar tomate pelado pelo passe-vite.", "Refogar 2 dentes de alho + azeite + manjericão 1m30.", "Retirar alho, juntar tomate e sal.", "Ferver e reduzir 30 min.", "Arrefecer em abatedor, guardar 0–4°C máx. 5 dias."],
+      notas:"SEM CUSTO no ficheiro original — falta o rendimento do lote para calcular €/kg. Usado na Diavola (ver aviso nessa ficha)."
+    }
+  ];
+
+  var RECEITAS_SEED = [
+    {
+      nome:"Diavola", categoria:"Focaccia", pvp:9.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Tomate pelado", qtd:0.04, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Ventricina piccante (peso netto)", qtd:0.055, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Provolone dolce", qtd:0.04, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Manjericão", qtd:0.003, unidade:"kg"}
+      ],
+      passos:[
+        "Espalhar 1 colher de molho de tomate (50g) na base da focaccia.",
+        "Adicionar metade do provolone (30g).",
+        "Colocar a ventricina fatiada fina por cima (50g), dando volume.",
+        "Adicionar 4 folhas médias de manjericão.",
+        "Adicionar o restante provolone (25g).",
+        "Fechar a focaccia com cuidado, sem pressionar.",
+        "Levar ao forno 2 minutos.",
+        "Cortar ao meio.",
+        "Servir imediatamente."
+      ],
+      notas:"Não pressionar antes de assar. Ventricina deve ficar farta e generosa.",
+      avisos:["Peso total de provolone no ficheiro de custo (40g) é inferior à soma dos passos (30g+25g=55g) — confirmar valor real.",
+              "Usa 'tomate pelado' cru no cálculo de custo, não a preparação 'Molho Tomate Cozido' — confirmar se é essa a intenção."]
+    },
+    {
+      nome:"Vegetariana", categoria:"Focaccia", pvp:9.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Rúcula", qtd:0.02, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Tomate seco (peso escorrido)", qtd:0.035, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Stracciatella", qtd:0.07, unidade:"kg"},
+        {tipo:"preparacao", nome:"Pesto di Pistacchio", qtd:0.03, unidade:"kg"}
+      ],
+      passos:[
+        "Espalhar 100g de stracciatella na base.",
+        "Adicionar 50g de pesto de pistachio com dosador.",
+        "Adicionar 55g de tomate semi-seco.",
+        "Levar ao forno 2 minutos.",
+        "Abrir a focaccia e adicionar 20g de rúcula.",
+        "Fechar com cuidado.",
+        "Cortar ao meio e servir imediatamente."
+      ],
+      notas:"Se o pesto estiver frio ou duro, usar colher para ajudar. Tomate seco deve estar seco, sem excesso de óleo.",
+      avisos:[]
+    },
+    {
+      nome:"Mortadella", categoria:"Focaccia", pvp:9.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Mortadella (peso netto)", qtd:0.07, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Stracciatella", qtd:0.06, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Granella di Pistacchio", qtd:0.003, unidade:"kg"},
+        {tipo:"preparacao", nome:"Pesto di Pistacchio", qtd:0.015, unidade:"kg"}
+      ],
+      passos:[
+        "Levar ao forno 2 minutos.",
+        "Espalhar 65g de stracciatella na base.",
+        "Adicionar 90g de mortadella, dando volume.",
+        "Adicionar 3g de pistachio triturado.",
+        "Adicionar 12g de pesto de pistachio com dosador.",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Mortadella deve ficar farta e generosa.",
+      avisos:["Peso da mortadella nos passos (90g) difere do ficheiro de custo (70g) — confirmar."]
+    },
+    {
+      nome:"Carbocream", categoria:"Focaccia", pvp:10.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"preparacao", nome:"Molho Carbo Cream", qtd:0.06, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Maple Syrup", qtd:0.001, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Guanciale crocante (cubos)", qtd:0.03, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Guanciale (peso netto, tiras finas)", qtd:0.035, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Pecorino Romano ralado", qtd:0.003, unidade:"kg"}
+      ],
+      passos:[
+        "Adicionar 30g de guanciale fatiado fino e 3g de pecorino ralado.",
+        "Levar ao forno 2 minutos.",
+        "Preparar 2 tachos pequenos: 80g de molho Carbo Cream num, 40g de guanciale crocante no outro.",
+        "Aquecer o molho Carbo Cream no forno 15 segundos.",
+        "Aquecer o guanciale crocante no forno 30 segundos.",
+        "Abrir a focaccia novamente.",
+        "Adicionar o molho Carbo Cream dentro.",
+        "Adicionar o guanciale crocante.",
+        "Adicionar uma linha muito fina de maple syrup (1g).",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Não sobreaquecer o molho Carbo Cream. Maple syrup deve ser muito ligeiro.",
+      avisos:[]
+    },
+    {
+      nome:"Italiano Vero", categoria:"Focaccia", pvp:10.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Fior di Latte", qtd:0.055, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Prosciutto crudo (peso netto)", qtd:0.07, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Glassa di Aceto Balsamico", qtd:0.002, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Tomate seco (peso escorrido)", qtd:0.03, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Rúcula", qtd:0.02, unidade:"kg"}
+      ],
+      passos:[
+        "Adicionar 90g de fior di latte fatiado fino.",
+        "Adicionar 30g de tomate semi-seco.",
+        "Levar ao forno 2 minutos.",
+        "Adicionar 70g de prosciutto crudo, dando volume.",
+        "Adicionar 20g de rúcula.",
+        "Adicionar uma linha leve de glaze balsâmico por cima (2g).",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Ter tudo pronto enquanto a focaccia está no forno — importante para rapidez e qualidade final. Não pressionar o prosciutto crudo.",
+      avisos:[]
+    },
+    {
+      nome:"Al Green", categoria:"Focaccia", pvp:11.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"preparacao", nome:"Pesto Vegan", qtd:0.05, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Alcachofras al naturale (escorrido)", qtd:0.04, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Azeitona Kalamata", qtd:0.01, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Tomate seco (peso escorrido)", qtd:0.03, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Cebola roxa caramelizada", qtd:0.01, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Abacate fresco HASS", qtd:0.03, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Rúcula", qtd:0.015, unidade:"kg"}
+      ],
+      passos:[
+        "Espalhar 60g de pesto vegan na base.",
+        "Adicionar 34g de gomos de alcachofra.",
+        "Adicionar 26g de tomate semi-seco.",
+        "Adicionar 13g de cebola pickle.",
+        "Adicionar 37g de abacate fatiado fino.",
+        "Levar ao forno 2 minutos.",
+        "Abrir a focaccia e adicionar 15g de rúcula.",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Não pressionar ao fechar.",
+      avisos:["Passos mencionam 'cebola pickle' mas o ficheiro de custo usa 'cebola roxa caramelizada' — confirmar se é a mesma preparação ou duas diferentes."]
+    },
+    {
+      nome:"Salmon Bikini", categoria:"Focaccia", pvp:11.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Salmão fumado (aparas)", qtd:0.09, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Creme Fraîche", qtd:0.05, unidade:"kg"},
+        {tipo:"preparacao", nome:"Azeite Aromático", qtd:0.003, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Cebolinho", qtd:0.002, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Rúcula", qtd:0.015, unidade:"kg"}
+      ],
+      passos:[
+        "Levar ao forno 2 minutos.",
+        "Adicionar 80g de crème fraîche.",
+        "Adicionar 80g de salmão fumado.",
+        "Adicionar azeite aromático sobre o salmão (3g).",
+        "Adicionar cebolinho (2g).",
+        "Adicionar 15g de rúcula.",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Salmão fumado deve ter volume para um visual rico.",
+      avisos:[]
+    },
+    {
+      nome:"Italian Pastrami", categoria:"Focaccia", pvp:11.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Pastrami (peso netto)", qtd:0.07, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Pepino rodelas em bolsa", qtd:0.015, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Mostarda de Dijon", qtd:0.05, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Provolone dolce", qtd:0.04, unidade:"kg"}
+      ],
+      passos:[
+        "Espalhar uma camada fina de mostarda na base.",
+        "Adicionar 15g de provolone.",
+        "Adicionar 25g de pickles.",
+        "Adicionar 80g de pastrami, dando volume.",
+        "Adicionar 25g de provolone por cima.",
+        "Fechar com cuidado.",
+        "Levar ao forno 2 minutos.",
+        "Cortar ao meio, servir imediatamente."
+      ],
+      notas:"Manter o pastrami farto e volumoso sem pressionar. Atenção à mostarda e pickles usados — produtos diferentes desequilibram a receita.",
+      avisos:[]
+    },
+    {
+      nome:"Porchetta", categoria:"Focaccia", pvp:11.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Base Focaccia", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Porchetta (peso netto)", qtd:0.07, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Stracchino", qtd:0.05, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Aceto balsamico (spray)", qtd:0.005, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Rúcula", qtd:0.015, unidade:"kg"}
+      ],
+      passos:[
+        "Espalhar 60g de stracchino na base.",
+        "Adicionar 90g de porchetta.",
+        "Levar ao forno 2 minutos.",
+        "Abrir a focaccia e adicionar 15g de rúcula.",
+        "Adicionar glaze balsâmico sobre a rúcula (5g).",
+        "Fechar com cuidado, cortar ao meio, servir imediatamente."
+      ],
+      notas:"Porchetta deve ter volume para visual rico. Stracchino deve descongelar pelo menos 30 min antes de usar, para ficar cremoso.",
+      avisos:[]
+    },
+    {
+      nome:"Stick di Polenta Fritta", categoria:"Side", pvp:2.90,
+      componentes:[{tipo:"preparacao", nome:"Polenta Frita (massa)", qtd:0.1, unidade:"kg"}],
+      passos:["Cozinhar sticks a 255°C durante 20 minutos.", "Regenerar no forno à temperatura da focaccia, 3-4 minutos."],
+      notas:null, avisos:[]
+    },
+    {
+      nome:"Olive Verdi Dolci Siciliane", categoria:"Side", pvp:2.90,
+      componentes:[{tipo:"ingrediente", nome:"Olive Dolci Siciliane", qtd:0.05, unidade:"kg"}],
+      passos:[], notas:"Pronto a servir.", avisos:[]
+    },
+    {
+      nome:"Maritozzo al Ragù", categoria:"Maritozzo Salgado", pvp:5.50,
+      componentes:[
+        {tipo:"ingrediente", nome:"Pão Maritozzo", qtd:1, unidade:"un"},
+        {tipo:"preparacao", nome:"Ragù alla Bolognese", qtd:0.08, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Grana Padano (Maritozzo)", qtd:0.003, unidade:"kg"}
+      ],
+      passos:[
+        "Manter o maritozzo congelado; passar para o frio pelo menos 1 dia antes de usar.",
+        "Aquecer ragù em tacho pequeno (40s a 1 minuto).",
+        "Reaquecer maritozzo no forno 25 segundos, abrir com faca serrilhada (mais de metade da profundidade, sem cortar por completo).",
+        "Encher com 80g de ragù usando colher.",
+        "Finalizar com pecorino ralado."
+      ],
+      notas:null, avisos:[]
+    },
+    {
+      nome:"Maritozzo Mortadella", categoria:"Maritozzo Salgado", pvp:5.50,
+      componentes:[
+        {tipo:"ingrediente", nome:"Pão Maritozzo", qtd:1, unidade:"un"},
+        {tipo:"preparacao", nome:"Pesto di Pistacchio", qtd:0.005, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Mortadella", qtd:0.02, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Stracciatella", qtd:0.025, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Granella di Pistacchio", qtd:0.001, unidade:"kg"}
+      ],
+      passos:[
+        "Reaquecer maritozzo no forno 25 segundos, abrir gentilmente.",
+        "Adicionar 15g de stracciatella/burrata no fundo.",
+        "Adicionar 20g de mortadella, com volume.",
+        "Adicionar mais 10g de stracciatella/burrata por cima.",
+        "Finalizar com 5g de pesto de pistachio e 1g de pistachio triturado."
+      ],
+      notas:null, avisos:[]
+    },
+    {
+      nome:"Maritozzo Nutella", categoria:"Maritozzo Doce", pvp:3.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Pão Maritozzo", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Nutella (bag 1kg)", qtd:0.02, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Ricotta", qtd:0.01, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Coco ralado", qtd:0.005, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Miolo avelã s/pele (granella nocciola)", qtd:0.003, unidade:"kg"}
+      ],
+      passos:[
+        "Abrir maritozzo com faca serrilhada como indicado.",
+        "Reaquecer no forno 20 segundos.",
+        "Encher generosamente com creme chantilly.",
+        "Alisar o creme com espátula.",
+        "Aquecer chocolate em tigela no micro-ondas 30 segundos até derreter.",
+        "Mergulhar o maritozzo do lado do creme no chocolate.",
+        "Deixar escorrer o excesso de chocolate.",
+        "Servir no prato."
+      ],
+      notas:null,
+      avisos:["Quantidade de 'granella di nocciola' (miolo de avelã) não veio especificada no ficheiro de custo — valor de 3g é uma estimativa, confirmar com o Mattia."]
+    },
+    {
+      nome:"Maritozzo Panna e Albicocca", categoria:"Maritozzo Doce", pvp:3.90,
+      componentes:[
+        {tipo:"ingrediente", nome:"Pão Maritozzo", qtd:1, unidade:"un"},
+        {tipo:"ingrediente", nome:"Natas bater vegetal (panna montata)", qtd:0.035, unidade:"kg"},
+        {tipo:"ingrediente", nome:"Confettura di Albicocca", qtd:0.003, unidade:"kg"}
+      ],
+      passos:[
+        "Abrir maritozzo com faca serrilhada como indicado.",
+        "Reaquecer no forno 20 segundos.",
+        "Adicionar 5g de doce de alperce no centro, no fundo.",
+        "Encher generosamente com creme chantilly.",
+        "Alisar o creme com espátula.",
+        "Finalizar com um leve pó de pimenta preta."
+      ],
+      notas:"Creme chantilly: bater em batedeira a velocidade média-alta até ficar liso e estável. Guardar em recipiente fechado no frio, máx. 5 dias.",
+      avisos:[]
+    }
+  ];
+
+  // ===================================================================
+  // Helpers
+  // ===================================================================
+
+  var ACCENT_MAP = {
+    "à":"a","á":"a","â":"a","ã":"a","ä":"a",
+    "è":"e","é":"e","ê":"e","ë":"e",
+    "ì":"i","í":"i","î":"i","ï":"i",
+    "ò":"o","ó":"o","ô":"o","õ":"o","ö":"o",
+    "ù":"u","ú":"u","û":"u","ü":"u",
+    "ç":"c","ñ":"n"
+  };
+
+  // Mesma lógica de normalização usada em leitura-faturas.html: minúsculas,
+  // sem acentos, sem espaços à volta.
+  function normalizarTexto(s) {
+    var lower = String(s === null || s === undefined ? "" : s).toLowerCase();
+    var out = "";
+    for (var i = 0; i < lower.length; i++) {
+      var ch = lower.charAt(i);
+      out += ACCENT_MAP[ch] || ch;
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+
+  function escapeHtml(str) {
+    return String(str === null || str === undefined ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function formatEuros(valor, casas) {
+    if (typeof valor !== 'number' || isNaN(valor)) return null;
+    return valor.toFixed(casas === undefined ? 2 : casas).replace('.', ',') + ' €';
+  }
+
+  function formatQtd(qtd, unidade) {
+    if (typeof qtd !== 'number' || isNaN(qtd)) return '—';
+    var u = normalizarTexto(unidade);
+    if (u === 'kg' && qtd < 1) return Math.round(qtd * 1000) + ' g';
+    if (u === 'l' && qtd < 1) return Math.round(qtd * 1000) + ' ml';
+    var texto = (Math.round(qtd * 1000) / 1000).toString().replace('.', ',');
+    return texto + (unidade ? ' ' + unidade : '');
+  }
+
+  // Conversões entre unidades da mesma família. Devolve null quando as
+  // unidades são incompatíveis — nesse caso a linha fica sinalizada em vez
+  // de produzir um custo errado.
+  var UNIDADE_ALIASES = {
+    kg:'kg', quilo:'kg', quilos:'kg', g:'g', gr:'g', grama:'g', gramas:'g',
+    l:'l', lt:'l', litro:'l', litros:'l', ml:'ml',
+    un:'un', uni:'un', und:'un', unid:'un', unidade:'un', unidades:'un', pc:'un', pç:'un'
+  };
+
+  var FATORES = {
+    kg:{kg:1, g:0.001},
+    g:{g:1, kg:1000},
+    l:{l:1, ml:0.001},
+    ml:{ml:1, l:1000},
+    un:{un:1}
+  };
+
+  function unidadeCanonica(u) {
+    var n = normalizarTexto(u);
+    return UNIDADE_ALIASES[n] || n;
+  }
+
+  // Quantos "de" cabem em 1 "para". Ex.: converterFator('g','kg') = 0.001
+  function converterFator(de, para) {
+    var a = unidadeCanonica(de);
+    var b = unidadeCanonica(para);
+    if (!a || !b) return 1;          // unidade desconhecida: assume-se igual
+    if (a === b) return 1;
+    if (FATORES[a] && typeof FATORES[a][b] === 'number') return FATORES[a][b];
+    return null;
+  }
+
+  // ===================================================================
+  // Estado
+  // ===================================================================
+
+  var allIngredientes = {};
+  var allPreparacoes = {};
+  var allReceitas = {};
+  var carregado = { ing:false, prep:false, rec:false };
+
+  var abaAtiva = 'artigos';
+  var termoPesquisa = '';
+  var categoriaAtiva = 'Todas';
+
+  var statusMsg = document.getElementById('statusMsg');
+  var conteudo = document.getElementById('conteudo');
+  var searchInput = document.getElementById('searchInput');
+  var categoriaChips = document.getElementById('categoriaChips');
+
+  // ===================================================================
+  // Custo — função central reutilizável
+  // ===================================================================
+
+  // Devolve sempre { custo:number|null, ok:boolean, motivo:string|null,
+  //                  nome:string, detalhe:string|null }
+  // custo === null significa "não é possível calcular" — nunca 0 disfarçado.
+  function calcularCustoComponente(componente, visitados) {
+    visitados = visitados || {};
+    var qtd = typeof componente.qtd === 'number' ? componente.qtd : parseFloat(componente.qtd);
+    if (isNaN(qtd)) qtd = null;
+
+    if (componente.tipo === 'preparacao') {
+      var prep = allPreparacoes[componente.prepId];
+      var nomePrep = (prep && prep.nome) || componente.nome || 'Preparação desconhecida';
+      if (!prep) {
+        return { custo:null, ok:false, motivo:'sem-referencia', nome:nomePrep, detalhe:null };
+      }
+      var porUnidade = custoPorUnidadeDaPreparacao(componente.prepId, visitados);
+      if (porUnidade.custo === null || qtd === null) {
+        return { custo:null, ok:false, motivo:porUnidade.motivo || 'sem-preco', nome:nomePrep, detalhe:null };
+      }
+      var fatorP = converterFator(componente.unidade, porUnidade.unidade);
+      if (fatorP === null) {
+        return { custo:null, ok:false, motivo:'unidade', nome:nomePrep,
+                 detalhe:'unidade incompatível (' + (componente.unidade || '?') + ' vs ' + porUnidade.unidade + ')' };
+      }
+      return {
+        custo: qtd * fatorP * porUnidade.custo,
+        ok: true, motivo: null, nome: nomePrep,
+        detalhe: formatEuros(porUnidade.custo, 2) + ' / ' + porUnidade.unidade
+      };
+    }
+
+    // tipo === 'ingrediente'
+    var ing = allIngredientes[componente.ingredienteId];
+    var nomeIng = (ing && ing.nome) || componente.nome || 'Ingrediente desconhecido';
+    if (!ing) {
+      return { custo:null, ok:false, motivo:'sem-referencia', nome:nomeIng, detalhe:null };
+    }
+    var preco = ing.precoUltimaCompra;
+    if (typeof preco !== 'number') preco = parseFloat(preco);
+    if (preco === null || preco === undefined || isNaN(preco)) {
+      return { custo:null, ok:false, motivo:'sem-preco', nome:nomeIng, detalhe:null };
+    }
+    if (qtd === null) {
+      return { custo:null, ok:false, motivo:'sem-qtd', nome:nomeIng, detalhe:null };
+    }
+    var fator = converterFator(componente.unidade, ing.unidade || componente.unidade);
+    if (fator === null) {
+      return { custo:null, ok:false, motivo:'unidade', nome:nomeIng,
+               detalhe:'unidade incompatível (' + (componente.unidade || '?') + ' vs ' + ing.unidade + ')' };
+    }
+    return {
+      custo: qtd * fator * preco,
+      ok: true, motivo: null, nome: nomeIng,
+      detalhe: formatEuros(preco, 2) + ' / ' + (ing.unidade || componente.unidade || 'un')
+    };
+  }
+
+  // Custo por kg/l/un de uma preparação. Recursivo: uma preparação pode
+  // conter outra (ainda não acontece, mas fica preparado) — visitados corta
+  // ciclos para não entrar em recursão infinita.
+  function custoPorUnidadeDaPreparacao(prepId, visitados) {
+    visitados = visitados || {};
+    var prep = allPreparacoes[prepId];
+    if (!prep) return { custo:null, unidade:'kg', motivo:'sem-referencia' };
+
+    if (visitados[prepId]) return { custo:null, unidade:'kg', motivo:'ciclo' };
+    visitados[prepId] = true;
+
+    if (prep.custoManual) {
+      var manual = prep.custoManualPorUnidade;
+      if (typeof manual !== 'number') manual = parseFloat(manual);
+      var unidadeManual = (prep.rendimento && prep.rendimento.unidade) || 'kg';
+      if (manual === null || manual === undefined || isNaN(manual)) {
+        return { custo:null, unidade:unidadeManual, motivo:'sem-preco' };
+      }
+      return { custo:manual, unidade:unidadeManual, motivo:null, manual:true };
+    }
+
+    var detalhe = custoDoLote(prepId, visitados);
+    if (!detalhe.completo || detalhe.rendimento === null || !detalhe.rendimento) {
+      return { custo:null, unidade:detalhe.unidade, motivo:detalhe.rendimento ? 'sem-preco' : 'sem-rendimento' };
+    }
+    return { custo: detalhe.total / detalhe.rendimento, unidade: detalhe.unidade, motivo:null };
+  }
+
+  // Custo total do lote de uma preparação, linha a linha.
+  function custoDoLote(prepId, visitados) {
+    var prep = allPreparacoes[prepId] || {};
+    var lista = Array.isArray(prep.ingredientes) ? prep.ingredientes : [];
+    var linhas = [];
+    var total = 0;
+    var completo = true;
+
+    lista.forEach(function (item) {
+      var res = calcularCustoComponente({
+        tipo: 'ingrediente',
+        ingredienteId: item.ingredienteId,
+        nome: item.nome,
+        qtd: item.qtd,
+        unidade: item.unidade
+      }, Object.assign({}, visitados || {}));
+      linhas.push({ item: item, res: res });
+      if (res.ok) total += res.custo; else completo = false;
+    });
+
+    var rendimento = prep.rendimento && typeof prep.rendimento.qtd === 'number' ? prep.rendimento.qtd : null;
+    return {
+      linhas: linhas,
+      total: total,
+      completo: completo,
+      rendimento: rendimento,
+      unidade: (prep.rendimento && prep.rendimento.unidade) || 'kg'
+    };
+  }
+
+  // Custo total de um artigo, com o detalhe de cada componente.
+  function custoDoArtigo(receita) {
+    var componentes = Array.isArray(receita.componentes) ? receita.componentes : [];
+    var linhas = [];
+    var total = 0;
+    var completo = true;
+
+    componentes.forEach(function (comp) {
+      var res = calcularCustoComponente(comp, {});
+      linhas.push({ comp: comp, res: res });
+      if (res.ok) total += res.custo; else completo = false;
+    });
+
+    return { linhas: linhas, total: total, completo: completo };
+  }
+
+  // ===================================================================
+  // Render
+  // ===================================================================
+
+  var MOTIVO_LABEL = {
+    'sem-preco': '— preço em falta',
+    'sem-referencia': '— ingrediente não encontrado',
+    'sem-qtd': '— quantidade em falta',
+    'sem-rendimento': '— rendimento em falta',
+    'ciclo': '— referência circular',
+    'unidade': '— unidade incompatível'
+  };
+
+  function linhaComponenteHtml(nome, qtd, unidade, res, badge) {
+    var html = '<div class="comp-line">';
+    html += '<span class="comp-nome">' + escapeHtml(nome) +
+            (badge ? '<span class="comp-prep-badge">' + escapeHtml(badge) + '</span>' : '') + '</span>';
+    html += '<span class="comp-qtd">' + escapeHtml(formatQtd(qtd, unidade)) +
+            (res.ok && res.detalhe ? ' · ' + escapeHtml(res.detalhe) : '') + '</span>';
+    if (res.ok) {
+      html += '<span class="comp-custo">' + escapeHtml(formatEuros(res.custo, 3)) + '</span>';
+    } else {
+      var label = MOTIVO_LABEL[res.motivo] || '— sem custo';
+      if (res.motivo === 'unidade' && res.detalhe) label = '— ' + res.detalhe;
+      html += '<span class="comp-custo missing">' + escapeHtml(label) + '</span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function avisosHtml(avisos) {
+    var lista = (avisos || []).filter(function (a) { return a && String(a).trim(); });
+    if (!lista.length) return '';
+    var html = '<div class="avisos"><p class="avisos-label">⚠ Por confirmar</p><ul>';
+    lista.forEach(function (a) { html += '<li>' + escapeHtml(a) + '</li>'; });
+    return html + '</ul></div>';
+  }
+
+  function passosHtml(passos, aberto) {
+    var lista = (passos || []).filter(function (p) { return p && String(p).trim(); });
+    if (!lista.length) return '';
+    var html = '<details class="bloco"' + (aberto ? ' open' : '') + '><summary>Passos (' + lista.length + ')</summary><ol>';
+    lista.forEach(function (p) { html += '<li>' + escapeHtml(p) + '</li>'; });
+    return html + '</ol></details>';
+  }
+
+  function notasHtml(notas) {
+    if (!notas || !String(notas).trim()) return '';
+    return '<p class="notas">' + escapeHtml(notas) + '</p>';
+  }
+
+  function cardArtigoHtml(id, receita) {
+    var calc = custoDoArtigo(receita);
+    var pvp = typeof receita.pvp === 'number' ? receita.pvp : parseFloat(receita.pvp);
+    if (isNaN(pvp)) pvp = null;
+
+    var html = '<div class="card">';
+    html += '<div class="card-head">';
+    html += '<h3 class="card-nome">' + escapeHtml(receita.nome || 'Sem nome') + '</h3>';
+    html += '<span class="card-tag">' + escapeHtml(receita.categoria || 'Sem categoria') + '</span>';
+    html += '</div>';
+
+    html += '<p class="block-label">Componentes</p>';
+    if (!calc.linhas.length) {
+      html += '<p class="rel-empty">Sem componentes registados.</p>';
+    }
+    calc.linhas.forEach(function (l) {
+      var badge = l.comp.tipo === 'preparacao' ? 'preparação' : null;
+      html += linhaComponenteHtml(l.res.nome, l.comp.qtd, l.comp.unidade, l.res, badge);
+    });
+
+    html += '<div class="totais">';
+    if (calc.completo) {
+      html += '<div class="total-box"><p class="total-label">Custo</p><p class="total-value">' +
+              escapeHtml(formatEuros(calc.total, 2)) + '</p></div>';
+    } else {
+      html += '<div class="total-box incompleto"><p class="total-label">Custo — incompleto</p>' +
+              '<p class="total-value small">≥ ' + escapeHtml(formatEuros(calc.total, 2)) +
+              '<br><span style="font-size:10px;font-weight:400;">faltam preços</span></p></div>';
+    }
+    html += '<div class="total-box"><p class="total-label">PVP</p><p class="total-value">' +
+            escapeHtml(pvp === null ? '—' : formatEuros(pvp, 2)) + '</p></div>';
+
+    if (calc.completo && pvp) {
+      var fc = calc.total / pvp * 100;
+      html += '<div class="total-box' + (fc > 30 ? ' fc-alto' : '') + '"><p class="total-label">Food cost</p>' +
+              '<p class="total-value">' + fc.toFixed(1).replace('.', ',') + '%</p></div>';
+    } else {
+      html += '<div class="total-box incompleto"><p class="total-label">Food cost</p>' +
+              '<p class="total-value small">incompleto</p></div>';
+    }
+    html += '</div>';
+
+    html += avisosHtml(receita.avisos);
+    html += passosHtml(receita.passos, false);
+    html += notasHtml(receita.notas);
+    html += '</div>';
+    return html;
+  }
+
+  function cardPreparacaoHtml(id, prep) {
+    var lote = custoDoLote(id, {});
+    var porUnidade = custoPorUnidadeDaPreparacao(id, {});
+
+    var html = '<div class="card">';
+    html += '<div class="card-head">';
+    html += '<h3 class="card-nome">' + escapeHtml(prep.nome || 'Sem nome') + '</h3>';
+    html += '<span class="card-tag">' + escapeHtml(prep.codigo || 'sem código') + '</span>';
+    html += '</div>';
+
+    var subPartes = [];
+    if (prep.rendimento && typeof prep.rendimento.qtd === 'number') {
+      subPartes.push('Rendimento ' + formatQtd(prep.rendimento.qtd, prep.rendimento.unidade));
+    } else {
+      subPartes.push('Rendimento não definido');
+    }
+    if (prep.validadeDias) subPartes.push('Validade ' + prep.validadeDias + ' dias');
+    html += '<p class="card-sub">' + escapeHtml(subPartes.join(' · ')) + '</p>';
+
+    if (prep.custoManual) {
+      html += '<div class="avisos"><p class="avisos-label">⚠ Custo manual</p><ul><li>' +
+              'Sem breakdown de ingredientes — ' +
+              (porUnidade.custo === null
+                ? 'e sem valor de custo definido. Custo por calcular.'
+                : 'custo fixo de ' + formatEuros(porUnidade.custo, 2) + ' / ' + porUnidade.unidade + '.') +
+              '</li></ul></div>';
+    } else {
+      html += '<p class="block-label">Ingredientes</p>';
+      if (!lote.linhas.length) {
+        html += '<p class="rel-empty">Sem ingredientes registados.</p>';
+      }
+      lote.linhas.forEach(function (l) {
+        html += linhaComponenteHtml(l.res.nome, l.item.qtd, l.item.unidade, l.res, null);
+      });
+    }
+
+    html += '<div class="totais">';
+    if (!prep.custoManual) {
+      if (lote.completo) {
+        html += '<div class="total-box"><p class="total-label">Custo do lote</p><p class="total-value">' +
+                escapeHtml(formatEuros(lote.total, 2)) + '</p></div>';
+      } else {
+        html += '<div class="total-box incompleto"><p class="total-label">Lote — incompleto</p>' +
+                '<p class="total-value small">≥ ' + escapeHtml(formatEuros(lote.total, 2)) + '</p></div>';
+      }
+    }
+    if (porUnidade.custo === null) {
+      html += '<div class="total-box incompleto"><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) +
+              '</p><p class="total-value small">' + escapeHtml(MOTIVO_LABEL[porUnidade.motivo] || '— sem custo') + '</p></div>';
+    } else {
+      html += '<div class="total-box"><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) +
+              (prep.custoManual ? ' (manual)' : '') + '</p><p class="total-value">' +
+              escapeHtml(formatEuros(porUnidade.custo, 2)) + '</p></div>';
+    }
+    html += '<div class="total-box"><p class="total-label">Usada em</p><p class="total-value">' +
+            usadaEmQuantosArtigos(id) + '</p></div>';
+    html += '</div>';
+
+    html += passosHtml(prep.passos, false);
+    html += notasHtml(prep.notas);
+    html += '</div>';
+    return html;
+  }
+
+  function usadaEmQuantosArtigos(prepId) {
+    var n = 0;
+    Object.keys(allReceitas).forEach(function (rid) {
+      var comps = allReceitas[rid].componentes;
+      if (!Array.isArray(comps)) return;
+      if (comps.some(function (c) { return c.tipo === 'preparacao' && c.prepId === prepId; })) n++;
+    });
+    return n;
+  }
+
+  function categoriasDisponiveis() {
+    if (abaAtiva !== 'artigos') return [];
+    var set = {};
+    Object.keys(allReceitas).forEach(function (id) {
+      var cat = allReceitas[id].categoria || 'Sem categoria';
+      set[cat] = true;
+    });
+    return Object.keys(set).sort();
+  }
+
+  function renderChips() {
+    var cats = categoriasDisponiveis();
+    if (!cats.length) { categoriaChips.innerHTML = ''; return; }
+    var html = '';
+    ['Todas'].concat(cats).forEach(function (cat) {
+      html += '<button type="button" class="chip' + (cat === categoriaAtiva ? ' active' : '') +
+              '" data-cat="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</button>';
+    });
+    categoriaChips.innerHTML = html;
+    categoriaChips.querySelectorAll('.chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        categoriaAtiva = btn.getAttribute('data-cat');
+        render();
+      });
+    });
+  }
+
+  var ORDEM_CATEGORIAS = ['Focaccia', 'Maritozzo Salgado', 'Maritozzo Doce', 'Side', 'Bebida'];
+
+  function render() {
+    if (!carregado.ing || !carregado.prep || !carregado.rec) return;
+
+    document.getElementById('countArtigos').textContent = '(' + Object.keys(allReceitas).length + ')';
+    document.getElementById('countPreparacoes').textContent = '(' + Object.keys(allPreparacoes).length + ')';
+
+    var cats = categoriasDisponiveis();
+    if (categoriaAtiva !== 'Todas' && cats.indexOf(categoriaAtiva) === -1) categoriaAtiva = 'Todas';
+    renderChips();
+
+    var termo = normalizarTexto(termoPesquisa);
+    var html = '';
+
+    if (abaAtiva === 'artigos') {
+      var ids = Object.keys(allReceitas).filter(function (id) {
+        var r = allReceitas[id];
+        var cat = r.categoria || 'Sem categoria';
+        if (categoriaAtiva !== 'Todas' && cat !== categoriaAtiva) return false;
+        return !termo || normalizarTexto(r.nome).indexOf(termo) !== -1;
+      });
+      ids.sort(function (a, b) {
+        var ra = allReceitas[a], rb = allReceitas[b];
+        var ia = ORDEM_CATEGORIAS.indexOf(ra.categoria || '');
+        var ib = ORDEM_CATEGORIAS.indexOf(rb.categoria || '');
+        if (ia === -1) ia = 99;
+        if (ib === -1) ib = 99;
+        if (ia !== ib) return ia - ib;
+        return String(ra.nome || '').localeCompare(String(rb.nome || ''));
+      });
+      if (!ids.length) {
+        html = vazioHtml('artigo');
+      } else {
+        html = '<div class="cards">';
+        ids.forEach(function (id) { html += cardArtigoHtml(id, allReceitas[id]); });
+        html += '</div>';
+      }
+    } else {
+      var pids = Object.keys(allPreparacoes).filter(function (id) {
+        return !termo || normalizarTexto(allPreparacoes[id].nome).indexOf(termo) !== -1;
+      });
+      pids.sort(function (a, b) {
+        var ca = allPreparacoes[a].codigo || 'zz';
+        var cb = allPreparacoes[b].codigo || 'zz';
+        if (ca !== cb) return ca.localeCompare(cb);
+        return String(allPreparacoes[a].nome || '').localeCompare(String(allPreparacoes[b].nome || ''));
+      });
+      if (!pids.length) {
+        html = vazioHtml('preparação');
+      } else {
+        html = '<div class="cards">';
+        pids.forEach(function (id) { html += cardPreparacaoHtml(id, allPreparacoes[id]); });
+        html += '</div>';
+      }
+    }
+
+    conteudo.innerHTML = html;
+    statusMsg.textContent = 'Custos calculados ao vivo a partir dos preços dos ingredientes em Compras.';
+  }
+
+  function vazioHtml(tipo) {
+    var vazioTotal = !Object.keys(allReceitas).length && !Object.keys(allPreparacoes).length;
+    if (!vazioTotal) {
+      return '<div class="empty">Nenhum ' + escapeHtml(tipo) + ' corresponde ao filtro.</div>';
+    }
+    return '<div class="empty">Ainda não há fichas técnicas na base de dados.<br><br>' +
+           'Para carregar o levantamento inicial, abre <code>receitas.html?seed=1</code> ' +
+           'ou corre <code>seedTudo()</code> na consola.</div>';
+  }
+
+  // ===================================================================
+  // Listeners de dados
+  // ===================================================================
+
+  ingredientesRef.on('value', function (snap) {
+    allIngredientes = snap.val() || {};
+    carregado.ing = true;
+    render();
+  }, function (error) {
+    statusMsg.textContent = 'Erro de ligação à base de dados: ' + error.message;
+  });
+
+  preparacoesRef.on('value', function (snap) {
+    allPreparacoes = snap.val() || {};
+    carregado.prep = true;
+    render();
+  });
+
+  receitasRef.on('value', function (snap) {
+    allReceitas = snap.val() || {};
+    carregado.rec = true;
+    render();
+  });
+
+  // ===================================================================
+  // UI
+  // ===================================================================
+
+  Array.prototype.slice.call(document.querySelectorAll('.tab-btn')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      abaAtiva = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      categoriaAtiva = 'Todas';
+      render();
+    });
+  });
+
+  searchInput.addEventListener('input', function () {
+    termoPesquisa = searchInput.value;
+    render();
+  });
+
+  // ===================================================================
+  // Migração / seed — corre uma vez, por ?seed=1 ou pela consola.
+  // Regra fixa do projeto: NUNCA sobrescrever um precoUltimaCompra que já
+  // exista. Só se cria o que falta, ou se preenche o que está vazio.
+  // ===================================================================
+
+  // Os ingredientes do seed usam categorias que ainda não existem em
+  // categoriasIngredientes. Sem o rótulo registado, o select da ficha do
+  // ingrediente em compras.html não teria a opção correspondente e limparia
+  // a categoria ao guardar. Só se criam as que faltam.
+  var CATEGORIAS_SEED_RECEITAS = {
+    Receitas: "Receitas (fichas técnicas)",
+    Base: "Bases (focaccia e maritozzo)"
+  };
+
+  function garantirCategoriasIngredientes() {
+    return categoriasIngredientesRef.once('value').then(function (snap) {
+      var atuais = snap.val() || {};
+      var escritas = [];
+      Object.keys(CATEGORIAS_SEED_RECEITAS).forEach(function (key) {
+        if (atuais[key]) return;
+        escritas.push(categoriasIngredientesRef.child(key).set({ label: CATEGORIAS_SEED_RECEITAS[key] }));
+      });
+      return Promise.all(escritas);
+    });
+  }
+
+  var seedOverlay = document.getElementById('seedOverlay');
+  var seedBody = document.getElementById('seedBody');
+  var seedTitle = document.getElementById('seedTitle');
+
+  document.getElementById('seedClose').addEventListener('click', function () {
+    seedOverlay.classList.remove('open');
+  });
+  seedOverlay.addEventListener('click', function (e) {
+    if (e.target === seedOverlay) seedOverlay.classList.remove('open');
+  });
+
+  function indexarPorNome(objeto) {
+    var idx = {};
+    Object.keys(objeto || {}).forEach(function (id) {
+      var item = objeto[id] || {};
+      var chave = normalizarTexto(item.nome);
+      if (chave && !idx[chave]) idx[chave] = id;
+      (Array.isArray(item.aliases) ? item.aliases : []).forEach(function (a) {
+        var ca = normalizarTexto(a);
+        if (ca && !idx[ca]) idx[ca] = id;
+      });
+    });
+    return idx;
+  }
+
+  function seedIngredientesFromReceitas() {
+    var relatorio = { criados:[], preenchidos:[], ignorados:[], semPreco:[], fornecedorDesconhecido:[] };
+
+    return garantirCategoriasIngredientes()
+      .then(function () {
+        return Promise.all([ingredientesRef.once('value'), suppliersRef.once('value')]);
+      })
+      .then(function (snaps) {
+        var atuais = snaps[0].val() || {};
+        var fornecedores = snaps[1].val() || {};
+        var idx = indexarPorNome(atuais);
+
+        var nomesFornecedores = {};
+        Object.keys(fornecedores).forEach(function (sid) {
+          var nome = fornecedores[sid] && fornecedores[sid].nome;
+          if (nome) nomesFornecedores[normalizarTexto(nome)] = nome;
+        });
+
+        var escritas = [];
+
+        INGREDIENTES_SEED.forEach(function (seed) {
+          var chave = normalizarTexto(seed.nome);
+          var existenteId = idx[chave];
+
+          // O fornecedor é guardado pelo nome. Se não houver correspondência
+          // na lista de fornecedores, guarda-se na mesma e sinaliza-se.
+          var fornecedor = seed.fornecedor || null;
+          if (fornecedor) {
+            var match = nomesFornecedores[normalizarTexto(fornecedor)];
+            if (match) fornecedor = match;
+            else relatorio.fornecedorDesconhecido.push(seed.nome + ' → ' + fornecedor);
+          }
+
+          if (!existenteId) {
+            var novoId = ingredientesRef.push().key;
+            var dados = {
+              nome: seed.nome,
+              unidade: seed.unidade || null,
+              precoUltimaCompra: (seed.precoUltimaCompra === undefined ? null : seed.precoUltimaCompra),
+              dataUltimaCompra: null,
+              fornecedor: fornecedor,
+              categoria: seed.categoria || 'Receitas',
+              aliases: [],
+              tipoArmazenamento: null,
+              localArmazenamento: null,
+              alergenios: []
+            };
+            escritas.push(ingredientesRef.child(novoId).set(dados));
+            atuais[novoId] = dados;
+            idx[chave] = novoId;
+            relatorio.criados.push(seed.nome);
+            if (dados.precoUltimaCompra === null) relatorio.semPreco.push(seed.nome);
+            return;
+          }
+
+          var atual = atuais[existenteId] || {};
+          var precoAtual = atual.precoUltimaCompra;
+          var temPreco = typeof precoAtual === 'number' && !isNaN(precoAtual);
+
+          if (temPreco) {
+            relatorio.ignorados.push(atual.nome + ' — já tinha preço mais recente, mantido');
+            return;
+          }
+
+          if (seed.precoUltimaCompra === null || seed.precoUltimaCompra === undefined) {
+            relatorio.semPreco.push(atual.nome || seed.nome);
+            return;
+          }
+
+          escritas.push(ingredientesRef.child(existenteId).update({ precoUltimaCompra: seed.precoUltimaCompra }));
+          atual.precoUltimaCompra = seed.precoUltimaCompra;
+          relatorio.preenchidos.push((atual.nome || seed.nome) + ' → ' + formatEuros(seed.precoUltimaCompra, 2));
+        });
+
+        return Promise.all(escritas).then(function () {
+          return { relatorio: relatorio, indice: idx };
+        });
+      });
+  }
+
+  function seedPreparacoes(indiceIngredientes) {
+    var relatorio = { criadas:[], ignoradas:[], semIngrediente:[] };
+
+    return preparacoesRef.once('value').then(function (snap) {
+      var atuais = snap.val() || {};
+      var idx = indexarPorNome(atuais);
+      var escritas = [];
+
+      PREPARACOES_SEED.forEach(function (seed) {
+        var chave = normalizarTexto(seed.nome);
+        if (idx[chave]) {
+          relatorio.ignoradas.push(seed.nome + ' — já existia, mantida');
+          return;
+        }
+
+        var ingredientes = (seed.ingredientes || []).map(function (item) {
+          var ingId = indiceIngredientes[normalizarTexto(item.nome)] || null;
+          if (!ingId) relatorio.semIngrediente.push(seed.nome + ' → ' + item.nome);
+          return { ingredienteId: ingId, nome: item.nome, qtd: item.qtd, unidade: item.unidade };
+        });
+
+        var novoId = preparacoesRef.push().key;
+        var dados = {
+          nome: seed.nome,
+          codigo: seed.codigo || null,
+          rendimento: seed.rendimento || null,
+          ingredientes: ingredientes,
+          custoManual: !!seed.custoManual,
+          custoManualPorUnidade: (seed.custoManualPorUnidade === undefined ? null : seed.custoManualPorUnidade),
+          passos: seed.passos || [],
+          notas: seed.notas || null,
+          validadeDias: seed.validadeDias === undefined ? null : seed.validadeDias,
+          atualizadoEm: new Date().toISOString()
+        };
+        escritas.push(preparacoesRef.child(novoId).set(dados));
+        idx[chave] = novoId;
+        relatorio.criadas.push(seed.nome);
+      });
+
+      return Promise.all(escritas).then(function () {
+        return { relatorio: relatorio, indice: idx };
+      });
+    });
+  }
+
+  function seedReceitas(indiceIngredientes, indicePreparacoes) {
+    var relatorio = { criados:[], ignorados:[], semReferencia:[] };
+
+    return receitasRef.once('value').then(function (snap) {
+      var atuais = snap.val() || {};
+      var idx = indexarPorNome(atuais);
+      var escritas = [];
+
+      RECEITAS_SEED.forEach(function (seed) {
+        var chave = normalizarTexto(seed.nome);
+        if (idx[chave]) {
+          relatorio.ignorados.push(seed.nome + ' — já existia, mantido');
+          return;
+        }
+
+        var componentes = (seed.componentes || []).map(function (comp) {
+          if (comp.tipo === 'preparacao') {
+            var prepId = indicePreparacoes[normalizarTexto(comp.nome)] || null;
+            if (!prepId) relatorio.semReferencia.push(seed.nome + ' → preparação ' + comp.nome);
+            return { tipo:'preparacao', prepId: prepId, nome: comp.nome, qtd: comp.qtd, unidade: comp.unidade };
+          }
+          var ingId = indiceIngredientes[normalizarTexto(comp.nome)] || null;
+          if (!ingId) relatorio.semReferencia.push(seed.nome + ' → ingrediente ' + comp.nome);
+          return { tipo:'ingrediente', ingredienteId: ingId, nome: comp.nome, qtd: comp.qtd, unidade: comp.unidade };
+        });
+
+        var novoId = receitasRef.push().key;
+        escritas.push(receitasRef.child(novoId).set({
+          nome: seed.nome,
+          categoria: seed.categoria || null,
+          pvp: typeof seed.pvp === 'number' ? seed.pvp : null,
+          componentes: componentes,
+          passos: seed.passos || [],
+          notas: seed.notas || null,
+          avisos: seed.avisos || [],
+          atualizadoEm: new Date().toISOString()
+        }));
+        idx[chave] = novoId;
+        relatorio.criados.push(seed.nome);
+      });
+
+      return Promise.all(escritas).then(function () { return relatorio; });
+    });
+  }
+
+  function grupoHtml(titulo, lista) {
+    if (!lista || !lista.length) return '';
+    var html = '<div class="rel-group"><h4>' + escapeHtml(titulo) + ' (' + lista.length + ')</h4><ul>';
+    lista.forEach(function (l) { html += '<li>' + escapeHtml(l) + '</li>'; });
+    return html + '</ul></div>';
+  }
+
+  function mostrarRelatorio(ing, prep, rec) {
+    var resumo = 'Ingredientes: ' + ing.criados.length + ' criados, ' +
+                 ing.preenchidos.length + ' preenchidos, ' +
+                 ing.ignorados.length + ' ignorados (já tinham preço). ' +
+                 'Preparações: ' + prep.criadas.length + ' criadas, ' + prep.ignoradas.length + ' ignoradas. ' +
+                 'Artigos: ' + rec.criados.length + ' criados, ' + rec.ignorados.length + ' ignorados.';
+
+    console.log('=== Seed receitas ===');
+    console.log(resumo);
+    console.log('Ingredientes:', ing);
+    console.log('Preparações:', prep);
+    console.log('Artigos:', rec);
+
+    var html = '<p style="font-size:14px;line-height:1.6;margin:0 0 16px;">' + escapeHtml(resumo) + '</p>';
+    html += grupoHtml('Ingredientes criados', ing.criados);
+    html += grupoHtml('Preços preenchidos', ing.preenchidos);
+    html += grupoHtml('Ignorados — preço já existente mantido', ing.ignorados);
+    html += grupoHtml('Sem preço (a confirmar)', ing.semPreco);
+    html += grupoHtml('Fornecedor sem correspondência na lista', ing.fornecedorDesconhecido);
+    html += grupoHtml('Preparações criadas', prep.criadas);
+    html += grupoHtml('Preparações ignoradas', prep.ignoradas);
+    html += grupoHtml('Preparações com ingrediente por resolver', prep.semIngrediente);
+    html += grupoHtml('Artigos criados', rec.criados);
+    html += grupoHtml('Artigos ignorados', rec.ignorados);
+    html += grupoHtml('Artigos com referência por resolver', rec.semReferencia);
+
+    seedTitle.textContent = 'Relatório da migração';
+    seedBody.innerHTML = html;
+    seedOverlay.classList.add('open');
+  }
+
+  function seedTudo() {
+    statusMsg.textContent = 'A correr a migração…';
+    return seedIngredientesFromReceitas()
+      .then(function (resIng) {
+        return seedPreparacoes(resIng.indice).then(function (resPrep) {
+          return seedReceitas(resIng.indice, resPrep.indice).then(function (relRec) {
+            mostrarRelatorio(resIng.relatorio, resPrep.relatorio, relRec);
+            statusMsg.textContent = 'Migração concluída.';
+            return { ingredientes: resIng.relatorio, preparacoes: resPrep.relatorio, receitas: relRec };
+          });
+        });
+      })
+      .catch(function (err) {
+        console.error(err);
+        seedTitle.textContent = 'Migração falhou';
+        seedBody.innerHTML = '<p style="font-size:14px;">' + escapeHtml(err.message || String(err)) + '</p>';
+        seedOverlay.classList.add('open');
+        statusMsg.textContent = 'Migração falhou: ' + (err.message || err);
+      });
+  }
+
+  // Disponíveis na consola; sem botão permanente na UI.
+  window.seedIngredientesFromReceitas = seedIngredientesFromReceitas;
+  window.seedTudo = seedTudo;
+
+  if (/[?&]seed=1(&|$)/.test(window.location.search)) {
+    seedTudo();
+  }
+
+});
+</script>
+
+</body>
+</html>
