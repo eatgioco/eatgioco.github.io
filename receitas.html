@@ -101,18 +101,11 @@
   .nota-iva{
     background:var(--white);
     border:2px solid var(--black);
-    border-left:6px solid var(--red);
-    padding:12px 16px;
+    border-left:8px solid var(--red);
+    padding:16px;
     margin:24px 0 0;
     font-size:13px;
     line-height:1.6;
-  }
-
-  .total-nota{
-    font-family:'Space Mono', monospace;
-    font-size:9px;
-    color:var(--muted);
-    margin:3px 0 0;
   }
 
   .status-msg{
@@ -189,96 +182,82 @@
     color:var(--white);
   }
 
-  /* ---------- Resumo de food cost ---------- */
+  /* ---------- Resumo de food cost (ledger) ---------- */
   .resumo{
-    display:flex;
-    flex-wrap:wrap;
-    gap:20px;
-    align-items:stretch;
     background:var(--white);
     border:2px solid var(--black);
-    padding:20px;
+    border-top:2px dashed var(--black);
+    padding:24px;
     margin-top:24px;
   }
 
-  .resumo-geral{
-    flex:1 1 240px;
+  .ledger{
+    display:flex;
+    flex-wrap:wrap;
+    gap:16px 0;
   }
 
-  .resumo-valor{
+  .ledger-item{
+    flex:1 1 152px;
+    min-width:0;
+    padding:0 16px;
+    border-left:1px solid var(--muted);
+  }
+
+  .ledger-item.principal{
+    flex:1 1 216px;
+    padding-left:0;
+    border-left:none;
+  }
+
+  .ledger-valor{
     font-family:'Space Mono', monospace;
-    font-size:38px;
+    font-size:28px;
     font-weight:700;
-    line-height:1;
+    line-height:1.1;
     margin:0;
+  }
+
+  .ledger-item.principal .ledger-valor{
+    font-size:40px;
+  }
+
+  .ledger-valor.alto{
+    color:var(--red);
+  }
+
+  .ledger-label{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:8px 0 0;
+    line-height:1.4;
   }
 
   .resumo-base{
     font-family:'Space Mono', monospace;
     font-size:11px;
     color:var(--muted);
-    margin:8px 0 0;
-    line-height:1.5;
+    margin:24px 0 0;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+    line-height:1.6;
   }
 
   .resumo-excluidos{
     font-size:12px;
     color:var(--muted);
-    margin:6px 0 0;
-    line-height:1.5;
+    margin:8px 0 0;
+    line-height:1.6;
   }
 
-  .resumo-cats{
-    flex:2 1 320px;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    gap:2px;
-  }
-
-  .resumo-cat{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    align-items:baseline;
-    padding:7px 0;
-    border-bottom:1px solid var(--line);
-  }
-
-  .resumo-cat:last-child{
-    border-bottom:none;
-  }
-
-  .resumo-cat-nome{
-    flex:1 1 100px;
-    min-width:0;
-    font-size:14px;
-  }
-
-  .resumo-cat-n{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    color:var(--muted);
-    white-space:nowrap;
-  }
-
-  .resumo-cat-valor{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    min-width:70px;
-    text-align:right;
-  }
-
-  .resumo-cat-valor.alto{
-    color:var(--red);
-  }
-
-  /* ---------- Cards ---------- */
+  /* ---------- Cards (ticket) ---------- */
   .cards{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(min(420px,100%), 1fr));
-    gap:20px;
+    gap:24px;
     margin-top:24px;
     align-items:start;
   }
@@ -286,84 +265,182 @@
   .card{
     background:var(--white);
     border:2px solid var(--black);
-    padding:20px;
+    border-top:2px dashed var(--black);
+    padding:24px;
   }
 
   .card-head{
     display:flex;
     flex-wrap:wrap;
-    gap:8px;
-    align-items:baseline;
+    gap:16px;
+    align-items:flex-start;
     justify-content:space-between;
-    border-bottom:2px solid var(--black);
-    padding-bottom:12px;
+  }
+
+  .card-head-main{
+    flex:1 1 176px;
+    min-width:0;
+  }
+
+  .card-eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 8px;
   }
 
   .card-nome{
     font-family:'Space Mono', monospace;
-    font-size:18px;
+    font-size:20px;
     font-weight:700;
+    line-height:1.2;
     margin:0;
-  }
-
-  .card-tag{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--muted);
-    border:1px solid var(--muted);
-    padding:3px 6px;
-    white-space:nowrap;
+    overflow-wrap:anywhere;
   }
 
   .card-sub{
     font-family:'Space Mono', monospace;
     font-size:11px;
     color:var(--muted);
-    margin:10px 0 0;
-    letter-spacing:0.5px;
+    margin:8px 0 0;
+    letter-spacing:0.04em;
+  }
+
+  /* ---------- Selo de food cost ---------- */
+  .selo-wrap{
+    flex:0 0 auto;
+    width:72px;
+    text-align:center;
+  }
+
+  .selo{
+    width:64px;
+    height:64px;
+    margin:4px auto 0;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    transform:rotate(-3deg);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+  }
+
+  .selo-atencao{
+    border-color:var(--amber);
+    background:var(--warn-bg);
+  }
+
+  .selo-alto{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .selo-incompleto{
+    border:2px dashed var(--muted);
+    color:var(--muted);
+  }
+
+  .selo-pct{
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    line-height:1;
+  }
+
+  .selo-incompleto .selo-pct{
+    font-size:24px;
+  }
+
+  .selo-word{
+    font-family:'Space Mono', monospace;
+    font-size:8px;
+    letter-spacing:0.08em;
+    line-height:1;
+    white-space:nowrap;
+  }
+
+  .selo-sub{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    color:var(--muted);
+    margin:8px 0 0;
+    line-height:1.4;
+  }
+
+  /* ---------- Secções do card ---------- */
+  .card-sec{
+    margin-top:24px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
   }
 
   .block-label{
     font-family:'Space Mono', monospace;
     font-size:10px;
-    letter-spacing:1px;
+    letter-spacing:0.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin:18px 0 8px;
+    margin:0 0 8px;
   }
 
-  /* ---------- Linhas de componentes ---------- */
+  /* ---------- Linha de componente (recibo) ---------- */
   .comp-line{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    align-items:baseline;
-    justify-content:space-between;
-    padding:7px 0;
-    border-bottom:1px solid var(--line);
+    padding:8px 0;
     font-size:14px;
   }
 
+  /* Nome, pontos e custo ficam sempre na mesma linha: só o nome encolhe,
+     por isso os pontos nunca desaparecem nem passam para baixo. */
+  .comp-main{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:baseline;
+    gap:0 8px;
+  }
+
   .comp-nome{
-    flex:1 1 180px;
+    flex:0 1 auto;
     min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .comp-prep-badge{
+    flex:0 0 auto;
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .comp-dots{
+    flex:1 1 16px;
+    min-width:12px;
+    align-self:center;
+    border-bottom:1px dotted var(--muted);
+    height:1px;
   }
 
   .comp-qtd{
     font-family:'Space Mono', monospace;
-    font-size:12px;
+    font-size:11px;
     color:var(--muted);
-    white-space:nowrap;
+    margin:2px 0 0;
+    line-height:1.4;
   }
 
   .comp-custo{
+    flex:0 0 auto;
     font-family:'Space Mono', monospace;
     font-size:13px;
     font-weight:700;
     white-space:nowrap;
-    min-width:74px;
     text-align:right;
   }
 
@@ -372,87 +449,75 @@
     font-weight:400;
   }
 
-  .comp-prep-badge{
-    font-family:'Space Mono', monospace;
-    font-size:9px;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
-    border:1px solid var(--muted);
-    color:var(--muted);
-    padding:1px 4px;
-    margin-left:6px;
-    white-space:nowrap;
-  }
-
-  /* ---------- Totais ---------- */
+  /* ---------- Totais do card (ledger) ---------- */
   .totais{
     display:flex;
     flex-wrap:wrap;
-    gap:10px;
+    gap:16px 0;
     margin-top:16px;
   }
 
-  .total-box{
-    flex:1 1 110px;
-    border:2px solid var(--black);
-    padding:10px 12px;
+  .total-item{
+    flex:1 1 120px;
+    min-width:0;
+    padding:0 16px;
+    border-left:1px solid var(--muted);
   }
 
-  .total-box.incompleto{
-    border-color:var(--amber);
-    background:var(--warn-bg);
+  .total-item:first-child{
+    padding-left:0;
+    border-left:none;
   }
 
-  .total-box.fc-alto{
-    border-color:var(--red);
+  .total-valor{
+    font-family:'Space Mono', monospace;
+    font-size:22px;
+    font-weight:700;
+    line-height:1.1;
+    margin:0;
+    overflow-wrap:anywhere;
+  }
+
+  .total-valor.incompleto{
+    color:var(--amber);
   }
 
   .total-label{
     font-family:'Space Mono', monospace;
-    font-size:9px;
-    letter-spacing:1px;
+    font-size:10px;
+    letter-spacing:0.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin:0 0 4px;
-  }
-
-  .total-value{
-    font-family:'Space Mono', monospace;
-    font-size:19px;
-    font-weight:700;
-    margin:0;
-  }
-
-  .total-value.small{
-    font-size:14px;
+    margin:8px 0 0;
+    line-height:1.4;
   }
 
   /* ---------- Avisos ---------- */
   .avisos{
     background:var(--warn-bg);
-    border:2px solid var(--amber);
-    padding:12px 14px;
-    margin-top:16px;
+    border-left:4px solid var(--amber);
+    padding:16px;
+    margin-top:24px;
   }
 
   .avisos-label{
     font-family:'Space Mono', monospace;
     font-size:10px;
-    letter-spacing:1px;
+    letter-spacing:0.08em;
     text-transform:uppercase;
     color:var(--amber);
-    margin:0 0 6px;
+    margin:0 0 8px;
   }
 
   .avisos ul{
     margin:0;
-    padding-left:18px;
+    padding-left:16px;
   }
 
   .avisos li{
     font-size:13px;
-    line-height:1.5;
-    margin-bottom:4px;
+    line-height:1.6;
+    margin-bottom:8px;
   }
 
   .avisos li:last-child{
@@ -460,54 +525,90 @@
   }
 
   /* ---------- Passos e notas ---------- */
-  details.bloco{
-    margin-top:16px;
-    border-top:1px solid var(--line);
-    padding-top:12px;
+  .passos{
+    list-style:none;
+    counter-reset:passo;
+    margin:0;
+    padding:0;
   }
 
-  details.bloco summary{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--muted);
-    cursor:pointer;
-  }
-
-  details.bloco ol{
-    margin:10px 0 0;
-    padding-left:20px;
-  }
-
-  details.bloco li{
+  .passos li{
+    counter-increment:passo;
+    position:relative;
+    padding-left:32px;
+    margin-bottom:16px;
     font-size:13px;
     line-height:1.6;
-    margin-bottom:5px;
+  }
+
+  .passos li:last-child{
+    margin-bottom:0;
+  }
+
+  .passos li::before{
+    content:counter(passo);
+    position:absolute;
+    left:0;
+    top:0;
+    width:20px;
+    height:20px;
+    background:var(--black);
+    color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
   }
 
   .notas{
     font-size:13px;
     line-height:1.6;
-    margin:12px 0 0;
-    padding-left:12px;
-    border-left:3px solid var(--line);
+    margin:0;
     color:var(--muted);
   }
 
+  /* ---------- Estado vazio ---------- */
   .empty{
     background:var(--white);
-    border:2px dashed var(--black);
-    padding:28px;
+    border:2px solid var(--black);
+    border-top:2px dashed var(--black);
+    padding:32px;
     margin-top:24px;
+  }
+
+  .empty-title{
     font-family:'Space Mono', monospace;
-    font-size:13px;
+    font-size:18px;
+    font-weight:700;
+    margin:0 0 8px;
+  }
+
+  .empty p{
+    font-size:14px;
     line-height:1.7;
+    margin:0 0 16px;
+    max-width:640px;
+  }
+
+  .empty p:last-child{
+    margin-bottom:0;
+  }
+
+  .empty ol{
+    margin:0 0 16px;
+    padding-left:20px;
+    font-size:14px;
+    line-height:1.8;
+    max-width:640px;
   }
 
   .empty code{
+    font-family:'Space Mono', monospace;
     background:var(--bg);
-    padding:2px 5px;
+    border:1px solid var(--line);
+    padding:2px 6px;
   }
 
   /* ---------- Modal ---------- */
@@ -1341,12 +1442,13 @@ window.addEventListener('load', function () {
     'unidade': '— unidade incompatível'
   };
 
+  // Linha ao estilo de talão: nome (e quantidade) à esquerda, pontos a
+  // preencher o vão, custo sempre encostado à direita.
   function linhaComponenteHtml(nome, qtd, unidade, res, badge) {
-    var html = '<div class="comp-line">';
-    html += '<span class="comp-nome">' + escapeHtml(nome) +
-            (badge ? '<span class="comp-prep-badge">' + escapeHtml(badge) + '</span>' : '') + '</span>';
-    html += '<span class="comp-qtd">' + escapeHtml(formatQtd(qtd, unidade)) +
-            (res.ok && res.detalhe ? ' · ' + escapeHtml(res.detalhe) : '') + '</span>';
+    var html = '<div class="comp-line"><div class="comp-main">';
+    html += '<span class="comp-nome">' + escapeHtml(nome) + '</span>';
+    if (badge) html += '<span class="comp-prep-badge">' + escapeHtml(badge) + '</span>';
+    html += '<span class="comp-dots"></span>';
     if (res.ok) {
       html += '<span class="comp-custo">' + escapeHtml(formatEuros(res.custo, 3)) + '</span>';
     } else {
@@ -1354,6 +1456,9 @@ window.addEventListener('load', function () {
       if (res.motivo === 'unidade' && res.detalhe) label = '— ' + res.detalhe;
       html += '<span class="comp-custo missing">' + escapeHtml(label) + '</span>';
     }
+    html += '</div>';
+    html += '<p class="comp-qtd">' + escapeHtml(formatQtd(qtd, unidade)) +
+            (res.ok && res.detalhe ? ' · ' + escapeHtml(res.detalhe) : '') + '</p>';
     html += '</div>';
     return html;
   }
@@ -1366,30 +1471,55 @@ window.addEventListener('load', function () {
     return html + '</ul></div>';
   }
 
-  function passosHtml(passos, aberto) {
+  function passosHtml(passos) {
     var lista = (passos || []).filter(function (p) { return p && String(p).trim(); });
     if (!lista.length) return '';
-    var html = '<details class="bloco"' + (aberto ? ' open' : '') + '><summary>Passos (' + lista.length + ')</summary><ol>';
+    var html = '<div class="card-sec"><p class="block-label">Passos</p><ol class="passos">';
     lista.forEach(function (p) { html += '<li>' + escapeHtml(p) + '</li>'; });
-    return html + '</ol></details>';
+    return html + '</ol></div>';
   }
 
   function notasHtml(notas) {
     if (!notas || !String(notas).trim()) return '';
-    return '<p class="notas">' + escapeHtml(notas) + '</p>';
+    return '<div class="card-sec"><p class="block-label">Notas</p>' +
+           '<p class="notas">' + escapeHtml(notas) + '</p></div>';
+  }
+
+  // Selo carimbado no canto do card. A cor segue as mesmas fasquias em toda
+  // a página: abaixo de 25% ok, 25–30% atenção, 30% ou mais alto.
+  function seloHtml(calc) {
+    if (calc.foodCost === null) {
+      return '<div class="selo-wrap">' +
+             '<div class="selo selo-incompleto"><span class="selo-pct">?</span>' +
+             '<span class="selo-word">S/ DADOS</span></div></div>';
+    }
+    var classe = 'selo';
+    var palavra = 'OK';
+    if (calc.foodCost >= 30) { classe += ' selo-alto'; palavra = 'ALTO'; }
+    else if (calc.foodCost >= 25) { classe += ' selo-atencao'; palavra = 'ATENÇÃO'; }
+
+    return '<div class="selo-wrap">' +
+           '<div class="' + classe + '">' +
+           '<span class="selo-pct">' + formatPct(calc.foodCost) + '</span>' +
+           '<span class="selo-word">' + palavra + '</span>' +
+           '</div>' +
+           '<p class="selo-sub">food cost<br>s/ ' + escapeHtml(formatEuros(calc.pvpLiquido, 2)) + '</p>' +
+           '</div>';
   }
 
   function cardArtigoHtml(id, receita, calc) {
     calc = calc || custoDoArtigo(receita);
-    var pvp = calc.pvp;
 
     var html = '<div class="card">';
     html += '<div class="card-head">';
+    html += '<div class="card-head-main">';
+    html += '<p class="card-eyebrow">' + escapeHtml(receita.categoria || 'Sem categoria') + '</p>';
     html += '<h3 class="card-nome">' + escapeHtml(receita.nome || 'Sem nome') + '</h3>';
-    html += '<span class="card-tag">' + escapeHtml(receita.categoria || 'Sem categoria') + '</span>';
+    html += '</div>';
+    html += seloHtml(calc);
     html += '</div>';
 
-    html += '<p class="block-label">Componentes</p>';
+    html += '<div class="card-sec"><p class="block-label">Componentes</p>';
     if (!calc.linhas.length) {
       html += '<p class="rel-empty">Sem componentes registados.</p>';
     }
@@ -1400,28 +1530,19 @@ window.addEventListener('load', function () {
 
     html += '<div class="totais">';
     if (calc.completo) {
-      html += '<div class="total-box"><p class="total-label">Custo</p><p class="total-value">' +
-              escapeHtml(formatEuros(calc.total, 2)) + '</p></div>';
+      html += '<div class="total-item"><p class="total-valor">' + escapeHtml(formatEuros(calc.total, 2)) +
+              '</p><p class="total-label">Custo</p></div>';
     } else {
-      html += '<div class="total-box incompleto"><p class="total-label">Custo — incompleto</p>' +
-              '<p class="total-value small">≥ ' + escapeHtml(formatEuros(calc.total, 2)) +
-              '<br><span style="font-size:10px;font-weight:400;">faltam preços</span></p></div>';
+      html += '<div class="total-item"><p class="total-valor incompleto">≥ ' + escapeHtml(formatEuros(calc.total, 2)) +
+              '</p><p class="total-label">Custo incompleto — faltam preços</p></div>';
     }
-    html += '<div class="total-box"><p class="total-label">PVP</p><p class="total-value">' +
-            escapeHtml(pvp === null ? '—' : formatEuros(pvp, 2)) + '</p></div>';
-
-    if (calc.foodCost !== null) {
-      html += '<div class="total-box' + (calc.foodCost > 30 ? ' fc-alto' : '') + '"><p class="total-label">Food cost s/ IVA</p>' +
-              '<p class="total-value">' + formatPct(calc.foodCost) + '</p>' +
-              '<p class="total-nota">s/ ' + escapeHtml(formatEuros(calc.pvpLiquido, 2)) + '</p></div>';
-    } else {
-      html += '<div class="total-box incompleto"><p class="total-label">Food cost s/ IVA</p>' +
-              '<p class="total-value small">incompleto</p></div>';
-    }
-    html += '</div>';
+    html += '<div class="total-item"><p class="total-valor">' +
+            escapeHtml(calc.pvp === null ? '—' : formatEuros(calc.pvp, 2)) +
+            '</p><p class="total-label">PVP c/ IVA</p></div>';
+    html += '</div></div>';
 
     html += avisosHtml(receita.avisos);
-    html += passosHtml(receita.passos, false);
+    html += passosHtml(receita.passos);
     html += notasHtml(receita.notas);
     html += '</div>';
     return html;
@@ -1431,11 +1552,13 @@ window.addEventListener('load', function () {
     var lote = custoDoLote(id, {});
     var porUnidade = custoPorUnidadeDaPreparacao(id, {});
 
+    var eyebrow = prep.codigo ? prep.codigo + ' · Preparação' : 'Preparação';
+
     var html = '<div class="card">';
     html += '<div class="card-head">';
+    html += '<div class="card-head-main">';
+    html += '<p class="card-eyebrow">' + escapeHtml(eyebrow) + '</p>';
     html += '<h3 class="card-nome">' + escapeHtml(prep.nome || 'Sem nome') + '</h3>';
-    html += '<span class="card-tag">' + escapeHtml(prep.codigo || 'sem código') + '</span>';
-    html += '</div>';
 
     var subPartes = [];
     if (prep.rendimento && typeof prep.rendimento.qtd === 'number') {
@@ -1444,7 +1567,9 @@ window.addEventListener('load', function () {
       subPartes.push('Rendimento não definido');
     }
     if (prep.validadeDias) subPartes.push('Validade ' + prep.validadeDias + ' dias');
+    subPartes.push('Usada em ' + usadaEmQuantosArtigos(id) + (usadaEmQuantosArtigos(id) === 1 ? ' artigo' : ' artigos'));
     html += '<p class="card-sub">' + escapeHtml(subPartes.join(' · ')) + '</p>';
+    html += '</div></div>';
 
     if (prep.custoManual) {
       html += '<div class="avisos"><p class="avisos-label">⚠ Custo manual</p><ul><li>' +
@@ -1454,7 +1579,7 @@ window.addEventListener('load', function () {
                 : 'custo fixo de ' + formatEuros(porUnidade.custo, 2) + ' / ' + porUnidade.unidade + '.') +
               '</li></ul></div>';
     } else {
-      html += '<p class="block-label">Ingredientes</p>';
+      html += '<div class="card-sec"><p class="block-label">Ingredientes</p>';
       if (!lote.linhas.length) {
         html += '<p class="rel-empty">Sem ingredientes registados.</p>';
       }
@@ -1463,29 +1588,28 @@ window.addEventListener('load', function () {
       });
     }
 
-    html += '<div class="totais">';
+    html += (prep.custoManual ? '<div class="card-sec">' : '') + '<div class="totais">';
     if (!prep.custoManual) {
       if (lote.completo) {
-        html += '<div class="total-box"><p class="total-label">Custo do lote</p><p class="total-value">' +
-                escapeHtml(formatEuros(lote.total, 2)) + '</p></div>';
+        html += '<div class="total-item"><p class="total-valor">' + escapeHtml(formatEuros(lote.total, 2)) +
+                '</p><p class="total-label">Custo do lote</p></div>';
       } else {
-        html += '<div class="total-box incompleto"><p class="total-label">Lote — incompleto</p>' +
-                '<p class="total-value small">≥ ' + escapeHtml(formatEuros(lote.total, 2)) + '</p></div>';
+        html += '<div class="total-item"><p class="total-valor incompleto">≥ ' + escapeHtml(formatEuros(lote.total, 2)) +
+                '</p><p class="total-label">Lote incompleto — faltam preços</p></div>';
       }
     }
     if (porUnidade.custo === null) {
-      html += '<div class="total-box incompleto"><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) +
-              '</p><p class="total-value small">' + escapeHtml(MOTIVO_LABEL[porUnidade.motivo] || '— sem custo') + '</p></div>';
+      html += '<div class="total-item"><p class="total-valor incompleto">' +
+              escapeHtml(MOTIVO_LABEL[porUnidade.motivo] || '— sem custo') +
+              '</p><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) + '</p></div>';
     } else {
-      html += '<div class="total-box"><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) +
-              (prep.custoManual ? ' (manual)' : '') + '</p><p class="total-value">' +
-              escapeHtml(formatEuros(porUnidade.custo, 2)) + '</p></div>';
+      html += '<div class="total-item"><p class="total-valor">' + escapeHtml(formatEuros(porUnidade.custo, 2)) +
+              '</p><p class="total-label">Custo / ' + escapeHtml(porUnidade.unidade) +
+              (prep.custoManual ? ' (manual)' : '') + '</p></div>';
     }
-    html += '<div class="total-box"><p class="total-label">Usada em</p><p class="total-value">' +
-            usadaEmQuantosArtigos(id) + '</p></div>';
-    html += '</div>';
+    html += '</div></div>';
 
-    html += passosHtml(prep.passos, false);
+    html += passosHtml(prep.passos);
     html += notasHtml(prep.notas);
     html += '</div>';
     return html;
@@ -1544,31 +1668,32 @@ window.addEventListener('load', function () {
     var r = resumoFoodCost(calculos);
     if (!r.total) return '';
 
-    var html = '<div class="resumo">';
-    html += '<div class="resumo-geral">';
-    html += '<p class="total-label">Food cost médio s/ IVA</p>';
-    html += '<p class="resumo-valor">' + (r.media === null ? '—' : formatPct(r.media)) + '</p>';
-    html += '<p class="resumo-base">' + r.completos + ' de ' + r.total + ' artigos' +
-            (r.excluidos.length
-              ? ', ' + r.excluidos.length + (r.excluidos.length === 1 ? ' excluído' : ' excluídos') + ' por dados incompletos'
-              : '') + '</p>';
-    if (r.excluidos.length) {
-      html += '<p class="resumo-excluidos">Fora da conta: ' + escapeHtml(r.excluidos.join(', ')) + '</p>';
-    }
-    html += '</div>';
+    var html = '<div class="resumo"><div class="ledger">';
+    html += '<div class="ledger-item principal">';
+    html += '<p class="ledger-valor' + (r.media !== null && r.media >= 30 ? ' alto' : '') + '">' +
+            (r.media === null ? '—' : formatPct(r.media)) + '</p>';
+    html += '<p class="ledger-label">Food cost médio s/ IVA</p></div>';
 
-    html += '<div class="resumo-cats">';
     if (!r.categorias.length) {
-      html += '<p class="rel-empty">Nenhum artigo com custo completo — sem médias por categoria.</p>';
+      html += '<div class="ledger-item"><p class="ledger-label">' +
+              'Nenhum artigo com custo completo — sem médias por categoria.</p></div>';
     }
     r.categorias.forEach(function (c) {
-      html += '<div class="resumo-cat">';
-      html += '<span class="resumo-cat-nome">' + escapeHtml(c.categoria) + '</span>';
-      html += '<span class="resumo-cat-n">' + c.n + (c.n === 1 ? ' artigo' : ' artigos') + '</span>';
-      html += '<span class="resumo-cat-valor' + (c.media > 30 ? ' alto' : '') + '">' + formatPct(c.media) + '</span>';
+      html += '<div class="ledger-item">';
+      html += '<p class="ledger-valor' + (c.media >= 30 ? ' alto' : '') + '">' + formatPct(c.media) + '</p>';
+      html += '<p class="ledger-label">' + escapeHtml(c.categoria) + ' · ' + c.n +
+              (c.n === 1 ? ' artigo' : ' artigos') + '</p>';
       html += '</div>';
     });
     html += '</div>';
+
+    html += '<p class="resumo-base">Média simples sobre ' + r.completos + ' de ' + r.total + ' artigos' +
+            (r.excluidos.length
+              ? ' — ' + r.excluidos.length + (r.excluidos.length === 1 ? ' excluído' : ' excluídos') + ' por dados incompletos'
+              : '') + '.</p>';
+    if (r.excluidos.length) {
+      html += '<p class="resumo-excluidos">Fora da conta: ' + escapeHtml(r.excluidos.join(', ')) + '</p>';
+    }
 
     return html + '</div>';
   }
@@ -1690,11 +1815,21 @@ window.addEventListener('load', function () {
   function vazioHtml(tipo) {
     var vazioTotal = !Object.keys(allReceitas).length && !Object.keys(allPreparacoes).length;
     if (!vazioTotal) {
-      return '<div class="empty">Nenhum ' + escapeHtml(tipo) + ' corresponde ao filtro.</div>';
+      return '<div class="empty"><p class="empty-title">Nada com este filtro</p>' +
+             '<p>Nenhum ' + escapeHtml(tipo) + ' corresponde à pesquisa. Limpa o campo ou ' +
+             'carrega em <strong>Todas</strong> para voltar a ver a lista completa.</p></div>';
     }
-    return '<div class="empty">Ainda não há fichas técnicas na base de dados.<br><br>' +
-           'Para carregar o levantamento inicial, abre <code>receitas.html?seed=1</code> ' +
-           'ou corre <code>seedTudo()</code> na consola.</div>';
+    return '<div class="empty"><p class="empty-title">Falta carregar o levantamento</p>' +
+           '<p>A base de dados ainda não tem fichas técnicas. Para as criar:</p>' +
+           '<ol>' +
+           '<li>Abre <code>receitas.html?seed=1</code> — uma vez só.</li>' +
+           '<li>Lê o relatório que aparece: diz o que foi criado, que preços foram ' +
+           'preenchidos e quais ficaram por confirmar.</li>' +
+           '<li>Confirma na secção <strong>Fornecedor sem correspondência</strong> que os ' +
+           'nomes batem certo com os fornecedores em Compras.</li>' +
+           '</ol>' +
+           '<p>A migração nunca sobrepõe um preço já existente, por isso podes correr ' +
+           'outra vez sem risco.</p></div>';
   }
 
   // ===================================================================
