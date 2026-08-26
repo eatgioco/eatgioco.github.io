@@ -277,6 +277,13 @@
   .vendas-metric-value.positiva{ color:var(--green); }
   .vendas-metric-value.negativa{ color:var(--red); }
 
+  /* Data da importação — discreta, não compete com os números acima */
+  .vendas-importado{
+    margin:10px 0 0;
+    font-size:11px;
+    color:var(--muted);
+  }
+
   .vendas-oculto{ display:none; }
 
   .card-header-row{
@@ -2349,6 +2356,7 @@
           <span class="vendas-metric-value" id="cardVendasVariacao">—</span>
         </div>
       </div>
+      <p class="vendas-importado vendas-oculto" id="cardVendasImportado"></p>
       <span class="status-badge status-badge-warning vendas-oculto" id="cardVendasBadge">Em configuração</span>
     </a>
 
@@ -5932,12 +5940,25 @@ window.addEventListener('load', function () {
     var ticketEl = document.getElementById('cardVendasTicket');
     var variacaoEl = document.getElementById('cardVendasVariacao');
     var variacaoBlocoEl = document.getElementById('cardVendasVariacaoBloco');
+    var importadoEl = document.getElementById('cardVendasImportado');
     if (!subtituloEl || !metricsEl) return;
+
+    // Acima disto assume-se que ninguém importou o mês corrente.
+    var DIAS_IMPORT_ANTIGO = 45;
 
     function mostrarVazio() {
       subtituloEl.textContent = 'Sem dados — importar SAF-T';
       metricsEl.classList.add('vendas-oculto');
+      importadoEl.classList.add('vendas-oculto');
+      badgeEl.textContent = 'Em configuração';
       badgeEl.classList.remove('vendas-oculto');
+    }
+
+    function dataHoraExtenso(ts) {
+      var d = new Date(ts);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' às ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
     }
 
     function euros(n) {
@@ -5991,7 +6012,24 @@ window.addEventListener('load', function () {
       }
 
       metricsEl.classList.remove('vendas-oculto');
-      badgeEl.classList.add('vendas-oculto');
+
+      var quando = actual.importadoEm ? dataHoraExtenso(actual.importadoEm) : null;
+      if (quando) {
+        importadoEl.textContent = 'Importado em ' + quando;
+        importadoEl.classList.remove('vendas-oculto');
+      } else {
+        importadoEl.classList.add('vendas-oculto');
+      }
+
+      var dias = quando
+        ? (Date.now() - new Date(actual.importadoEm).getTime()) / 86400000
+        : 0;
+      if (dias > DIAS_IMPORT_ANTIGO) {
+        badgeEl.textContent = 'Importação desatualizada';
+        badgeEl.classList.remove('vendas-oculto');
+      } else {
+        badgeEl.classList.add('vendas-oculto');
+      }
     }).catch(mostrarVazio);
   }
 

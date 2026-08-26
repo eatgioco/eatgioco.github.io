@@ -169,6 +169,7 @@
   }
 
   .file-name{
+    margin:10px 0 0;
     font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
@@ -180,6 +181,90 @@
     height:1px;
     opacity:0;
     overflow:hidden;
+  }
+
+  /* ---------- Zona de drop ---------- */
+  .dropzone{
+    flex:1 1 420px;
+    min-width:320px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    text-align:center;
+    padding:26px 20px;
+    border:2px dashed var(--black);
+    background:var(--bg);
+    cursor:pointer;
+  }
+
+  .dropzone:hover{
+    border-color:var(--red);
+  }
+
+  /* estado activo enquanto se arrasta um ficheiro por cima */
+  .dropzone.arrasta{
+    border-color:var(--red);
+    background:var(--white);
+    box-shadow:inset 0 0 0 4px rgba(217,17,36,0.08);
+  }
+
+  .dropzone-title{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+
+  .dropzone.arrasta .dropzone-title{ color:var(--red); }
+
+  .dropzone-sub{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Pasta autorizada ---------- */
+  .pasta-col{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:6px;
+  }
+
+  .pasta-linha{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .link-mini{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    background:none;
+    border:0;
+    padding:0;
+  }
+
+  .link-mini:hover{ color:var(--red); }
+  .link-mini[disabled]{ color:var(--line); cursor:not-allowed; text-decoration:none; }
+
+  .pasta-nome{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  /* ---------- Indicador de última importação ---------- */
+  .ultima-importacao{
+    margin:10px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
   }
 
   .progress-wrap{
@@ -482,6 +567,7 @@
 <main>
   <h1 class="page-title">GIOCO · Vendas</h1>
   <p class="page-subtitle">Importador e análise de SAF-T</p>
+  <p class="ultima-importacao" id="ultimaImportacao">Última importação: a carregar…</p>
 
   <!-- ============ IMPORT ============ -->
   <div class="card">
@@ -491,10 +577,20 @@
       só os agregados são gravados no Firebase, nunca as linhas de fatura.
     </p>
     <div class="import-row">
-      <label class="file-label" for="fileInput">Escolher ficheiro</label>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <span class="dropzone-title">Arraste o ficheiro .zip ou .xml aqui</span>
+        <span class="dropzone-sub">ou clique para escolher</span>
+      </label>
       <input type="file" id="fileInput" accept=".zip,.xml">
-      <span class="file-name" id="fileName">Nenhum ficheiro escolhido</span>
+      <div class="pasta-col">
+        <div class="pasta-linha">
+          <button type="button" class="btn btn-ghost" id="btnPasta">Importar mais recente da pasta</button>
+          <button type="button" class="link-mini" id="btnMudarPasta">mudar pasta</button>
+        </div>
+        <span class="pasta-nome" id="pastaNome"></span>
+      </div>
     </div>
+    <p class="file-name" id="fileName">Nenhum ficheiro escolhido</p>
 
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -503,6 +599,7 @@
 
     <div class="msg erro" id="msgErro"></div>
     <div class="msg aviso" id="msgAviso"></div>
+    <div class="msg aviso" id="msgDrop"></div>
     <div class="msg ok" id="msgOk"></div>
   </div>
 
@@ -566,7 +663,16 @@
      Utilitários
      ========================================================= */
   var CATEGORIAS = ['Focaccia','Bebida','Café','Extra','Doce','Outro'];
-  var DIAS_SEMANA = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  // Único texto de erro para "este ficheiro não é um SAF-T" — usado tanto pelo parser
+  // (XML ilegível) como pela validação de extensão à entrada.
+  var ERRO_FICHEIRO_INVALIDO = 'O XML não é válido (erro de parse). Confirma que o ficheiro é o SAF-T exportado do ZoneSoft.';
+
+  // Padrão dos SAF-T exportados do ZoneSoft: começam pelo NIF da GIOCO.
+  var RE_SAFT_ZIP = /^518717186.*\.zip$/i;
+  var RE_EXT_ACEITE = /\.(zip|xml)$/i;
+
+  var DIAS_SEMANA =['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
   var MEIOS_PAGAMENTO = {
     NU:'Numerário', CD:'Cartão débito', CC:'Cartão crédito', MB:'Multibanco',
@@ -623,6 +729,15 @@
     var d = new Date(ts);
     if (isNaN(d.getTime())) return String(ts);
     return d.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  // Como dataHora(), mas com "às" entre a data e a hora — para o indicador de topo.
+  function dataHoraExtenso(ts){
+    if (!ts) return '—';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleDateString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+      ' às ' + d.toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit' });
   }
 
   /* =========================================================
@@ -776,7 +891,7 @@
 
     var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
     if (doc.getElementsByTagName('parsererror').length){
-      throw new Error('O XML não é válido (erro de parse). Confirma que o ficheiro é o SAF-T exportado do ZoneSoft.');
+      throw new Error(ERRO_FICHEIRO_INVALIDO);
     }
 
     var root = doc.documentElement;
@@ -1152,7 +1267,7 @@
      Mensagens e progresso
      ========================================================= */
   function limparMensagens(){
-    ['msgErro','msgAviso','msgOk'].forEach(function(id){
+    ['msgErro','msgAviso','msgOk','msgDrop'].forEach(function(id){
       var n = el(id);
       n.className = n.className.replace(' on', '');
       n.textContent = '';
@@ -1230,6 +1345,15 @@
     esconderCatalogo();
     estado.pendente = null;
     el('fileName').textContent = file.name;
+
+    // O input tem accept=".zip,.xml", mas o drop e a pasta autorizada não passam
+    // por esse filtro — travar aqui evita ler um ficheiro grande só para o parser
+    // falhar no fim. A mensagem é a mesma que o parser daria.
+    if (!RE_EXT_ACEITE.test(file.name || '')){
+      mostrarMsg('msgErro', ERRO_FICHEIRO_INVALIDO);
+      return;
+    }
+
     progresso(0.02, 'A ler o ficheiro…');
 
     var t0 = Date.now();
@@ -1404,6 +1528,35 @@
   /* =========================================================
      Leitura dos dados gravados
      ========================================================= */
+
+  // O importadoEm mais recente de entre todos os meses gravados — não é
+  // necessariamente o do mês mais recente (pode reimportar-se um mês antigo).
+  function mostrarUltimaImportacao(dados){
+    var alvo = el('ultimaImportacao');
+    if (!alvo) return;
+
+    var melhorMes = null;
+    var melhorTs = 0;
+    Object.keys(dados).forEach(function(mes){
+      var resumo = dados[mes] && dados[mes].resumo;
+      if (!resumo || !resumo.importadoEm) return;
+      var ts = new Date(resumo.importadoEm).getTime();
+      if (isNaN(ts)) return;
+      // Um import multi-mês grava todos com o mesmo instante — aí desempata o mês.
+      if (ts < melhorTs) return;
+      if (ts === melhorTs && melhorMes && mes < melhorMes) return;
+      melhorTs = ts;
+      melhorMes = mes;
+    });
+
+    if (!melhorMes){
+      alvo.textContent = 'Ainda sem dados importados';
+      return;
+    }
+    alvo.textContent = 'Última importação: ' + nomeMes(melhorMes) + ' — ' +
+      dataHoraExtenso(dados[melhorMes].resumo.importadoEm);
+  }
+
   function carregarDados(mesPreferido){
     return vendasRef.once('value').then(function(snap){
       var val = snap.val() || {};
@@ -1417,6 +1570,7 @@
         dados[k] = val[k];
       });
       estado.dados = dados;
+      mostrarUltimaImportacao(dados);
 
       var meses = Object.keys(dados).sort();
       var sel = el('mesSel');
@@ -1806,12 +1960,251 @@
   }
 
   /* =========================================================
+     Drag and drop
+     A zona é um <label for="fileInput">, por isso o clique abre o selector
+     nativo sem JS nenhum. Aqui só se trata do arrastar/largar, que acaba
+     sempre em tratarFicheiro() — o mesmo caminho do input.
+     ========================================================= */
+  function ligarDropzone(){
+    var zona = el('dropzone');
+    if (!zona) return;
+
+    // dragenter/dragleave disparam também ao passar sobre os <span> filhos;
+    // um contador evita que o destaque pisque a meio da zona.
+    var profundidade = 0;
+
+    function travar(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    function destacar(on){
+      zona.className = on ? 'dropzone arrasta' : 'dropzone';
+    }
+
+    zona.addEventListener('dragenter', function(ev){
+      travar(ev);
+      profundidade++;
+      destacar(true);
+    });
+
+    zona.addEventListener('dragover', function(ev){
+      travar(ev);
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+      destacar(true);
+    });
+
+    zona.addEventListener('dragleave', function(ev){
+      travar(ev);
+      profundidade--;
+      if (profundidade <= 0){
+        profundidade = 0;
+        destacar(false);
+      }
+    });
+
+    zona.addEventListener('drop', function(ev){
+      travar(ev);
+      profundidade = 0;
+      destacar(false);
+
+      var ficheiros = ev.dataTransfer ? ev.dataTransfer.files : null;
+      if (!ficheiros || !ficheiros.length) return;
+
+      tratarFicheiro(ficheiros[0]);
+
+      // Depois de tratarFicheiro(), que limpa as mensagens todas.
+      if (ficheiros.length > 1){
+        mostrarMsg('msgDrop',
+          'Largaste ' + ficheiros.length + ' ficheiros — só o primeiro (' +
+          ficheiros[0].name + ') foi processado.');
+      }
+    });
+  }
+
+  /* =========================================================
+     Pasta autorizada (File System Access API)
+     Só Chrome/Edge no computador. A referência da pasta fica em IndexedDB
+     para não pedir autorização em cada visita — o browser reautoriza em
+     silêncio enquanto a permissão for válida.
+     ========================================================= */
+  var PASTA_DB = 'gioco-vendas';
+  var PASTA_STORE = 'handles';
+  var PASTA_CHAVE = 'pastaSaft';
+
+  function temSuportePasta(){
+    return typeof window.showDirectoryPicker === 'function';
+  }
+
+  function idbAbrir(){
+    return new Promise(function(resolve, reject){
+      var pedido = indexedDB.open(PASTA_DB, 1);
+      pedido.onupgradeneeded = function(){
+        if (!pedido.result.objectStoreNames.contains(PASTA_STORE)){
+          pedido.result.createObjectStore(PASTA_STORE);
+        }
+      };
+      pedido.onsuccess = function(){ resolve(pedido.result); };
+      pedido.onerror = function(){ reject(pedido.error); };
+    });
+  }
+
+  function idbGuardar(handle){
+    return idbAbrir().then(function(bd){
+      return new Promise(function(resolve, reject){
+        var tx = bd.transaction(PASTA_STORE, 'readwrite');
+        tx.objectStore(PASTA_STORE).put(handle, PASTA_CHAVE);
+        tx.oncomplete = function(){ bd.close(); resolve(); };
+        tx.onerror = function(){ bd.close(); reject(tx.error); };
+      });
+    });
+  }
+
+  function idbLer(){
+    return idbAbrir().then(function(bd){
+      return new Promise(function(resolve, reject){
+        var tx = bd.transaction(PASTA_STORE, 'readonly');
+        var pedido = tx.objectStore(PASTA_STORE).get(PASTA_CHAVE);
+        pedido.onsuccess = function(){ bd.close(); resolve(pedido.result || null); };
+        pedido.onerror = function(){ bd.close(); reject(pedido.error); };
+      });
+    }).catch(function(){ return null; });
+  }
+
+  function mostrarPastaNome(handle){
+    el('pastaNome').textContent = handle ? 'Pasta: ' + handle.name : '';
+  }
+
+  // pedir=false só consulta (sem gesto do utilizador); pedir=true pode abrir o prompt.
+  function garantirPermissao(handle, pedir){
+    if (!handle || !handle.queryPermission) return Promise.resolve(true);
+    return handle.queryPermission({ mode:'read' }).then(function(estadoPerm){
+      if (estadoPerm === 'granted') return true;
+      if (!pedir) return false;
+      return handle.requestPermission({ mode:'read' }).then(function(res){
+        return res === 'granted';
+      });
+    });
+  }
+
+  function escolherPasta(){
+    return window.showDirectoryPicker({ id:'giocoSaft', mode:'read', startIn:'downloads' })
+      .then(function(handle){
+        // Guardar é só conveniência: se o IndexedDB falhar (modo privado, storage
+        // negado) a pasta escolhida agora continua a servir para este import.
+        return idbGuardar(handle).catch(function(){}).then(function(){
+          mostrarPastaNome(handle);
+          return handle;
+        });
+      });
+  }
+
+  // Mais recente por data de modificação, entre os ZIP que começam pelo NIF.
+  function saftMaisRecente(handle){
+    var candidatos = [];
+    var it = handle.values();
+
+    function passo(){
+      return it.next().then(function(r){
+        if (r.done) return null;
+        var entrada = r.value;
+        if (entrada.kind !== 'file' || !RE_SAFT_ZIP.test(entrada.name)) return passo();
+        return entrada.getFile().then(function(f){
+          candidatos.push(f);
+          return passo();
+        }, function(){ return passo(); });
+      });
+    }
+
+    return passo().then(function(){
+      if (!candidatos.length) return null;
+      candidatos.sort(function(a, b){ return b.lastModified - a.lastModified; });
+      return candidatos[0];
+    });
+  }
+
+  function importarDaPasta(){
+    limparMensagens();
+    el('btnPasta').disabled = true;
+
+    idbLer()
+      .then(function(handle){
+        if (!handle) return escolherPasta();
+        return garantirPermissao(handle, true).then(function(ok){
+          if (ok) return handle;
+          // permissão revogada ou negada — voltar a pedir a pasta
+          return escolherPasta();
+        });
+      })
+      .then(function(handle){
+        mostrarPastaNome(handle);
+        return saftMaisRecente(handle).then(function(file){
+          if (!file){
+            mostrarMsg('msgAviso',
+              'Não encontrei nenhum SAF-T na pasta «' + handle.name + '». ' +
+              'Os ficheiros do ZoneSoft começam por 518717186 e terminam em .zip — ' +
+              'confirma que é a pasta certa ou usa «mudar pasta».');
+            return;
+          }
+          tratarFicheiro(file);
+          // Em fileName e não numa msg: se o import seguir logo para a gravação,
+          // limparMensagens() apagaria a nota antes de alguém a ler.
+          el('fileName').textContent = file.name + ' — de «' + handle.name +
+            '», modificado em ' + dataHoraExtenso(file.lastModified);
+        });
+      })
+      .catch(function(err){
+        if (err && err.name === 'AbortError') return;   // o utilizador fechou o selector
+        mostrarMsg('msgErro', 'Não foi possível ler a pasta: ' +
+          (err && err.message ? err.message : String(err)));
+      })
+      .then(function(){ el('btnPasta').disabled = false; });
+  }
+
+  function ligarPasta(){
+    var btn = el('btnPasta');
+    var mudar = el('btnMudarPasta');
+
+    if (!temSuportePasta()){
+      btn.disabled = true;
+      mudar.disabled = true;
+      btn.title = 'Disponível em Chrome/Edge no computador';
+      mudar.title = 'Disponível em Chrome/Edge no computador';
+      return;
+    }
+
+    btn.addEventListener('click', importarDaPasta);
+
+    mudar.addEventListener('click', function(){
+      limparMensagens();
+      escolherPasta().then(function(handle){
+        mostrarMsg('msgOk', 'Pasta autorizada: ' + handle.name + '.');
+      }).catch(function(err){
+        if (err && err.name === 'AbortError') return;
+        mostrarMsg('msgErro', 'Não foi possível trocar de pasta: ' +
+          (err && err.message ? err.message : String(err)));
+      });
+    });
+
+    // Mostrar a pasta já autorizada, sem pedir nada ao utilizador.
+    idbLer().then(function(handle){
+      if (!handle) return;
+      return garantirPermissao(handle, false).then(function(ok){
+        if (ok) mostrarPastaNome(handle);
+      });
+    }).catch(function(){});
+  }
+
+  /* =========================================================
      Eventos
      ========================================================= */
   el('fileInput').addEventListener('change', function(){
     if (this.files && this.files[0]) tratarFicheiro(this.files[0]);
     this.value = '';
   });
+
+  ligarDropzone();
+  ligarPasta();
 
   el('btnGravar').addEventListener('click', gravar);
 
@@ -1844,6 +2237,10 @@
     descodificar: descodificar,
     lerFicheiro: lerFicheiro,
     keyFor: keyFor,
+    dataHoraExtenso: dataHoraExtenso,
+    mostrarUltimaImportacao: mostrarUltimaImportacao,
+    tratarFicheiro: tratarFicheiro,
+    temSuportePasta: temSuportePasta,
     estado: estado
   };
 
