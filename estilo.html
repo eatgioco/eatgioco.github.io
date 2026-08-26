@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>GIOCO OS — Estilo</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<style>
+  /* Estilos só desta página. Sem @media (regra do OS), flex-wrap resolve tudo. */
+  header{ background:var(--red); color:var(--white); padding:20px 24px; }
+  .header-inner{
+    max-width:var(--maxw); margin:0 auto;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .brand-mark{ font-family:var(--font-mono); font-size:16px; font-weight:700; letter-spacing:.5px; }
+  .header-inner .spacer{ flex:1 1 auto; }
+  .header-inner a{
+    color:var(--white); text-decoration:none; border:2px solid var(--white);
+    padding:6px 12px; font-family:var(--font-mono); font-size:12px; font-weight:700;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .header-inner a:hover{ background:var(--white); color:var(--red); }
+
+  main{ max-width:var(--maxw); margin:0 auto; padding:40px 24px 80px; }
+
+  .sec{ margin-bottom:56px; }
+  .sec-head{ border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:20px; }
+  .sec-num{ color:var(--red); }
+
+  .aviso{
+    display:flex; gap:12px; align-items:flex-start;
+    border:2px solid var(--navy-deep); background:var(--blush); color:var(--navy-deep);
+    padding:12px 16px; margin-top:12px;
+    font-family:var(--font-mono); font-size:13px; font-weight:700;
+  }
+
+  /* Paleta */
+  .swatches{ display:flex; flex-wrap:wrap; gap:12px; }
+  .swatch{ border:2px solid var(--ink); background:var(--white); width:170px; }
+  .swatch .chip{ height:78px; border-bottom:2px solid var(--ink); }
+  .swatch .meta{ padding:8px 10px; }
+  .swatch .name{ font-family:var(--font-mono); font-size:12px; font-weight:700; }
+  .swatch .hex{ font-family:var(--font-mono); font-size:12px; color:var(--muted); }
+
+  /* Tipografia */
+  .type-row{ border-bottom:1px solid var(--line-soft); padding:16px 0; }
+  .type-row:last-child{ border-bottom:none; }
+  .type-spec{ font-family:var(--font-mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+
+  /* Grelhas */
+  .cols{ display:flex; flex-wrap:wrap; gap:24px; }
+  .col{ flex:1 1 320px; min-width:280px; }
+  .col-narrow{ flex:0 1 380px; min-width:300px; }
+
+  .icon-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .icon-cell{
+    width:104px; border:2px solid var(--ink); background:var(--white);
+    padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .icon-cell:hover{ background:var(--mustard); }
+  .icon-cell .icon{ width:26px; height:26px; }
+  .icon-cell code{ font-family:var(--font-mono); font-size:10px; word-break:break-all; text-align:center; }
+
+  .navprev{
+    border:2px dashed var(--muted); padding:16px; background:var(--white);
+    flex:1 1 340px; min-width:300px;
+  }
+  .navprev-tag{
+    font-family:var(--font-mono); font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--navy-deep); background:var(--blush);
+    border:2px solid var(--navy-deep); display:inline-block; padding:3px 8px; margin-bottom:12px;
+  }
+  .phone-frame{ width:340px; max-width:100%; border:2px solid var(--ink); background:var(--dough); }
+  .phone-frame .fake-content{ height:150px; padding:12px; }
+
+  footer{
+    border-top:2px solid var(--ink); margin-top:40px; padding-top:16px;
+    font-family:var(--font-mono); font-size:12px; color:var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <span class="brand-mark">&#9679; GIOCO&reg;</span>
+    <span class="brand-mark" style="opacity:.75">/ ESTILO</span>
+    <span class="spacer"></span>
+    <a href="index.html">&#127968; Home</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============================================================= -->
+  <div class="sec">
+    <p class="text-label">Design system &mdash; Fase 0</p>
+    <h1 class="text-hero">O sistema<br>por dentro.</h1>
+    <p class="text-body" style="max-width:640px;margin-top:16px">
+      Esta página é o guia de estilo do GIOCO OS. Mostra os tokens, os componentes e os ícones
+      definidos em <code>gioco-shell.css</code> e <code>gioco-shell.js</code>. Serve só para
+      avaliação visual.
+    </p>
+    <div class="aviso">
+      <svg class="icon"><use href="#icon-info"/></svg>
+      <span>Nenhuma página existente do OS usa estes ficheiros. Nada aqui liga ao Firebase.
+      A propagação para os módulos é decisão da Fase 1.</span>
+    </div>
+  </div>
+
+  <!-- ============================================================= 01 PALETA -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">01</span> &nbsp;Paleta</h2></div>
+    <div class="swatches" id="paleta"></div>
+  </section>
+
+  <!-- ============================================================= 02 TIPOGRAFIA -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">02</span> &nbsp;Tipografia</h2></div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-hero &mdash; Space Mono itálico 700 / 56px / -0.02em &mdash; um por página</p>
+      <p class="text-hero">Focaccia<br>ao balcão.</p>
+    </div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-h1 &mdash; Space Mono 700 / 32px / sem itálico</p>
+      <p class="text-h1">Fichas técnicas de artigos</p>
+    </div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-h2 &mdash; Space Mono 700 / 20px</p>
+      <p class="text-h2">Preparações internas</p>
+    </div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-body &mdash; Inter 400 / 15px</p>
+      <p class="text-body" style="max-width:640px">
+        O custo por quilo de cada preparação é a soma dos ingredientes a dividir pelo rendimento,
+        ou o custo manual quando a preparação está marcada como tal. O food cost do artigo é
+        calculado sobre o PVP sem IVA.
+      </p>
+    </div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-label &mdash; Space Mono 700 / 11px / maiúsculas / 0.08em</p>
+      <span class="text-label">Fornecedor principal</span>
+    </div>
+
+    <div class="type-row">
+      <p class="type-spec">.text-data &mdash; Space Mono / 15px / tabular-nums &mdash; números e tabelas</p>
+      <p class="text-data">1 240,50 &euro; &nbsp;&middot;&nbsp; 18,4 % &nbsp;&middot;&nbsp; 0,842 kg &nbsp;&middot;&nbsp; 26/08/2026</p>
+    </div>
+  </section>
+
+  <!-- ============================================================= 03 BOTÕES -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">03</span> &nbsp;Botões</h2></div>
+
+    <span class="text-label">Normal</span>
+    <div class="gioco-row" style="margin:8px 0 20px">
+      <button class="btn-primary"><svg class="icon"><use href="#icon-check"/></svg> Guardar</button>
+      <button class="btn-secondary"><svg class="icon"><use href="#icon-pencil"/></svg> Editar</button>
+      <button class="btn-danger"><svg class="icon"><use href="#icon-trash-2"/></svg> Apagar</button>
+      <button class="btn-ghost"><svg class="icon"><use href="#icon-x"/></svg> Cancelar</button>
+    </div>
+
+    <span class="text-label">Desactivado</span>
+    <div class="gioco-row" style="margin:8px 0 20px">
+      <button class="btn-primary" disabled>Guardar</button>
+      <button class="btn-secondary" disabled>Editar</button>
+      <button class="btn-danger" disabled>Apagar</button>
+      <button class="btn-ghost" disabled>Cancelar</button>
+    </div>
+
+    <span class="text-label">Pequeno (.btn-sm) e bloco (.btn-block)</span>
+    <div class="gioco-row" style="margin:8px 0 12px">
+      <button class="btn-secondary btn-sm"><svg class="icon" style="width:14px;height:14px"><use href="#icon-plus"/></svg> Linha</button>
+      <button class="btn-ghost btn-sm">Duplicar</button>
+    </div>
+    <div style="max-width:320px"><button class="btn-primary btn-block">Registar encomenda</button></div>
+
+    <div class="aviso">
+      <svg class="icon"><use href="#icon-info"/></svg>
+      <span>Navega com Tab para ver o anel de foco (:focus-visible) em cada botão.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================= 04 CAMPOS -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">04</span> &nbsp;Campos</h2></div>
+    <div class="cols">
+      <div class="col col-narrow">
+        <div class="field">
+          <label class="text-label" for="f1">Nome do fornecedor</label>
+          <input class="gioco-input" id="f1" type="text" value="Molino Rossi">
+        </div>
+        <div class="field">
+          <label class="text-label" for="f2">Preço por kg</label>
+          <input class="gioco-input num" id="f2" type="number" step="0.01" value="1.85">
+          <span class="field-hint">Sem IVA, tal como aparece na factura.</span>
+        </div>
+        <div class="field">
+          <label class="text-label" for="f3">Categoria</label>
+          <select class="gioco-select" id="f3">
+            <option>Farinhas</option>
+            <option>Charcutaria</option>
+            <option>Queijos</option>
+            <option>Bebidas</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="col col-narrow">
+        <div class="field">
+          <label class="text-label" for="f4">Notas</label>
+          <textarea class="gioco-textarea" id="f4" placeholder="Entregas às terças, antes das 10h."></textarea>
+        </div>
+        <div class="field">
+          <label class="text-label" for="f5">Campo com erro</label>
+          <input class="gioco-input is-invalid" id="f5" type="text" value="">
+          <span class="field-error">Obrigatório: indica o NIF do fornecedor.</span>
+        </div>
+        <div class="field">
+          <label class="text-label" for="f6">Campo desactivado</label>
+          <input class="gioco-input" id="f6" type="text" value="Gerado automaticamente" disabled>
+        </div>
+        <label class="gioco-check"><input type="checkbox" checked> <span>Fornecedor activo</span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= 05 BADGES -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">05</span> &nbsp;Badges de estado</h2></div>
+    <div class="gioco-row">
+      <span class="badge-ok"><svg class="icon"><use href="#icon-check"/></svg> OK</span>
+      <span class="badge-atencao"><svg class="icon"><use href="#icon-alert-triangle"/></svg> Atenção</span>
+      <span class="badge-alto"><svg class="icon"><use href="#icon-alert-circle"/></svg> Alto</span>
+      <span class="badge-info"><svg class="icon"><use href="#icon-info"/></svg> Info</span>
+    </div>
+    <p class="text-body text-muted" style="margin-top:12px;max-width:640px">
+      Lime, mustard e blush levam sempre texto escuro (ink ou navy-deep) para garantir contraste.
+      O badge <code>.badge-alto</code> é o único com fundo vermelho e texto branco.
+    </p>
+  </section>
+
+  <!-- ============================================================= 06 TABELA -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">06</span> &nbsp;Tabela</h2></div>
+    <div class="gioco-table-wrap">
+      <table class="gioco-table">
+        <thead>
+          <tr>
+            <th>Artigo</th>
+            <th>Preparação base</th>
+            <th class="num">Custo</th>
+            <th class="num">PVP s/IVA</th>
+            <th class="num">Food cost</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-demo"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">Média</td>
+            <td class="num">1,86 &euro;</td>
+            <td class="num">7,02 &euro;</td>
+            <td class="num">26,5 %</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="text-body text-muted" style="margin-top:12px">
+      Cabeçalho sticky (faz scroll dentro da caixa), zebra subtil e números em
+      <code>.num</code> com <code>tabular-nums</code> alinhados à direita.
+    </p>
+  </section>
+
+  <!-- ============================================================= 07 MODAL + TOAST -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">07</span> &nbsp;Modal e toast</h2></div>
+    <div class="cols">
+      <div class="col">
+        <span class="text-label">Modal</span>
+        <p class="text-body text-muted">Fecha com Escape, com o X, ou com clique fora do painel.</p>
+        <div class="gioco-row">
+          <button class="btn-secondary" id="btn-modal"><svg class="icon"><use href="#icon-external-link"/></svg> Abrir modal</button>
+          <button class="btn-danger" id="btn-modal-danger"><svg class="icon"><use href="#icon-trash-2"/></svg> Modal de confirmação</button>
+        </div>
+      </div>
+      <div class="col">
+        <span class="text-label">Toast &mdash; giocoToast(msg, tipo)</span>
+        <p class="text-body text-muted">Fila no canto inferior direito, auto-dismiss a 4 segundos.</p>
+        <div class="gioco-row">
+          <button class="btn-secondary" data-toast="sucesso">Sucesso</button>
+          <button class="btn-secondary" data-toast="erro">Erro</button>
+          <button class="btn-secondary" data-toast="aviso">Aviso</button>
+          <button class="btn-secondary" data-toast="info">Info</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= 08 SKELETON + EMPTY -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">08</span> &nbsp;Carregamento e vazio</h2></div>
+    <div class="cols">
+      <div class="col">
+        <span class="text-label">Skeleton &mdash; em vez de ecrã em branco</span>
+        <div class="gioco-card" style="margin-top:8px">
+          <span class="skeleton skeleton-line-sm"></span>
+          <span class="skeleton skeleton-block"></span>
+          <span class="skeleton skeleton-line-lg"></span>
+          <span class="skeleton skeleton-line-md"></span>
+        </div>
+      </div>
+      <div class="col">
+        <span class="text-label">Empty state &mdash; ícone, título e acção</span>
+        <div id="empty-demo" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= 09 ÍCONES -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">09</span> &nbsp;Ícones</h2></div>
+    <p class="text-body text-muted" style="max-width:680px">
+      Sprite injectado no <code>&lt;body&gt;</code> por <code>gioco-shell.js</code>.
+      Uso: <code>&lt;svg class="icon"&gt;&lt;use href="#icon-home"/&gt;&lt;/svg&gt;</code>
+      ou <code>giocoIcon('home', {size:20})</code> a partir de JS.
+      Paths do <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (licença ISC/MIT).
+    </p>
+    <p class="text-label" style="margin:16px 0 8px">Total: <span id="icon-count">—</span> ícones</p>
+    <div class="icon-grid" id="icon-grid"></div>
+  </section>
+
+  <!-- ============================================================= 10 NAVEGAÇÃO -->
+  <section class="sec">
+    <div class="sec-head"><h2 class="text-h1"><span class="sec-num">10</span> &nbsp;Navegação</h2></div>
+    <div class="aviso">
+      <svg class="icon"><use href="#icon-lock"/></svg>
+      <span>PRÉ-VISUALIZAÇÃO &mdash; ainda não activa em nenhuma página.
+      <code>giocoNavSidebar()</code> e <code>giocoNavBottom()</code> existem em
+      gioco-shell.js mas nenhum módulo do OS as chama. Fica para a Fase 1.</span>
+    </div>
+
+    <div class="cols" style="margin-top:20px">
+      <div class="navprev">
+        <span class="navprev-tag">Pré-visualização &mdash; sidebar desktop</span>
+        <div id="prev-sidebar"></div>
+        <p class="text-body text-muted" style="margin-top:12px">
+          <code>giocoNavSidebar('compras')</code> &mdash; fixa à esquerda quando activada.
+        </p>
+      </div>
+
+      <div class="navprev">
+        <span class="navprev-tag">Pré-visualização &mdash; bottom nav mobile</span>
+        <div class="phone-frame">
+          <div class="fake-content">
+            <span class="skeleton skeleton-line-md"></span>
+            <span class="skeleton skeleton-line-lg"></span>
+            <span class="skeleton skeleton-line-sm"></span>
+          </div>
+          <div id="prev-bottom"></div>
+        </div>
+        <p class="text-body text-muted" style="margin-top:12px">
+          <code>giocoNavBottom('compras')</code> &mdash; alvos de toque de 56px, fixa em baixo quando activada.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    GIOCO OS &mdash; guia de estilo, Fase 0. Ficheiros: gioco-shell.css, gioco-shell.js, estilo.html.
+  </footer>
+
+</main>
+
+<script src="gioco-shell.js"></script>
+<script>
+(function(){
+  /* ---------- Paleta ---------- */
+  var PALETA = [
+    ['--dough','#FFEDDA','fundo base'],
+    ['--ink','#141414','texto e bordas'],
+    ['--red','#D91124','acção principal'],
+    ['--lime','#D7EF91','estado OK'],
+    ['--mustard','#FFCC02','estado de atenção'],
+    ['--blush','#F9CBCB','informativo suave'],
+    ['--navy-deep','#004476','texto sobre info'],
+    ['--navy-mid','#0768B1','foco e links'],
+    ['--navy-light','#298BD6','apoio'],
+    ['--white','#FFFFFF','superfícies'],
+    ['--muted','#8a8478','texto secundário']
+  ];
+  document.getElementById('paleta').innerHTML = PALETA.map(function(c){
+    return '<div class="swatch">' +
+      '<div class="chip" style="background:' + c[1] + '"></div>' +
+      '<div class="meta">' +
+        '<div class="name">' + c[0] + '</div>' +
+        '<div class="hex">' + c[1] + '</div>' +
+        '<div class="hex">' + c[2] + '</div>' +
+      '</div></div>';
+  }).join('');
+
+  /* ---------- Tabela de exemplo (dados fictícios) ---------- */
+  var LINHAS = [
+    ['Focaccia Mortadella','Pesto de pistácio','2,14','7,50','28,5','ok'],
+    ['Focaccia Nduja','Stracciatella','1,98','7,50','26,4','ok'],
+    ['Focaccia Ortolana','Creme de curgete','1,52','6,90','22,0','ok'],
+    ['Focaccia Tonno','Maionese de limão','2,41','7,50','32,1','atencao'],
+    ['Focaccia Parma 24m','&mdash;','2,87','7,90','36,3','alto'],
+    ['Focaccia Margherita','Molho de tomate','1,05','5,90','17,8','ok'],
+    ['Trancio do dia','Variável','1,31','4,50','29,1','info']
+  ];
+  var BADGE = {
+    ok:      ['badge-ok','check','OK'],
+    atencao: ['badge-atencao','alert-triangle','Atenção'],
+    alto:    ['badge-alto','alert-circle','Alto'],
+    info:    ['badge-info','info','A rever']
+  };
+  document.getElementById('tabela-demo').innerHTML = LINHAS.map(function(l){
+    var b = BADGE[l[5]];
+    return '<tr>' +
+      '<td>' + l[0] + '</td>' +
+      '<td class="text-muted">' + l[1] + '</td>' +
+      '<td class="num">' + l[2] + ' &euro;</td>' +
+      '<td class="num">' + l[3] + ' &euro;</td>' +
+      '<td class="num">' + l[4] + ' %</td>' +
+      '<td><span class="' + b[0] + '">' + giocoIcon(b[1]) + b[2] + '</span></td>' +
+      '</tr>';
+  }).join('');
+
+  /* ---------- Empty state ---------- */
+  document.getElementById('empty-demo').innerHTML = giocoEmptyState({
+    icone: 'package',
+    titulo: 'Sem encomendas esta semana',
+    descricao: 'Ainda não há encomendas registadas para os fornecedores activos. Cria a primeira para começar a acompanhar entregas.',
+    acao: { texto: 'Nova encomenda', href: '#', icone: 'plus' }
+  });
+
+  /* ---------- Grelha de ícones ---------- */
+  var grid = document.getElementById('icon-grid');
+  grid.innerHTML = giocoIconNames.map(function(n){
+    return '<div class="icon-cell">' + giocoIcon(n) + '<code>' + n + '</code></div>';
+  }).join('');
+  document.getElementById('icon-count').textContent = giocoIconNames.length;
+
+  /* ---------- Toasts ---------- */
+  var MSG = {
+    sucesso: 'Ficha técnica guardada.',
+    erro:    'Falhou a ligação ao Firebase.',
+    aviso:   'Três ingredientes ainda por confirmar.',
+    info:    'Food cost recalculado com o último preço.'
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-toast]'), function(b){
+    b.addEventListener('click', function(){
+      var t = b.getAttribute('data-toast');
+      giocoToast(MSG[t], t);
+    });
+  });
+
+  /* ---------- Modais ---------- */
+  document.getElementById('btn-modal').addEventListener('click', function(){
+    giocoModal({
+      titulo: 'Nova preparação',
+      corpo:
+        '<div class="field"><label class="text-label" for="m1">Nome</label>' +
+        '<input class="gioco-input" id="m1" type="text" placeholder="Pesto de pistácio"></div>' +
+        '<div class="field"><label class="text-label" for="m2">Rendimento (kg)</label>' +
+        '<input class="gioco-input num" id="m2" type="number" step="0.01" value="1.20"></div>' +
+        '<p class="text-body text-muted">Fecha com Escape, com o X, ou clicando fora deste painel.</p>',
+      acoes: [
+        { texto: 'Cancelar', estilo: 'ghost' },
+        { texto: 'Guardar', estilo: 'primary', onClick: function(){ giocoToast(MSG.sucesso, 'sucesso'); } }
+      ]
+    });
+  });
+
+  document.getElementById('btn-modal-danger').addEventListener('click', function(){
+    giocoModal({
+      titulo: 'Apagar preparação?',
+      corpo: '<p class="text-body">O <strong>Pesto de pistácio</strong> é usado em 3 artigos. ' +
+             'Ao apagar, esses artigos ficam sem custo calculado até seres tu a corrigi-los.</p>',
+      acoes: [
+        { texto: 'Manter', estilo: 'secondary' },
+        { texto: 'Apagar', estilo: 'danger', onClick: function(){ giocoToast('Preparação apagada.', 'erro'); } }
+      ]
+    });
+  });
+
+  /* ---------- Pré-visualização de navegação (não activa) ---------- */
+  document.getElementById('prev-sidebar').appendChild(giocoNavSidebar('compras'));
+  document.getElementById('prev-bottom').appendChild(giocoNavBottom('compras'));
+
+  /* Nas pré-visualizações os links não navegam. */
+  Array.prototype.forEach.call(
+    document.querySelectorAll('#prev-sidebar a, #prev-bottom a'),
+    function(a){ a.addEventListener('click', function(e){
+      e.preventDefault();
+      giocoToast('Pré-visualização: a navegação ainda não está activa.', 'info');
+    }); }
+  );
+})();
+</script>
+
+</body>
+</html>
