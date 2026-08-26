@@ -1369,12 +1369,14 @@
      Estado da pagina
      ========================================================= */
   var estado = {
-    catalogo: {},          // key -> { desc, categoria }
+    catalogo: {},          // key -> { desc, categoria, subcategoria }
     catalogoCarregado: false,
     pendente: null,        // { meses, anuladas, header, ficheiro, novos:[] }
     dados: {},             // mes -> payload lido do Firebase
     mesActivo: '',
-    ordemProdutos: 'valor'
+    ordemProdutos: 'valor',
+    planoMigracao: null,   // plano calculado por verificarMigracao()
+    escritorCatalogo: null // só os testes preenchem, para simular falhas de escrita
   };
 
   /* =========================================================
@@ -1776,6 +1778,46 @@
   /* =========================================================
      Gravacao no Firebase
      ========================================================= */
+
+  /* Escreve o catálogo registo a registo, o mesmo padrão da migração.
+
+     Não é atómico e não pretende ser: se falhar a meio, os produtos já
+     escritos ficam escritos. O que garante é que se sabe EXACTAMENTE quais
+     — a promise rejeitada leva `err.escritas` com as chaves confirmadas
+     pelo servidor, e só essas entram no catálogo em memória. O estado
+     parcial fica reportado, nunca silencioso.
+
+     A alternativa seria um único update() multi-chave, esse sim atómico no
+     Realtime Database. Não é o que está aqui porque um update() multi-chave
+     contra a ref de `notificacoes` já deixou a promise pendurada para
+     sempre neste projecto (ver comentário em mrn-dashboard.html), e sem
+     promise não há forma de saber se a escrita passou.
+
+     `escrever` existe só para os testes poderem simular falha a meio. */
+  function escreverCatalogo(entradas, aoProgredir, escrever){
+    var chaves = Object.keys(entradas);
+    var escritas = [];
+    if (!chaves.length) return Promise.resolve(escritas);
+
+    var fn = escrever || function(k, v){ return catalogoRef.child(k).set(v); };
+
+    return chaves.reduce(function(cadeia, k){
+      return cadeia.then(function(){
+        return fn(k, entradas[k]).then(function(){
+          escritas.push(k);
+          if (aoProgredir) aoProgredir(escritas.length, chaves.length);
+        });
+      });
+    }, Promise.resolve())
+      .then(function(){ return escritas; })
+      .catch(function(err){
+        var e = err instanceof Error ? err : new Error(String(err));
+        e.escritas = escritas;
+        e.total = chaves.length;
+        throw e;
+      });
+  }
+
   function gravar(){
     var pend = estado.pendente;
     if (!pend) return;
@@ -1784,13 +1826,11 @@
     var novasEntradas = {};
     pend.novos.forEach(function(p){
       var cls = escolhas[p.key] || p.sugestao;
-      var entrada = {
+      novasEntradas[p.key] = {
         desc: p.desc,
         categoria: cls.categoria,
         subcategoria: cls.subcategoria || null
       };
-      estado.catalogo[p.key] = entrada;
-      novasEntradas[p.key] = entrada;
     });
 
     el('btnGravar').disabled = true;
@@ -1800,11 +1840,14 @@
     var mesesLista = Object.keys(pend.meses).sort();
     var agora = new Date().toISOString();
 
-    var gravarCatalogo = Object.keys(novasEntradas).length
-      ? catalogoRef.update(novasEntradas)
-      : Promise.resolve();
-
-    gravarCatalogo
+    escreverCatalogo(novasEntradas, function(feitas, total){
+        progresso(0.1 + 0.15 * (feitas / total), 'A gravar catálogo… ' + feitas + '/' + total);
+      }, estado.escritorCatalogo)
+      .then(function(escritas){
+        // Só depois de o servidor confirmar é que o catálogo em memória passa a
+        // dar estes produtos como classificados.
+        escritas.forEach(function(k){ estado.catalogo[k] = novasEntradas[k]; });
+      })
       .then(function(){
         // Confirmar substituicao de meses ja importados, um a um.
         return mesesLista.reduce(function(cadeia, mes){
@@ -1860,7 +1903,29 @@
       .catch(function(err){
         esconderProgresso();
         el('btnGravar').disabled = false;
-        mostrarMsg('msgErro', 'Erro ao gravar: ' + (err && err.message ? err.message : String(err)));
+        var base = 'Erro ao gravar: ' + (err && err.message ? err.message : String(err));
+
+        // Falha a meio da escrita do catálogo: dizer exactamente quantos
+        // produtos ficaram gravados, para o estado não ser ambíguo.
+        if (err && err.escritas) {
+          var feitas = err.escritas.length;
+          var falta = err.total - feitas;
+
+          // O catálogo em memória ficou dessincronizado do servidor: alguns
+          // produtos foram gravados mas não entraram no mapa local. Forçar
+          // releitura no próximo import, senão voltavam a aparecer para
+          // classificar dentro desta mesma sessão.
+          estado.catalogoCarregado = false;
+
+          mostrarMsg('msgErro', base +
+            ' — catálogo gravado parcialmente: ' + intFmt(feitas) + ' de ' + intFmt(err.total) +
+            ' produto' + (err.total === 1 ? '' : 's') + ' ficaram gravados, ' + intFmt(falta) +
+            ' não. Nenhum mês foi gravado. Volta a correr o import: os que faltam voltam a aparecer' +
+            ' para classificar, os já gravados não.');
+          return;
+        }
+
+        mostrarMsg('msgErro', base);
       });
   }
 
@@ -2627,6 +2692,7 @@
     TAXONOMIA: TAXONOMIA,
     planearMigracao: planearMigracao,
     mostrarRelatorioMigracao: mostrarRelatorioMigracao,
+    escreverCatalogo: escreverCatalogo,
     migrarEntrada: migrarEntrada,
     jaMigrada: jaMigrada,
     descodificar: descodificar,
