@@ -633,21 +633,38 @@
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   }
 
+  /* Maritozzo é o formato do pão, não o tipo de prato: há dois salgados e dois
+     doces. Comparados sem acentos ("AL RAGÚ" -> "al ragu"). Qualquer outro
+     maritozzo cai em 'Outro' de propósito, para forçar revisão manual. */
+  var MARITOZZI_SALGADOS = ['maritozzo mortadella', 'maritozzo al ragu'];
+  var MARITOZZI_DOCES    = ['maritozzo nutella', 'maritozzo panna', 'panna e albicocca'];
+
   function sugerirCategoria(desc){
     // Comparar sem acentos: o ZoneSoft escreve "Caffe", "Caffé", "Agua" e "Água".
     var d = semAcentos(desc);
     if (d.indexOf('focaccia') === 0) return 'Focaccia';
     if (d.indexOf('extra') !== -1) return 'Extra';
-    if (d.indexOf('maritozzo') !== -1) return 'Doce';
+
+    for (var s = 0; s < MARITOZZI_SALGADOS.length; s++){
+      if (d.indexOf(MARITOZZI_SALGADOS[s]) !== -1) return 'Focaccia';
+    }
+    for (var t = 0; t < MARITOZZI_DOCES.length; t++){
+      if (d.indexOf(MARITOZZI_DOCES[t]) !== -1) return 'Doce';
+    }
+    if (d.indexOf('maritozzo') !== -1) return 'Outro';
 
     var cafes = ['caffe', 'cafe', 'cappuccino', 'americano', 'macchiato'];
     for (var i = 0; i < cafes.length; i++){
       if (d.indexOf(cafes[i]) !== -1) return 'Café';
     }
-    if (/\bcha\b/.test(d)) return 'Café';
 
-    var bebidas = ['cerveja', 'vinho', 'spritz', 'prosecco', 'agua', 'coca', 'limonata',
-                   'limonada', 'aranciata', 'chinotto', 'somersby', 'bellini', 'amaro', 'limoncello'];
+    // "Chá da Casa" está no menu na secção SOFTS, ao lado da Coca-Cola: bebida fria.
+    // Fica com fronteira de palavra para não apanhar "chinotto"/"macchiato".
+    if (/\bcha\b/.test(d)) return 'Bebida';
+
+    var bebidas = ['cerveja', 'sidra', 'vinho', 'lambrusco', 'spritz', 'prosecco', 'agua',
+                   'coca', 'limonata', 'limonada', 'aranciata', 'chinotto', 'somersby',
+                   'bellini', 'amaro', 'limoncello'];
     for (var j = 0; j < bebidas.length; j++){
       if (d.indexOf(bebidas[j]) !== -1) return 'Bebida';
     }
