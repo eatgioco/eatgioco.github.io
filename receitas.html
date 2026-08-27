@@ -7,267 +7,187 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
 <style>
+  /* ======================================================================
+     receitas.html — estilos próprios da página.
+     O layout, o vidro, a sidebar, os KPI, os .cat-chip e os .status vêm
+     todos do gioco-shell.css. Aqui só fica o que é específico das fichas
+     técnicas: linhas de componente, avisos, passos e o modal do seed.
+     ====================================================================== */
+
+  /* Tokens de estado. O shell não define cor de TEXTO para valores em risco,
+     e o vermelho/âmbar do tema claro não têm contraste sobre o fundo escuro.
+     Por isso cada um tem par nos dois temas. */
   :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-    --amber:#B8860B;
+    --fc-alto:#D91124;
+    --fc-atencao:#B8860B;
     --warn-bg:#FDF6D8;
+    --warn-line:#B8860B;
+  }
+  [data-theme="dark"]{
+    --fc-alto:#ff7d88;
+    --fc-atencao:#e0ab1f;
+    --warn-bg:rgba(224,171,31,0.12);
+    --warn-line:#e0ab1f;
   }
 
-  *{box-sizing:border-box;}
+  /* Legibilidade dos selos no tema escuro: os fundos (--lime, --mustard,
+     --blush) continuam claros, mas --ink passa a claro e o texto herdado
+     desaparecia. Só o tema escuro é corrigido; no claro o shell já serve. */
+  [data-theme="dark"] .status.ok,
+  [data-theme="dark"] .status.warn{ color:#141414; }
+  [data-theme="dark"] .status.high{ color:#3d0810; }
 
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
+  body{ -webkit-font-smoothing:antialiased; }
+
+  /* Os itens do menu são links reais (<a>), estilizados pelo .nav-row do shell. */
+  .nav-row{ text-decoration:none; }
+
+  /* Rodapé da sidebar: utilizador fixo, sem sessões nem logout. */
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
   }
 
-  h1,h2,h3,.mono{
-    font-family:'Space Mono', monospace;
-  }
-
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
-
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
-
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:40px 24px 80px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
+  /* Mesma largura de leitura das outras páginas do OS. */
+  .page{ max-width:1200px; }
 
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:6px 0 0;
     font-size:12px;
+    font-weight:600;
     color:var(--red);
-    letter-spacing:2px;
+    letter-spacing:.14em;
     text-transform:uppercase;
   }
 
   .nota-iva{
-    background:var(--white);
-    border:2px solid var(--black);
-    border-left:8px solid var(--red);
-    padding:16px;
-    margin:24px 0 0;
+    border-left:4px solid var(--red);
+    padding:16px 20px;
+    margin:18px 0 0;
     font-size:13px;
     line-height:1.6;
   }
 
   .status-msg{
-    margin:20px 0 0;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
+    margin:16px 0 0;
+    font-size:12.5px;
     color:var(--muted);
+    font-weight:500;
   }
 
-  /* ---------- Tabs ---------- */
+  /* ---------- Separador Artigos / Preparações ----------
+     Mesma pílula dos .cat-chip, sem o círculo do ícone à esquerda. */
   .tabs{
     display:flex;
     flex-wrap:wrap;
     gap:10px;
-    margin-top:28px;
+    margin-top:26px;
   }
 
   .tab-btn{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:600;
     background:var(--white);
-    color:var(--black);
-    border:2px solid var(--black);
-    padding:10px 16px;
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:9px 20px;
     cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, color .15s ease;
   }
 
+  .tab-btn:hover{ border-color:var(--red); }
+
   .tab-btn.active{
-    background:var(--black);
-    color:var(--white);
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--dough);
   }
 
   .tab-count{
     font-weight:400;
-    opacity:0.7;
+    opacity:0.65;
     margin-left:6px;
   }
 
-  /* ---------- Filtros ---------- */
-  .filter-row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    align-items:center;
-    margin-top:22px;
+  /* ---------- Pesquisa (caixa .search-box do shell) ---------- */
+  .filter-row{ margin-top:22px; }
+
+  .search-box.receitas-search{
+    max-width:340px;
+    margin:0 0 20px;
   }
 
-  .search-input{
-    font-family:'Inter', sans-serif;
-    font-size:14px;
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:9px 12px;
-    width:280px;
-    max-width:100%;
-  }
-
-  .chip{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    letter-spacing:0.5px;
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:7px 11px;
-    cursor:pointer;
-  }
-
-  .chip.active{
-    background:var(--red);
-    border-color:var(--red);
-    color:var(--white);
-  }
-
-  /* ---------- Resumo de food cost (ledger) ---------- */
-  .resumo{
-    background:var(--white);
-    border:2px solid var(--black);
-    border-top:2px dashed var(--black);
-    padding:24px;
-    margin-top:24px;
-  }
-
-  .ledger{
-    display:flex;
-    flex-wrap:wrap;
-    gap:16px 0;
-  }
-
-  .ledger-item{
-    flex:1 1 152px;
+  .search-box.receitas-search input{
+    flex:1;
     min-width:0;
-    padding:0 16px;
-    border-left:1px solid var(--muted);
+    background:none;
+    border:none;
+    outline:none;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--ink);
   }
 
-  .ledger-item.principal{
-    flex:1 1 216px;
-    padding-left:0;
-    border-left:none;
+  .search-box.receitas-search input::placeholder{ color:var(--muted); }
+
+  [data-theme="dark"] .search-box{
+    background:rgba(40,36,30,0.45);
+    border-top-color:rgba(255,255,255,0.14);
+    border-left-color:rgba(255,255,255,0.08);
+    border-right-color:rgba(255,255,255,0.03);
+    border-bottom-color:rgba(0,0,0,0.3);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 14px rgba(0,0,0,0.22);
   }
 
-  .ledger-valor{
-    font-family:'Space Mono', monospace;
-    font-size:28px;
-    font-weight:700;
-    line-height:1.1;
-    margin:0;
-  }
+  /* Os .cat-chip são <button>: sem cor explícita ficavam com o preto que o
+     browser dá por omissão, ilegível sobre o chip escuro. O estado activo
+     tem mais especificidade (.cat-chip.active) e continua a mandar. */
+  .cat-chip{ color:var(--ink); }
 
-  .ledger-item.principal .ledger-valor{
-    font-size:40px;
-  }
-
-  .ledger-valor.alto{
-    color:var(--red);
-  }
-
-  .ledger-label{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:var(--muted);
-    margin:8px 0 0;
-    line-height:1.4;
-  }
+  /* ---------- Resumo de food cost (KPI do shell) ---------- */
+  .kpi-row.resumo-row{ flex-wrap:wrap; margin-bottom:14px; }
+  .kpi-row.resumo-row .kpi{ flex:1 1 176px; }
+  .kpi-row.resumo-row .kpi.principal{ flex:1 1 260px; }
+  .kpi .k-value.alto{ color:var(--fc-alto); }
+  .kpi.principal .k-value{ font-size:36px; line-height:1.05; }
 
   .resumo-base{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:12px;
     color:var(--muted);
-    margin:24px 0 0;
-    padding-top:16px;
-    border-top:1px solid var(--line);
+    margin:0 0 4px;
     line-height:1.6;
   }
 
   .resumo-excluidos{
     font-size:12px;
     color:var(--muted);
-    margin:8px 0 0;
+    margin:0 0 20px;
     line-height:1.6;
   }
 
-  /* ---------- Cards (ticket) ---------- */
+  /* ---------- Cards ---------- */
   .cards{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(min(420px,100%), 1fr));
-    gap:24px;
-    margin-top:24px;
+    gap:20px;
+    margin-top:4px;
     align-items:start;
   }
 
-  .card{
-    background:var(--white);
-    border:2px solid var(--black);
-    border-top:2px dashed var(--black);
-    padding:24px;
-  }
+  /* .card e .glass-light vêm do shell; aqui só a folga interna maior. */
+  .cards .card{ padding:22px 24px; }
 
   .card-head{
     display:flex;
@@ -283,115 +203,89 @@
   }
 
   .card-eyebrow{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    letter-spacing:0.08em;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin:0 0 8px;
+    margin:0 0 6px;
   }
 
   .card-nome{
-    font-family:'Space Mono', monospace;
-    font-size:20px;
+    font-family:'Inter', sans-serif;
+    font-size:18px;
     font-weight:700;
-    line-height:1.2;
+    line-height:1.25;
     margin:0;
     overflow-wrap:anywhere;
   }
 
   .card-sub{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:11.5px;
     color:var(--muted);
     margin:8px 0 0;
-    letter-spacing:0.04em;
+    line-height:1.5;
   }
 
-  /* ---------- Selo de food cost ---------- */
+  /* ---------- Selo de food cost (.status do shell) ---------- */
   .selo-wrap{
     flex:0 0 auto;
-    width:72px;
-    text-align:center;
+    text-align:right;
   }
 
-  .selo{
-    width:64px;
-    height:64px;
-    margin:4px auto 0;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
-    transform:rotate(-3deg);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:2px;
+  .selo-wrap .status{
+    display:inline-flex;
+    align-items:baseline;
+    gap:6px;
+    padding:5px 12px;
+    font-size:13px;
+    font-variant-numeric:tabular-nums;
   }
 
-  .selo-atencao{
-    border-color:var(--amber);
-    background:var(--warn-bg);
+  .selo-wrap .selo-word{
+    font-size:9.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    opacity:.75;
   }
 
-  .selo-alto{
-    border-color:var(--red);
-    color:var(--red);
-  }
-
-  .selo-incompleto{
-    border:2px dashed var(--muted);
+  /* Sem dados não é um estado de risco: nem lime, nem mustard, nem blush. */
+  .status.incompleto{
+    background:none;
+    border:1px dashed var(--muted);
     color:var(--muted);
-  }
-
-  .selo-pct{
-    font-family:'Space Mono', monospace;
-    font-size:15px;
-    font-weight:700;
-    line-height:1;
-  }
-
-  .selo-incompleto .selo-pct{
-    font-size:24px;
-  }
-
-  .selo-word{
-    font-family:'Space Mono', monospace;
-    font-size:8px;
-    letter-spacing:0.08em;
-    line-height:1;
-    white-space:nowrap;
   }
 
   .selo-sub{
-    font-family:'Space Mono', monospace;
-    font-size:9px;
+    font-size:10.5px;
     color:var(--muted);
-    margin:8px 0 0;
+    margin:7px 0 0;
     line-height:1.4;
   }
 
   /* ---------- Secções do card ---------- */
   .card-sec{
-    margin-top:24px;
-    padding-top:16px;
+    margin-top:20px;
+    padding-top:14px;
     border-top:1px solid var(--line);
   }
 
   .block-label{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.08em;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin:0 0 8px;
+    margin:0 0 10px;
   }
 
   /* ---------- Linha de componente (recibo) ---------- */
   .comp-line{
-    padding:8px 0;
-    font-size:14px;
+    padding:7px 0;
+    font-size:13.5px;
   }
 
   /* Nome, pontos e custo ficam sempre na mesma linha: só o nome encolhe,
@@ -411,9 +305,9 @@
 
   .comp-prep-badge{
     flex:0 0 auto;
-    font-family:'Space Mono', monospace;
     font-size:9px;
-    letter-spacing:0.04em;
+    font-weight:600;
+    letter-spacing:.04em;
     text-transform:uppercase;
     color:var(--muted);
     white-space:nowrap;
@@ -428,28 +322,28 @@
   }
 
   .comp-qtd{
-    font-family:'Space Mono', monospace;
     font-size:11px;
     color:var(--muted);
     margin:2px 0 0;
     line-height:1.4;
+    font-variant-numeric:tabular-nums;
   }
 
   .comp-custo{
     flex:0 0 auto;
-    font-family:'Space Mono', monospace;
-    font-size:13px;
+    font-size:12.5px;
     font-weight:700;
     white-space:nowrap;
     text-align:right;
+    font-variant-numeric:tabular-nums;
   }
 
   .comp-custo.missing{
-    color:var(--red);
-    font-weight:400;
+    color:var(--fc-alto);
+    font-weight:500;
   }
 
-  /* ---------- Totais do card (ledger) ---------- */
+  /* ---------- Totais do card ---------- */
   .totais{
     display:flex;
     flex-wrap:wrap;
@@ -461,7 +355,7 @@
     flex:1 1 120px;
     min-width:0;
     padding:0 16px;
-    border-left:1px solid var(--muted);
+    border-left:1px solid var(--line);
   }
 
   .total-item:first-child{
@@ -470,42 +364,46 @@
   }
 
   .total-valor{
-    font-family:'Space Mono', monospace;
-    font-size:22px;
+    font-size:21px;
     font-weight:700;
     line-height:1.1;
     margin:0;
     overflow-wrap:anywhere;
+    font-variant-numeric:tabular-nums;
   }
 
   .total-valor.incompleto{
-    color:var(--amber);
+    color:var(--fc-atencao);
   }
 
   .total-label{
-    font-family:'Space Mono', monospace;
     font-size:10px;
-    letter-spacing:0.08em;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin:8px 0 0;
+    margin:7px 0 0;
     line-height:1.4;
   }
 
   /* ---------- Avisos ---------- */
   .avisos{
     background:var(--warn-bg);
-    border-left:4px solid var(--amber);
-    padding:16px;
-    margin-top:24px;
+    border-left:4px solid var(--warn-line);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-top:20px;
   }
 
   .avisos-label{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:0.08em;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.08em;
     text-transform:uppercase;
-    color:var(--amber);
+    color:var(--fc-atencao);
     margin:0 0 8px;
   }
 
@@ -535,8 +433,8 @@
   .passos li{
     counter-increment:passo;
     position:relative;
-    padding-left:32px;
-    margin-bottom:16px;
+    padding-left:30px;
+    margin-bottom:14px;
     font-size:13px;
     line-height:1.6;
   }
@@ -549,12 +447,12 @@
     content:counter(passo);
     position:absolute;
     left:0;
-    top:0;
+    top:1px;
     width:20px;
     height:20px;
-    background:var(--black);
-    color:var(--white);
-    font-family:'Space Mono', monospace;
+    border-radius:6px;
+    background:var(--ink);
+    color:var(--dough);
     font-size:11px;
     font-weight:700;
     display:flex;
@@ -569,18 +467,18 @@
     color:var(--muted);
   }
 
-  /* ---------- Estado vazio ---------- */
-  .empty{
-    background:var(--white);
-    border:2px solid var(--black);
-    border-top:2px dashed var(--black);
-    padding:32px;
-    margin-top:24px;
+  .rel-empty{
+    font-size:13px;
+    color:var(--muted);
+    margin:0;
   }
 
+  /* ---------- Estado vazio ---------- */
+  .empty{ padding:28px 30px; }
+
   .empty-title{
-    font-family:'Space Mono', monospace;
-    font-size:18px;
+    font-family:'Inter', sans-serif;
+    font-size:17px;
     font-weight:700;
     margin:0 0 8px;
   }
@@ -605,13 +503,15 @@
   }
 
   .empty code{
-    font-family:'Space Mono', monospace;
-    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    background:var(--dough);
     border:1px solid var(--line);
+    border-radius:5px;
     padding:2px 6px;
   }
 
-  /* ---------- Modal ---------- */
+  /* ---------- Modal do relatório do seed ---------- */
   .modal-overlay{
     display:none;
     position:fixed;
@@ -626,10 +526,12 @@
 
   .modal{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:16px;
     max-width:640px;
     margin:0 auto;
     padding:24px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.22);
   }
 
   .modal-head{
@@ -637,13 +539,13 @@
     align-items:center;
     justify-content:space-between;
     gap:12px;
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
     padding-bottom:12px;
     margin-bottom:16px;
   }
 
   .modal-title{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:16px;
     font-weight:700;
     margin:0;
@@ -651,7 +553,9 @@
 
   .modal-close{
     background:none;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:9px;
+    color:var(--ink);
     font-size:18px;
     line-height:1;
     padding:4px 9px;
@@ -661,9 +565,10 @@
   .rel-group{margin-bottom:16px;}
 
   .rel-group h4{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
-    letter-spacing:1px;
+    font-weight:700;
+    letter-spacing:.08em;
     text-transform:uppercase;
     margin:0 0 6px;
   }
@@ -674,43 +579,79 @@
     font-size:13px;
     line-height:1.6;
   }
-
-  .rel-empty{
-    font-size:13px;
-    color:var(--muted);
-    margin:0;
-  }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav>
+      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Dashboard</span></a>
+      <a class="nav-row active" href="receitas.html"><svg class="icon" width="17" height="17"><use href="#i-chef-hat"/></svg> <span>Receitas</span></a>
+      <a class="nav-row" href="compras.html"><svg class="icon" width="17" height="17"><use href="#i-shopping-cart"/></svg> <span>Compras</span></a>
+      <a class="nav-row" href="pagamentos.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Pagamentos</span></a>
+      <a class="nav-row" href="vendas.html"><svg class="icon" width="17" height="17"><use href="#i-bar-chart-2"/></svg> <span>Vendas</span></a>
+      <!-- Definições ainda não tem página. Link morto de propósito: fica à vista
+           no menu, mas não navega para lado nenhum. -->
+      <a class="nav-row" href="#"><svg class="icon" width="17" height="17"><use href="#i-settings"/></svg> <span>Definições</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
   </div>
-</header>
 
-<main>
-  <h1 class="page-title">GIOCO · Receitas</h1>
-  <p class="page-subtitle">Fichas técnicas e custo</p>
+  <div class="main">
+    <div class="page">
 
-  <p class="nota-iva">Food cost calculado sobre o PVP <strong>sem IVA</strong> (13%, taxa da restauração): custo ÷ (PVP ÷ 1,13). Os valores de PVP mostrados nos cards são os de venda ao público, com IVA incluído.</p>
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-chef-hat"/></svg>GIOCO · <b>Receitas</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
 
-  <p class="status-msg" id="statusMsg">A carregar…</p>
+      <p class="page-subtitle">Fichas técnicas e custo</p>
 
-  <div class="tabs">
-    <button class="tab-btn active" id="tabArtigos" data-tab="artigos">Artigos<span class="tab-count" id="countArtigos"></span></button>
-    <button class="tab-btn" id="tabPreparacoes" data-tab="preparacoes">Preparações<span class="tab-count" id="countPreparacoes"></span></button>
+      <p class="nota-iva card glass-light">Food cost calculado sobre o PVP <strong>sem IVA</strong> (13%, taxa da restauração): custo ÷ (PVP ÷ 1,13). Os valores de PVP mostrados nos cards são os de venda ao público, com IVA incluído.</p>
+
+      <p class="status-msg" id="statusMsg">A carregar…</p>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tabArtigos" data-tab="artigos">Artigos<span class="tab-count" id="countArtigos"></span></button>
+        <button class="tab-btn" id="tabPreparacoes" data-tab="preparacoes">Preparações<span class="tab-count" id="countPreparacoes"></span></button>
+      </div>
+
+      <div class="filter-row">
+        <div class="search-box receitas-search">
+          <svg class="icon" width="14" height="14"><use href="#i-search"/></svg>
+          <input type="text" id="searchInput" placeholder="Procurar por nome…">
+        </div>
+        <div class="cat-row" id="categoriaChips"></div>
+      </div>
+
+      <div id="conteudo"></div>
+
+    </div>
   </div>
 
-  <div class="filter-row">
-    <input type="text" class="search-input" id="searchInput" placeholder="Procurar por nome…">
-    <div id="categoriaChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-  </div>
-
-  <div id="conteudo"></div>
-</main>
+</div>
 
 <div class="modal-overlay" id="seedOverlay">
   <div class="modal">
@@ -1466,7 +1407,8 @@ window.addEventListener('load', function () {
   function avisosHtml(avisos) {
     var lista = (avisos || []).filter(function (a) { return a && String(a).trim(); });
     if (!lista.length) return '';
-    var html = '<div class="avisos"><p class="avisos-label">⚠ Por confirmar</p><ul>';
+    var html = '<div class="avisos"><p class="avisos-label">' + giocoIcon('bell', {size:13}) +
+               'Por confirmar</p><ul>';
     lista.forEach(function (a) { html += '<li>' + escapeHtml(a) + '</li>'; });
     return html + '</ul></div>';
   }
@@ -1474,35 +1416,38 @@ window.addEventListener('load', function () {
   function passosHtml(passos) {
     var lista = (passos || []).filter(function (p) { return p && String(p).trim(); });
     if (!lista.length) return '';
-    var html = '<div class="card-sec"><p class="block-label">Passos</p><ol class="passos">';
+    var html = '<div class="card-sec"><p class="block-label">' + giocoIcon('chef-hat', {size:13}) +
+               'Passos</p><ol class="passos">';
     lista.forEach(function (p) { html += '<li>' + escapeHtml(p) + '</li>'; });
     return html + '</ol></div>';
   }
 
   function notasHtml(notas) {
     if (!notas || !String(notas).trim()) return '';
-    return '<div class="card-sec"><p class="block-label">Notas</p>' +
+    return '<div class="card-sec"><p class="block-label">' + giocoIcon('message-square', {size:13}) +
+           'Notas</p>' +
            '<p class="notas">' + escapeHtml(notas) + '</p></div>';
   }
 
-  // Selo carimbado no canto do card. A cor segue as mesmas fasquias em toda
-  // a página: abaixo de 25% ok, 25–30% atenção, 30% ou mais alto.
+  // Selo no canto do card, agora no .status do shell. As fasquias são as
+  // mesmas de sempre — abaixo de 25% ok, 25–30% atenção, 30% ou mais alto —
+  // só muda a classe CSS que lhes corresponde: .ok / .warn / .high.
   function seloHtml(calc) {
     if (calc.foodCost === null) {
       return '<div class="selo-wrap">' +
-             '<div class="selo selo-incompleto"><span class="selo-pct">?</span>' +
-             '<span class="selo-word">S/ DADOS</span></div></div>';
+             '<span class="status incompleto">?' +
+             '<span class="selo-word">s/ dados</span></span></div>';
     }
-    var classe = 'selo';
-    var palavra = 'OK';
-    if (calc.foodCost >= 30) { classe += ' selo-alto'; palavra = 'ALTO'; }
-    else if (calc.foodCost >= 25) { classe += ' selo-atencao'; palavra = 'ATENÇÃO'; }
+    var classe = 'status ok';
+    var palavra = 'ok';
+    if (calc.foodCost >= 30) { classe = 'status high'; palavra = 'alto'; }
+    else if (calc.foodCost >= 25) { classe = 'status warn'; palavra = 'atenção'; }
 
     return '<div class="selo-wrap">' +
-           '<div class="' + classe + '">' +
-           '<span class="selo-pct">' + formatPct(calc.foodCost) + '</span>' +
+           '<span class="' + classe + '">' +
+           formatPct(calc.foodCost) +
            '<span class="selo-word">' + palavra + '</span>' +
-           '</div>' +
+           '</span>' +
            '<p class="selo-sub">food cost<br>s/ ' + escapeHtml(formatEuros(calc.pvpLiquido, 2)) + '</p>' +
            '</div>';
   }
@@ -1510,7 +1455,7 @@ window.addEventListener('load', function () {
   function cardArtigoHtml(id, receita, calc) {
     calc = calc || custoDoArtigo(receita);
 
-    var html = '<div class="card">';
+    var html = '<div class="card glass-light">';
     html += '<div class="card-head">';
     html += '<div class="card-head-main">';
     html += '<p class="card-eyebrow">' + escapeHtml(receita.categoria || 'Sem categoria') + '</p>';
@@ -1519,7 +1464,8 @@ window.addEventListener('load', function () {
     html += seloHtml(calc);
     html += '</div>';
 
-    html += '<div class="card-sec"><p class="block-label">Componentes</p>';
+    html += '<div class="card-sec"><p class="block-label">' + giocoIcon('receipt', {size:13}) +
+            'Componentes</p>';
     if (!calc.linhas.length) {
       html += '<p class="rel-empty">Sem componentes registados.</p>';
     }
@@ -1554,7 +1500,7 @@ window.addEventListener('load', function () {
 
     var eyebrow = prep.codigo ? prep.codigo + ' · Preparação' : 'Preparação';
 
-    var html = '<div class="card">';
+    var html = '<div class="card glass-light">';
     html += '<div class="card-head">';
     html += '<div class="card-head-main">';
     html += '<p class="card-eyebrow">' + escapeHtml(eyebrow) + '</p>';
@@ -1572,14 +1518,16 @@ window.addEventListener('load', function () {
     html += '</div></div>';
 
     if (prep.custoManual) {
-      html += '<div class="avisos"><p class="avisos-label">⚠ Custo manual</p><ul><li>' +
+      html += '<div class="avisos"><p class="avisos-label">' + giocoIcon('pencil', {size:13}) +
+              'Custo manual</p><ul><li>' +
               'Sem breakdown de ingredientes — ' +
               (porUnidade.custo === null
                 ? 'e sem valor de custo definido. Custo por calcular.'
                 : 'custo fixo de ' + formatEuros(porUnidade.custo, 2) + ' / ' + porUnidade.unidade + '.') +
               '</li></ul></div>';
     } else {
-      html += '<div class="card-sec"><p class="block-label">Ingredientes</p>';
+      html += '<div class="card-sec"><p class="block-label">' + giocoIcon('shopping-cart', {size:13}) +
+              'Ingredientes</p>';
       if (!lote.linhas.length) {
         html += '<p class="rel-empty">Sem ingredientes registados.</p>';
       }
@@ -1668,21 +1616,22 @@ window.addEventListener('load', function () {
     var r = resumoFoodCost(calculos);
     if (!r.total) return '';
 
-    var html = '<div class="resumo"><div class="ledger">';
-    html += '<div class="ledger-item principal">';
-    html += '<p class="ledger-valor' + (r.media !== null && r.media >= 30 ? ' alto' : '') + '">' +
+    var html = '<div class="kpi-row resumo-row">';
+    html += '<div class="kpi principal card glass-light">';
+    html += '<p class="k-label">Food cost médio s/ IVA</p>';
+    html += '<p class="k-value' + (r.media !== null && r.media >= 30 ? ' alto' : '') + '">' +
             (r.media === null ? '—' : formatPct(r.media)) + '</p>';
-    html += '<p class="ledger-label">Food cost médio s/ IVA</p></div>';
+    html += '</div>';
 
     if (!r.categorias.length) {
-      html += '<div class="ledger-item"><p class="ledger-label">' +
+      html += '<div class="kpi card glass-light"><p class="k-label">' +
               'Nenhum artigo com custo completo — sem médias por categoria.</p></div>';
     }
     r.categorias.forEach(function (c) {
-      html += '<div class="ledger-item">';
-      html += '<p class="ledger-valor' + (c.media >= 30 ? ' alto' : '') + '">' + formatPct(c.media) + '</p>';
-      html += '<p class="ledger-label">' + escapeHtml(c.categoria) + ' · ' + c.n +
+      html += '<div class="kpi card glass-light">';
+      html += '<p class="k-label">' + escapeHtml(c.categoria) + ' · ' + c.n +
               (c.n === 1 ? ' artigo' : ' artigos') + '</p>';
+      html += '<p class="k-value' + (c.media >= 30 ? ' alto' : '') + '">' + formatPct(c.media) + '</p>';
       html += '</div>';
     });
     html += '</div>';
@@ -1695,7 +1644,7 @@ window.addEventListener('load', function () {
       html += '<p class="resumo-excluidos">Fora da conta: ' + escapeHtml(r.excluidos.join(', ')) + '</p>';
     }
 
-    return html + '</div>';
+    return html;
   }
 
   function usadaEmQuantosArtigos(prepId) {
@@ -1718,16 +1667,32 @@ window.addEventListener('load', function () {
     return Object.keys(set).sort();
   }
 
+  // Ícone e cor do círculo de cada separador de categoria. O sprite do shell
+  // não tem um símbolo por categoria, por isso o que distingue salgado de
+  // doce é a cor do círculo, não o desenho.
+  var CHIP_ICONE = {
+    'Todas':             { icone:'layout-dashboard', cor:'var(--white)' },
+    'Focaccia':          { icone:'chef-hat',         cor:'var(--lime)' },
+    'Maritozzo Salgado': { icone:'chef-hat',         cor:'var(--mustard)' },
+    'Maritozzo Doce':    { icone:'chef-hat',         cor:'var(--blush)' },
+    'Side':              { icone:'shopping-cart',    cor:'var(--lime)' },
+    'Bebida':            { icone:'shopping-cart',    cor:'var(--blush)' }
+  };
+
   function renderChips() {
     var cats = categoriasDisponiveis();
     if (!cats.length) { categoriaChips.innerHTML = ''; return; }
     var html = '';
     ['Todas'].concat(cats).forEach(function (cat) {
-      html += '<button type="button" class="chip' + (cat === categoriaAtiva ? ' active' : '') +
-              '" data-cat="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</button>';
+      var meta = CHIP_ICONE[cat] || { icone:'receipt', cor:'var(--white)' };
+      html += '<button type="button" class="cat-chip' + (cat === categoriaAtiva ? ' active' : '') +
+              '" data-cat="' + escapeHtml(cat) + '">' +
+              '<span class="circle" style="background:' + meta.cor + ';color:#141414">' +
+              giocoIcon(meta.icone, {size:16}) + '</span>' +
+              '<span>' + escapeHtml(cat) + '</span></button>';
     });
     categoriaChips.innerHTML = html;
-    categoriaChips.querySelectorAll('.chip').forEach(function (btn) {
+    categoriaChips.querySelectorAll('.cat-chip').forEach(function (btn) {
       btn.addEventListener('click', function () {
         categoriaAtiva = btn.getAttribute('data-cat');
         render();
@@ -1815,11 +1780,11 @@ window.addEventListener('load', function () {
   function vazioHtml(tipo) {
     var vazioTotal = !Object.keys(allReceitas).length && !Object.keys(allPreparacoes).length;
     if (!vazioTotal) {
-      return '<div class="empty"><p class="empty-title">Nada com este filtro</p>' +
+      return '<div class="empty card glass-light"><p class="empty-title">Nada com este filtro</p>' +
              '<p>Nenhum ' + escapeHtml(tipo) + ' corresponde à pesquisa. Limpa o campo ou ' +
              'carrega em <strong>Todas</strong> para voltar a ver a lista completa.</p></div>';
     }
-    return '<div class="empty"><p class="empty-title">Falta carregar o levantamento</p>' +
+    return '<div class="empty card glass-light"><p class="empty-title">Falta carregar o levantamento</p>' +
            '<p>A base de dados ainda não tem fichas técnicas. Para as criar:</p>' +
            '<ol>' +
            '<li>Abre <code>receitas.html?seed=1</code> — uma vez só.</li>' +
