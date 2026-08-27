@@ -411,15 +411,33 @@
   }
 
   /* O modal de encomenda mostra a tabela completa do fornecedor — precisa de
-     muito mais espaço que os restantes modais. */
+     muito mais espaço que os restantes modais, por isso encosta-se às margens
+     e comprime tudo o que rodeia a tabela. */
   .modal-order{
-    max-width:1100px;
+    max-width:1400px;
+    padding:16px 16px 18px;
+  }
+
+  #orderModalOverlay{
+    padding:16px 12px;
+  }
+
+  .modal-order .modal-header{
+    margin-bottom:12px;
+  }
+
+  .modal-order .modal-actions{
+    margin-top:14px;
+  }
+
+  .modal-order #orderNotas{
+    min-height:52px;
   }
 
   .order-table-wrap{
     /* Cresce com o ecrã, mas deixa sempre espaço para o cabeçalho, as
        observações e os botões — sem obrigar a fazer scroll do modal. */
-    max-height:min(62vh, calc(100vh - 420px));
+    max-height:min(78vh, calc(100vh - 312px));
     min-height:280px;
     overflow-y:auto;
     border:2px solid var(--black);
@@ -553,7 +571,17 @@
      colunas fixas encolhem, para sobrar espaço para o nome do ingrediente. */
   @media (max-width:640px){
     .modal-order{
-      padding:18px 14px;
+      padding:14px 10px 16px;
+    }
+
+    #orderModalOverlay{
+      padding:10px 8px;
+    }
+
+    /* Em mobile os botões de ação partem para várias linhas, por isso a
+       tabela precisa de reservar mais espaço do que no desktop. */
+    .order-table-wrap{
+      max-height:min(62vh, calc(100vh - 420px));
     }
 
     .order-table thead th{
@@ -748,9 +776,11 @@
   }
 
   /* O clique no cartão abre a encomenda; a ficha do fornecedor passa a ter
-     este botão dedicado. */
+     este botão dedicado, encostado ao canto inferior esquerdo do cartão
+     (margin-top:auto empurra-o para baixo nos cartões mais curtos). */
   .card-info-btn{
-    margin-left:auto;
+    align-self:flex-start;
+    margin-top:auto;
     flex:0 0 auto;
     width:26px;
     height:26px;
@@ -1837,7 +1867,7 @@
       <button class="modal-close" id="orderModalClose">×</button>
     </div>
 
-    <div class="field-label" style="margin-bottom:8px;">Linhas de encomenda</div>
+    <div class="field-label" style="margin-bottom:6px;">Linhas de encomenda</div>
     <div class="order-table-wrap">
       <table class="order-table">
         <thead>
@@ -1847,7 +1877,7 @@
       </table>
     </div>
 
-    <div class="field full" style="margin-top:18px;">
+    <div class="field full" style="margin-top:12px;">
       <label class="field-label">Observações</label>
       <textarea id="orderNotas"></textarea>
     </div>
@@ -3841,7 +3871,6 @@ window.addEventListener('load', function () {
       html += '<div class="card-title-row">';
       html += '<button type="button" class="star-btn' + (s.favorito ? ' star-btn-active' : '') + '" title="Favorito">' + (s.favorito ? '★' : '☆') + '</button>';
       html += '<h3 class="card-title">' + escapeHtml(s.nome) + '</h3>';
-      html += '<button type="button" class="card-info-btn" title="Ficha do fornecedor" aria-label="Ficha do fornecedor">ℹ</button>';
       html += '</div>';
       html += '<div class="badge-group">' + cats.map(function (c) { return '<span class="badge">' + escapeHtml(c) + '</span>'; }).join('') + '</div>';
       html += '</div>';
@@ -3888,6 +3917,7 @@ window.addEventListener('load', function () {
       if ((s.plataformaEncomenda || temWhatsapp) && temEmailEnc) {
         html += '<button type="button" class="order-email-link">ou encomendar por email</button>';
       }
+      html += '<button type="button" class="card-info-btn" title="Ficha do fornecedor" aria-label="Ficha do fornecedor">ℹ</button>';
 
       card.innerHTML = html;
       // O clique no cartão abre a encomenda pelo canal principal do fornecedor;
