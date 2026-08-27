@@ -1258,11 +1258,14 @@
     flex-shrink:0;
     margin-top:3px;
   }
-  .cf-print-loja{
-    display:block;
+  .cf-print-loja-header{
+    font-family:'Space Mono', monospace;
     font-size:12px;
-    font-weight:400;
-    color:#141414;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+    color:#6b6660;
+    margin:8px 0 4px;
   }
 </style>
 </head>
@@ -1690,6 +1693,7 @@
   document.getElementById('cfPrintBtn').addEventListener('click', function(){
     var scope = document.getElementById('cfPrintScope').value;
     var categorias = scope === 'ambos' ? ['Food', 'Não-Food'] : [scope];
+    var lojas = ['Supermercado', 'Cash & Carry', 'Loja de Materiais'];
 
     var itens = Object.keys(allComprasFisicas)
       .map(function(id){ return Object.assign({ id: id }, allComprasFisicas[id]); })
@@ -1703,18 +1707,32 @@
     var html = '<div class="cf-print-title">GIOCO · Lista de Compras</div>';
     html += '<div class="cf-print-sub">' + new Date().toLocaleDateString('pt-PT') + '</div>';
 
+    function imprimirItens(lista){
+      lista.forEach(function(i){
+        html += '<div class="cf-print-item">';
+        html += '<span class="cf-print-checkbox"></span>';
+        html += '<span>' + escapeHtml(i.nome) + '</span>';
+        html += '</div>';
+      });
+    }
+
     categorias.forEach(function(cat){
       var doCat = itens.filter(function(i){ return i.categoria === cat; });
       if (!doCat.length) return;
       html += '<div class="cf-print-cat">' + escapeHtml(cat) + '</div>';
-      doCat.forEach(function(i){
-        html += '<div class="cf-print-item">';
-        html += '<span class="cf-print-checkbox"></span>';
-        html += '<span>' + escapeHtml(i.nome);
-        if (i.loja) html += '<span class="cf-print-loja">' + escapeHtml(i.loja) + '</span>';
-        html += '</span>';
-        html += '</div>';
+
+      lojas.forEach(function(loja){
+        var doLoja = doCat.filter(function(i){ return (i.loja || '') === loja; });
+        if (!doLoja.length) return;
+        html += '<div class="cf-print-loja-header">' + escapeHtml(loja) + '</div>';
+        imprimirItens(doLoja);
       });
+
+      var semLoja = doCat.filter(function(i){ return !i.loja; });
+      if (semLoja.length){
+        html += '<div class="cf-print-loja-header">Outro</div>';
+        imprimirItens(semLoja);
+      }
     });
 
     document.getElementById('cfPrintArea').innerHTML = html;
