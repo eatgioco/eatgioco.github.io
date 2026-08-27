@@ -316,6 +316,15 @@
   .msg.aviso{ border-color:var(--amber); color:var(--amber); background:var(--white); }
   .msg.ok{ border-color:var(--green); color:var(--green); background:var(--white); }
 
+  /* ---------- Relatório do import, dia a dia ---------- */
+  /* A cor é só do estado do dia; o resto da linha mantém o estilo da tabela. */
+  #relatorioBody td:nth-child(2){ font-weight:700; }
+  #relatorioBody tr.dia-novo td:nth-child(2){ color:var(--green); }
+  #relatorioBody tr.dia-substituido td:nth-child(2){ color:var(--muted); }
+  #relatorioBody tr.dia-suspeito td:nth-child(2){ color:var(--amber); }
+  #relatorioBody tr.dia-saltado td{ color:var(--muted); text-decoration:line-through; }
+  #relatorioBody tr.dia-saltado td:nth-child(2){ color:var(--red); text-decoration:none; }
+
   /* ---------- Resumo / KPIs ---------- */
   .kpi-row{
     display:flex;
@@ -878,6 +887,30 @@
     </div>
   </div>
 
+  <!-- ============ RELATÓRIO DO IMPORT, DIA A DIA ============ -->
+  <div class="card hidden" id="relatorioCard">
+    <p class="card-title">O que este import gravou</p>
+    <p class="card-note">
+      Cada dia do ficheiro é gravado à parte e o mês é recalculado a partir de
+      todos os dias que existem — os deste import e os anteriores. Substituir um
+      dia não toca nos outros.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Estado</th>
+            <th class="num">Bruto anterior</th>
+            <th class="num">Bruto novo</th>
+            <th class="num">Diferença</th>
+          </tr>
+        </thead>
+        <tbody id="relatorioBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- ============ VISTAS ============ -->
   <div class="toolbar">
     <div>
@@ -905,6 +938,17 @@
   var db = firebase.database();
   var vendasRef = db.ref('vendas');
   var catalogoRef = db.ref('vendas/catalogo');
+
+  /* Granularidade diária do import. Nó irmão de vendas/, não filho: o
+     carregarDados() lê vendas/ inteiro em cada abertura da página, e pendurar
+     aqui um payload por dia duplicaria essa leitura sem que nenhuma vista
+     precisasse dele. vendas/{mes} passa a ser sempre derivado destes dias. */
+  var diarioRef = db.ref('vendasDiario');
+
+  /* Cada dia guarda mais pares do que o mês mostra: o mês soma os tops de cada
+     dia, por isso um top curto por dia deitaria fora pares que só somados
+     chegariam ao top 30 do mês. O nó do mês continua a ter 30. */
+  var PARES_POR_DIA = 200;
 
   /* =========================================================
      Utilitários
@@ -1154,9 +1198,9 @@
   }
 
   /* =========================================================
-     Parse do SAF-T → agregados intermédios (por mês)
+     Parse do SAF-T → agregados intermédios (um por dia)
      ========================================================= */
-  function novoMes(){
+  function novoDia(){
     return {
       bruto:0, liquido:0, docs:0, qtdTotal:0,
       produtos:{},                 // key → { codigo, desc, qtd, valor, iva }
@@ -1197,7 +1241,7 @@
       throw new Error('O SAF-T não contém nenhuma fatura no período.');
     }
 
-    var meses = {};
+    var dias = {};
     var anuladas = 0;
     var anuladasPorMes = {};
     var total = invoices.length;
@@ -1222,9 +1266,8 @@
 
       var dia = (invoiceDate || systemEntry.slice(0, 10)).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) continue;
-      var mesKey = dia.slice(0, 7);
 
-      var m = meses[mesKey] || (meses[mesKey] = novoMes());
+      var m = dias[dia] || (dias[dia] = novoDia());
 
       var totais = kid(inv, 'DocumentTotals');
       var bruto  = totais ? numTxt(totais, 'GrossTotal') : 0;
@@ -1310,11 +1353,11 @@
       }
     }
 
-    if (!Object.keys(meses).length){
+    if (!Object.keys(dias).length){
       throw new Error('Não foi possível agregar nenhuma fatura (todas anuladas ou sem data válida).');
     }
 
-    return { meses: meses, anuladas: anuladas, anuladasPorMes: anuladasPorMes,
+    return { dias: dias, anuladas: anuladas, anuladasPorMes: anuladasPorMes,
              totalFaturas: total, header: headerInfo };
   }
 
@@ -1324,6 +1367,16 @@
   function round(n, casas){
     var f = Math.pow(10, casas === undefined ? 2 : casas);
     return Math.round((Number(n) || 0) * f) / f;
+  }
+
+  /* Empates desempatados pela chave do par, não pela ordem de inserção: o mês
+     é somado a partir dos dias e a ordem em que os pares aparecem depende de
+     que dia os viu primeiro. Sem isto, o mesmo mês dava listas diferentes
+     consoante o caminho, com as mesmas contagens. */
+  function ordemPares(x, y){
+    if (y.n !== x.n) return y.n - x.n;
+    if (x.a !== y.a) return x.a < y.a ? -1 : 1;
+    return x.b < y.b ? -1 : (x.b > y.b ? 1 : 0);
   }
 
   function topPares(taloes, limite){
@@ -1341,10 +1394,10 @@
       }
     }
     return Object.keys(mapa).map(function(chave){ return mapa[chave]; })
-      .sort(function(x, y){ return y.n - x.n; }).slice(0, limite || 30);
+      .sort(ordemPares).slice(0, limite || 30);
   }
 
-  function construirPayload(m, catalogo, meta){
+  function construirPayload(m, catalogo, meta, paresLimite){
     var payload = {};
 
     // --- produtos + categorias
@@ -1454,6 +1507,7 @@
       dias: diasAbertos,
       artigosPorTalao: round(m.docs ? m.qtdTotal / m.docs : 0, 4),
       valorPorArtigo: round(m.qtdTotal ? m.bruto / m.qtdTotal : 0, 4),
+      qtdTotal: round(m.qtdTotal, 3),
       importadoEm: meta.importadoEm,
       ficheiro: meta.ficheiro
     };
@@ -1470,7 +1524,7 @@
       taloesComFocacciaEBebida: comFocacciaEBebida,
       taxa: round(comFocaccia ? comFocacciaEBebida / comFocaccia : 0, 4)
     };
-    payload.pares = topPares(m.taloes, 30);
+    payload.pares = topPares(m.taloes, paresLimite || 30);
 
     return payload;
   }
@@ -1489,7 +1543,7 @@
 
   function mergePayloads(lista){
     var out = {
-      resumo:{ bruto:0, liquido:0, docs:0, dias:0, ticket:0, artigosPorTalao:0, valorPorArtigo:0 },
+      resumo:{ bruto:0, liquido:0, docs:0, dias:0, ticket:0, artigosPorTalao:0, valorPorArtigo:0, qtdTotal:0 },
       produtos:{}, porDia:{}, porHora:{}, porDiaSemana:{}, porTipo:{},
       porPagamento:{}, porCategoria:{}, porSubcategoria:{},
       attach:{ taloesComFocaccia:0, taloesComFocacciaEBebida:0, taxa:0 },
@@ -1505,7 +1559,12 @@
       out.resumo.liquido += Number(r.liquido) || 0;
       out.resumo.docs += Number(r.docs) || 0;
       out.resumo.dias += Number(r.dias) || 0;
-      qtdTotal += (Number(r.artigosPorTalao) || 0) * (Number(r.docs) || 0);
+      // qtdTotal explícito quando existe; a reconstrução por artigosPorTalao
+      // arrasta o erro do arredondamento a 4 casas e é só o que resta para
+      // meses gravados antes de este campo existir.
+      qtdTotal += (r.qtdTotal !== undefined && r.qtdTotal !== null)
+        ? (Number(r.qtdTotal) || 0)
+        : (Number(r.artigosPorTalao) || 0) * (Number(r.docs) || 0);
 
       Object.keys(p.produtos || {}).forEach(function(k){
         var src = p.produtos[k];
@@ -1516,6 +1575,7 @@
         if (src.desc) d.desc = src.desc;
         if (src.categoria) d.categoria = src.categoria;
         if (src.subcategoria) d.subcategoria = src.subcategoria;
+        if (src.iva) d.iva = Number(src.iva) || 0;
       });
 
       somaMapa(out.porDia, p.porDia, ['bruto','docs']);
@@ -1554,13 +1614,56 @@
 
     out.resumo.ticket = out.resumo.docs ? out.resumo.bruto / out.resumo.docs : 0;
     out.resumo.artigosPorTalao = out.resumo.docs ? qtdTotal / out.resumo.docs : 0;
+    out.resumo.qtdTotal = qtdTotal;
     out.resumo.valorPorArtigo = qtdTotal ? out.resumo.bruto / qtdTotal : 0;
     out.attach.taxa = out.attach.taloesComFocaccia
       ? out.attach.taloesComFocacciaEBebida / out.attach.taloesComFocaccia : 0;
     out.pares = Object.keys(paresMapa).map(function(chave){ return paresMapa[chave]; })
-      .sort(function(x, y){ return y.n - x.n; }).slice(0, 30);
+      .sort(ordemPares).slice(0, 30);
 
     return out;
+  }
+
+  /* mergePayloads soma sem arredondar — chega para desenhar a vista "todos os
+     meses", mas o que vai para vendas/{mes} tem de sair com as mesmas casas
+     decimais que construirPayload sempre gravou, senão o nó muda de formato.
+     As casas aqui são exactamente as de construirPayload. */
+  function arredondarMapa(mapa, campos){
+    Object.keys(mapa || {}).forEach(function(k){
+      Object.keys(campos).forEach(function(c){
+        if (mapa[k][c] !== undefined) mapa[k][c] = round(mapa[k][c], campos[c]);
+      });
+    });
+  }
+
+  function arredondarPayload(p){
+    var r = p.resumo;
+    r.bruto = round(r.bruto, 2);
+    r.liquido = round(r.liquido, 2);
+    r.ticket = round(r.ticket, 4);
+    r.artigosPorTalao = round(r.artigosPorTalao, 4);
+    r.valorPorArtigo = round(r.valorPorArtigo, 4);
+    r.qtdTotal = round(r.qtdTotal, 3);
+    Object.keys(p.produtos).forEach(function(k){
+      var d = p.produtos[k];
+      d.qtd = round(d.qtd, 3);
+      d.valor = round(d.valor, 2);
+      d.pvpMedio = round(d.pvpMedio, 4);
+      if (d.iva !== undefined) d.iva = round(d.iva, 2);
+    });
+
+    arredondarMapa(p.porDia, { bruto:2 });
+    arredondarMapa(p.porHora, { bruto:2 });
+    arredondarMapa(p.porDiaSemana, { bruto:2 });
+    arredondarMapa(p.porTipo, { bruto:2, ticket:4 });
+    arredondarMapa(p.porPagamento, { bruto:2 });
+    arredondarMapa(p.porCategoria, { valor:2, qtd:3 });
+    Object.keys(p.porSubcategoria || {}).forEach(function(cat){
+      arredondarMapa(p.porSubcategoria[cat], { valor:2, qtd:3 });
+    });
+
+    p.attach.taxa = round(p.attach.taxa, 4);
+    return p;
   }
 
   /* =========================================================
@@ -1590,7 +1693,7 @@
   var estado = {
     catalogo: {},          // key -> { desc, categoria, subcategoria }
     catalogoCarregado: false,
-    pendente: null,        // { meses, anuladas, header, ficheiro, novos:[] }
+    pendente: null,        // { dias, anuladas, header, ficheiro, novos:[] }
     dados: {},             // mes -> payload lido do Firebase
     mesActivo: '',
     ordemProdutos: 'valor',
@@ -1900,6 +2003,7 @@
   function tratarFicheiro(file){
     limparMensagens();
     esconderCatalogo();
+    esconderRelatorio();
     estado.pendente = null;
     el('fileName').textContent = file.name;
 
@@ -1935,8 +2039,8 @@
         // produtos ainda sem categoria no catalogo
         var vistos = {};
         var novos = [];
-        Object.keys(parsed.meses).forEach(function(mes){
-          var prods = parsed.meses[mes].produtos;
+        Object.keys(parsed.dias).forEach(function(dia){
+          var prods = parsed.dias[dia].produtos;
           Object.keys(prods).forEach(function(k){
             var p = prods[k];
             if (vistos[k]){
@@ -1953,7 +2057,7 @@
         novos.sort(function(a, b){ return b.valor - a.valor; });
 
         estado.pendente = {
-          meses: parsed.meses,
+          dias: parsed.dias,
           anuladas: parsed.anuladas,
           anuladasPorMes: parsed.anuladasPorMes,
           header: parsed.header,
@@ -1963,12 +2067,19 @@
 
         esconderProgresso();
 
-        var mesesLista = Object.keys(parsed.meses).sort();
+        var diasLista = Object.keys(parsed.dias).sort();
+        var mesesLista = [];
+        diasLista.forEach(function(dia){
+          var mes = dia.slice(0, 7);
+          if (mesesLista.indexOf(mes) === -1) mesesLista.push(mes);
+        });
+        mesesLista.sort();
         var segundos = ((Date.now() - t0) / 1000).toFixed(1);
-        var faturasOk = mesesLista.reduce(function(acc, mes){ return acc + parsed.meses[mes].docs; }, 0);
+        var faturasOk = diasLista.reduce(function(acc, dia){ return acc + parsed.dias[dia].docs; }, 0);
         mostrarMsg('msgOk',
           'Lido em ' + segundos + 's: ' + intFmt(faturasOk) + ' faturas válidas em ' +
-          mesesLista.map(nomeMes).join(', ') + '.');
+          intFmt(diasLista.length) + ' dia' + (diasLista.length === 1 ? '' : 's') +
+          ' (' + mesesLista.map(nomeMes).join(', ') + ').');
 
         if (parsed.anuladas > 0){
           var detalhe = Object.keys(parsed.anuladasPorMes).sort().map(function(mes){
@@ -2039,6 +2150,149 @@
       });
   }
 
+  /* Compara o bruto anterior com o novo e devolve a variação relativa.
+     Sem anterior (dia novo) devolve 0 — dia novo nunca é suspeito. */
+  function variacaoBruto(anterior, novo){
+    var a = Number(anterior) || 0;
+    var n = Number(novo) || 0;
+    if (!a) return n ? 1 : 0;
+    return Math.abs(n - a) / a;
+  }
+
+  /* Lê o estado actual de cada dia do import em vendasDiario/ e decide o que
+     fazer com ele. Só pergunta ao utilizador quando um dia que já existia muda
+     de bruto em mais de LIMIAR_SUSPEITA — reimportar o mesmo dia com o mesmo
+     valor, ou juntar dias novos a um mês já importado, é rotina e não leva
+     confirmação nenhuma. */
+  var LIMIAR_SUSPEITA = 0.05;
+
+  function planearDias(dias, payloads){
+    var lista = Object.keys(dias).sort();
+    return lista.reduce(function(cadeia, dia){
+      return cadeia.then(function(plano){
+        var mes = dia.slice(0, 7);
+        return diarioRef.child(mes).child(dia).child('resumo').once('value').then(function(snap){
+          var anterior = snap.val();
+          var brutoNovo = payloads[dia].resumo.bruto;
+          var entrada = {
+            dia: dia,
+            mes: mes,
+            novo: !anterior,
+            brutoAnterior: anterior ? (Number(anterior.bruto) || 0) : null,
+            brutoNovo: brutoNovo,
+            ficheiroAnterior: anterior ? (anterior.ficheiro || '') : '',
+            variacao: 0,
+            gravar: true,
+            suspeito: false
+          };
+          if (anterior){
+            entrada.variacao = variacaoBruto(entrada.brutoAnterior, brutoNovo);
+            if (entrada.variacao > LIMIAR_SUSPEITA){
+              entrada.suspeito = true;
+              entrada.gravar = window.confirm(
+                'O dia ' + dia + ' já tinha sido importado e o valor mudou muito.\n\n' +
+                'Bruto anterior: ' + eur(entrada.brutoAnterior) +
+                '  (' + (entrada.ficheiroAnterior || '—') + ')\n' +
+                'Bruto novo:     ' + eur(brutoNovo) + '\n' +
+                'Diferença:      ' + pct(entrada.variacao, 1) + '\n\n' +
+                'Uma diferença desta dimensão pode significar que este é o ficheiro errado.\n' +
+                'Substituir este dia? (os outros dias do import seguem na mesma)'
+              );
+            }
+          }
+          plano.push(entrada);
+          return plano;
+        });
+      });
+    }, Promise.resolve([]));
+  }
+
+  /* Escreve dia a dia, nunca em lote: no RTDB deste projecto as escritas
+     multi-chave já se mostraram pouco fiáveis (ver escreverCatalogo). */
+  function gravarDias(plano, payloads, aoProgredir){
+    var aceites = plano.filter(function(e){ return e.gravar; });
+    var feitos = 0;
+    return aceites.reduce(function(cadeia, entrada){
+      return cadeia.then(function(){
+        return diarioRef.child(entrada.mes).child(entrada.dia).set(payloads[entrada.dia])
+          .then(function(){
+            feitos++;
+            if (aoProgredir) aoProgredir(feitos, aceites.length, entrada.dia);
+          });
+      });
+    }, Promise.resolve()).then(function(){ return aceites; });
+  }
+
+  /* Recompõe o payload do mês a partir de TODOS os dias que estão em
+     vendasDiario/{mes} — os deste import e os que já lá estavam. É esta a
+     única origem de vendas/{mes}: nunca sai directamente do ficheiro. */
+  function payloadDoMes(diasDoMes, meta){
+    var chaves = Object.keys(diasDoMes || {}).sort();
+    var payload = arredondarPayload(mergePayloads(chaves.map(function(d){ return diasDoMes[d]; })));
+    payload.resumo.importadoEm = meta.importadoEm;
+    payload.resumo.ficheiro = meta.ficheiro;
+    payload.resumo.diasImportados = chaves.length;
+    payload.resumo.ultimoImportEm = meta.importadoEm;
+    return payload;
+  }
+
+  /* O mês passa a ser sempre derivado de vendasDiario/. Isso levanta um risco
+     de transição: meses gravados pelo código antigo (que escrevia o mês inteiro
+     de uma vez) não têm dias nenhuns em vendasDiario/, e um import de um único
+     dia recomporia o mês só com esse dia. O guarda abaixo apanha isso — e
+     apanha também, em regime normal, qualquer recálculo que encolha o mês.
+     Recalcular com MAIS dias do que antes é o caso normal e não pergunta nada. */
+  function recalcularMes(mes, meta){
+    return diarioRef.child(mes).once('value').then(function(snap){
+      var diasDoMes = snap.val() || {};
+      var nDias = Object.keys(diasDoMes).length;
+      return db.ref('vendas/' + mes + '/resumo').once('value').then(function(snapMes){
+        var antes = snapMes.val();
+        var diasAntes = antes ? (Number(antes.dias) || 0) : 0;
+        if (antes && nDias < diasAntes){
+          var ok = window.confirm(
+            'O mês de ' + nomeMes(mes) + ' tem hoje ' + diasAntes + ' dias, mas só ' +
+            nDias + ' estão gravados dia a dia.\n\n' +
+            'Recalcular agora deixaria o mês só com esses ' + nDias + '.\n' +
+            'Isto é normal na primeira vez que se usa a gravação por dia: a solução é\n' +
+            'importar o SAF-T do período completo, não um dia solto.\n\n' +
+            'Recalcular à mesma? (Cancelar deixa ' + nomeMes(mes) + ' como está —\n' +
+            'os dias já gravados em vendasDiario/ não se perdem.)'
+          );
+          if (!ok) return { mes: mes, dias: nDias, saltado: true };
+        }
+        return db.ref('vendas/' + mes).set(payloadDoMes(diasDoMes, meta))
+          .then(function(){ return { mes: mes, dias: nDias, saltado: false }; });
+      });
+    });
+  }
+
+  /* Quadro dia a dia do que este import fez. Substitui o confirm() por mês:
+     o normal é ver aqui o que mudou, não ter de responder a perguntas. */
+  function relatorioDias(plano){
+    var alvo = el('relatorioBody');
+    if (!alvo) return;
+    alvo.innerHTML = plano.map(function(e){
+      var estadoTxt, cls;
+      if (!e.gravar){ estadoTxt = 'não gravado'; cls = 'dia-saltado'; }
+      else if (e.novo){ estadoTxt = 'novo'; cls = 'dia-novo'; }
+      else { estadoTxt = 'substituído'; cls = e.suspeito ? 'dia-suspeito' : 'dia-substituido'; }
+      return '<tr class="' + cls + '">' +
+        '<td class="mono">' + esc(e.dia) + '</td>' +
+        '<td>' + estadoTxt + '</td>' +
+        '<td class="num">' + (e.brutoAnterior === null ? '—' : eur(e.brutoAnterior)) + '</td>' +
+        '<td class="num">' + eur(e.brutoNovo) + '</td>' +
+        '<td class="num">' + (e.brutoAnterior === null ? '—' : pct(e.variacao || 0, 1)) + '</td>' +
+        '</tr>';
+    }).join('');
+    el('relatorioCard').className = 'card';
+  }
+
+  function esconderRelatorio(){
+    var card = el('relatorioCard');
+    if (card) card.className = 'card hidden';
+  }
+
   function gravar(){
     var pend = estado.pendente;
     if (!pend) return;
@@ -2056,13 +2310,17 @@
 
     el('btnGravar').disabled = true;
     limparMensagens();
+    esconderRelatorio();
     progresso(0.1, 'A gravar catálogo…');
 
-    var mesesLista = Object.keys(pend.meses).sort();
+    var diasLista = Object.keys(pend.dias).sort();
     var agora = new Date().toISOString();
+    var meta = { importadoEm: agora, ficheiro: pend.ficheiro };
+    var payloads = {};
+    var plano = null;
 
     escreverCatalogo(novasEntradas, function(feitas, total){
-        progresso(0.1 + 0.15 * (feitas / total), 'A gravar catálogo… ' + feitas + '/' + total);
+        progresso(0.1 + 0.1 * (feitas / total), 'A gravar catálogo… ' + feitas + '/' + total);
       }, estado.escritorCatalogo)
       .then(function(escritas){
         // Só depois de o servidor confirmar é que o catálogo em memória passa a
@@ -2070,56 +2328,79 @@
         escritas.forEach(function(k){ estado.catalogo[k] = novasEntradas[k]; });
       })
       .then(function(){
-        // Confirmar substituicao de meses ja importados, um a um.
-        return mesesLista.reduce(function(cadeia, mes){
-          return cadeia.then(function(aceites){
-            return db.ref('vendas/' + mes + '/resumo').once('value').then(function(snap){
-              var anterior = snap.val();
-              if (anterior){
-                var quando = dataHora(anterior.importadoEm);
-                var ok = window.confirm(
-                  'Já existe um import de ' + nomeMes(mes) + '.\n\n' +
-                  'Importado em: ' + quando + '\n' +
-                  'Ficheiro: ' + (anterior.ficheiro || '—') + '\n' +
-                  'Bruto actual: ' + eur(anterior.bruto) + '\n\n' +
-                  'Substituir por este import? (os outros meses não são tocados)'
-                );
-                if (!ok) return aceites;
-              }
-              aceites.push(mes);
-              return aceites;
-            });
-          });
-        }, Promise.resolve([]));
+        // Um payload completo por dia — o formato de sempre, só que a
+        // representar um dia em vez de um mês. `pares` guarda mais do que os 30
+        // do mês: como o merge do mês soma os tops de cada dia, um top curto por
+        // dia perderia pares que só somados chegariam ao top do mês.
+        progresso(0.2, 'A preparar ' + diasLista.length + ' dia' + (diasLista.length === 1 ? '' : 's') + '…');
+        diasLista.forEach(function(dia){
+          payloads[dia] = construirPayload(pend.dias[dia], estado.catalogo, meta, PARES_POR_DIA);
+        });
+        return planearDias(pend.dias, payloads);
       })
-      .then(function(aceites){
-        if (!aceites.length){
+      .then(function(p){
+        plano = p;
+        var aGravar = plano.filter(function(e){ return e.gravar; }).length;
+        if (!aGravar){
           esconderProgresso();
           el('btnGravar').disabled = false;
-          mostrarMsg('msgAviso', 'Nada gravado — nenhum mês foi confirmado.');
+          relatorioDias(plano);
+          mostrarMsg('msgAviso', 'Nada gravado — nenhum dia foi confirmado.');
           return null;
         }
-        var i = 0;
-        return aceites.reduce(function(cadeia, mes){
-          return cadeia.then(function(){
-            i++;
-            progresso(0.2 + 0.7 * (i / aceites.length), 'A gravar ' + nomeMes(mes) + '…');
-            var payload = construirPayload(pend.meses[mes], estado.catalogo, {
-              importadoEm: agora,
-              ficheiro: pend.ficheiro
-            });
-            return db.ref('vendas/' + mes).set(payload);
-          });
-        }, Promise.resolve()).then(function(){ return aceites; });
+        return gravarDias(plano, payloads, function(feitos, total, dia){
+          progresso(0.25 + 0.5 * (feitos / total), 'A gravar ' + dia + '… ' + feitos + '/' + total);
+        });
       })
       .then(function(aceites){
+        if (!aceites) return null;
+        // Meses tocados por este import — só esses precisam de recálculo.
+        var meses = [];
+        aceites.forEach(function(e){ if (meses.indexOf(e.mes) === -1) meses.push(e.mes); });
+        meses.sort();
+        var i = 0;
+        var recalculos = [];
+        return meses.reduce(function(cadeia, mes){
+          return cadeia.then(function(){
+            i++;
+            progresso(0.75 + 0.2 * (i / meses.length), 'A recalcular ' + nomeMes(mes) + '…');
+            return recalcularMes(mes, meta).then(function(r){ recalculos.push(r); });
+          });
+        }, Promise.resolve()).then(function(){
+          return { meses: meses, aceites: aceites, recalculos: recalculos };
+        });
+      })
+      .then(function(res){
         el('btnGravar').disabled = false;
-        if (!aceites) return;
+        if (!res) return;
         esconderProgresso();
         esconderCatalogo();
         estado.pendente = null;
-        mostrarMsg('msgOk', 'Gravado: ' + aceites.map(nomeMes).join(', ') + '.');
-        return carregarDados(aceites[aceites.length - 1]);
+        relatorioDias(plano);
+
+        var saltados = plano.length - res.aceites.length;
+        var mesesFeitos = res.recalculos.filter(function(r){ return !r.saltado; });
+        var mesesSaltados = res.recalculos.filter(function(r){ return r.saltado; });
+
+        mostrarMsg('msgOk',
+          'Gravados ' + res.aceites.length + ' dia' + (res.aceites.length === 1 ? '' : 's') +
+          ' em vendasDiario/.' +
+          (mesesFeitos.length
+            ? ' Recalculado: ' + mesesFeitos.map(function(r){
+                return nomeMes(r.mes) + ' (' + r.dias + ' dia' + (r.dias === 1 ? '' : 's') + ')';
+              }).join(', ') + '.'
+            : '') +
+          (saltados ? ' ' + saltados + ' dia' + (saltados === 1 ? '' : 's') + ' não gravado' +
+            (saltados === 1 ? '' : 's') + ' (ver quadro abaixo).' : ''));
+
+        if (mesesSaltados.length){
+          mostrarMsg('msgAviso',
+            'Não recalculado: ' + mesesSaltados.map(function(r){ return nomeMes(r.mes); }).join(', ') +
+            '. Os dias ficaram gravados em vendasDiario/, mas o mês ficou como estava —' +
+            ' importa o SAF-T do período completo para o mês passar a ser somado a partir dos dias.');
+        }
+
+        return carregarDados(res.meses[res.meses.length - 1]);
       })
       .catch(function(err){
         esconderProgresso();
@@ -2141,12 +2422,17 @@
           mostrarMsg('msgErro', base +
             ' — catálogo gravado parcialmente: ' + intFmt(feitas) + ' de ' + intFmt(err.total) +
             ' produto' + (err.total === 1 ? '' : 's') + ' ficaram gravados, ' + intFmt(falta) +
-            ' não. Nenhum mês foi gravado. Volta a correr o import: os que faltam voltam a aparecer' +
+            ' não. Nenhum dia foi gravado. Volta a correr o import: os que faltam voltam a aparecer' +
             ' para classificar, os já gravados não.');
           return;
         }
 
-        mostrarMsg('msgErro', base);
+        // Falha a meio da gravação dos dias: os que já foram escritos ficaram
+        // escritos, e o mês pode não ter chegado a ser recalculado.
+        mostrarMsg('msgErro', base +
+          ' — os dias já gravados ficaram em vendasDiario/; volta a correr o' +
+          ' import para recompor os meses afectados.');
+        if (plano) relatorioDias(plano);
       });
   }
 
@@ -3159,6 +3445,7 @@
 
   el('btnCancelar').addEventListener('click', function(){
     estado.pendente = null;
+    esconderRelatorio();
     esconderCatalogo();
     limparMensagens();
     el('fileName').textContent = 'Nenhum ficheiro escolhido';
@@ -3186,6 +3473,11 @@
     parseSaft: parseSaft,
     construirPayload: construirPayload,
     mergePayloads: mergePayloads,
+    arredondarPayload: arredondarPayload,
+    payloadDoMes: payloadDoMes,
+    planearDias: planearDias,
+    gravarDias: gravarDias,
+    recalcularMes: recalcularMes,
     sugerirCategoria: sugerirCategoria,
     TAXONOMIA: TAXONOMIA,
     planearMigracao: planearMigracao,
