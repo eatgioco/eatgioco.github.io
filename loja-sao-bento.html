@@ -1169,6 +1169,98 @@
     padding:20px 4px; font-family:'Space Mono', monospace;
     font-size:12px; color:var(--muted); text-align:center;
   }
+  .cf-counter-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:10px;
+    margin:0 0 10px;
+  }
+  .cf-counter-row .cf-counter{ margin:0; }
+  .cf-print-controls{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .cf-print-scope{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    padding:6px 8px;
+    border:1.5px solid var(--line);
+    background:var(--bg);
+  }
+  .cf-print-btn{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    padding:6px 12px;
+    border:1.5px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+  }
+  .cf-print-btn:hover{ background:var(--black); color:var(--white); }
+  #cfPrintArea{ display:none; }
+  @media print{
+    body *{ visibility:hidden; }
+    #cfPrintArea, #cfPrintArea *{ visibility:visible; }
+    #cfPrintArea{
+      display:block;
+      position:absolute;
+      top:0; left:0;
+      width:100%;
+    }
+    @page{ size:80mm auto; margin:4mm; }
+  }
+  .cf-print-title{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    margin-bottom:2px;
+  }
+  .cf-print-sub{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-align:center;
+    color:#141414;
+    border-bottom:1px dashed #141414;
+    padding-bottom:8px;
+    margin-bottom:8px;
+  }
+  .cf-print-cat{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    margin:10px 0 4px;
+    border-bottom:1px solid #141414;
+    padding-bottom:2px;
+  }
+  .cf-print-item{
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    display:flex;
+    align-items:flex-start;
+    gap:6px;
+    padding:3px 0;
+  }
+  .cf-print-checkbox{
+    width:10px; height:10px;
+    border:1.5px solid #141414;
+    flex-shrink:0;
+    margin-top:2px;
+  }
+  .cf-print-loja{
+    display:block;
+    font-size:9px;
+    color:#6b6660;
+  }
 </style>
 </head>
 <body>
@@ -1203,8 +1295,19 @@
         <select id="cfPessoa" disabled><option>A carregar...</option></select>
         <button type="button" class="btn-registar cf-add-btn" id="cfAddBtn">+ Adicionar</button>
       </div>
-      <p class="cf-counter" id="cfCounter"></p>
+      <div class="cf-counter-row">
+        <p class="cf-counter" id="cfCounter"></p>
+        <div class="cf-print-controls">
+          <select class="cf-print-scope" id="cfPrintScope">
+            <option value="ambos" selected>Food + Não-Food</option>
+            <option value="Food">Só Food</option>
+            <option value="Não-Food">Só Não-Food</option>
+          </select>
+          <button type="button" class="cf-print-btn" id="cfPrintBtn">🖨️ Imprimir</button>
+        </div>
+      </div>
       <div id="cfList"></div>
+      <div id="cfPrintArea"></div>
     </div>
   </div>
 
@@ -1580,6 +1683,40 @@
     document.getElementById('cfList').innerHTML = html;
   }
   window.renderComprasFisicas = renderComprasFisicas;
+
+  document.getElementById('cfPrintBtn').addEventListener('click', function(){
+    var scope = document.getElementById('cfPrintScope').value;
+    var categorias = scope === 'ambos' ? ['Food', 'Não-Food'] : [scope];
+
+    var itens = Object.keys(allComprasFisicas)
+      .map(function(id){ return Object.assign({ id: id }, allComprasFisicas[id]); })
+      .filter(function(i){ return !i.comprado && categorias.indexOf(i.categoria) !== -1; });
+
+    if (!itens.length){
+      alert('Não há itens por comprar neste âmbito.');
+      return;
+    }
+
+    var html = '<div class="cf-print-title">GIOCO · Lista de Compras</div>';
+    html += '<div class="cf-print-sub">' + new Date().toLocaleDateString('pt-PT') + '</div>';
+
+    categorias.forEach(function(cat){
+      var doCat = itens.filter(function(i){ return i.categoria === cat; });
+      if (!doCat.length) return;
+      html += '<div class="cf-print-cat">' + escapeHtml(cat) + '</div>';
+      doCat.forEach(function(i){
+        html += '<div class="cf-print-item">';
+        html += '<span class="cf-print-checkbox"></span>';
+        html += '<span>' + escapeHtml(i.nome);
+        if (i.loja) html += '<span class="cf-print-loja">' + escapeHtml(i.loja) + '</span>';
+        html += '</span>';
+        html += '</div>';
+      });
+    });
+
+    document.getElementById('cfPrintArea').innerHTML = html;
+    window.print();
+  });
 
   function toggleCompraFisica(id, estavaComprado){
     var pessoaSelecao = resolvePessoaSelecao(document.getElementById('cfPessoa'));
