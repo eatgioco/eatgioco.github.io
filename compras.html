@@ -410,19 +410,134 @@
     cursor:default;
   }
 
-  .order-line{
-    display:flex;
-    gap:8px;
-    margin-bottom:8px;
+  .order-table-wrap{
+    max-height:420px;
+    overflow-y:auto;
+    border:2px solid var(--black);
   }
 
-  .order-qty{
-    width:80px;
-    flex:0 0 80px;
+  .order-table{
+    width:100%;
+    border-collapse:collapse;
   }
 
-  .order-produto{
-    flex:1;
+  .order-table thead th{
+    position:sticky;
+    top:0;
+    background:var(--black);
+    color:var(--white);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    text-align:left;
+    padding:8px 10px;
+  }
+
+  .order-table td{
+    border-top:1px solid var(--line);
+    padding:6px 10px;
+    vertical-align:middle;
+  }
+
+  .order-table .oc-qtd{width:70px;}
+  .order-table .oc-tipo{width:130px;}
+
+  .order-table .order-qty{
+    width:100%;
+    padding:6px 8px;
+    border:2px solid var(--black);
+    font-family:'Space Mono', monospace;
+  }
+
+  .order-table .order-tipo{
+    width:100%;
+    padding:6px 8px;
+    border:2px solid var(--black);
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+  }
+
+  .order-ing-nome{
+    font-size:14px;
+  }
+
+  .order-empty{
+    padding:16px 10px;
+    color:var(--muted);
+    font-size:14px;
+    text-align:center;
+  }
+
+  .order-new-line{
+    background:var(--bg);
+  }
+
+  .order-new-line td{
+    border-bottom:2px solid var(--black);
+    padding-bottom:10px;
+  }
+
+  .order-new-nome-cell{
+    position:relative;
+  }
+
+  .order-new-nome{
+    width:100%;
+    padding:6px 8px;
+    border:2px solid var(--black);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+  }
+
+  .order-suggest-box{
+    display:none;
+    position:absolute;
+    left:10px;
+    right:10px;
+    top:100%;
+    margin-top:2px;
+    background:var(--white);
+    border:2px solid var(--black);
+    max-height:180px;
+    overflow-y:auto;
+    z-index:20;
+  }
+
+  .order-suggest-box.open{
+    display:block;
+  }
+
+  .order-suggest-item{
+    padding:8px 10px;
+    font-size:14px;
+    cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+
+  .order-suggest-item:last-child{
+    border-bottom:none;
+  }
+
+  .order-suggest-item:hover,
+  .order-suggest-item.active{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  .osi-fornecedor{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    font-family:'Space Mono', monospace;
+    margin-top:2px;
+  }
+
+  .order-suggest-item:hover .osi-fornecedor,
+  .order-suggest-item.active .osi-fornecedor{
+    color:var(--white);
+    opacity:.75;
   }
 
   .order-preview{
@@ -1665,8 +1780,14 @@
     </div>
 
     <div class="field-label" style="margin-bottom:8px;">Linhas de encomenda</div>
-    <div id="orderLines"></div>
-    <button type="button" class="btn" id="btnAddLine">+ Adicionar linha</button>
+    <div class="order-table-wrap">
+      <table class="order-table">
+        <thead>
+          <tr><th class="oc-qtd">Qtd</th><th class="oc-tipo">Tipo</th><th class="oc-nome">Ingrediente</th></tr>
+        </thead>
+        <tbody id="orderLines"></tbody>
+      </table>
+    </div>
 
     <div class="field full" style="margin-top:18px;">
       <label class="field-label">Observações</label>
@@ -3599,7 +3720,6 @@ window.addEventListener('load', function () {
   var orderModalCancel = document.getElementById('orderModalCancel');
   var orderSupplierName = document.getElementById('orderSupplierName');
   var orderLines = document.getElementById('orderLines');
-  var btnAddLine = document.getElementById('btnAddLine');
   var orderNotas = document.getElementById('orderNotas');
   var orderPreview = document.getElementById('orderPreview');
   var previewSubject = document.getElementById('previewSubject');
@@ -3952,38 +4072,222 @@ window.addEventListener('load', function () {
   }
 
   function registarUltimaEncomenda(supplier, order, via) {
-    var itemsSummary = order.lines.map(function (l) { return l.qtd + "x " + l.produto; }).join(", ");
+    var itemsSummary = order.lines.map(function (l) {
+      return l.tipo ? (l.qtd + " " + l.tipo + " " + l.produto) : (l.qtd + "x " + l.produto);
+    }).join(", ");
     suppliersRef.child(supplier.id).update({
       lastOrder: { date: order.dateStr, items: itemsSummary, via: via }
     });
   }
 
-  function createOrderLineRow() {
-    var row = document.createElement('div');
+  var ORDER_TIPOS = ['Unidade', 'Caixa', 'Kg'];
+
+  function tipoDefaultFromUnidade(unidade) {
+    var u = String(unidade || '').trim().toLowerCase();
+    if (u.indexOf('kg') === 0 || u === 'kilo' || u === 'quilo') return 'Kg';
+    if (u.indexOf('cx') === 0 || u.indexOf('caix') === 0) return 'Caixa';
+    return 'Unidade';
+  }
+
+  function tipoOptionsHtml(selecionado) {
+    return ORDER_TIPOS.map(function (t) {
+      return '<option value="' + t + '"' + (t === selecionado ? ' selected' : '') + '>' + t + '</option>';
+    }).join('');
+  }
+
+  function getSupplierIngredientes(supplierNome) {
+    var alvo = String(supplierNome || '').trim().toLowerCase();
+    var lista = [];
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id];
+      if (ing && String(ing.fornecedor || '').trim().toLowerCase() === alvo) {
+        lista.push(Object.assign({ id: id }, ing));
+      }
+    });
+    lista.sort(function (a, b) {
+      return (a.nome || '').localeCompare(b.nome || '', 'pt');
+    });
+    return lista;
+  }
+
+  function createOrderIngredientRow(ing) {
+    var row = document.createElement('tr');
     row.className = 'order-line';
+    row.dataset.ingredienteId = ing.id;
+    row.dataset.ingredienteNome = ing.nome || '';
     row.innerHTML =
-      '<input type="number" class="order-qty" min="1" placeholder="Qtd">' +
-      '<input type="text" class="order-produto" placeholder="Produto">';
+      '<td><input type="number" class="order-qty" min="0" step="1" placeholder="0"></td>' +
+      '<td><select class="order-tipo">' + tipoOptionsHtml(tipoDefaultFromUnidade(ing.unidade)) + '</select></td>' +
+      '<td class="order-ing-nome">' + escapeHtml(ing.nome || '(sem nome)') + '</td>';
     return row;
   }
 
-  function resetOrderLines() {
+  function createOrderNewItemRow() {
+    var row = document.createElement('tr');
+    row.className = 'order-line order-new-line';
+    row.innerHTML =
+      '<td><input type="number" class="order-qty" id="orderNewItemQty" min="0" step="1" placeholder="0"></td>' +
+      '<td><select class="order-tipo" id="orderNewItemTipo">' + tipoOptionsHtml('Unidade') + '</select></td>' +
+      '<td class="order-new-nome-cell">' +
+        '<input type="text" class="order-new-nome" id="orderNewItemNome" placeholder="Escrever nome do ingrediente…" autocomplete="off">' +
+        '<div class="order-suggest-box" id="orderSuggestBox"></div>' +
+      '</td>';
+    return row;
+  }
+
+  function resetOrderLines(supplierNome) {
     orderLines.innerHTML = "";
-    orderLines.appendChild(createOrderLineRow());
+    orderLines.appendChild(createOrderNewItemRow());
+
+    var ingredientes = getSupplierIngredientes(supplierNome);
+    if (ingredientes.length === 0) {
+      var trVazio = document.createElement('tr');
+      trVazio.innerHTML = '<td colspan="3" class="order-empty">Sem ingredientes associados a este fornecedor.</td>';
+      orderLines.appendChild(trVazio);
+      return;
+    }
+    ingredientes.forEach(function (ing) {
+      orderLines.appendChild(createOrderIngredientRow(ing));
+    });
+  }
+
+  function ingredienteMatchesQuery(ing, query) {
+    var q = query.toLowerCase();
+    if (String(ing.nome || '').toLowerCase().indexOf(q) !== -1) return true;
+    var aliases = ing.aliases || [];
+    for (var i = 0; i < aliases.length; i++) {
+      if (String(aliases[i] || '').toLowerCase().indexOf(q) !== -1) return true;
+    }
+    return false;
+  }
+
+  // Resolve a linha livre no momento de gerar a encomenda (não a cada tecla):
+  // - nome já existe noutro fornecedor -> pergunta se associa a este;
+  // - nome não existe -> pergunta se grava como novo ingrediente deste fornecedor;
+  // - em qualquer dos casos, se a resposta for não, a linha entra na encomenda na mesma.
+  // Cacheia a resposta em dataset.resolvedNome para não perguntar duas vezes pelo mesmo texto.
+  function resolveOrderNewItemRow(supplierNome) {
+    var input = document.getElementById('orderNewItemNome');
+    var qtdInput = document.getElementById('orderNewItemQty');
+    var tipoSelect = document.getElementById('orderNewItemTipo');
+    if (!input || !qtdInput || !tipoSelect) return null;
+
+    var nome = input.value.trim();
+    var qtd = qtdInput.value.trim();
+    if (!nome || !qtd || Number(qtd) <= 0) return null;
+
+    var tipo = tipoSelect.value;
+
+    if (input.dataset.resolvedNome === nome) {
+      return { qtd: qtd, tipo: tipo, produto: input.dataset.resolvedFinalNome || nome };
+    }
+
+    var alvo = nome.toLowerCase();
+    var existenteId = null;
+    var existente = null;
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id];
+      if (ing && String(ing.nome || '').trim().toLowerCase() === alvo) {
+        existenteId = id;
+        existente = ing;
+      }
+    });
+
+    if (existente) {
+      var fornecedorAtual = String(existente.fornecedor || '').trim().toLowerCase();
+      if (fornecedorAtual !== String(supplierNome || '').trim().toLowerCase()) {
+        var msg = 'O ingrediente "' + existente.nome + '" já existe em sistema, associado a "' +
+          (existente.fornecedor || 'nenhum fornecedor') + '". Queres associá-lo a "' + supplierNome + '"?';
+        if (confirm(msg)) {
+          ingredientesRef.child(existenteId).update({ fornecedor: supplierNome });
+        }
+      }
+      input.dataset.resolvedNome = nome;
+      input.dataset.resolvedFinalNome = existente.nome;
+    } else {
+      var msgNovo = 'O ingrediente "' + nome + '" não existe em sistema. Queres guardá-lo, associado a "' + supplierNome + '"?';
+      if (confirm(msgNovo)) {
+        ingredientesRef.push({ nome: nome, fornecedor: supplierNome });
+      }
+      input.dataset.resolvedNome = nome;
+      input.dataset.resolvedFinalNome = nome;
+    }
+
+    return { qtd: qtd, tipo: tipo, produto: input.dataset.resolvedFinalNome };
   }
 
   function getValidOrderLines() {
-    var rows = orderLines.querySelectorAll('.order-line');
     var lines = [];
+    var supplierNome = currentOrderSupplier ? currentOrderSupplier.nome : '';
+
+    var novo = resolveOrderNewItemRow(supplierNome);
+    if (novo) lines.push(novo);
+
+    var rows = orderLines.querySelectorAll('.order-line[data-ingrediente-id]');
     rows.forEach(function (row) {
-      var qtd = row.querySelector('.order-qty').value.trim();
-      var produto = row.querySelector('.order-produto').value.trim();
-      if (qtd && produto) {
-        lines.push({ qtd: qtd, produto: produto });
+      var qtdInput = row.querySelector('.order-qty');
+      var tipoSelect = row.querySelector('.order-tipo');
+      if (!qtdInput || !tipoSelect) return;
+      var qtd = qtdInput.value.trim();
+      var tipo = tipoSelect.value;
+      var produto = row.dataset.ingredienteNome;
+      if (qtd && Number(qtd) > 0 && produto) {
+        lines.push({ qtd: qtd, tipo: tipo, produto: produto });
       }
     });
     return lines;
   }
+
+  // Sugestões automáticas na linha livre (delegação de eventos em #orderLines,
+  // que persiste entre resets — não é preciso reatar listeners a cada abertura do modal).
+  orderLines.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('order-new-nome')) return;
+    var query = e.target.value.trim();
+    var box = document.getElementById('orderSuggestBox');
+    if (!box) return;
+    if (query.length < 2) {
+      box.classList.remove('open');
+      box.innerHTML = '';
+      return;
+    }
+    var resultados = Object.keys(allIngredientes).map(function (id) {
+      return Object.assign({ id: id }, allIngredientes[id]);
+    }).filter(function (ing) {
+      return ingredienteMatchesQuery(ing, query);
+    }).slice(0, 6);
+
+    if (resultados.length === 0) {
+      box.classList.remove('open');
+      box.innerHTML = '';
+      return;
+    }
+
+    box.innerHTML = resultados.map(function (ing) {
+      return '<div class="order-suggest-item" data-nome="' + escapeHtml(ing.nome || '') + '">' +
+        escapeHtml(ing.nome || '') +
+        '<span class="osi-fornecedor">' + escapeHtml(ing.fornecedor || 'sem fornecedor') + '</span>' +
+        '</div>';
+    }).join('');
+    box.classList.add('open');
+  });
+
+  orderLines.addEventListener('click', function (e) {
+    var item = e.target.closest('.order-suggest-item');
+    if (!item) return;
+    var input = document.getElementById('orderNewItemNome');
+    var box = document.getElementById('orderSuggestBox');
+    input.value = item.dataset.nome;
+    box.classList.remove('open');
+    box.innerHTML = '';
+    input.focus();
+  });
+
+  document.addEventListener('click', function (e) {
+    var box = document.getElementById('orderSuggestBox');
+    if (!box || !box.classList.contains('open')) return;
+    if (e.target.id === 'orderNewItemNome' || box.contains(e.target)) return;
+    box.classList.remove('open');
+  });
 
   // Lógica pura de composição da mensagem, partilhada pelo fluxo dos cartões
   // de fornecedor e pelo checkout do carrinho.
@@ -3998,7 +4302,11 @@ window.addEventListener('load', function () {
     bodyLines.push("Gostaríamos de encomendar:");
     bodyLines.push("");
     lines.forEach(function (l) {
-      bodyLines.push("— " + l.qtd + "x " + l.produto);
+      if (l.tipo) {
+        bodyLines.push("— " + l.qtd + " " + l.tipo + " de " + l.produto);
+      } else {
+        bodyLines.push("— " + l.qtd + "x " + l.produto);
+      }
     });
 
     var obs = (notas || "").trim();
@@ -4021,7 +4329,7 @@ window.addEventListener('load', function () {
   function openOrderModal(supplier, canal) {
     currentOrderSupplier = supplier;
     orderSupplierName.textContent = supplier.nome;
-    resetOrderLines();
+    resetOrderLines(supplier.nome);
     orderNotas.value = "";
     orderPreview.style.display = "none";
 
@@ -4041,10 +4349,6 @@ window.addEventListener('load', function () {
     orderModalOverlay.classList.remove('open');
     currentOrderSupplier = null;
   }
-
-  btnAddLine.addEventListener('click', function () {
-    orderLines.appendChild(createOrderLineRow());
-  });
 
   btnPreview.addEventListener('click', function () {
     var email = buildOrderEmail();
