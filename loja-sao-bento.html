@@ -1165,6 +1165,18 @@
     font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0;
   }
   .cf-item-remove:hover{ color:var(--red); }
+  .cf-group-header{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    margin:14px 0 6px;
+    padding-bottom:4px;
+    border-bottom:1px solid var(--line);
+  }
+  .cf-group-header:first-child{ margin-top:0; }
   .cf-empty{
     padding:20px 4px; font-family:'Space Mono', monospace;
     font-size:12px; color:var(--muted); text-align:center;
@@ -1300,7 +1312,6 @@
         <select id="cfLoja">
           <option value="Supermercado">Supermercado</option>
           <option value="Cash &amp; Carry">Cash &amp; Carry</option>
-          <option value="Loja de Materiais">Loja de Materiais</option>
         </select>
         <select id="cfPessoa" disabled><option>A carregar...</option></select>
         <button type="button" class="btn-registar cf-add-btn" id="cfAddBtn">+ Adicionar</button>
@@ -1657,6 +1668,20 @@
     renderComprasFisicas();
   });
 
+  function atualizarOpcoesLoja(){
+    var cfLojaEl = document.getElementById('cfLoja');
+    var selecionado = cfLojaEl.value;
+    var opcoes = cfActiveCat === 'Não-Food'
+      ? ['Supermercado', 'Cash & Carry', 'Loja de Materiais']
+      : ['Supermercado', 'Cash & Carry'];
+    cfLojaEl.innerHTML = opcoes.map(function(o){
+      return '<option value="' + o + '">' + o + '</option>';
+    }).join('');
+    if (opcoes.indexOf(selecionado) !== -1){
+      cfLojaEl.value = selecionado;
+    }
+  }
+
   function renderComprasFisicas(){
     var cfPessoaEl = document.getElementById('cfPessoa');
     var pessoaEscolhida = cfPessoaEl.value;
@@ -1664,6 +1689,8 @@
     if (pessoaEscolhida && cfPessoaEl.querySelector('option[value="' + pessoaEscolhida + '"]')){
       cfPessoaEl.value = pessoaEscolhida;
     }
+
+    atualizarOpcoesLoja();
 
     var itens = Object.keys(allComprasFisicas)
       .map(function(id){ return Object.assign({ id: id }, allComprasFisicas[id]); })
@@ -1681,15 +1708,33 @@
       return;
     }
 
+    var lojas = cfActiveCat === 'Não-Food'
+      ? ['Supermercado', 'Cash & Carry', 'Loja de Materiais']
+      : ['Supermercado', 'Cash & Carry'];
+
+    function itemRow(i){
+      var row = '<div class="cf-item-row">';
+      row += '  <input type="checkbox" ' + (i.comprado ? 'checked' : '') + ' onchange="toggleCompraFisica(\'' + i.id + '\',' + (!!i.comprado) + ')">';
+      row += '  <span class="cf-item-nome' + (i.comprado ? ' checked' : '') + '">' + escapeHtml(i.nome) + '</span>';
+      row += '  <button type="button" class="cf-item-remove" onclick="removerCompraFisica(\'' + i.id + '\')">✕</button>';
+      row += '</div>';
+      return row;
+    }
+
     var html = '';
-    itens.forEach(function(i){
-      html += '<div class="cf-item-row">';
-      html += '  <input type="checkbox" ' + (i.comprado ? 'checked' : '') + ' onchange="toggleCompraFisica(\'' + i.id + '\',' + (!!i.comprado) + ')">';
-      html += '  <span class="cf-item-nome' + (i.comprado ? ' checked' : '') + '">' + escapeHtml(i.nome) + '</span>';
-      html += '  <span class="cf-item-loja">' + escapeHtml(i.loja || '') + '</span>';
-      html += '  <button type="button" class="cf-item-remove" onclick="removerCompraFisica(\'' + i.id + '\')">✕</button>';
-      html += '</div>';
+    lojas.forEach(function(loja){
+      var doLoja = itens.filter(function(i){ return (i.loja || '') === loja; });
+      if (!doLoja.length) return;
+      html += '<p class="cf-group-header">' + escapeHtml(loja) + '</p>';
+      doLoja.forEach(function(i){ html += itemRow(i); });
     });
+
+    var semLoja = itens.filter(function(i){ return !i.loja || lojas.indexOf(i.loja) === -1; });
+    if (semLoja.length){
+      html += '<p class="cf-group-header">Outro</p>';
+      semLoja.forEach(function(i){ html += itemRow(i); });
+    }
+
     document.getElementById('cfList').innerHTML = html;
   }
   window.renderComprasFisicas = renderComprasFisicas;
