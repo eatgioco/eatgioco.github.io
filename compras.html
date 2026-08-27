@@ -747,6 +747,29 @@
     color:var(--red);
   }
 
+  /* O clique no cartão abre a encomenda; a ficha do fornecedor passa a ter
+     este botão dedicado. */
+  .card-info-btn{
+    margin-left:auto;
+    flex:0 0 auto;
+    width:26px;
+    height:26px;
+    padding:0;
+    background:var(--white);
+    border:2px solid var(--black);
+    color:var(--black);
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .card-info-btn:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
   .tabs-bar{
     max-width:1200px;
     margin:16px auto 0;
@@ -3818,6 +3841,7 @@ window.addEventListener('load', function () {
       html += '<div class="card-title-row">';
       html += '<button type="button" class="star-btn' + (s.favorito ? ' star-btn-active' : '') + '" title="Favorito">' + (s.favorito ? '★' : '☆') + '</button>';
       html += '<h3 class="card-title">' + escapeHtml(s.nome) + '</h3>';
+      html += '<button type="button" class="card-info-btn" title="Ficha do fornecedor" aria-label="Ficha do fornecedor">ℹ</button>';
       html += '</div>';
       html += '<div class="badge-group">' + cats.map(function (c) { return '<span class="badge">' + escapeHtml(c) + '</span>'; }).join('') + '</div>';
       html += '</div>';
@@ -3866,7 +3890,17 @@ window.addEventListener('load', function () {
       }
 
       card.innerHTML = html;
+      // O clique no cartão abre a encomenda pelo canal principal do fornecedor;
+      // a ficha (editar) fica no botão ℹ. Ao contrário do botão "📦 Encomenda",
+      // não avisa quando não há canal: abre à mesma para se poder compor e
+      // pré-visualizar a mensagem.
       card.addEventListener('click', function () {
+        openOrderModal(s, temWhatsapp ? 'whatsapp' : 'email');
+      });
+
+      var infoBtn = card.querySelector('.card-info-btn');
+      infoBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
         openModal(s);
       });
 
