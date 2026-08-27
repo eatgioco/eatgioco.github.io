@@ -22,29 +22,6 @@
      técnicas: linhas de componente, avisos, passos e o modal do seed.
      ====================================================================== */
 
-  /* Tokens de estado. O shell não define cor de TEXTO para valores em risco,
-     e o vermelho/âmbar do tema claro não têm contraste sobre o fundo escuro.
-     Por isso cada um tem par nos dois temas. */
-  :root{
-    --fc-alto:#D91124;
-    --fc-atencao:#B8860B;
-    --warn-bg:#FDF6D8;
-    --warn-line:#B8860B;
-  }
-  [data-theme="dark"]{
-    --fc-alto:#ff7d88;
-    --fc-atencao:#e0ab1f;
-    --warn-bg:rgba(224,171,31,0.12);
-    --warn-line:#e0ab1f;
-  }
-
-  /* Legibilidade dos selos no tema escuro: os fundos (--lime, --mustard,
-     --blush) continuam claros, mas --ink passa a claro e o texto herdado
-     desaparecia. Só o tema escuro é corrigido; no claro o shell já serve. */
-  [data-theme="dark"] .status.ok,
-  [data-theme="dark"] .status.warn{ color:#141414; }
-  [data-theme="dark"] .status.high{ color:#3d0810; }
-
   body{ -webkit-font-smoothing:antialiased; }
 
   /* Os itens do menu são links reais (<a>), estilizados pelo .nav-row do shell. */
@@ -150,11 +127,6 @@
     border-bottom-color:rgba(0,0,0,0.3);
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 14px rgba(0,0,0,0.22);
   }
-
-  /* Os .cat-chip são <button>: sem cor explícita ficavam com o preto que o
-     browser dá por omissão, ilegível sobre o chip escuro. O estado activo
-     tem mais especificidade (.cat-chip.active) e continua a mandar. */
-  .cat-chip{ color:var(--ink); }
 
   /* ---------- Resumo de food cost (KPI do shell) ---------- */
   .kpi-row.resumo-row{ flex-wrap:wrap; margin-bottom:14px; }

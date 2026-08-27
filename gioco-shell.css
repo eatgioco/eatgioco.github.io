@@ -12,6 +12,13 @@
   --dough:#F3F1EE; --ink:#141414; --red:#D91124;
   --lime:#D7EF91; --mustard:#FFCC02; --blush:#F9CBCB; --navy:#004476;
   --white:#FFFFFF; --muted:#8a8478; --line:#f0e6d6;
+  /* Estado: valores em risco / a precisar de atencao. --fc-atencao foi
+     escurecido de #B8860B (2,89:1 sobre --dough, falha AA) para #8A6300
+     (4,82:1). Cada um tem par no tema escuro. */
+  --fc-alto:#D91124;
+  --fc-atencao:#8A6300;
+  --warn-bg:#FDF6D8;
+  --warn-line:#8A6300;
   --card-blur-bg: linear-gradient(180deg, rgba(35,32,30,0.82), rgba(20,18,17,0.88));
   --sidebar-bg: linear-gradient(180deg, rgba(199,199,199,0.5), rgba(182,182,182,0.58));
   --sidebar-text: var(--ink);
@@ -25,6 +32,10 @@
 [data-theme="dark"]{
   --dough:#15130f; --ink:#f2ede4; --white:#1f1c17; --line:#332e26; --muted:#8f887b;
   --lime:#9fd15a; --mustard:#e0ab1f; --blush:#c97d7d; --navy:#5fa8e6;
+  --fc-alto:#ff7d88;
+  --fc-atencao:#e0ab1f;
+  --warn-bg:rgba(224,171,31,0.12);
+  --warn-line:#e0ab1f;
   --card-blur-bg: linear-gradient(180deg, rgba(10,9,7,0.85), rgba(5,5,4,0.9));
   --sidebar-bg: linear-gradient(180deg, rgba(35,32,30,0.82), rgba(20,18,17,0.88));
   --sidebar-text: #f2ede4;
@@ -237,11 +248,14 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .activity-who{ display:flex; align-items:center; gap:8px; font-weight:600; }
 .activity-who .av{ width:22px; height:22px; border-radius:50%; background:var(--blush); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--navy); }
 .status{ font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:100px; }
-.status.ok{ background:var(--lime); }
-.status.warn{ background:var(--mustard); }
-/* .high — não existia na referência; acrescentado a pedido, na mesma família
-   (blush + navy) já usada nos avatares. Confirmar com o Manel. */
-.status.high{ background:var(--blush); color:var(--navy); }
+/* Cor de texto explicita: --ink inverte no tema escuro e os fundos dos selos
+   ficam claros nos dois temas, por isso o texto herdado desaparecia. */
+.status.ok{ background:var(--lime); color:#141414; }
+.status.warn{ background:var(--mustard); color:#141414; }
+/* .high — nao existia na referencia. Era blush+navy, mas azul le-se como
+   informativo; no resto do OS alto risco e sempre vermelho. --red nao muda
+   entre temas, por isso a regra serve os dois (branco/--red = 5,18:1). */
+.status.high{ background:var(--red); color:#FFFFFF; }
 
 .health-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; }
 .health-row .dot{ width:7px; height:7px; border-radius:50%; background:var(--lime); }
@@ -285,6 +299,10 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 .cat-chip{
   display:flex; align-items:center; gap:9px; flex-shrink:0;
   background:var(--white); border:1.5px solid var(--line); border-radius:100px;
+  /* Sem cor explicita os <button> herdavam o preto do browser: ilegivel
+     sobre o chip escuro. .cat-chip.active tem mais especificidade e continua
+     a mandar no estado activo. */
+  color:var(--ink);
   padding:7px 18px 7px 7px; cursor:pointer; transition:border-color .15s ease, background .15s ease;
 }
 .cat-chip:hover{ border-color:var(--red); }
