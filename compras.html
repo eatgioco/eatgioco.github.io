@@ -410,8 +410,17 @@
     cursor:default;
   }
 
+  /* O modal de encomenda mostra a tabela completa do fornecedor — precisa de
+     muito mais espaço que os restantes modais. */
+  .modal-order{
+    max-width:1100px;
+  }
+
   .order-table-wrap{
-    max-height:420px;
+    /* Cresce com o ecrã, mas deixa sempre espaço para o cabeçalho, as
+       observações e os botões — sem obrigar a fazer scroll do modal. */
+    max-height:min(62vh, calc(100vh - 420px));
+    min-height:280px;
     overflow-y:auto;
     border:2px solid var(--black);
   }
@@ -538,6 +547,32 @@
   .order-suggest-item.active .osi-fornecedor{
     color:var(--white);
     opacity:.75;
+  }
+
+  /* Em ecrãs estreitos o modal usa quase toda a largura disponível e as
+     colunas fixas encolhem, para sobrar espaço para o nome do ingrediente. */
+  @media (max-width:640px){
+    .modal-order{
+      padding:18px 14px;
+    }
+
+    .order-table thead th{
+      padding:8px 6px;
+    }
+
+    .order-table td{
+      padding:6px 6px;
+    }
+
+    .order-table .oc-qtd{width:56px;}
+    .order-table .oc-tipo{width:96px;}
+
+    /* A caixa de sugestões deixa de caber na célula do nome: alarga-se para
+       a esquerda por cima das colunas Qtd/Tipo enquanto está aberta. */
+    .order-suggest-box{
+      left:-150px;
+      right:6px;
+    }
   }
 
   .order-preview{
@@ -1773,7 +1808,7 @@
 
 <!-- Modal de Encomenda -->
 <div class="modal-overlay" id="orderModalOverlay">
-  <div class="modal">
+  <div class="modal modal-order">
     <div class="modal-header">
       <h2>Encomenda — <span id="orderSupplierName"></span></h2>
       <button class="modal-close" id="orderModalClose">×</button>
