@@ -246,6 +246,28 @@
     min-width:280px;
   }
 
+  /* Contraparte: linha secundária por baixo da descrição. Quando não existe
+     (o ABANCA não a devolve) o elemento não é gerado — nada de espaço vazio
+     nem de "null" à vista. */
+  .mov-parte{
+    display:block;
+    margin-top:3px;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .mov-parte-papel{
+    font-family:'Space Mono', monospace;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    margin-right:5px;
+  }
+
+  .mov-in .mov-parte-papel{ color:var(--green); }
+  .mov-out .mov-parte-papel{ color:var(--red); }
+
   .estado{
     background:var(--white);
     border:2px solid var(--black);
@@ -354,6 +376,17 @@ window.addEventListener('load', function () {
     return formatData(iso) + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
+  // Numa saída interessa quem recebeu; numa entrada, quem enviou. Se só
+  // vier o outro lado, mostra-se esse — mais vale um nome do que nenhum.
+  function contraparte(m){
+    var entrada = m.credit_debit_indicator === 'CRDT';
+    var principal = entrada ? m.debtor_name : m.creditor_name;
+    var alternativa = entrada ? m.creditor_name : m.debtor_name;
+    if (principal) return { papel: entrada ? 'De' : 'Para', nome: principal };
+    if (alternativa) return { papel: entrada ? 'Para' : 'De', nome: alternativa };
+    return null;
+  }
+
   // Comparação de descrições sem acentos nem maiúsculas — o banco escreve
   // "DEPOSITO", o Manel procura "depósito".
   function normalizar(txt){
@@ -458,7 +491,11 @@ window.addEventListener('load', function () {
     var termo = normalizar(document.getElementById('filtroTexto').value.trim());
     var visiveis = termo
       ? movimentos.filter(function(m){
-          return normalizar(m.remittance_information).indexOf(termo) !== -1;
+          // Descrição + contraparte: com o nome à vista na lista, não
+          // conseguir procurá-lo seria estranho.
+          var alvo = normalizar(m.remittance_information) + ' ' +
+                     normalizar(m.creditor_name) + ' ' + normalizar(m.debtor_name);
+          return alvo.indexOf(termo) !== -1;
         })
       : movimentos;
 
@@ -478,13 +515,16 @@ window.addEventListener('load', function () {
 
     body.innerHTML = visiveis.map(function(m){
       var entrada = m.credit_debit_indicator === 'CRDT';
+      var parte = contraparte(m);
       var valor = parseFloat(m.amount);
       var saldoApos = parseFloat(m.balance_after_transaction);
       return '<tr class="' + (entrada ? 'mov-in' : 'mov-out') + '">' +
         '<td class="mono">' + escapeHtml(formatData(m.booking_date)) + '</td>' +
         '<td class="mov-seta" title="' + (entrada ? 'Entrada' : 'Saída') + '">' +
           (entrada ? '↓' : '↑') + '</td>' +
-        '<td class="mov-desc">' + escapeHtml(m.remittance_information || '—') + '</td>' +
+        '<td class="mov-desc">' + escapeHtml(m.remittance_information || '—') +
+          (parte ? '<span class="mov-parte"><span class="mov-parte-papel">' +
+             parte.papel + '</span>' + escapeHtml(parte.nome) + '</span>' : '') + '</td>' +
         '<td class="num">' + (isNaN(valor) ? '—' : formatEuro(Math.abs(valor))) + '</td>' +
         '<td class="num" style="font-weight:400;color:var(--muted);">' +
           (isNaN(saldoApos) ? '—' : formatEuro(saldoApos)) + '</td>' +
