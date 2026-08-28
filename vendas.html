@@ -617,6 +617,22 @@
 
   .sec-link:hover{ color:var(--red); }
 
+  /* Aviso de topo quando há um dia específico seleccionado — as vistas
+     passam a mostrar esse dia e não o mês inteiro. */
+  .dia-aviso{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+    margin-top:28px;
+    padding:12px 16px;
+    background:var(--white);
+    border:2px solid var(--black);
+    border-left:6px solid var(--red);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+  }
+
   .sec-head{
     display:flex;
     flex-wrap:wrap;
@@ -917,6 +933,10 @@
       <label class="field-label" for="mesSel">Mês</label>
       <select id="mesSel"><option value="">A carregar…</option></select>
     </div>
+    <div id="diaCampo">
+      <label class="field-label" for="diaSel">Dia</label>
+      <select id="diaSel"><option value="">Mês inteiro</option></select>
+    </div>
     <button class="btn btn-ghost btn-sm" id="btnRecarregar">Recarregar</button>
   </div>
 
@@ -1020,6 +1040,58 @@
                  'Agosto','Setembro','Outubro','Novembro','Dezembro'];
     var i = parseInt(partes[1], 10) - 1;
     return (nomes[i] || partes[1]) + ' ' + partes[0];
+  }
+
+  var MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  function mesCurto(mm){
+    return MESES_CURTOS[parseInt(mm, 10) - 1] || mm;
+  }
+
+  // '2026-08-27' -> '27 Ago (Qui)' — usado nas opções do selector de dia.
+  function rotuloDia(iso){
+    var dow = new Date(iso + 'T12:00:00').getDay();
+    return parseInt(iso.slice(8), 10) + ' ' + mesCurto(iso.slice(5, 7)) +
+      ' (' + DIAS_SEMANA[dow].slice(0, 3) + ')';
+  }
+
+  // '2026-08-27' -> 'Quinta, 27 de Agosto 2026' — para o aviso de topo.
+  function dataExtenso(iso){
+    var dow = new Date(iso + 'T12:00:00').getDay();
+    return DIAS_SEMANA[dow] + ', ' + parseInt(iso.slice(8), 10) + ' de ' + nomeMes(iso.slice(0, 7));
+  }
+
+  function isoDeData(dt){
+    var m = dt.getMonth() + 1, d = dt.getDate();
+    return dt.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  /* Chave da semana a que um dia pertence = data da segunda-feira dessa semana.
+     getDay() dá 0 ao domingo, por isso o recuo é (dow + 6) % 7. */
+  function segundaDe(iso){
+    var dt = new Date(iso + 'T12:00:00');
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return isoDeData(dt);
+  }
+
+  // Segunda '2026-08-18' -> '18–24 Ago'; a cavalo de dois meses -> '28 Jul–3 Ago'.
+  function rotuloSemana(seg){
+    var ini = new Date(seg + 'T12:00:00');
+    var fim = new Date(ini.getTime());
+    fim.setDate(fim.getDate() + 6);
+    if (ini.getMonth() === fim.getMonth()){
+      return ini.getDate() + '–' + fim.getDate() + ' ' + MESES_CURTOS[ini.getMonth()];
+    }
+    return ini.getDate() + ' ' + MESES_CURTOS[ini.getMonth()] + '–' +
+      fim.getDate() + ' ' + MESES_CURTOS[fim.getMonth()];
+  }
+
+  // '2026-01' -> '2025-12'
+  function mesAnteriorDe(mes){
+    var ano = parseInt(mes.slice(0, 4), 10);
+    var m = parseInt(mes.slice(5, 7), 10) - 1;
+    if (m < 1){ m = 12; ano -= 1; }
+    return ano + '-' + (m < 10 ? '0' : '') + m;
   }
 
   function dataHora(ts){
@@ -1696,6 +1768,8 @@
     pendente: null,        // { dias, anuladas, header, ficheiro, novos:[] }
     dados: {},             // mes -> payload lido do Firebase
     mesActivo: '',
+    diaActivo: '',         // '' = mês inteiro; senão 'YYYY-MM-DD' dentro de mesActivo
+    diasCache: {},         // 'mes/dia' -> payload de vendasDiario/ (null = não existe)
     ordemProdutos: 'valor',
     planoMigracao: null,   // plano calculado por verificarMigracao()
     escritorCatalogo: null, // só os testes preenchem, para simular falhas de escrita
@@ -2471,6 +2545,7 @@
   function carregarDados(mesPreferido){
     return vendasRef.once('value').then(function(snap){
       var val = snap.val() || {};
+      estado.diasCache = {};
       estado.catalogo = val.catalogo || estado.catalogo || {};
       estado.catalogoCarregado = true;
 
@@ -2490,6 +2565,8 @@
         sel.innerHTML = '<option value="">—</option>';
         el('vistas').innerHTML = '';
         el('semDados').className = 'empty-state';
+        estado.mesActivo = '';
+        popularDias();
         return;
       }
 
@@ -2503,15 +2580,100 @@
       var alvo = mesPreferido && dados[mesPreferido] ? mesPreferido : (estado.mesActivo && (dados[estado.mesActivo] || estado.mesActivo === '__todos') ? estado.mesActivo : meses[meses.length - 1]);
       sel.value = alvo;
       estado.mesActivo = alvo;
+      popularDias();
       renderVistas();
     });
   }
 
   function payloadActivo(){
+    /* Com um dia seleccionado, todas as vistas passam a receber o payload
+       desse dia — vendasDiario/{mes}/{dia} tem exactamente a mesma forma que
+       o nó do mês, por isso nada mais precisa de mudar. */
+    if (estado.diaActivo){
+      return estado.diasCache[estado.mesActivo + '/' + estado.diaActivo] || null;
+    }
     if (estado.mesActivo === '__todos'){
       return mergePayloads(Object.keys(estado.dados).sort().map(function(m){ return estado.dados[m]; }));
     }
     return estado.dados[estado.mesActivo] || null;
+  }
+
+  /* Repovoa o selector de dia a partir dos dias abertos do mês activo.
+     Em "Todos os meses" não há dia possível — o campo desaparece. */
+  function popularDias(){
+    var sel = el('diaSel');
+    var campo = el('diaCampo');
+    if (!sel || !campo) return;
+
+    var mes = estado.mesActivo;
+    if (mes === '__todos' || !estado.dados[mes]){
+      estado.diaActivo = '';
+      sel.innerHTML = '<option value="">Mês inteiro</option>';
+      sel.value = '';
+      sel.disabled = true;
+      campo.className = 'hidden';
+      return;
+    }
+
+    campo.className = '';
+    sel.disabled = false;
+    var dias = Object.keys(estado.dados[mes].porDia || {}).sort();
+    sel.innerHTML = '<option value="">Mês inteiro</option>' + dias.map(function(d){
+      return '<option value="' + d + '">' + esc(rotuloDia(d)) + '</option>';
+    }).join('');
+
+    if (estado.diaActivo && dias.indexOf(estado.diaActivo) < 0) estado.diaActivo = '';
+    sel.value = estado.diaActivo || '';
+  }
+
+  /* Cada dia é lido uma única vez de vendasDiario/ e fica em estado.diasCache
+     indexado por "mes/dia" — trocar entre dias já vistos não repete o pedido.
+     A chave é guardada mesmo quando o dia não existe (valor null), senão cada
+     render tentava outra vez o mesmo pedido falhado. */
+  function seleccionarDia(dia){
+    estado.diaActivo = dia || '';
+    if (!estado.diaActivo){ renderVistas(); return; }
+
+    var mes = estado.mesActivo;
+    var chave = mes + '/' + dia;
+    if (Object.prototype.hasOwnProperty.call(estado.diasCache, chave)){ renderVistas(); return; }
+
+    el('vistas').innerHTML = '<p class="legend">A carregar dia…</p>';
+    diarioRef.child(mes).child(dia).once('value').then(function(snap){
+      estado.diasCache[chave] = snap.val() || null;
+      // Entretanto o utilizador pode ter mudado de dia ou de mês.
+      if (estado.mesActivo !== mes || estado.diaActivo !== dia) return;
+      renderVistas();
+    }).catch(function(err){
+      if (estado.mesActivo !== mes || estado.diaActivo !== dia) return;
+      el('vistas').innerHTML = '<div class="msg erro on">Não foi possível ler o dia: ' +
+        esc(err && err.message ? err.message : String(err)) + '</div>';
+    });
+  }
+
+  function avisoDia(){
+    return '<div class="dia-aviso">' +
+      '<span>A ver: <strong>' + esc(dataExtenso(estado.diaActivo)) + '</strong></span>' +
+      '<span>·</span>' +
+      '<button type="button" class="sec-link" data-voltar-mes="1">Voltar ao mês inteiro</button>' +
+      '</div>';
+  }
+
+  function voltarAoMes(){
+    estado.diaActivo = '';
+    var sel = el('diaSel');
+    if (sel) sel.value = '';
+    renderVistas();
+  }
+
+  function ligarVoltarMes(alvo){
+    var botoes = alvo.querySelectorAll('[data-voltar-mes]');
+    for (var i = 0; i < botoes.length; i++){
+      botoes[i].addEventListener('click', function(ev){
+        ev.stopPropagation();
+        voltarAoMes();
+      });
+    }
   }
 
   /* =========================================================
@@ -3080,6 +3242,115 @@
       corpo, botoesVista('dias', VISTAS_TEMPO, vista));
   }
 
+  /* Evolução semana a semana dentro do mês. As semanas são de segunda a
+     domingo e a chave é a data da segunda-feira. Só se somam dias que existem
+     em porDia — as semanas de fronteira do mês (e as que apanham dias
+     fechados) aparecem na mesma, com a nota "X/7 dias", em vez de se
+     inventarem zeros que puxariam a barra para baixo sem razão. */
+  function vistaSemanas(p){
+    if (estado.mesActivo === '__todos' || estado.diaActivo) return '';
+
+    var dias = p.porDia || {};
+    var chaves = Object.keys(dias).sort();
+    if (!chaves.length) return '';
+
+    var semanas = {};
+    chaves.forEach(function(d){
+      var seg = segundaDe(d);
+      if (!semanas[seg]) semanas[seg] = { dias:0, bruto:0, docs:0 };
+      var s = semanas[seg];
+      s.dias += 1;
+      s.bruto += Number(dias[d].bruto) || 0;
+      s.docs += Number(dias[d].docs) || 0;
+    });
+
+    var ordem = Object.keys(semanas).sort();
+    var max = 0;
+    ordem.forEach(function(seg){ max = Math.max(max, semanas[seg].bruto); });
+
+    var itens = ordem.map(function(seg){
+      var s = semanas[seg];
+      return {
+        label: rotuloSemana(seg),
+        // Semana incompleta (fronteira do mês ou dias fechados): fica assinalada
+        // em vez de se somarem zeros que puxariam a barra para baixo sem razão.
+        nota: s.dias < 7 ? s.dias + '/7 dias' : '',
+        valor: s.bruto,
+        texto: eur(s.bruto) + ' <span style="color:var(--muted);font-weight:400;">· ' +
+          intFmt(s.docs) + '</span>',
+        curto: eur(s.bruto)
+      };
+    });
+
+    var vista = vistaDe('semanas');
+    var corpo;
+    if (vista === 'vertical'){
+      corpo = barrasVerticais(itens.map(function(x){
+        return { label: x.label + (x.nota ? ' (' + x.nota.replace(' dias', '') + ')' : ''), valor:x.valor, curto:x.curto };
+      }));
+    }
+    else if (vista === 'linha') corpo = graficoLinha(itens, { aria:'Vendas por semana' });
+    else corpo = '<div class="bars">' + itens.map(function(x){
+      return barra(x.label, x.valor, max, x.texto, x.nota);
+    }).join('') + '</div>';
+
+    return seccao('Evolução semanal',
+      'Bruto e nº de talões por semana (segunda a domingo). Semanas com menos de 7 dias abertos vêm assinaladas.',
+      corpo, botoesVista('semanas', VISTAS_TEMPO, vista));
+  }
+
+  /* Comparação homóloga: os N primeiros dias abertos do mês anterior contra os
+     N dias abertos que o mês activo já tem. Compara o mês a meio com o mês
+     anterior no mesmo ponto, não com o mês anterior fechado. */
+  function vistaHomologa(p, mes){
+    if (!mes || mes === '__todos' || estado.diaActivo) return '';
+
+    var chaves = Object.keys(p.porDia || {}).sort();
+    var n = chaves.length;
+    if (!n) return '';
+
+    var anterior = mesAnteriorDe(mes);
+    var dadosAnt = estado.dados[anterior];
+    if (!dadosAnt || !dadosAnt.porDia){
+      return seccao('Comparação homóloga', '',
+        '<p class="legend">Sem dados de ' + esc(nomeMes(anterior)) + '.</p>');
+    }
+
+    var chavesAnt = Object.keys(dadosAnt.porDia).sort().slice(0, n);
+    var brutoAnt = 0, docsAnt = 0;
+    chavesAnt.forEach(function(d){
+      var v = dadosAnt.porDia[d] || {};
+      brutoAnt += Number(v.bruto) || 0;
+      docsAnt += Number(v.docs) || 0;
+    });
+    var ticketAnt = docsAnt ? brutoAnt / docsAnt : 0;
+
+    var bruto = 0, docs = 0;
+    chaves.forEach(function(d){
+      var v = p.porDia[d] || {};
+      bruto += Number(v.bruto) || 0;
+      docs += Number(v.docs) || 0;
+    });
+    var ticket = docs ? bruto / docs : 0;
+
+    var sub = 'Primeiros ' + intFmt(n) + ' dias abertos de ' + nomeMes(mes) +
+      ' contra os primeiros ' + intFmt(chavesAnt.length) + ' de ' + nomeMes(anterior) + '.';
+    var aviso = chavesAnt.length < n
+      ? '<p class="legend">Comparação parcial — só ' + intFmt(chavesAnt.length) +
+        ' dias abertos em ' + esc(nomeMes(anterior)) + '.</p>'
+      : '';
+
+    return seccao('Comparação homóloga', sub,
+      '<div class="kpi-row">' +
+        kpi('Bruto (c/ IVA)', eur(bruto),
+          nomeMes(anterior) + ': ' + eur(brutoAnt) + ' · ' + deltaTexto(bruto, brutoAnt)) +
+        kpi('Documentos', intFmt(docs),
+          nomeMes(anterior) + ': ' + intFmt(docsAnt) + ' · ' + deltaTexto(docs, docsAnt)) +
+        kpi('Ticket médio', eur(ticket),
+          nomeMes(anterior) + ': ' + eur(ticketAnt) + ' · ' + deltaTexto(ticket, ticketAnt)) +
+      '</div>' + aviso);
+  }
+
   /* Abre/fecha uma secção directamente no DOM — não há re-render, por isso
      o que já estava aberto lá dentro (subcategorias, ordenação) mantém-se.
      O id é um slug [a-z0-9-], seguro dentro do selector. */
@@ -3101,7 +3372,13 @@
   function renderVistas(){
     var p = payloadActivo();
     var alvo = el('vistas');
-    if (!p){ alvo.innerHTML = ''; return; }
+    if (!p){
+      alvo.innerHTML = estado.diaActivo
+        ? avisoDia() + '<div class="empty-state">Sem dados guardados em vendasDiario/ para este dia.</div>'
+        : '';
+      ligarVoltarMes(alvo);
+      return;
+    }
 
     var r = p.resumo || {};
     var rodape = '<p class="legend">Importado em ' + esc(dataHora(r.importadoEm)) +
@@ -3114,13 +3391,16 @@
       '</div>';
 
     alvo.innerHTML =
+      (estado.diaActivo ? avisoDia() : '') +
       barraGlobal +
       vistaResumo(p) +
       (estado.mesActivo === '__todos' ? '' : rodape) +
+      vistaHomologa(p, estado.mesActivo) +
       vistaTicket(p) +
       vistaHoras(p) +
       vistaDiaSemana(p) +
       vistaDias(p) +
+      vistaSemanas(p) +
       vistaProdutos(p) +
       vistaConcentracao(p) +
       vistaAttach(p) +
@@ -3128,6 +3408,8 @@
       vistaTipos(p) +
       vistaPagamentos(p) +
       vistaPares(p);
+
+    ligarVoltarMes(alvo);
 
     // Cabeçalho de secção: abre/fecha o corpo e guarda o estado.
     var cabsSeccao = alvo.querySelectorAll('[data-sec-toggle]');
@@ -3453,7 +3735,13 @@
 
   el('mesSel').addEventListener('change', function(){
     estado.mesActivo = this.value;
+    estado.diaActivo = '';
+    popularDias();
     renderVistas();
+  });
+
+  el('diaSel').addEventListener('change', function(){
+    seleccionarDia(this.value);
   });
 
   el('btnRecarregar').addEventListener('click', function(){
@@ -3491,6 +3779,17 @@
     dataHoraExtenso: dataHoraExtenso,
     mostrarUltimaImportacao: mostrarUltimaImportacao,
     tratarFicheiro: tratarFicheiro,
+    segundaDe: segundaDe,
+    rotuloSemana: rotuloSemana,
+    rotuloDia: rotuloDia,
+    dataExtenso: dataExtenso,
+    mesAnteriorDe: mesAnteriorDe,
+    vistaSemanas: vistaSemanas,
+    vistaHomologa: vistaHomologa,
+    popularDias: popularDias,
+    seleccionarDia: seleccionarDia,
+    payloadActivo: payloadActivo,
+    renderVistas: renderVistas,
     temSuportePasta: temSuportePasta,
     estado: estado
   };
