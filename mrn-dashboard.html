@@ -112,10 +112,80 @@
     margin-top:48px;
   }
 
+  /* Cinco cartões desde que as Contas Bancárias entraram nesta linha.
+     minmax(0,…) e não 1fr: com 1fr a coluna nunca desce abaixo do
+     min-content do cartão e a linha rebentava os 1200px. */
   .grid-quick{
     display:grid;
-    grid-template-columns:repeat(4, 1fr);
+    grid-template-columns:repeat(5, minmax(0, 1fr));
     gap:16px;
+  }
+
+  /* ---------- Cartão Contas Bancárias ---------- */
+  .contas-total{
+    font-family:'Space Mono', monospace;
+    font-size:24px;
+    font-weight:700;
+    line-height:1;
+    margin-top:8px;
+  }
+
+  .contas-lista{
+    margin-top:12px;
+    border-top:1px solid var(--line);
+  }
+
+  .conta-linha{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+    text-decoration:none;
+    color:inherit;
+  }
+
+  .conta-linha:last-child{
+    border-bottom:none;
+  }
+
+  a.conta-linha:hover .conta-nome,
+  a.conta-linha:hover .conta-saldo{
+    color:var(--red);
+  }
+
+  .conta-nome{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .conta-sync{
+    display:block;
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    font-weight:400;
+    letter-spacing:0;
+    text-transform:none;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .conta-saldo{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  /* Conta ainda não ligada: presente na lista, mas apagada e sem link. */
+  .conta-linha-off .conta-nome,
+  .conta-linha-off .conta-saldo{
+    color:var(--muted);
+    font-weight:400;
   }
 
   .grid-active{
@@ -2391,6 +2461,17 @@
 
   <h2 class="section-heading">Vista Rápida</h2>
   <div class="grid-quick">
+    <!-- Contas Bancárias: alimentado por contasBancarias/, escrito pelo
+         eb_sync.py. As linhas são geradas em JS a partir das contas que
+         existirem no nó — o Revolut entra sem tocar neste HTML. -->
+    <div class="card card-compact card-contas" id="cardContas">
+      <div class="card-icon">🏦</div>
+      <h3 class="card-title">Contas Bancárias</h3>
+      <div class="contas-total" id="cardContasTotal">—</div>
+      <p class="card-subtitle" id="cardContasSub">A carregar…</p>
+      <div class="contas-lista" id="cardContasLista"></div>
+    </div>
+
     <a class="card card-compact card-vendas" id="cardVendas" href="vendas.html">
       <div class="card-icon">📊</div>
       <h3 class="card-title">Vendas</h3>
@@ -5282,26 +5363,29 @@ window.addEventListener('load', function () {
   // Refs extra, carregadas só para alimentar notificações (sem UI própria
   // no dashboard, que já vive em caixa.html / loja-sao-bento.html / equipa.html).
   var caixaRef = db.ref('caixaMovimentos');
-  // Conta bancária: escrita de fora pelo eb_sync.py (Enable Banking → RTDB).
-  // O dashboard só lê estes dois nós; a reconciliação escreve de volta em
-  // caixaMovimentos, nunca em contaBancaria.
-  var contaSaldoRef = db.ref('contaBancaria/saldo');
-  var contaMovsRef = db.ref('contaBancaria/movimentos');
+  // Contas bancárias: escritas de fora pelo eb_sync.py (Enable Banking → RTDB).
+  // Um único listener no nó pai — o cartão "Contas Bancárias" descobre as
+  // contas que existirem (o Revolut entra sem alterar código) e a
+  // reconciliação usa a sub-árvore da ABANCA. O dashboard só lê daqui;
+  // escreve sempre em caixaMovimentos, nunca em contasBancarias.
+  var contasRef = db.ref('contasBancarias');
+  var CONTA_RECONCILIACAO = 'abanca';
   var tempsRef = db.ref('lojaTemperaturas');
   var checklistsRef = db.ref('lojaChecklistRegistos');
   var turnosRef = db.ref('turnos');
   var pessoasNotifRef = db.ref('pessoas');
 
   var allCaixaMovs = {};
-  var contaSaldo = null;
-  var allContaMovs = {};
+  var allContas = {};        // contasBancarias/ inteiro, tal como está no RTDB
+  var contaSaldo = null;     // saldo da conta usada na reconciliação
+  var allContaMovs = {};     // movimentos dessa mesma conta
   var allTemps = {};
   var allChecklists = {};
   var allTurnos = {};
   var allPessoasNotif = {};
 
   var caixaCarregada = false;
-  var contaSaldoCarregado = false;
+  var contasCarregadas = false;
   var contaMovsCarregados = false;
   var tempsCarregadas = false;
   var checklistsCarregados = false;
@@ -5720,15 +5804,19 @@ window.addEventListener('load', function () {
     reconciliarDepositos();
   });
 
-  contaSaldoRef.on('value', function(snapshot){
-    contaSaldo = snapshot.val();
-    contaSaldoCarregado = true;
-    renderSaldoBanco();
-  });
+  contasRef.on('value', function(snapshot){
+    allContas = snapshot.val() || {};
+    contasCarregadas = true;
 
-  contaMovsRef.on('value', function(snapshot){
-    allContaMovs = snapshot.val() || {};
+    // A reconciliação continua a olhar só para a conta da ABANCA; o resto do
+    // nó alimenta o cartão de topo.
+    var conta = allContas[CONTA_RECONCILIACAO] || {};
+    contaSaldo = conta.saldo || null;
+    allContaMovs = conta.movimentos || {};
     contaMovsCarregados = true;
+
+    renderSaldoBanco();
+    renderCartaoContas();
     // Corre a cada carregamento da página, assim que as duas pontas
     // (caixa + banco) estiverem disponíveis — a ordem de chegada não importa.
     reconciliarDepositos();
@@ -5867,6 +5955,90 @@ window.addEventListener('load', function () {
         }).join('') +
         '</tbody></table>';
     }
+  }
+
+  /* ---------- Cartão Contas Bancárias ----------
+     Soma dinamicamente todas as chaves de contasBancarias/ — não assume
+     "abanca". CONTAS_LABEL só dá nomes bonitos e garante que o Revolut
+     aparece como "Não ligado" enquanto o nó não existir; qualquer conta
+     nova que o eb_sync.py escreva aparece na mesma, com o slug por nome. */
+  var CONTAS_LABEL = { abanca: 'ABANCA', revolut: 'Revolut' };
+
+  function nomeConta(slug){
+    return CONTAS_LABEL[slug] || (slug.charAt(0).toUpperCase() + slug.slice(1));
+  }
+
+  // "há 3h" / "há 2 dias" / data curta a partir de uma semana.
+  function tempoRelativo(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    var min = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (min < 1) return 'agora mesmo';
+    if (min < 60) return 'há ' + min + ' min';
+    var horas = Math.floor(min / 60);
+    if (horas < 24) return 'há ' + horas + 'h';
+    var dias = Math.floor(horas / 24);
+    if (dias < 7) return 'há ' + dias + (dias === 1 ? ' dia' : ' dias');
+    return formatDataCurta(iso);
+  }
+
+  function dataHoraCompleta(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return formatDataCurta(iso) + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function renderCartaoContas(){
+    var totalEl = document.getElementById('cardContasTotal');
+    var subEl = document.getElementById('cardContasSub');
+    var listaEl = document.getElementById('cardContasLista');
+
+    if (!contasCarregadas){ subEl.textContent = 'A carregar…'; return; }
+
+    // Contas presentes no nó + as conhecidas que ainda lá não estão.
+    var slugs = Object.keys(allContas);
+    Object.keys(CONTAS_LABEL).forEach(function(s){
+      if (slugs.indexOf(s) === -1) slugs.push(s);
+    });
+    slugs.sort();
+
+    var total = 0, ligadas = 0, moedaEstranha = false;
+
+    listaEl.innerHTML = slugs.map(function(slug){
+      var saldo = (allContas[slug] || {}).saldo;
+      var valor = saldo ? parseFloat(saldo.amount) : NaN;
+
+      if (!saldo || isNaN(valor)){
+        return '<div class="conta-linha conta-linha-off">' +
+          '<span class="conta-nome">' + escapeHtml(nomeConta(slug)) +
+            '<span class="conta-sync">Não ligado</span></span>' +
+          '<span class="conta-saldo">—</span></div>';
+      }
+
+      ligadas++;
+      // Só somamos euros: misturar moedas num único total seria mentira.
+      if (!saldo.currency || saldo.currency === 'EUR') total += valor;
+      else moedaEstranha = true;
+
+      var quando = tempoRelativo(saldo.atualizadoEm);
+      return '<a class="conta-linha" href="conta-bancaria.html?conta=' +
+          encodeURIComponent(slug) + '" title="Última sincronização: ' +
+          escapeHtml(dataHoraCompleta(saldo.atualizadoEm)) + '">' +
+        '<span class="conta-nome">' + escapeHtml(nomeConta(slug)) +
+          '<span class="conta-sync">' +
+            (quando ? 'atualizado ' + escapeHtml(quando) : 'sincronização desconhecida') +
+          '</span></span>' +
+        '<span class="conta-saldo">' + formatEuro(valor) + '</span></a>';
+    }).join('');
+
+    if (ligadas === 0){
+      totalEl.textContent = '—';
+      subEl.textContent = 'Nenhuma conta ligada ainda.';
+      return;
+    }
+    totalEl.textContent = formatEuro(total);
+    subEl.textContent = ligadas + (ligadas === 1 ? ' conta ligada' : ' contas ligadas') +
+      (moedaEstranha ? ' · outras moedas não somadas' : '');
   }
 
   /* ---------- Reconciliação automática com a conta bancária ----------

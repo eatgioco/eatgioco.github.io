@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Conta Bancária</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .home-link:hover{
+    background:var(--white);
+    color:var(--red);
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:8px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--red);
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  .back-link{
+    display:inline-block;
+    margin-bottom:20px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--black);
+    text-decoration:none;
+    border:2px solid var(--black);
+    padding:6px 10px;
+  }
+
+  .back-link:hover{
+    background:var(--black);
+    color:var(--white);
+  }
+
+  /* ---------- Saldo ---------- */
+  .saldo-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:24px;
+    margin-top:24px;
+  }
+
+  .bloco-label{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+
+  .saldo-valor{
+    font-family:'Space Mono', monospace;
+    font-size:44px;
+    font-weight:700;
+    line-height:1;
+  }
+
+  .saldo-sync{
+    margin:12px 0 0;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .saldo-stale{
+    color:var(--red);
+  }
+
+  /* ---------- Filtro ---------- */
+  .filtro-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:12px;
+    margin-top:28px;
+  }
+
+  .filtro-input{
+    flex:1 1 min(360px, 100%);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    background:var(--white);
+    color:var(--black);
+    border:2px solid var(--black);
+  }
+
+  .filtro-input:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .filtro-contagem{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  /* ---------- Tabela de movimentos ---------- */
+  .movs-wrap{
+    background:var(--white);
+    border:2px solid var(--black);
+    margin-top:16px;
+    /* ~200 movimentos numa tabela larga: o scroll é da tabela, não do body. */
+    overflow-x:auto;
+  }
+
+  .movs-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+
+  .movs-table th{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    text-align:left;
+    padding:12px 14px;
+    border-bottom:2px solid var(--black);
+    white-space:nowrap;
+  }
+
+  .movs-table td{
+    padding:11px 14px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+
+  .movs-table tr:last-child td{
+    border-bottom:none;
+  }
+
+  .movs-table .mono{
+    font-family:'Space Mono', monospace;
+    white-space:nowrap;
+  }
+
+  .movs-table .num{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    text-align:right;
+    white-space:nowrap;
+  }
+
+  /* Entrada e saída: seta + cor, para não depender só do sinal do número. */
+  .mov-in .num{ color:var(--green); }
+  .mov-out .num{ color:var(--black); }
+
+  .mov-seta{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:14px;
+  }
+
+  .mov-in .mov-seta{ color:var(--green); }
+  .mov-out .mov-seta{ color:var(--red); }
+
+  .mov-desc{
+    min-width:280px;
+  }
+
+  .estado{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:40px 24px;
+    margin-top:24px;
+    text-align:center;
+  }
+
+  .estado-erro{
+    border-color:var(--red);
+  }
+
+  .estado h2{
+    margin:0 0 10px;
+    font-size:18px;
+  }
+
+  .estado p{
+    margin:0;
+    color:var(--muted);
+    font-size:14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<main>
+  <a class="back-link" href="mrn-dashboard.html">← Dashboard</a>
+
+  <h1 class="page-title" id="tituloConta">Conta Bancária</h1>
+  <p class="page-subtitle" id="subtituloConta">A carregar…</p>
+
+  <!-- Estado de erro/vazio; substitui todo o conteúdo abaixo quando aparece. -->
+  <div class="estado estado-erro" id="estadoErro" style="display:none;">
+    <h2 id="estadoErroTitulo">Conta não encontrada ou ainda não ligada</h2>
+    <p id="estadoErroTexto"></p>
+  </div>
+
+  <div id="conteudo" style="display:none;">
+    <div class="saldo-card">
+      <p class="bloco-label">Saldo atual</p>
+      <div class="saldo-valor" id="saldoValor">—</div>
+      <p class="saldo-sync" id="saldoSync">—</p>
+    </div>
+
+    <div class="filtro-row">
+      <input class="filtro-input" id="filtroTexto" type="search"
+             placeholder="Filtrar por descrição…" autocomplete="off">
+      <span class="filtro-contagem" id="filtroContagem"></span>
+    </div>
+
+    <div class="movs-wrap">
+      <table class="movs-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th></th>
+            <th>Descrição</th>
+            <th style="text-align:right;">Valor</th>
+            <th style="text-align:right;">Saldo após</th>
+          </tr>
+        </thead>
+        <tbody id="movsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+window.addEventListener('load', function () {
+
+  var CONTAS_LABEL = { abanca: 'ABANCA', revolut: 'Revolut' };
+  var SALDO_VELHO_HORAS = 26;   // uma corrida diária do eb_sync.py + folga
+
+  // ---------- helpers ----------
+  function escapeHtml(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  // Mesmo formato do mrn-dashboard.html, de onde se chega a esta página —
+  // ver o mesmo saldo mudar de separador num clique seria confuso.
+  function formatEuro(n){
+    return (isNaN(n) ? 0 : n).toFixed(2) + '€';
+  }
+
+  function formatData(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+
+  function dataHoraCompleta(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return formatData(iso) + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  // Comparação de descrições sem acentos nem maiúsculas — o banco escreve
+  // "DEPOSITO", o Manel procura "depósito".
+  function normalizar(txt){
+    return String(txt || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function nomeConta(slug){
+    return CONTAS_LABEL[slug] || (slug.charAt(0).toUpperCase() + slug.slice(1));
+  }
+
+  function mostrarErro(titulo, texto){
+    document.getElementById('conteudo').style.display = 'none';
+    var el = document.getElementById('estadoErro');
+    el.style.display = 'block';
+    document.getElementById('estadoErroTitulo').textContent = titulo;
+    document.getElementById('estadoErroTexto').textContent = texto;
+    document.getElementById('subtituloConta').textContent = '—';
+  }
+
+  // ---------- parâmetro da URL ----------
+  var slug = (new URLSearchParams(window.location.search).get('conta') || '').trim().toLowerCase();
+
+  document.getElementById('tituloConta').textContent =
+    'GIOCO · ' + (slug ? nomeConta(slug) : 'Conta Bancária');
+
+  if (!slug){
+    mostrarErro('Nenhuma conta indicada',
+      'Abre esta página a partir do cartão "Contas Bancárias" no dashboard.');
+    return;
+  }
+  // Uma barra no slug sairia do nó pretendido na ref do Firebase.
+  if (!/^[a-z0-9_-]+$/.test(slug)){
+    mostrarErro('Conta inválida', 'O identificador "' + slug + '" não é válido.');
+    return;
+  }
+
+  // ---------- Firebase ----------
+  firebase.initializeApp({
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
+  });
+  var db = firebase.database();
+
+  var movimentos = [];   // já ordenados, o filtro trabalha sobre esta lista
+
+  db.ref('contasBancarias/' + slug).on('value', function(snapshot){
+    var conta = snapshot.val();
+
+    if (!conta || (!conta.saldo && !conta.movimentos)){
+      mostrarErro('Conta não encontrada ou ainda não ligada',
+        'Não há dados em contasBancarias/' + slug +
+        '. Corre o atualizar-gioco.bat para sincronizar.');
+      return;
+    }
+
+    document.getElementById('estadoErro').style.display = 'none';
+    document.getElementById('conteudo').style.display = 'block';
+    document.getElementById('subtituloConta').textContent = 'Conta bancária';
+
+    renderSaldo(conta.saldo);
+
+    movimentos = Object.keys(conta.movimentos || {}).map(function(ref){
+      return Object.assign({ ref: ref }, conta.movimentos[ref]);
+    }).sort(function(a, b){
+      // Mais recentes primeiro. booking_date é YYYY-MM-DD, por isso a
+      // comparação de strings já é cronológica; a ref desempata para a
+      // ordem não dançar entre renders no mesmo dia.
+      var da = a.booking_date || '', dbb = b.booking_date || '';
+      if (da !== dbb) return da < dbb ? 1 : -1;
+      return a.ref < b.ref ? 1 : (a.ref > b.ref ? -1 : 0);
+    });
+
+    renderMovimentos();
+  }, function(err){
+    mostrarErro('Não foi possível ler do Firebase', err && err.message ? err.message : String(err));
+  });
+
+  function renderSaldo(saldo){
+    var valorEl = document.getElementById('saldoValor');
+    var syncEl = document.getElementById('saldoSync');
+
+    if (!saldo || saldo.amount == null){
+      valorEl.textContent = '—';
+      syncEl.textContent = 'Sem saldo sincronizado.';
+      return;
+    }
+
+    var n = parseFloat(saldo.amount);
+    valorEl.textContent = isNaN(n) ? String(saldo.amount) : formatEuro(n);
+
+    var quando = dataHoraCompleta(saldo.atualizadoEm);
+    if (!quando){ syncEl.textContent = 'Data de sincronização desconhecida.'; return; }
+
+    var horas = (Date.now() - new Date(saldo.atualizadoEm).getTime()) / 3600000;
+    syncEl.innerHTML = horas > SALDO_VELHO_HORAS
+      ? '<span class="saldo-stale">Última sincronização: ' + escapeHtml(quando) +
+        ' — desatualizado.</span>'
+      : 'Última sincronização: ' + escapeHtml(quando) + '.';
+  }
+
+  function renderMovimentos(){
+    var termo = normalizar(document.getElementById('filtroTexto').value.trim());
+    var visiveis = termo
+      ? movimentos.filter(function(m){
+          return normalizar(m.remittance_information).indexOf(termo) !== -1;
+        })
+      : movimentos;
+
+    document.getElementById('filtroContagem').textContent = termo
+      ? visiveis.length + ' de ' + movimentos.length + ' movimentos'
+      : movimentos.length + (movimentos.length === 1 ? ' movimento' : ' movimentos');
+
+    var body = document.getElementById('movsBody');
+
+    if (!visiveis.length){
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);' +
+        'padding:32px 14px;">' +
+        (movimentos.length ? 'Nenhum movimento corresponde ao filtro.'
+                           : 'Ainda sem movimentos sincronizados.') + '</td></tr>';
+      return;
+    }
+
+    body.innerHTML = visiveis.map(function(m){
+      var entrada = m.credit_debit_indicator === 'CRDT';
+      var valor = parseFloat(m.amount);
+      var saldoApos = parseFloat(m.balance_after_transaction);
+      return '<tr class="' + (entrada ? 'mov-in' : 'mov-out') + '">' +
+        '<td class="mono">' + escapeHtml(formatData(m.booking_date)) + '</td>' +
+        '<td class="mov-seta" title="' + (entrada ? 'Entrada' : 'Saída') + '">' +
+          (entrada ? '↓' : '↑') + '</td>' +
+        '<td class="mov-desc">' + escapeHtml(m.remittance_information || '—') + '</td>' +
+        '<td class="num">' + (isNaN(valor) ? '—' : formatEuro(Math.abs(valor))) + '</td>' +
+        '<td class="num" style="font-weight:400;color:var(--muted);">' +
+          (isNaN(saldoApos) ? '—' : formatEuro(saldoApos)) + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  document.getElementById('filtroTexto').addEventListener('input', renderMovimentos);
+});
+</script>
+
+</body>
+</html>
