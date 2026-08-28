@@ -1537,6 +1537,59 @@
     color:var(--muted);
   }
 
+  /* Caixa vs. banco lado a lado. Sem @media: flex-wrap com base mínima,
+     o mesmo padrão dos painéis da Análise. */
+  .tes-duo{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    margin-bottom:20px;
+  }
+
+  .tes-duo > .tes-block{
+    flex:1 1 min(320px, 100%);
+    margin-bottom:0;
+  }
+
+  /* O saldo do banco é informação vinda de fora (eb_sync.py), não um valor
+     que o dashboard controle — daí a moldura tracejada. */
+  .tes-block-banco{
+    border-style:dashed;
+  }
+
+  .tes-saldo-stale{
+    color:var(--red);
+  }
+
+  .tes-recon{
+    border-color:var(--red);
+  }
+
+  .tes-recon-badge{
+    display:inline-block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--white);
+    background:var(--red);
+    padding:2px 7px;
+    margin-left:8px;
+  }
+
+  .tes-recon-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  .tes-recon-head .tes-block-title{
+    margin:0;
+  }
+
   .tes-week{
     display:flex;
     align-items:center;
@@ -2642,14 +2695,34 @@
     <h2>🏦 Depósitos Bancários</h2>
   </div>
 
-  <div class="tes-block">
-    <p class="tes-block-title">Total por depositar</p>
-    <div class="tes-bigtotal" id="depDetalheTotal">0.00€</div>
-    <p class="tes-bigtotal-sub" id="depDetalheSub">—</p>
+  <div class="tes-duo">
+    <div class="tes-block">
+      <p class="tes-block-title">Total por depositar</p>
+      <div class="tes-bigtotal" id="depDetalheTotal">0.00€</div>
+      <p class="tes-bigtotal-sub" id="depDetalheSub">—</p>
+    </div>
+
+    <!-- Saldo real da conta ABANCA, escrito por eb_sync.py. Se o script não
+         correr, o valor fica velho — daí mostrar sempre quando foi lido. -->
+    <div class="tes-block tes-block-banco">
+      <p class="tes-block-title">Saldo real da conta</p>
+      <div class="tes-bigtotal" id="depSaldoBanco">—</div>
+      <p class="tes-bigtotal-sub" id="depSaldoBancoSub">Sem dados do banco ainda.</p>
+    </div>
+  </div>
+
+  <!-- Só aparece quando esta sessão reconciliou alguma coisa. -->
+  <div class="tes-block tes-recon" id="depReconBloco" style="display:none;">
+    <p class="tes-block-title">Reconciliados agora <span class="tes-recon-badge">Novo</span></p>
+    <div id="depReconLista"></div>
   </div>
 
   <div class="tes-block">
-    <p class="tes-block-title">Pendentes por depositar</p>
+    <div class="tes-recon-head">
+      <p class="tes-block-title">Pendentes por depositar</p>
+      <button type="button" class="btn-small" id="btnReconciliar">⟳ Reconciliar com o banco</button>
+    </div>
+    <p class="tes-bigtotal-sub" id="depReconEstado" style="margin:0 0 14px;"></p>
     <div id="depPendentesLista"></div>
   </div>
 
@@ -5209,18 +5282,27 @@ window.addEventListener('load', function () {
   // Refs extra, carregadas só para alimentar notificações (sem UI própria
   // no dashboard, que já vive em caixa.html / loja-sao-bento.html / equipa.html).
   var caixaRef = db.ref('caixaMovimentos');
+  // Conta bancária: escrita de fora pelo eb_sync.py (Enable Banking → RTDB).
+  // O dashboard só lê estes dois nós; a reconciliação escreve de volta em
+  // caixaMovimentos, nunca em contaBancaria.
+  var contaSaldoRef = db.ref('contaBancaria/saldo');
+  var contaMovsRef = db.ref('contaBancaria/movimentos');
   var tempsRef = db.ref('lojaTemperaturas');
   var checklistsRef = db.ref('lojaChecklistRegistos');
   var turnosRef = db.ref('turnos');
   var pessoasNotifRef = db.ref('pessoas');
 
   var allCaixaMovs = {};
+  var contaSaldo = null;
+  var allContaMovs = {};
   var allTemps = {};
   var allChecklists = {};
   var allTurnos = {};
   var allPessoasNotif = {};
 
   var caixaCarregada = false;
+  var contaSaldoCarregado = false;
+  var contaMovsCarregados = false;
   var tempsCarregadas = false;
   var checklistsCarregados = false;
   var turnosCarregados = false;
@@ -5635,6 +5717,21 @@ window.addEventListener('load', function () {
     caixaCarregada = true;
     agendarNotificacoes();
     renderDepositosCard();
+    reconciliarDepositos();
+  });
+
+  contaSaldoRef.on('value', function(snapshot){
+    contaSaldo = snapshot.val();
+    contaSaldoCarregado = true;
+    renderSaldoBanco();
+  });
+
+  contaMovsRef.on('value', function(snapshot){
+    allContaMovs = snapshot.val() || {};
+    contaMovsCarregados = true;
+    // Corre a cada carregamento da página, assim que as duas pontas
+    // (caixa + banco) estiverem disponíveis — a ordem de chegada não importa.
+    reconciliarDepositos();
   });
 
   tempsRef.on('value', function(snapshot){
@@ -5771,6 +5868,189 @@ window.addEventListener('load', function () {
         '</tbody></table>';
     }
   }
+
+  /* ---------- Reconciliação automática com a conta bancária ----------
+     contaBancaria/ é escrito de fora pelo eb_sync.py. Aqui cruzamos os
+     levantamentos por depositar com os créditos que já entraram na conta:
+     valor exatamente igual e booking_date até 7 dias depois da saída de
+     caixa. Um crédito do banco nunca serve dois depósitos.
+
+     Só escreve em caixaMovimentos, nunca em contaBancaria — o script é a
+     única fonte desse nó. */
+  var JANELA_RECONCILIACAO_DIAS = 7;
+  var SALDO_VELHO_HORAS = 26;   // uma corrida diária do .bat + folga
+  var reconciliadosNestaSessao = [];
+  var reconciliacaoAEscrever = false;
+
+  // Comparar em cêntimos inteiros evita o 0.1+0.2 dos floats — "valor exato"
+  // tem de ser mesmo exato, não uma tolerância disfarçada.
+  function centimos(valor){
+    var n = parseFloat(valor);
+    return isNaN(n) ? null : Math.round(Math.abs(n) * 100);
+  }
+
+  // dataHora de caixaMovimentos é um ISO com hora; queremos só o dia civil
+  // local (usar o dia UTC deslocaria os movimentos da noite).
+  function diaLocalDe(valor){
+    var d = new Date(valor);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  // booking_date vem do banco já como YYYY-MM-DD.
+  function diaBancoDe(valor){
+    return (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)) ? valor.slice(0, 10) : null;
+  }
+
+  function diasEntre(diaA, diaB){
+    var a = Date.parse(diaA + 'T00:00:00Z');
+    var b = Date.parse(diaB + 'T00:00:00Z');
+    if (isNaN(a) || isNaN(b)) return null;
+    return Math.round((b - a) / 86400000);
+  }
+
+  function creditosDoBanco(){
+    return Object.keys(allContaMovs)
+      .map(function(ref){
+        var m = allContaMovs[ref] || {};
+        return { ref: ref, dia: diaBancoDe(m.booking_date), cents: centimos(m.amount),
+                 indicador: m.credit_debit_indicator, descricao: m.remittance_information || '' };
+      })
+      .filter(function(c){ return c.indicador === 'CRDT' && c.dia && c.cents !== null; })
+      // Mais antigo primeiro: um levantamento casa com o crédito mais próximo.
+      .sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : 0); });
+  }
+
+  function reconciliarDepositos(){
+    if (!caixaCarregada || !contaMovsCarregados || reconciliacaoAEscrever) return;
+
+    // Créditos já atribuídos noutra corrida — não podem servir outra vez.
+    var usados = {};
+    Object.keys(allCaixaMovs).forEach(function(id){
+      var m = allCaixaMovs[id];
+      if (m && m.movimentoContaRef) usados[m.movimentoContaRef] = true;
+    });
+
+    var creditos = creditosDoBanco();
+    var novos = [];
+
+    depositosPendentes().forEach(function(m){
+      var diaCaixa = diaLocalDe(m.dataHora);
+      var cents = centimos(m.valor);
+      if (!diaCaixa || cents === null) return;
+
+      for (var i = 0; i < creditos.length; i++){
+        var c = creditos[i];
+        if (usados[c.ref] || c.cents !== cents) continue;
+        var delta = diasEntre(diaCaixa, c.dia);
+        if (delta === null || delta < 0 || delta > JANELA_RECONCILIACAO_DIAS) continue;
+        usados[c.ref] = true;
+        novos.push({ id: m.id, mov: m, credito: c });
+        break;
+      }
+    });
+
+    renderReconEstado(creditos.length, novos.length);
+    if (novos.length) escreverReconciliacoes(novos);
+  }
+
+  function escreverReconciliacoes(novos){
+    reconciliacaoAEscrever = true;
+    var agora = new Date().toISOString();
+    var updates = {};
+
+    novos.forEach(function(n){
+      updates[n.id + '/depositado'] = true;
+      updates[n.id + '/reconciliadoAutomaticamente'] = true;
+      updates[n.id + '/reconciliadoEm'] = agora;
+      updates[n.id + '/movimentoContaRef'] = n.credito.ref;
+      // A tabela de histórico já mostra 'Depositado em' a partir deste campo;
+      // sem ele os automáticos apareciam com "—". A data que interessa é a do
+      // banco (quando o dinheiro entrou), não a de agora.
+      updates[n.id + '/depositadoEm'] = n.credito.dia + 'T12:00:00';
+    });
+
+    caixaRef.update(updates).then(function(){
+      reconciliacaoAEscrever = false;
+      reconciliadosNestaSessao = reconciliadosNestaSessao.concat(novos);
+      renderReconciliados();
+      // O listener de caixaRef reage à escrita e volta a chamar
+      // reconciliarDepositos(); estes já vão com depositado=true, por isso
+      // saem do conjunto de pendentes e não há segunda passagem.
+    }).catch(function(err){
+      reconciliacaoAEscrever = false;
+      document.getElementById('depReconEstado').innerHTML =
+        '<span class="tes-saldo-stale">Falhou ao gravar a reconciliação: ' +
+        escapeHtml(err && err.message ? err.message : String(err)) + '</span>';
+    });
+  }
+
+  function renderReconEstado(nCreditos, nNovos){
+    var el = document.getElementById('depReconEstado');
+    if (!contaMovsCarregados || nCreditos === 0){
+      el.innerHTML = '<span class="tes-saldo-stale">Sem movimentos do banco — ' +
+        'corre o atualizar-gioco.bat para sincronizar.</span>';
+      return;
+    }
+    el.textContent = nNovos > 0
+      ? 'Cruzado com ' + nCreditos + ' créditos do banco — ' + nNovos + ' reconciliado(s).'
+      : 'Cruzado com ' + nCreditos + ' créditos do banco — nada de novo para reconciliar.';
+  }
+
+  function renderSaldoBanco(){
+    var valorEl = document.getElementById('depSaldoBanco');
+    var subEl = document.getElementById('depSaldoBancoSub');
+
+    if (!contaSaldo || contaSaldo.amount == null){
+      valorEl.textContent = '—';
+      subEl.textContent = 'Sem dados do banco ainda.';
+      return;
+    }
+
+    var n = parseFloat(contaSaldo.amount);
+    valorEl.textContent = isNaN(n) ? String(contaSaldo.amount) : formatEuro(n);
+
+    var lido = new Date(contaSaldo.atualizadoEm);
+    if (isNaN(lido.getTime())){
+      subEl.textContent = 'Data de leitura desconhecida.';
+      return;
+    }
+    var horas = (Date.now() - lido.getTime()) / 3600000;
+    var quando = formatDataCurta(contaSaldo.atualizadoEm) + ' às ' +
+                 pad2(lido.getHours()) + ':' + pad2(lido.getMinutes());
+    subEl.innerHTML = horas > SALDO_VELHO_HORAS
+      ? '<span class="tes-saldo-stale">Lido em ' + quando + ' — desatualizado.</span>'
+      : 'Lido em ' + quando + '.';
+  }
+
+  function renderReconciliados(){
+    var bloco = document.getElementById('depReconBloco');
+    if (!reconciliadosNestaSessao.length){
+      bloco.style.display = 'none';
+      return;
+    }
+    bloco.style.display = 'block';
+    document.getElementById('depReconLista').innerHTML =
+      '<table class="tes-table"><thead><tr>' +
+      '<th>Levantamento</th><th>Pessoa</th><th style="text-align:right;">Valor</th>' +
+      '<th>Entrou no banco</th><th>Descrição</th>' +
+      '</tr></thead><tbody>' +
+      reconciliadosNestaSessao.map(function(n){
+        return '<tr>' +
+          '<td class="mono">' + formatDataCurta(n.mov.dataHora) + '</td>' +
+          '<td>' + escapeHtml(n.mov.pessoa || '—') + '</td>' +
+          '<td class="num">' + formatEuro(parseFloat(n.mov.valor) || 0) + '</td>' +
+          '<td class="mono">' + formatDataCurta(n.credito.dia + 'T12:00:00') + '</td>' +
+          '<td>' + escapeHtml(n.credito.descricao || '—') + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
+  document.getElementById('btnReconciliar').addEventListener('click', function(){
+    document.getElementById('depReconEstado').textContent = 'A verificar…';
+    reconciliarDepositos();
+  });
 
   // Delegado uma única vez sobre o contentor — sobrevive à substituição do
   // innerHTML a cada render (mesmo padrão de tesPendentesEl).
