@@ -222,7 +222,11 @@
 
   .payment-lines-list .card-row{ padding:2px 0; }
 
+  /* O botão de fechar a linha é absoluto e centrado na vertical, por isso a
+     linha é o contexto de posicionamento e abre folga à direita para ele. */
   .payment-line-detail{
+    position:relative;
+    padding-right:44px;
     padding-bottom:10px;
     margin-bottom:10px;
     border-bottom:1px solid var(--line);
@@ -243,6 +247,36 @@
     margin-left:8px;
     white-space:nowrap;
   }
+
+  /* Marcar a linha como paga: pastilha redonda só com o ✓, encostada à direita
+     e centrada na altura da linha. */
+  .btn-line-done{
+    position:absolute;
+    right:0;
+    top:calc(50% - 5px);
+    transform:translateY(-50%);
+    width:30px;
+    height:30px;
+    padding:0;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:13px;
+    line-height:1;
+    background:var(--white);
+    color:var(--muted);
+    border:1.5px solid var(--line);
+    cursor:pointer;
+    transition:border-color .15s ease, color .15s ease, transform .1s ease;
+  }
+
+  .btn-line-done:hover{ border-color:var(--green); color:var(--green); }
+  .btn-line-done:active{ transform:translateY(-50%) scale(0.92); }
+
+  /* Na última linha não há o padding-bottom da separação, por isso o centro
+     do bloco é o centro real. */
+  .payment-line-detail:last-child .btn-line-done{ top:50%; }
 
   /* ---------- Botão de copiar (emoji) ----------
      Sem equivalente no conjunto de 22 ícones do shell — fica emoji. */
@@ -1054,6 +1088,51 @@ window.addEventListener('load', function () {
     }).length;
   }
 
+  function marcarLinhaConcluida(pedidoId, lineIndex) {
+    var p = allPaymentRequests[pedidoId];
+    if (!p) return;
+    var lines = p.lines || [];
+    var linha = lines[lineIndex];
+    if (!linha || lineStatus(p, linha) === 'concluido') return;
+
+    // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
+    var lineRef = paymentRequestsRef.child(pedidoId).child('lines').child(lineIndex);
+    lineRef.child('status').set('concluido');
+    lineRef.child('concluidoEm').set(Date.now());
+
+    linha.status = 'concluido';
+    linha.concluidoEm = Date.now();
+
+    // O status do pedido passa a ser derivado: fecha quando a última linha fecha.
+    var todasConcluidas = lines.every(function (l) { return lineStatus(p, l) === 'concluido'; });
+    if (todasConcluidas) {
+      paymentRequestsRef.child(pedidoId).update({ status: 'concluido' });
+    }
+
+    enviarEmailConcluidoLinha(p, linha);
+  }
+
+  function enviarEmailConcluidoLinha(p, linha) {
+    var subject = "Pagamento Concluído | " + linha.fornecedor + " | Pedido #" + (p.numeroReferencia || "") +
+      " – Data: " + formatSubjectDate(new Date());
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock([linha]));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
+    var body = bodyLines.join("\n");
+
+    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
+      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+    window.location.href = mailto;
+
+    mostrarAvisoConcluido();
+  }
+
   function mostrarAvisoConcluido() {
     var aviso = document.getElementById('concluidoAviso');
     aviso.textContent = '✅ Pagamento marcado como concluído. Se o teu email não abriu automaticamente, confirma que o dispositivo tem um cliente de email configurado. Não esqueças de anexar o comprovativo de transferência antes de enviar.';
@@ -1156,13 +1235,20 @@ window.addEventListener('load', function () {
         html += '</span></div>';
       }
 
+      if (isPending && !linhaPaga) {
+        html += '<button type="button" class="btn-line-done" data-line="' + idx + '" title="Marcar esta linha como paga" aria-label="Marcar esta linha como paga">✓</button>';
+      }
+
       html += '</div>';
     });
     html += '</div>';
 
     html += '<div class="card-actions">';
     if (isPending) {
-      html += '<button type="button" class="btn-small btn-mark-done">✓ Concluído</button>';
+      // Assim que a primeira linha é paga, o pedido só fecha linha a linha.
+      if (linhasConcluidas === 0) {
+        html += '<button type="button" class="btn-small btn-mark-done">✓ Concluído</button>';
+      }
       html += '<button type="button" class="btn-small btn-edit-request"><svg class="icon" width="12" height="12"><use href="#i-pencil"/></svg> Editar</button>';
       html += '<button type="button" class="btn-small btn-cancel-request">✕ Anular</button>';
     }
@@ -1190,6 +1276,11 @@ window.addEventListener('load', function () {
         });
       });
 
+      card.querySelectorAll('.btn-line-done').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          marcarLinhaConcluida(p.id, parseInt(btn.getAttribute('data-line'), 10));
+        });
+      });
       var markDoneBtn = card.querySelector('.btn-mark-done');
       if (markDoneBtn) {
         markDoneBtn.addEventListener('click', function () {
