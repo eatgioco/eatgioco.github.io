@@ -11,6 +11,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
@@ -955,6 +956,20 @@
     databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
   };
   firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  function autenticarEContinuar(callback) {
+    firebase.auth().signInAnonymously()
+      .then(() => callback())
+      .catch((erro) => {
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+      });
+  }
+
+  autenticarEContinuar(function () {
   var db = firebase.database();
   var vendasRef = db.ref('vendas');
   var catalogoRef = db.ref('vendas/catalogo');
@@ -3794,6 +3809,7 @@
     estado: estado
   };
 
+  }); // fim de autenticarEContinuar
 })();
 </script>
 </body>

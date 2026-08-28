@@ -11,6 +11,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
   :root{
@@ -428,6 +429,20 @@ window.addEventListener('load', function () {
   firebase.initializeApp({
     databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app"
   });
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  function autenticarEContinuar(callback) {
+    firebase.auth().signInAnonymously()
+      .then(() => callback())
+      .catch((erro) => {
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+      });
+  }
+
+  autenticarEContinuar(function () {
   var db = firebase.database();
 
   var movimentos = [];   // já ordenados, o filtro trabalha sobre esta lista
@@ -533,6 +548,7 @@ window.addEventListener('load', function () {
   }
 
   document.getElementById('filtroTexto').addEventListener('input', renderMovimentos);
+  }); // fim de autenticarEContinuar
 });
 </script>
 
