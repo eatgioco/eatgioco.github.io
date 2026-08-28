@@ -12,6 +12,18 @@
   --dough:#F3F1EE; --ink:#141414; --red:#D91124;
   --lime:#D7EF91; --mustard:#FFCC02; --blush:#F9CBCB; --navy:#004476;
   --white:#FFFFFF; --muted:#8a8478; --line:#f0e6d6;
+  /* --red é o vermelho da marca: fundo de botão, rebordo, ping, e os TÍTULOS
+     (.greet-row h1 b, .page-subtitle). Fica igual nos dois temas — decisão do
+     Manel, o vermelho clareado no tema escuro não passava no olho. Não voltar
+     a trocá-lo por --red-ink nos títulos.
+     --red-ink é o vermelho de texto SECUNDÁRIO, onde a legibilidade manda mais
+     que a cor da marca (tendências em baixa, referências): clareia no tema
+     escuro porque o --red só dá 3.35:1 sobre fundo escuro.
+     --on-red é o texto POR CIMA de superfície vermelha: branco nos dois temas
+     de propósito. Nunca usar --white aqui: --white é um token de superfície e
+     no tema escuro resolve para #1f1c17. */
+  --red-ink:#D91124;
+  --on-red:#FFFFFF;
   --card-blur-bg: linear-gradient(180deg, rgba(35,32,30,0.82), rgba(20,18,17,0.88));
   --sidebar-bg: linear-gradient(180deg, rgba(199,199,199,0.5), rgba(182,182,182,0.58));
   --sidebar-text: var(--ink);
@@ -25,6 +37,8 @@
 [data-theme="dark"]{
   --dough:#15130f; --ink:#f2ede4; --white:#1f1c17; --line:#332e26; --muted:#8f887b;
   --lime:#9fd15a; --mustard:#e0ab1f; --blush:#c97d7d; --navy:#5fa8e6;
+  /* --red NÃO muda: é superfície. Só o vermelho de texto clareia. */
+  --red-ink:#ff7d88;
   --card-blur-bg: linear-gradient(180deg, rgba(10,9,7,0.85), rgba(5,5,4,0.9));
   --sidebar-bg: linear-gradient(180deg, rgba(35,32,30,0.82), rgba(20,18,17,0.88));
   --sidebar-text: #f2ede4;
@@ -215,7 +229,7 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .kpi-main{ display:flex; align-items:flex-end; justify-content:space-between; }
 .kpi .k-value{ font-family:'Inter',sans-serif; font-weight:700; font-size:24px; }
 .kpi .k-trend{ font-size:11.5px; font-weight:600; color:#4a7c1f; margin-top:4px; display:flex; align-items:center; gap:3px; }
-.kpi .k-trend.down{ color:var(--red); }
+.kpi .k-trend.down{ color:var(--red-ink); }
 .sparkline{ width:64px; height:28px; }
 
 /* ===== GRID 2x2 / PAINÉIS ===== */
@@ -242,6 +256,12 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 /* .high — não existia na referência; acrescentado a pedido, na mesma família
    (blush + navy) já usada nos avatares. Confirmar com o Manel. */
 .status.high{ background:var(--blush); color:var(--navy); }
+/* Contraste no tema escuro: os fundos (--lime, --mustard, --blush) continuam
+   claros, mas --ink passa a claro e o texto herdado desaparecia. Promovido do
+   receitas.html na Fase 2 — não duplicar por página. */
+[data-theme="dark"] .status.ok,
+[data-theme="dark"] .status.warn{ color:#141414; }
+[data-theme="dark"] .status.high{ color:#3d0810; }
 
 .health-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 0; }
 .health-row .dot{ width:7px; height:7px; border-radius:50%; background:var(--lime); }
@@ -250,7 +270,7 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .table-panel{ border-radius:14px; padding:20px; }
 .table-panel .head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
 .table-panel h3{ font-family:'Inter',sans-serif; font-weight:700; font-size:15px; margin:0; }
-.btn-add{ background:var(--red); color:var(--white); border:none; border-radius:100px; padding:10px 18px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer; position:relative; overflow:hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 16px rgba(217,17,36,0.3); transition: transform .1s ease; }
+.btn-add{ background:var(--red); color:var(--on-red); border:none; border-radius:100px; padding:10px 18px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer; position:relative; overflow:hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 16px rgba(217,17,36,0.3); transition: transform .1s ease; }
 .btn-add:hover{ transform: translateY(-1px); }
 .btn-add:active{ transform: scale(0.96); }
 .btn-add::before{
@@ -278,7 +298,7 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 .qa-card h3{ font-size:13.5px; font-weight:700; margin:0 0 12px; }
 .qa-btn{ width:100%; text-align:left; background:var(--dough); border:none; border-radius:9px; padding:11px 14px; font-size:12.5px; font-weight:600; margin-bottom:8px; cursor:pointer; color:var(--ink); }
 .qa-btn:last-child{ margin-bottom:0; }
-.qa-btn.primary{ background:var(--red); color:var(--white); }
+.qa-btn.primary{ background:var(--red); color:var(--on-red); }
 
 /* ===== SEPARADORES DE CATEGORIA — ícone circular + label, pílula ===== */
 .cat-row{ display:flex; gap:10px; margin-bottom:20px; overflow-x:auto; padding-bottom:4px; }
