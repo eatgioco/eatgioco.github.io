@@ -7,7 +7,11 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Space Mono continua carregado, mas na Fase 2 deixou de ser a fonte da
+     página: só o .mono o usa (códigos, datas ISO, nomes de ficheiro). -->
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -15,138 +19,133 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
+  /* ======================================================================
+     vendas.html — estilos próprios da página.
+     O layout, a sidebar, o vidro, o tema claro/escuro, a tipografia, o
+     .card, a .kpi, as tabelas e os --green/--amber vêm todos do
+     gioco-shell.css. Aqui fica só o que é específico do importador SAF-T
+     e das vistas de análise.
+     ====================================================================== */
+
+  /* Fatias do donut: vermelho e preto da marca mais tons intermédios, na
+     mesma paleta. Par claro/escuro obrigatório — uma fatia é superfície, por
+     isso o mínimo é 3:1 contra o cartão (WCAG 1.4.11, objectos gráficos):
+       claro  (#F8F7F4) → 1:4,83  2:17,20  3:3,05  4:3,41  5:6,84  6:5,22
+       escuro (#221F1A) → 1:3,17  2:14,08  3:5,03  4:4,50  5:6,68  6:9,27
+     O --fatia-2 (preto) e o --fatia-6 (bege) trocam de papel entre temas —
+     cada um era invisível no tema onde agora não está. O --fatia-5 clareia.
+     Os outros três aguentam os dois temas sem mudar. */
   :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-    --amber:#B8860B;
-    /* Fatias do donut: vermelho e preto da marca mais tons intermédios
-       (vermelho suave, vermelho escuro, cinzas quentes) na mesma paleta. */
     --fatia-1:#D91124;
     --fatia-2:#141414;
     --fatia-3:#E4694E;
     --fatia-4:#8C857B;
     --fatia-5:#A6202C;
+    --fatia-6:#6E675C;
+  }
+  [data-theme="dark"]{
+    --fatia-2:#F2EDE4;
+    --fatia-5:#FF7D88;
     --fatia-6:#C9C2B4;
   }
 
-  *{box-sizing:border-box;}
-
   body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
     -webkit-font-smoothing:antialiased;
-    /* impede o browser de inflar o texto quando a pagina e vista reduzida */
+    /* impede o browser de inflar o texto quando a página é vista reduzida */
     -webkit-text-size-adjust:100%;
     text-size-adjust:100%;
   }
 
-  h1,h2,h3,.mono{
-    font-family:'Space Mono', monospace;
+  /* Os itens do menu são links reais (<a>), estilizados pelo .nav-row do shell. */
+  .nav-row{ text-decoration:none; }
+
+  /* Rodapé da sidebar: utilizador fixo, sem sessões nem logout. */
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
   }
 
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
-
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
-
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:40px 24px 80px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
+  /* Mesma largura de leitura das outras páginas do OS. */
+  .page{ max-width:1200px; }
 
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:6px 0 0;
     font-size:12px;
+    font-weight:600;
     color:var(--red);
-    letter-spacing:2px;
+    letter-spacing:.14em;
     text-transform:uppercase;
   }
 
-  /* ---------- Cartões ---------- */
-  .card{
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:20px;
-    margin-top:24px;
+  /* Space Mono deixou de ser a fonte da página na Fase 2: fica só onde o
+     monoespaçado tem função — códigos de produto, datas ISO, nomes de
+     ficheiro. Tudo o resto é o Inter do shell. */
+  .mono{ font-family:'Space Mono', monospace; }
+
+  /* O shell já dá Inter + tabular-nums ao .num; o que falta é o alinhamento
+     à direita, específico desta página (62 células e cabeçalhos numéricos). */
+  .num{ text-align:right; white-space:nowrap; }
+
+  .ultima-importacao{
+    margin:14px 0 0;
+    font-size:12.5px;
+    color:var(--muted);
+    font-weight:500;
   }
 
+  /* ---------- Cartões ----------
+     .card (raio + folga) e .glass-light (vidro) vêm do shell. */
+  .card{ margin-top:24px; }
+
+  /* O ::before do .glass-light é absolute e pinta por cima do conteúdo
+     estático. Tem pointer-events:none, por isso os cliques passam, mas o
+     texto ficaria por baixo do brilho. Mesmo truque do pagamentos.html. */
+  .card > *, .kpi > *{ position:relative; z-index:1; }
+
   .card-title{
-    margin:0 0 12px;
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    letter-spacing:1px;
+    margin:0 0 10px;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
   }
 
   .card-note{
     margin:0 0 14px;
-    font-size:12px;
+    font-size:12.5px;
+    line-height:1.6;
     color:var(--muted);
   }
 
-  .section{
-    margin-top:36px;
+  .section{ margin-top:36px; }
+
+  /* Mesmo token do pagamentos.html: label pequena, maiúsculas, cinzento. */
+  .section-title{
+    margin:0;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
   }
 
-  .section-title{
-    margin:0 0 4px;
-    font-size:18px;
-    font-weight:700;
+  /* Wrapper local, não uma segunda versão do token: dentro do .sec-head o
+     título é a área clicável que abre/fecha uma das secções de análise, e a
+     10,5px cinzento não se lê como cabeçalho nem como alvo de clique. Sobe
+     para 13px e para a cor de texto normal só neste contexto. */
+  .sec-head .section-title{
+    font-size:13px;
+    letter-spacing:.06em;
+    color:var(--ink);
   }
 
   .section-sub{
     margin:0 0 14px;
-    font-size:12px;
+    font-size:12.5px;
+    line-height:1.6;
     color:var(--muted);
   }
 
@@ -158,28 +157,8 @@
     gap:12px;
   }
 
-  .file-label{
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    background:var(--black);
-    color:var(--white);
-    border:2px solid var(--black);
-    padding:12px 20px;
-    cursor:pointer;
-    display:inline-block;
-  }
-
-  .file-label:hover{
-    background:var(--red);
-    border-color:var(--red);
-  }
-
   .file-name{
     margin:10px 0 0;
-    font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
   }
@@ -203,14 +182,14 @@
     gap:6px;
     text-align:center;
     padding:26px 20px;
-    border:2px dashed var(--black);
-    background:var(--bg);
+    border:1.5px dashed var(--line);
+    border-radius:14px;
+    background:var(--dough);
     cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
   }
 
-  .dropzone:hover{
-    border-color:var(--red);
-  }
+  .dropzone:hover{ border-color:var(--red); }
 
   /* estado activo enquanto se arrasta um ficheiro por cima */
   .dropzone.arrasta{
@@ -220,11 +199,9 @@
   }
 
   .dropzone-title{
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:.04em;
   }
 
   .dropzone.arrasta .dropzone-title{ color:var(--red); }
@@ -249,8 +226,8 @@
   }
 
   .link-mini{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-family:'Inter', sans-serif;
+    font-size:11.5px;
     color:var(--muted);
     text-decoration:underline;
     cursor:pointer;
@@ -268,14 +245,7 @@
     color:var(--muted);
   }
 
-  /* ---------- Indicador de última importação ---------- */
-  .ultima-importacao{
-    margin:10px 0 0;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    color:var(--muted);
-  }
-
+  /* ---------- Progresso ---------- */
   .progress-wrap{
     margin-top:16px;
     display:none;
@@ -284,9 +254,11 @@
   .progress-wrap.on{ display:block; }
 
   .progress-bar{
-    height:14px;
-    border:2px solid var(--black);
-    background:var(--bg);
+    height:10px;
+    border-radius:100px;
+    background:var(--dough);
+    border:1px solid var(--line);
+    overflow:hidden;
   }
 
   .progress-fill{
@@ -298,24 +270,26 @@
 
   .progress-text{
     margin:6px 0 0;
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:11.5px;
     color:var(--muted);
-    letter-spacing:0.5px;
+    letter-spacing:.03em;
   }
 
+  /* ---------- Mensagens ---------- */
   .msg{
     margin-top:16px;
-    padding:12px 14px;
-    border:2px solid var(--black);
+    padding:12px 16px;
+    border-radius:10px;
+    border-left:4px solid var(--line);
     font-size:13px;
+    line-height:1.6;
     display:none;
   }
 
   .msg.on{ display:block; }
-  .msg.erro{ border-color:var(--red); color:var(--red); background:var(--white); }
-  .msg.aviso{ border-color:var(--amber); color:var(--amber); background:var(--white); }
-  .msg.ok{ border-color:var(--green); color:var(--green); background:var(--white); }
+  .msg.erro{ border-left-color:var(--red); color:var(--red-ink); background:var(--white); }
+  .msg.aviso{ border-left-color:var(--amber); color:var(--amber); background:var(--amber-bg); }
+  .msg.ok{ border-left-color:var(--green); color:var(--green); background:var(--green-bg); }
 
   /* ---------- Relatório do import, dia a dia ---------- */
   /* A cor é só do estado do dia; o resto da linha mantém o estilo da tabela. */
@@ -324,45 +298,22 @@
   #relatorioBody tr.dia-substituido td:nth-child(2){ color:var(--muted); }
   #relatorioBody tr.dia-suspeito td:nth-child(2){ color:var(--amber); }
   #relatorioBody tr.dia-saltado td{ color:var(--muted); text-decoration:line-through; }
-  #relatorioBody tr.dia-saltado td:nth-child(2){ color:var(--red); text-decoration:none; }
+  #relatorioBody tr.dia-saltado td:nth-child(2){ color:var(--red-ink); text-decoration:none; }
 
-  /* ---------- Resumo / KPIs ---------- */
-  .kpi-row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:14px;
-    margin-top:16px;
-  }
-
-  .kpi{
-    flex:1 1 190px;
-    min-width:170px;
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:16px 18px;
-  }
-
-  .kpi-label{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--muted);
-    margin:0 0 6px;
-  }
-
-  .kpi-value{
-    font-family:'Space Mono', monospace;
-    font-size:22px;
-    font-weight:700;
-    margin:0;
-    line-height:1.1;
-  }
+  /* ---------- KPIs ----------
+     .kpi-row / .kpi / .k-label / .k-value vêm do shell. Aqui só o que esta
+     página precisa a mais: mudar de linha (há vistas com 5 KPIs) e o
+     .kpi-sub, que o shell não tem — o .k-trend não serve, é uma tendência
+     com seta e cor, não uma legenda neutra. */
+  .kpi-row{ flex-wrap:wrap; margin-top:16px; }
+  .kpi{ flex:1 1 190px; min-width:170px; }
+  .kpi .k-label{ margin:0 0 8px; }
+  .kpi .k-value{ margin:0; line-height:1.15; }
 
   .kpi-sub{
+    margin:4px 0 0;
     font-size:11px;
     color:var(--muted);
-    margin:4px 0 0;
   }
 
   /* ---------- Selector ---------- */
@@ -376,102 +327,90 @@
 
   .field-label{
     display:block;
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
     margin-bottom:6px;
   }
 
   select, input[type="text"]{
-    padding:10px 12px;
-    border:2px solid var(--line);
-    background:var(--white);
     font-family:'Inter', sans-serif;
-    font-size:14px;
-    color:var(--black);
-  }
-
-  select:focus, input:focus{ outline:none; border-color:var(--black); }
-
-  .btn{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    padding:11px 20px;
-    border:2px solid var(--black);
-    background:var(--black);
-    color:var(--white);
-    cursor:pointer;
-  }
-
-  .btn:hover{ background:var(--red); border-color:var(--red); }
-  .btn:disabled{ background:var(--line); border-color:var(--line); color:var(--muted); cursor:not-allowed; }
-
-  .btn-ghost{
+    font-size:13.5px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
   }
 
-  .btn-ghost:hover{ background:var(--black); color:var(--white); border-color:var(--black); }
+  select:focus, input:focus{ outline:none; border-color:var(--red); }
 
-  .btn-sm{
-    font-size:11px;
-    padding:7px 12px;
+  /* ---------- Botões ----------
+     O primário é o .btn-add do shell, com o :disabled já lá dentro. Aqui só
+     o secundário — a mesma pílula do pagamentos.html. */
+  .btn{
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    background:var(--white);
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:9px 18px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
   }
 
-  /* ---------- Tabelas ---------- */
+  .btn:hover{ border-color:var(--red); }
+  .btn:active{ transform:scale(0.97); }
+
+  .btn-small{
+    font-size:11.5px;
+    padding:7px 14px;
+  }
+
+  .btn:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+    transform:none;
+  }
+  .btn:disabled:hover{ border-color:var(--line); transform:none; }
+
+  .btn-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  /* ---------- Tabelas ----------
+     table / th / td vêm do shell. O .table-wrap é o contentor: dá o scroll
+     horizontal e a moldura de painel. Não usa .table-panel + .glass-light
+     porque o markup é gerado em JS (10 sítios) e não leva classes extra —
+     ver nota no relatório da Fase 2. */
   .table-wrap{
     overflow-x:auto;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:14px;
     background:var(--white);
     margin-top:16px;
   }
 
-  table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:13px;
-  }
-
-  th{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--muted);
-    text-align:left;
-    padding:10px 12px;
-    border-bottom:2px solid var(--black);
-    white-space:nowrap;
-    background:var(--white);
-  }
-
+  th{ white-space:nowrap; }
   th.sortable{ cursor:pointer; }
   th.sortable:hover{ color:var(--red); }
   th.sorted{ color:var(--red); }
 
-  td{
-    padding:9px 12px;
-    border-bottom:1px solid var(--line);
-    vertical-align:middle;
-  }
-
+  td{ vertical-align:middle; }
   tr:last-child td{ border-bottom:none; }
 
-  .num{
-    font-family:'Space Mono', monospace;
-    text-align:right;
-    white-space:nowrap;
-  }
-
   .pos{ color:var(--green); }
-  .neg{ color:var(--red); }
+  .neg{ color:var(--red-ink); }
 
-  /* ---------- Barras ---------- */
+  /* ---------- Barras horizontais ---------- */
   .bars{
     margin-top:16px;
     display:flex;
@@ -485,20 +424,27 @@
     gap:10px;
   }
 
+  /* flex:0 1 (e não 0 0) de propósito: a coluna de conteúdo é mais estreita
+     do que era antes da Fase 2, porque a sidebar ocupa 84px. Com base fixa a
+     linha da barra transbordava; assim encolhe em vez de empurrar a página. */
   .bar-label{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    width:74px;
-    flex:0 0 74px;
+    font-size:11.5px;
+    flex:0 1 74px;
+    min-width:0;
     color:var(--muted);
     white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
 
   .bar-track{
-    flex:1 1 auto;
-    height:20px;
+    flex:1 1 40px;
+    min-width:40px;
+    height:18px;
     background:var(--white);
-    border:2px solid var(--line);
+    border:1px solid var(--line);
+    border-radius:100px;
+    overflow:hidden;
     position:relative;
     min-width:60px;
   }
@@ -509,33 +455,40 @@
     background:var(--red);
   }
 
-  .bar-fill.alt{ background:var(--black); }
+  .bar-fill.alt{ background:var(--fatia-2); }
 
   .bar-value{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:11.5px;
     font-weight:700;
-    width:96px;
-    flex:0 0 96px;
+    font-variant-numeric:tabular-nums;
+    flex:0 1 96px;
+    min-width:0;
     text-align:right;
     white-space:nowrap;
   }
 
   .bar-delta{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    width:74px;
-    flex:0 0 74px;
+    font-size:11.5px;
+    font-variant-numeric:tabular-nums;
+    flex:0 1 74px;
+    min-width:0;
     text-align:right;
     white-space:nowrap;
     color:var(--muted);
   }
 
-  .legend{
-    margin-top:10px;
-    font-size:11px;
+  /* Rodapé de secção. Nome próprio: o .legend do shell é a legenda em flex
+     com bolinhas de cor, isto é um parágrafo de nota. Não são a mesma coisa
+     e não vale a pena forçá-las a sê-lo. */
+  .legend-note{
+    margin:10px 0 0;
+    font-size:11.5px;
     color:var(--muted);
   }
+
+  /* O nome do ficheiro SAF-T é uma palavra longa sem espaços: sem isto
+     empurra a página para a direita. Já era assim antes da Fase 2. */
+  .legend-note .mono{ overflow-wrap:anywhere; }
 
   /* Mix por categoria: linha de topo clicável que abre as subcategorias.
      Alvo de toque generoso — o mesmo ecrã é consultado ao telemóvel. */
@@ -544,8 +497,8 @@
     -webkit-tap-highlight-color:transparent;
   }
 
-  .cat-expansivel:hover{ background:var(--bg); }
-  .cat-expansivel td{ padding-top:12px; padding-bottom:12px; }
+  .cat-expansivel:hover{ background:var(--dough); }
+  .cat-expansivel td{ padding-top:14px; padding-bottom:14px; }
 
   .cat-seta{
     display:inline-block;
@@ -557,13 +510,14 @@
   .cat-sub td{ font-size:12px; }
 
   .tag{
-    font-family:'Space Mono', monospace;
+    display:inline-block;
     font-size:10px;
     font-weight:700;
-    letter-spacing:0.5px;
+    letter-spacing:.05em;
     text-transform:uppercase;
-    padding:3px 8px;
-    border:2px solid var(--line);
+    padding:3px 9px;
+    border-radius:100px;
+    border:1.5px solid var(--line);
     white-space:nowrap;
   }
 
@@ -571,25 +525,24 @@
 
   .empty-state{
     text-align:center;
-    padding:32px 16px;
+    padding:60px 20px;
+    font-size:13.5px;
     color:var(--muted);
-    font-size:13px;
   }
 
   .hidden{ display:none !important; }
 
-  .cat-grid td select{ padding:6px 8px; font-size:13px; }
-
-  .split{
-    display:flex;
-    flex-wrap:wrap;
-    gap:24px;
-  }
-
-  .split > *{ flex:1 1 380px; min-width:300px; }
+  .cat-grid td select{ padding:7px 9px; font-size:13px; }
 
   .curve-wrap{ margin-top:16px; }
-  .curve-wrap svg{ width:100%; height:auto; display:block; border:2px solid var(--black); background:var(--white); }
+  .curve-wrap svg{
+    width:100%;
+    height:auto;
+    display:block;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:var(--white);
+  }
 
   /* ---------- Secções colapsáveis ---------- */
   .sec-global{
@@ -598,8 +551,7 @@
     align-items:center;
     gap:10px;
     margin-top:28px;
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:11.5px;
     color:var(--muted);
   }
 
@@ -607,9 +559,10 @@
     background:none;
     border:0;
     padding:0;
-    font-family:inherit;
+    font-family:'Inter', sans-serif;
     font-size:inherit;
-    letter-spacing:1px;
+    font-weight:600;
+    letter-spacing:.06em;
     text-transform:uppercase;
     color:var(--muted);
     text-decoration:underline;
@@ -626,12 +579,12 @@
     align-items:center;
     gap:10px;
     margin-top:28px;
-    padding:12px 16px;
+    padding:14px 16px;
     background:var(--white);
-    border:2px solid var(--black);
-    border-left:6px solid var(--red);
-    font-family:'Space Mono', monospace;
-    font-size:12px;
+    border:1px solid var(--line);
+    border-left:4px solid var(--red);
+    border-radius:10px;
+    font-size:12.5px;
   }
 
   .sec-head{
@@ -640,16 +593,14 @@
     align-items:center;
     gap:8px;
     cursor:pointer;
-    border-bottom:2px solid var(--black);
-    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:8px;
     user-select:none;
   }
 
-  .sec-head .section-title{ margin:0; }
   .sec-head:hover .section-title{ color:var(--red); }
 
   .sec-seta{
-    font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--red);
     flex:0 0 12px;
@@ -665,18 +616,20 @@
   .sec-corpo .section-sub{ margin:12px 0 14px; }
 
   .vista-btn{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:12px;
     line-height:1;
-    padding:5px 7px;
+    padding:6px 9px;
+    border-radius:8px;
     background:var(--white);
-    border:2px solid var(--line);
+    border:1.5px solid var(--line);
     color:var(--muted);
     cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, color .15s ease;
   }
 
-  .vista-btn:hover{ border-color:var(--black); color:var(--black); }
-  .vista-btn.activo{ border-color:var(--black); background:var(--black); color:var(--white); }
+  .vista-btn:hover{ border-color:var(--ink); color:var(--ink); }
+  .vista-btn.activo{ border-color:var(--ink); background:var(--ink); color:var(--white); }
 
   /* ---------- Barras verticais ---------- */
   .vbars{
@@ -699,9 +652,9 @@
   }
 
   .vbar-valor{
-    font-family:'Space Mono', monospace;
-    font-size:9px;
+    font-size:9.5px;
     font-weight:700;
+    font-variant-numeric:tabular-nums;
     white-space:nowrap;
   }
 
@@ -711,8 +664,10 @@
     display:flex;
     align-items:flex-end;
     background:var(--white);
-    border:2px solid var(--line);
+    border:1px solid var(--line);
     border-top:0;
+    border-radius:0 0 8px 8px;
+    overflow:hidden;
   }
 
   .vbar-fill{
@@ -721,11 +676,10 @@
     background:var(--red);
   }
 
-  .vbar-fill.alt{ background:var(--black); }
+  .vbar-fill.alt{ background:var(--fatia-2); }
 
   .vbar-label{
-    font-family:'Space Mono', monospace;
-    font-size:9px;
+    font-size:9.5px;
     color:var(--muted);
     text-align:center;
     line-height:1.2;
@@ -747,15 +701,15 @@
     width:200px;
     height:200px;
     border-radius:50%;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
   }
 
   .donut::after{
     content:'';
     position:absolute;
     inset:30%;
-    background:var(--bg);
-    border:2px solid var(--black);
+    background:var(--dough);
+    border:1px solid var(--line);
     border-radius:50%;
   }
 
@@ -774,15 +728,15 @@
     display:flex;
     align-items:center;
     gap:8px;
-    font-family:'Space Mono', monospace;
-    font-size:11px;
+    font-size:11.5px;
   }
 
   .donut-chip{
     flex:0 0 12px;
     width:12px;
     height:12px;
-    border:2px solid var(--black);
+    border-radius:3px;
+    border:1px solid var(--line);
   }
 
   .donut-nome{
@@ -794,156 +748,195 @@
   .donut-valor{
     flex:0 0 auto;
     font-weight:700;
+    font-variant-numeric:tabular-nums;
     white-space:nowrap;
   }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
-  </div>
-</header>
+<div class="shell">
 
-<main>
-  <h1 class="page-title">GIOCO · Vendas</h1>
-  <p class="page-subtitle">Importador e análise de SAF-T</p>
-  <p class="ultima-importacao" id="ultimaImportacao">Última importação: a carregar…</p>
-
-  <!-- ============ IMPORT ============ -->
-  <div class="card">
-    <p class="card-title">Importar SAF-T</p>
-    <p class="card-note">
-      ZIP mensal exportado do ZoneSoft (ou o XML directo). O ficheiro é lido no browser —
-      só os agregados são gravados no Firebase, nunca as linhas de fatura.
-    </p>
-    <div class="import-row">
-      <label class="dropzone" id="dropzone" for="fileInput">
-        <span class="dropzone-title">Arraste o ficheiro .zip ou .xml aqui</span>
-        <span class="dropzone-sub">ou clique para escolher</span>
-      </label>
-      <input type="file" id="fileInput" accept=".zip,.xml">
-      <div class="pasta-col">
-        <div class="pasta-linha">
-          <button type="button" class="btn btn-ghost" id="btnPasta">Importar mais recente da pasta</button>
-          <button type="button" class="link-mini" id="btnMudarPasta">mudar pasta</button>
-        </div>
-        <span class="pasta-nome" id="pastaNome"></span>
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav>
+      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Dashboard</span></a>
+      <a class="nav-row" href="receitas.html"><svg class="icon" width="17" height="17"><use href="#i-chef-hat"/></svg> <span>Receitas</span></a>
+      <a class="nav-row" href="compras.html"><svg class="icon" width="17" height="17"><use href="#i-shopping-cart"/></svg> <span>Compras</span></a>
+      <a class="nav-row" href="pagamentos.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Pagamentos</span></a>
+      <a class="nav-row active" href="vendas.html"><svg class="icon" width="17" height="17"><use href="#i-bar-chart-2"/></svg> <span>Vendas</span></a>
+      <!-- Definições ainda não tem página. Link morto de propósito: fica à vista
+           no menu, mas não navega para lado nenhum. -->
+      <a class="nav-row" href="#"><svg class="icon" width="17" height="17"><use href="#i-settings"/></svg> <span>Definições</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
       </div>
     </div>
-    <p class="file-name" id="fileName">Nenhum ficheiro escolhido</p>
-
-    <div class="progress-wrap" id="progressWrap">
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-      <p class="progress-text" id="progressText">A ler…</p>
-    </div>
-
-    <div class="msg erro" id="msgErro"></div>
-    <div class="msg aviso" id="msgAviso"></div>
-    <div class="msg aviso" id="msgDrop"></div>
-    <div class="msg ok" id="msgOk"></div>
   </div>
 
-  <!-- ============ MIGRAÇÃO DO CATÁLOGO ============ -->
-  <div class="card hidden" id="migracaoCard">
-    <p class="card-title">Migrar catálogo para categoria + subcategoria</p>
-    <p class="card-note">
-      O catálogo tem produtos classificados no esquema antigo (lista plana). Isto mostra
-      exactamente o que vai mudar. Nada é gravado até carregares em Migrar.
-    </p>
-    <div id="migracaoResumo"></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Descrição</th>
-            <th>Antiga</th>
-            <th>Categoria</th>
-            <th>Subcategoria</th>
-            <th>Nota</th>
-          </tr>
-        </thead>
-        <tbody id="migracaoDetalhe"></tbody>
-      </table>
-    </div>
-    <div class="btn-row">
-      <button class="btn" id="btnMigrar">Migrar catálogo</button>
-      <button class="btn btn-ghost" id="btnMigrarDepois">Agora não</button>
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-bar-chart-2"/></svg>GIOCO · <b>Vendas</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Importador e análise de SAF-T</p>
+      <p class="ultima-importacao" id="ultimaImportacao">Última importação: a carregar…</p>
+
+      <!-- ============ IMPORT ============ -->
+      <div class="card glass-light">
+        <p class="card-title">Importar SAF-T</p>
+        <p class="card-note">
+          ZIP mensal exportado do ZoneSoft (ou o XML directo). O ficheiro é lido no browser —
+          só os agregados são gravados no Firebase, nunca as linhas de fatura.
+        </p>
+        <div class="import-row">
+          <label class="dropzone" id="dropzone" for="fileInput">
+            <span class="dropzone-title">Arraste o ficheiro .zip ou .xml aqui</span>
+            <span class="dropzone-sub">ou clique para escolher</span>
+          </label>
+          <input type="file" id="fileInput" accept=".zip,.xml">
+          <div class="pasta-col">
+            <div class="pasta-linha">
+              <button type="button" class="btn" id="btnPasta">Importar mais recente da pasta</button>
+              <button type="button" class="link-mini" id="btnMudarPasta">mudar pasta</button>
+            </div>
+            <span class="pasta-nome" id="pastaNome"></span>
+          </div>
+        </div>
+        <p class="file-name" id="fileName">Nenhum ficheiro escolhido</p>
+
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <p class="progress-text" id="progressText">A ler…</p>
+        </div>
+
+        <div class="msg erro" id="msgErro"></div>
+        <div class="msg aviso" id="msgAviso"></div>
+        <div class="msg aviso" id="msgDrop"></div>
+        <div class="msg ok" id="msgOk"></div>
+      </div>
+
+      <!-- ============ MIGRAÇÃO DO CATÁLOGO ============ -->
+      <div class="card glass-light hidden" id="migracaoCard">
+        <p class="card-title">Migrar catálogo para categoria + subcategoria</p>
+        <p class="card-note">
+          O catálogo tem produtos classificados no esquema antigo (lista plana). Isto mostra
+          exactamente o que vai mudar. Nada é gravado até carregares em Migrar.
+        </p>
+        <div id="migracaoResumo"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descrição</th>
+                <th>Antiga</th>
+                <th>Categoria</th>
+                <th>Subcategoria</th>
+                <th>Nota</th>
+              </tr>
+            </thead>
+            <tbody id="migracaoDetalhe"></tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button class="btn-add" id="btnMigrar">Migrar catálogo</button>
+          <button class="btn" id="btnMigrarDepois">Agora não</button>
+        </div>
+      </div>
+
+      <!-- ============ CATÁLOGO ============ -->
+      <div class="card glass-light hidden" id="catalogoCard">
+        <p class="card-title">Classificar produtos novos</p>
+        <p class="card-note">
+          O IVA não distingue comida de bebida (água e cafés estão a 13% tal como as focaccias),
+          por isso a categoria é explícita. Confirma as sugestões abaixo — os produtos já
+          classificados não voltam a aparecer.
+        </p>
+        <div class="table-wrap">
+          <table class="cat-grid">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descrição</th>
+                <th class="num">Qtd</th>
+                <th class="num">Valor</th>
+                <th>Categoria</th>
+                <th>Subcategoria</th>
+              </tr>
+            </thead>
+            <tbody id="catalogoBody"></tbody>
+          </table>
+        </div>
+        <div class="toolbar">
+          <button class="btn-add" id="btnGravar">Confirmar e gravar</button>
+          <button class="btn" id="btnCancelar">Cancelar import</button>
+        </div>
+      </div>
+
+      <!-- ============ RELATÓRIO DO IMPORT, DIA A DIA ============ -->
+      <div class="card glass-light hidden" id="relatorioCard">
+        <p class="card-title">O que este import gravou</p>
+        <p class="card-note">
+          Cada dia do ficheiro é gravado à parte e o mês é recalculado a partir de
+          todos os dias que existem — os deste import e os anteriores. Substituir um
+          dia não toca nos outros.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Estado</th>
+                <th class="num">Bruto anterior</th>
+                <th class="num">Bruto novo</th>
+                <th class="num">Diferença</th>
+              </tr>
+            </thead>
+            <tbody id="relatorioBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============ VISTAS ============ -->
+      <div class="toolbar">
+        <div>
+          <label class="field-label" for="mesSel">Mês</label>
+          <select id="mesSel"><option value="">A carregar…</option></select>
+        </div>
+        <div id="diaCampo">
+          <label class="field-label" for="diaSel">Dia</label>
+          <select id="diaSel"><option value="">Mês inteiro</option></select>
+        </div>
+        <button class="btn btn-small" id="btnRecarregar">Recarregar</button>
+      </div>
+
+      <div id="vistas"></div>
+      <div class="empty-state" id="semDados">Sem meses importados. Começa por importar um SAF-T acima.</div>
     </div>
   </div>
 
-  <!-- ============ CATÁLOGO ============ -->
-  <div class="card hidden" id="catalogoCard">
-    <p class="card-title">Classificar produtos novos</p>
-    <p class="card-note">
-      O IVA não distingue comida de bebida (água e cafés estão a 13% tal como as focaccias),
-      por isso a categoria é explícita. Confirma as sugestões abaixo — os produtos já
-      classificados não voltam a aparecer.
-    </p>
-    <div class="table-wrap">
-      <table class="cat-grid">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Descrição</th>
-            <th class="num">Qtd</th>
-            <th class="num">Valor</th>
-            <th>Categoria</th>
-            <th>Subcategoria</th>
-          </tr>
-        </thead>
-        <tbody id="catalogoBody"></tbody>
-      </table>
-    </div>
-    <div class="toolbar">
-      <button class="btn" id="btnGravar">Confirmar e gravar</button>
-      <button class="btn btn-ghost" id="btnCancelar">Cancelar import</button>
-    </div>
-  </div>
-
-  <!-- ============ RELATÓRIO DO IMPORT, DIA A DIA ============ -->
-  <div class="card hidden" id="relatorioCard">
-    <p class="card-title">O que este import gravou</p>
-    <p class="card-note">
-      Cada dia do ficheiro é gravado à parte e o mês é recalculado a partir de
-      todos os dias que existem — os deste import e os anteriores. Substituir um
-      dia não toca nos outros.
-    </p>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Dia</th>
-            <th>Estado</th>
-            <th class="num">Bruto anterior</th>
-            <th class="num">Bruto novo</th>
-            <th class="num">Diferença</th>
-          </tr>
-        </thead>
-        <tbody id="relatorioBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ============ VISTAS ============ -->
-  <div class="toolbar">
-    <div>
-      <label class="field-label" for="mesSel">Mês</label>
-      <select id="mesSel"><option value="">A carregar…</option></select>
-    </div>
-    <div id="diaCampo">
-      <label class="field-label" for="diaSel">Dia</label>
-      <select id="diaSel"><option value="">Mês inteiro</option></select>
-    </div>
-    <button class="btn btn-ghost btn-sm" id="btnRecarregar">Recarregar</button>
-  </div>
-
-  <div id="vistas"></div>
-  <div class="empty-state" id="semDados">Sem meses importados. Começa por importar um SAF-T acima.</div>
-</main>
+</div>
 
 <script>
 (function(){
@@ -1804,7 +1797,7 @@
   function limparMensagens(){
     ['msgErro','msgAviso','msgOk','msgDrop'].forEach(function(id){
       var n = el(id);
-      n.className = n.className.replace(' on', '');
+      n.classList.remove('on');
       n.textContent = '';
     });
   }
@@ -1812,17 +1805,17 @@
   function mostrarMsg(id, texto){
     var n = el(id);
     n.textContent = texto;
-    if (n.className.indexOf(' on') === -1) n.className += ' on';
+    n.classList.add('on');
   }
 
   function progresso(fraccao, texto){
-    el('progressWrap').className = 'progress-wrap on';
+    el('progressWrap').classList.add('on');
     el('progressFill').style.width = Math.max(0, Math.min(1, fraccao)) * 100 + '%';
     el('progressText').textContent = texto || '';
   }
 
   function esconderProgresso(){
-    el('progressWrap').className = 'progress-wrap';
+    el('progressWrap').classList.remove('on');
     el('progressFill').style.width = '0%';
   }
 
@@ -1965,7 +1958,7 @@
       resumo + '</tbody></table></div>';
 
     el('migracaoDetalhe').innerHTML = detalhe;
-    el('migracaoCard').className = 'card';
+    el('migracaoCard').classList.remove('hidden');
   }
 
   // Escrita registo a registo. Um update() multi-chave neste RTDB já substituiu
@@ -1991,7 +1984,7 @@
       });
     }, Promise.resolve()).then(function(){
       esconderProgresso();
-      el('migracaoCard').className = 'card hidden';
+      el('migracaoCard').classList.add('hidden');
       mostrarMsg('msgOk', 'Catálogo migrado: ' + intFmt(plano.mudancas.length) +
         ' produto' + (plano.mudancas.length === 1 ? '' : 's') + ' reclassificado' +
         (plano.mudancas.length === 1 ? '' : 's') + '.' +
@@ -2067,11 +2060,11 @@
       selCat.addEventListener('change', function(){ sincronizarSub(selCat, selSub, null); });
     });
 
-    el('catalogoCard').className = 'card';
+    el('catalogoCard').classList.remove('hidden');
   }
 
   function esconderCatalogo(){
-    el('catalogoCard').className = 'card hidden';
+    el('catalogoCard').classList.add('hidden');
     el('catalogoBody').innerHTML = '';
   }
 
@@ -2380,12 +2373,12 @@
         '<td class="num">' + (e.brutoAnterior === null ? '—' : pct(e.variacao || 0, 1)) + '</td>' +
         '</tr>';
     }).join('');
-    el('relatorioCard').className = 'card';
+    el('relatorioCard').classList.remove('hidden');
   }
 
   function esconderRelatorio(){
     var card = el('relatorioCard');
-    if (card) card.className = 'card hidden';
+    if (card) card.classList.add('hidden');
   }
 
   function gravar(){
@@ -2585,13 +2578,13 @@
       if (!meses.length){
         sel.innerHTML = '<option value="">—</option>';
         el('vistas').innerHTML = '';
-        el('semDados').className = 'empty-state';
+        el('semDados').classList.remove('hidden');
         estado.mesActivo = '';
         popularDias();
         return;
       }
 
-      el('semDados').className = 'empty-state hidden';
+      el('semDados').classList.add('hidden');
       var opcoes = meses.slice().reverse().map(function(m){
         return '<option value="' + m + '">' + nomeMes(m) + '</option>';
       });
@@ -2632,11 +2625,11 @@
       sel.innerHTML = '<option value="">Mês inteiro</option>';
       sel.value = '';
       sel.disabled = true;
-      campo.className = 'hidden';
+      campo.classList.add('hidden');
       return;
     }
 
-    campo.className = '';
+    campo.classList.remove('hidden');
     sel.disabled = false;
     var dias = Object.keys(estado.dados[mes].porDia || {}).sort();
     sel.innerHTML = '<option value="">Mês inteiro</option>' + dias.map(function(d){
@@ -2659,7 +2652,7 @@
     var chave = mes + '/' + dia;
     if (Object.prototype.hasOwnProperty.call(estado.diasCache, chave)){ renderVistas(); return; }
 
-    el('vistas').innerHTML = '<p class="legend">A carregar dia…</p>';
+    el('vistas').innerHTML = '<p class="legend-note">A carregar dia…</p>';
     diarioRef.child(mes).child(dia).once('value').then(function(snap){
       estado.diasCache[chave] = snap.val() || null;
       // Entretanto o utilizador pode ter mudado de dia ou de mês.
@@ -2700,9 +2693,12 @@
   /* =========================================================
      Componentes visuais
      ========================================================= */
+  /* .kpi / .k-label / .k-value são do gioco-shell.css; o .glass-light dá-lhe o
+     vidro, como nos cartões. O .kpi-sub fica local: o shell não tem equivalente
+     (o .k-trend é uma tendência com seta e cor, não uma legenda neutra). */
   function kpi(label, valor, sub){
-    return '<div class="kpi"><p class="kpi-label">' + esc(label) + '</p>' +
-      '<p class="kpi-value">' + valor + '</p>' +
+    return '<div class="kpi glass-light"><p class="k-label">' + esc(label) + '</p>' +
+      '<p class="k-value">' + valor + '</p>' +
       (sub ? '<p class="kpi-sub">' + sub + '</p>' : '') + '</div>';
   }
 
@@ -2753,6 +2749,32 @@
     }).join('') + '</span>';
   }
 
+  /* Cores dos SVG gerados em JS. Os atributos stroke/fill de SVG não aceitam
+     var(--token), por isso os tokens do tema são lidos do <body> no momento do
+     render. É isto que faz os gráficos seguirem o tema activo em vez de ficarem
+     presos às cores do tema claro, como estavam antes da Fase 2. */
+  function coresTema(){
+    var cs = window.getComputedStyle(document.body);
+    function tok(nome, alternativa){
+      var v = cs.getPropertyValue(nome);
+      v = v ? v.trim() : '';
+      return v || alternativa;
+    }
+    return {
+      ink:   tok('--ink',   '#141414'),
+      line:  tok('--line',  '#E2DDD1'),
+      muted: tok('--muted', '#6b6660'),
+      red:   tok('--red',   '#D91124'),
+      /* Mesma regra do shell: o --red é superfície (traços, pontos, fatias),
+         o --red-ink é texto. Sobre fundo escuro o --red dá 3,17:1 — chega
+         para um traço (3:1), não chega para texto (4,5:1). */
+      redInk: tok('--red-ink', '#D91124')
+    };
+  }
+
+  /* O texto dentro dos SVG segue a mesma regra do resto da página: Inter. */
+  var SVG_FONTE = 'Inter, sans-serif';
+
   function barra(label, valor, max, texto, delta, alt){
     var largura = max > 0 ? Math.max(0, valor / max) * 100 : 0;
     return '<div class="bar-row">' +
@@ -2790,6 +2812,7 @@
     opts = opts || {};
     if (!itens.length) return '';
     var fmtY = opts.fmtY || function(v){ return intFmt(Math.round(v)) + '€'; };
+    var C = coresTema();
 
     var W = 720, H = 240, PADL = 60, PADR = 18, PADT = 24, PADB = 46;
     var n = itens.length;
@@ -2813,9 +2836,9 @@
       var v = escala * f;
       var y = py(v);
       return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) +
-          '" stroke="' + (f === 0 ? '#141414' : '#E2DDD1') + '" stroke-width="' + (f === 0 ? 2 : 1) + '"/>' +
+          '" stroke="' + (f === 0 ? C.ink : C.line) + '" stroke-width="' + (f === 0 ? 2 : 1) + '"/>' +
         '<text x="' + (PADL - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" ' +
-          'font-family="Space Mono, monospace" font-size="10" fill="#6b6660">' + esc(fmtY(v)) + '</text>';
+          'font-family="' + SVG_FONTE + '" font-size="10" fill="' + C.muted + '">' + esc(fmtY(v)) + '</text>';
     }).join('');
 
     // Com muitos pontos (31 dias) só se escrevem alguns labels, para não sobreporem.
@@ -2823,20 +2846,20 @@
     var marcasX = itens.map(function(x, i){
       if (i % salto !== 0 && i !== n - 1) return '';
       return '<text x="' + px(i).toFixed(1) + '" y="' + (H - PADB + 16) + '" text-anchor="middle" ' +
-        'font-family="Space Mono, monospace" font-size="10" fill="#6b6660">' + esc(x.label) + '</text>';
+        'font-family="' + SVG_FONTE + '" font-size="10" fill="' + C.muted + '">' + esc(x.label) + '</text>';
     }).join('');
 
     var destaque = max > 0 ?
-      '<circle cx="' + px(iMax).toFixed(1) + '" cy="' + py(max).toFixed(1) + '" r="5" fill="#D91124" stroke="#141414" stroke-width="2"/>' +
+      '<circle cx="' + px(iMax).toFixed(1) + '" cy="' + py(max).toFixed(1) + '" r="5" fill="' + C.red + '" stroke="' + C.ink + '" stroke-width="2"/>' +
       '<text x="' + px(iMax).toFixed(1) + '" y="' + Math.max(PADT - 6, py(max) - 12).toFixed(1) + '" text-anchor="middle" ' +
-        'font-family="Space Mono, monospace" font-size="11" fill="#D91124">' +
+        'font-family="' + SVG_FONTE + '" font-size="11" fill="' + C.redInk + '">' +
         esc((itens[iMax].curto || fmtY(max)) + ' · ' + itens[iMax].label) + '</text>' : '';
 
     return '<div class="curve-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
         esc(opts.aria || 'Gráfico de linha') + '">' +
       marcasY +
-      '<line x1="' + PADL + '" y1="' + PADT + '" x2="' + PADL + '" y2="' + (H - PADB) + '" stroke="#141414" stroke-width="2"/>' +
-      '<path d="' + caminho + '" fill="none" stroke="#D91124" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<line x1="' + PADL + '" y1="' + PADT + '" x2="' + PADL + '" y2="' + (H - PADB) + '" stroke="' + C.ink + '" stroke-width="2"/>' +
+      '<path d="' + caminho + '" fill="none" stroke="' + C.red + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
       destaque + marcasX +
       '</svg></div>';
   }
@@ -3059,6 +3082,7 @@
     }
     if (!n80) n80 = lista.length;
 
+    var C = coresTema();
     var W = 720, H = 220, PAD = 28;
     var caminho = pontos.map(function(pt, i){
       var x = PAD + pt[0] * (W - PAD * 2);
@@ -3069,14 +3093,14 @@
     var x80 = PAD + (n80 / lista.length) * (W - PAD * 2);
 
     var svg = '<div class="curve-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Curva de concentração de vendas">' +
-      '<line x1="' + PAD + '" y1="' + (H - PAD) + '" x2="' + (W - PAD) + '" y2="' + (H - PAD) + '" stroke="#141414" stroke-width="2"/>' +
-      '<line x1="' + PAD + '" y1="' + PAD + '" x2="' + PAD + '" y2="' + (H - PAD) + '" stroke="#141414" stroke-width="2"/>' +
-      '<line x1="' + PAD + '" y1="' + y80.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + y80.toFixed(1) + '" stroke="#6b6660" stroke-width="1" stroke-dasharray="4 4"/>' +
-      '<line x1="' + x80.toFixed(1) + '" y1="' + PAD + '" x2="' + x80.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="#D91124" stroke-width="1" stroke-dasharray="4 4"/>' +
-      '<path d="' + caminho + '" fill="none" stroke="#D91124" stroke-width="3"/>' +
-      '<text x="' + (PAD + 6) + '" y="' + (y80 - 6).toFixed(1) + '" font-family="Space Mono, monospace" font-size="11" fill="#6b6660">80% da faturação</text>' +
-      '<text x="' + (x80 + 6).toFixed(1) + '" y="' + (PAD + 12) + '" font-family="Space Mono, monospace" font-size="11" fill="#D91124">' + n80 + ' produtos</text>' +
-      '<text x="' + PAD + '" y="' + (H - 8) + '" font-family="Space Mono, monospace" font-size="10" fill="#6b6660">produtos ordenados por valor →</text>' +
+      '<line x1="' + PAD + '" y1="' + (H - PAD) + '" x2="' + (W - PAD) + '" y2="' + (H - PAD) + '" stroke="' + C.ink + '" stroke-width="2"/>' +
+      '<line x1="' + PAD + '" y1="' + PAD + '" x2="' + PAD + '" y2="' + (H - PAD) + '" stroke="' + C.ink + '" stroke-width="2"/>' +
+      '<line x1="' + PAD + '" y1="' + y80.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + y80.toFixed(1) + '" stroke="' + C.muted + '" stroke-width="1" stroke-dasharray="4 4"/>' +
+      '<line x1="' + x80.toFixed(1) + '" y1="' + PAD + '" x2="' + x80.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="' + C.red + '" stroke-width="1" stroke-dasharray="4 4"/>' +
+      '<path d="' + caminho + '" fill="none" stroke="' + C.red + '" stroke-width="3"/>' +
+      '<text x="' + (PAD + 6) + '" y="' + (y80 - 6).toFixed(1) + '" font-family="' + SVG_FONTE + '" font-size="11" fill="' + C.muted + '">80% da faturação</text>' +
+      '<text x="' + (x80 + 6).toFixed(1) + '" y="' + (PAD + 12) + '" font-family="' + SVG_FONTE + '" font-size="11" fill="' + C.redInk + '">' + n80 + ' produtos</text>' +
+      '<text x="' + PAD + '" y="' + (H - 8) + '" font-family="' + SVG_FONTE + '" font-size="10" fill="' + C.muted + '">produtos ordenados por valor →</text>' +
       '</svg></div>';
 
     return seccao('Concentração', 'Quantos produtos fazem a faturação. Curva: % de produtos (eixo X) contra % acumulada do bruto (eixo Y).',
@@ -3334,7 +3358,7 @@
     var dadosAnt = estado.dados[anterior];
     if (!dadosAnt || !dadosAnt.porDia){
       return seccao('Comparação homóloga', '',
-        '<p class="legend">Sem dados de ' + esc(nomeMes(anterior)) + '.</p>');
+        '<p class="legend-note">Sem dados de ' + esc(nomeMes(anterior)) + '.</p>');
     }
 
     var chavesAnt = Object.keys(dadosAnt.porDia).sort().slice(0, n);
@@ -3357,7 +3381,7 @@
     var sub = 'Primeiros ' + intFmt(n) + ' dias abertos de ' + nomeMes(mes) +
       ' contra os primeiros ' + intFmt(chavesAnt.length) + ' de ' + nomeMes(anterior) + '.';
     var aviso = chavesAnt.length < n
-      ? '<p class="legend">Comparação parcial — só ' + intFmt(chavesAnt.length) +
+      ? '<p class="legend-note">Comparação parcial — só ' + intFmt(chavesAnt.length) +
         ' dias abertos em ' + esc(nomeMes(anterior)) + '.</p>'
       : '';
 
@@ -3382,7 +3406,7 @@
 
     var aberta = corpo.hidden;   // estava escondida, portanto passa a aberta
     corpo.hidden = !aberta;
-    cab.className = 'sec-head' + (aberta ? '' : ' fechada');
+    cab.classList.toggle('fechada', !aberta);
     var seta = cab.querySelector('.sec-seta');
     if (seta) seta.textContent = aberta ? '▾' : '▸';
 
@@ -3402,7 +3426,7 @@
     }
 
     var r = p.resumo || {};
-    var rodape = '<p class="legend">Importado em ' + esc(dataHora(r.importadoEm)) +
+    var rodape = '<p class="legend-note">Importado em ' + esc(dataHora(r.importadoEm)) +
       (r.ficheiro ? ' · ficheiro <span class="mono">' + esc(r.ficheiro) + '</span>' : '') + '</p>';
 
     var barraGlobal = '<div class="sec-global">' +
@@ -3509,7 +3533,7 @@
     }
 
     function destacar(on){
-      zona.className = on ? 'dropzone arrasta' : 'dropzone';
+      zona.classList.toggle('arrasta', on);
     }
 
     zona.addEventListener('dragenter', function(ev){
@@ -3743,7 +3767,7 @@
   });
 
   el('btnMigrarDepois').addEventListener('click', function(){
-    el('migracaoCard').className = 'card hidden';
+    el('migracaoCard').classList.add('hidden');
   });
 
   el('btnCancelar').addEventListener('click', function(){
