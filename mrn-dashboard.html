@@ -181,6 +181,17 @@
     white-space:nowrap;
   }
 
+  /* Sem nenhuma conta ligada não há para onde ir: tira o cursor de mão
+     e o levantar no hover, como o cartão de Pagamentos já faz. */
+  .card-contas-inerte{
+    cursor:default;
+  }
+
+  .card-contas-inerte:hover{
+    transform:none;
+    box-shadow:none;
+  }
+
   /* Conta ainda não ligada: presente na lista, mas apagada e sem link. */
   .conta-linha-off .conta-nome,
   .conta-linha-off .conta-saldo{
@@ -2470,6 +2481,7 @@
       <div class="contas-total" id="cardContasTotal">—</div>
       <p class="card-subtitle" id="cardContasSub">A carregar…</p>
       <div class="contas-lista" id="cardContasLista"></div>
+      <p class="pay-card-hint" id="cardContasHint" style="display:none;">→ Ver movimentos</p>
     </div>
 
     <a class="card card-compact card-vendas" id="cardVendas" href="vendas.html">
@@ -5963,6 +5975,8 @@ window.addEventListener('load', function () {
      aparece como "Não ligado" enquanto o nó não existir; qualquer conta
      nova que o eb_sync.py escreva aparece na mesma, com o slug por nome. */
   var CONTAS_LABEL = { abanca: 'ABANCA', revolut: 'Revolut' };
+  // Conta para onde o cartão inteiro navega quando se clica fora das linhas.
+  var primeiraContaLigada = null;
 
   function nomeConta(slug){
     return CONTAS_LABEL[slug] || (slug.charAt(0).toUpperCase() + slug.slice(1));
@@ -6003,6 +6017,7 @@ window.addEventListener('load', function () {
     slugs.sort();
 
     var total = 0, ligadas = 0, moedaEstranha = false;
+    primeiraContaLigada = null;
 
     listaEl.innerHTML = slugs.map(function(slug){
       var saldo = (allContas[slug] || {}).saldo;
@@ -6016,6 +6031,7 @@ window.addEventListener('load', function () {
       }
 
       ligadas++;
+      if (!primeiraContaLigada) primeiraContaLigada = slug;
       // Só somamos euros: misturar moedas num único total seria mentira.
       if (!saldo.currency || saldo.currency === 'EUR') total += valor;
       else moedaEstranha = true;
@@ -6031,6 +6047,10 @@ window.addEventListener('load', function () {
         '<span class="conta-saldo">' + formatEuro(valor) + '</span></a>';
     }).join('');
 
+    var cartaoEl = document.getElementById('cardContas');
+    cartaoEl.classList.toggle('card-contas-inerte', ligadas === 0);
+    document.getElementById('cardContasHint').style.display = ligadas ? 'block' : 'none';
+
     if (ligadas === 0){
       totalEl.textContent = '—';
       subEl.textContent = 'Nenhuma conta ligada ainda.';
@@ -6040,6 +6060,16 @@ window.addEventListener('load', function () {
     subEl.textContent = ligadas + (ligadas === 1 ? ' conta ligada' : ' contas ligadas') +
       (moedaEstranha ? ' · outras moedas não somadas' : '');
   }
+
+  // Clicar no cartão abre a conta; clicar numa linha abre essa conta. As
+  // linhas são <a> e não podem viver dentro de outro <a>, daí o handler no
+  // cartão em vez de o envolver — mesmo padrão do cartão de Depósitos.
+  document.getElementById('cardContas').addEventListener('click', function(e){
+    if (e.target.closest('a.conta-linha')) return;   // o link da linha trata disto
+    if (!primeiraContaLigada) return;                 // nada ligado, nada a abrir
+    window.location.href = 'conta-bancaria.html?conta=' +
+      encodeURIComponent(primeiraContaLigada);
+  });
 
   /* ---------- Reconciliação automática com a conta bancária ----------
      contaBancaria/ é escrito de fora pelo eb_sync.py. Aqui cruzamos os
