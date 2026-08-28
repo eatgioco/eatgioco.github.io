@@ -12,13 +12,16 @@
   --dough:#F3F1EE; --ink:#141414; --red:#D91124;
   --lime:#D7EF91; --mustard:#FFCC02; --blush:#F9CBCB; --navy:#004476;
   --white:#FFFFFF; --muted:#8a8478; --line:#f0e6d6;
-  /* --red é o vermelho de SUPERFÍCIE (fundo de botão, rebordo, ping): fica
-     igual nos dois temas, é a cor da marca. Para TEXTO a vermelho usar
-     --red-ink, que clareia no tema escuro — o --red não tem contraste
-     suficiente sobre fundo escuro (3.35:1 medido, falha AA).
-     --on-red é o texto POR CIMA de superfície vermelha: branco nos dois
-     temas de propósito. Nunca usar --white aqui: --white é um token de
-     superfície e no tema escuro resolve para #1f1c17. */
+  /* --red é o vermelho da marca: fundo de botão, rebordo, ping, e os TÍTULOS
+     (.greet-row h1 b, .page-subtitle). Fica igual nos dois temas — decisão do
+     Manel, o vermelho clareado no tema escuro não passava no olho. Não voltar
+     a trocá-lo por --red-ink nos títulos.
+     --red-ink é o vermelho de texto SECUNDÁRIO, onde a legibilidade manda mais
+     que a cor da marca (tendências em baixa, referências): clareia no tema
+     escuro porque o --red só dá 3.35:1 sobre fundo escuro.
+     --on-red é o texto POR CIMA de superfície vermelha: branco nos dois temas
+     de propósito. Nunca usar --white aqui: --white é um token de superfície e
+     no tema escuro resolve para #1f1c17. */
   --red-ink:#D91124;
   --on-red:#FFFFFF;
   --card-blur-bg: linear-gradient(180deg, rgba(35,32,30,0.82), rgba(20,18,17,0.88));
@@ -214,7 +217,7 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 
 .greet-row{ display:flex; align-items:center; margin-bottom:22px; }
 .greet-row h1{ font-family:'Antonio',sans-serif; font-weight:700; text-transform:uppercase; font-size:28px; margin:0; letter-spacing:.01em; }
-.greet-row h1 b{ color:var(--red-ink); }
+.greet-row h1 b{ color:var(--red); }
 /* .greet-row .icon-btn herda o vidro de .icon-btn, sem override */
 
 /* ===== KPI ROW — número + tendência + sparkline inline ===== */
