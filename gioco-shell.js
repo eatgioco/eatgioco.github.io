@@ -136,10 +136,30 @@
 
   /* ---------- THEME TOGGLE ----------
      knob desliza, ícone dentro troca (sol/lua), ghost aparece do lado vazio,
-     aplica data-theme no <body>. */
+     aplica data-theme no <body>.
+
+     A escolha persiste em localStorage['gioco-theme'] e é aplicada logo no
+     arranque do script (que corre a seguir a <body>, antes do markup ser
+     pintado) — é isso que evita o flash de tema claro ao navegar entre
+     páginas. localStorage pode falhar (modo privado, cookies bloqueados):
+     em qualquer erro cai-se no tema claro, nunca se trava o resto. */
+  var THEME_KEY = 'gioco-theme';
+
+  function readStoredTheme() {
+    try {
+      var t = window.localStorage.getItem(THEME_KEY);
+      return (t === 'dark' || t === 'light') ? t : null;
+    } catch (e) { return null; }
+  }
+
+  function storeTheme(t) {
+    try { window.localStorage.setItem(THEME_KEY, t); } catch (e) { /* silencioso */ }
+  }
+
   function setTheme(t) {
     try {
       document.body.setAttribute('data-theme', t);
+      storeTheme(t);
       var track = document.getElementById('toggleTrack');
       if (track) {
         track.classList.toggle('is-dark', t === 'dark');
@@ -147,6 +167,15 @@
       }
       setIcon('knobIcon', t === 'dark' ? 'moon' : 'sun');
       setIcon('ghostIcon', t === 'dark' ? 'sun' : 'moon');
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+
+  /* Aplica só o atributo no <body>, sem tocar no toggle nem no localStorage.
+     Corre antes do DOM do toggle existir; o initTheme() sincroniza depois. */
+  function applyStoredThemeEarly() {
+    try {
+      var t = readStoredTheme();
+      if (document.body) document.body.setAttribute('data-theme', t || 'light');
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
@@ -163,6 +192,8 @@
       if (track && !track.getAttribute('onclick')) {
         track.addEventListener('click', toggleThemeSwitch);
       }
+      // Sincroniza o knob/ghost com o que já foi aplicado ao <body>.
+      setTheme(document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
@@ -174,6 +205,7 @@
   }
 
   injectSprite(); // o mais cedo possível, para os <use> do markup resolverem
+  applyStoredThemeEarly(); // antes do primeiro paint, para não haver flash
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', giocoShellInit);
   } else {
@@ -188,4 +220,5 @@
   window.setTheme = setTheme;
   window.toggleThemeSwitch = toggleThemeSwitch;
   window.toggleSidebarPin = toggleSidebarPin;
+  window.giocoReadStoredTheme = readStoredTheme;
 })();
