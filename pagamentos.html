@@ -136,12 +136,31 @@
     gap:10px;
   }
 
+  /* Hierarquia do cabeçalho: fornecedor > montante > data. */
   .card-title{
     font-family:'Inter', sans-serif;
-    font-size:16px;
+    font-size:19px;
     font-weight:700;
     margin:0;
+    line-height:1.25;
+    letter-spacing:-0.01em;
+  }
+
+  .card-amount{
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--ink);
     line-height:1.3;
+    margin-top:2px;
+  }
+
+  .card-date{
+    font-size:12px;
+    font-weight:500;
+    color:var(--muted);
+    line-height:1.3;
+    margin-top:3px;
   }
 
   /* Os selos usam o .status do shell (ok / warn / high). Aqui só a caixa alta
@@ -739,6 +758,32 @@ window.addEventListener('load', function () {
     return isNaN(n) ? String(montante) : n.toFixed(2);
   }
 
+  // Cabeçalho do ticket: um pedido pode ter várias linhas, logo vários
+  // fornecedores. Mostra-se o primeiro e conta-se o resto.
+  function headerFornecedor(lines) {
+    if (!lines || !lines.length) return "—";
+    var nomes = [];
+    lines.forEach(function (l) {
+      var nome = (l.fornecedor || "").trim();
+      if (nome && nomes.indexOf(nome) === -1) nomes.push(nome);
+    });
+    if (!nomes.length) return "—";
+    if (nomes.length === 1) return nomes[0];
+    return nomes[0] + ' +' + (nomes.length - 1);
+  }
+
+  // Total do pedido — soma de todas as linhas, no formato pt-PT.
+  function formatMontanteTotal(lines) {
+    var total = 0;
+    var valido = false;
+    (lines || []).forEach(function (l) {
+      var n = parseFloat(String(l.montante).replace(',', '.'));
+      if (!isNaN(n)) { total += n; valido = true; }
+    });
+    if (!valido) return "—";
+    return total.toFixed(2).replace('.', ',') + ' €';
+  }
+
   function supplierOptionsHtml() {
     var entries = Object.keys(allSuppliers).map(function (id) {
       return { id: id, nome: allSuppliers[id].nome };
@@ -1110,7 +1155,10 @@ window.addEventListener('load', function () {
     html += '<div class="card-top">';
     html += '<div>';
     if (p.numeroReferencia) html += '<span class="ticket-ref">#' + escapeHtml(p.numeroReferencia) + '</span>';
-    html += '<h3 class="card-title">' + escapeHtml(p.date || "") + '</h3>';
+    // Ordem de destaque: fornecedor, montante, data.
+    html += '<h3 class="card-title">' + escapeHtml(headerFornecedor(lines)) + '</h3>';
+    html += '<div class="card-amount">' + escapeHtml(formatMontanteTotal(lines)) + '</div>';
+    if (p.date) html += '<div class="card-date">' + escapeHtml(p.date) + '</div>';
     html += '</div>';
     html += '<span class="' + badgeClass + '">' + badgeText + '</span>';
     html += '</div>';
@@ -1124,11 +1172,16 @@ window.addEventListener('load', function () {
       // Numa linha já paga os botões de copiar deixam de fazer sentido.
       var linhaPaga = lineStatus(p, l) === 'concluido';
       var showCopyButtons = isPending && !linhaPaga;
-      var fornecedorLabel = l.fornecedor + (l.banco ? ' — ' + l.banco : '');
+      // Com uma só linha o fornecedor já está no cabeçalho — aqui fica só o banco.
+      var fornecedorLabel = lines.length === 1
+        ? (l.banco || '')
+        : (l.fornecedor + (l.banco ? ' — ' + l.banco : ''));
       html += '<div class="payment-line-detail">';
-      html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong>';
-      if (isPending && linhaPaga) html += '<span class="payment-line-paid">✓ Pago</span>';
-      html += '</div>';
+      if (fornecedorLabel || (isPending && linhaPaga)) {
+        html += '<div class="card-row"><strong>' + escapeHtml(fornecedorLabel) + '</strong>';
+        if (isPending && linhaPaga) html += '<span class="payment-line-paid">✓ Pago</span>';
+        html += '</div>';
+      }
 
       html += '<div class="card-row"><span>Montante: ' + escapeHtml(l.montante) + '€';
       if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-montante" data-line="' + idx + '" title="Copiar montante">📋</button>';
