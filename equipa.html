@@ -2,104 +2,174 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<!-- Excepção ao padrão desktop-only do OS: a grelha de turnos tem de ser usável ao balcão/telemóvel -->
+<!-- Excepção ao padrão desktop-only do OS: a grelha de turnos tem de ser usável ao balcão/telemóvel.
+     Por isso esta página continua com width=device-width e continua sem @media: adapta-se só com
+     unidades fluidas (min()/clamp()), overflow-x:auto e coluna sticky. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Equipa</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Antonio + Inter são as do shell; Space Mono fica só para números e rótulos de dados
+     (horários, datas, horas, colunas da grelha), por isso tem de ser pedida aqui. -->
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <style>
+  /* ======================================================================
+     equipa.html — estilos próprios da página.
+     O layout, a sidebar, o vidro, o tema claro/escuro, a tipografia base, os
+     .status, o .card e a tabela vêm do gioco-shell.css. Aqui fica só o que é
+     específico da escala: a grelha de turnos, os calendários, os modais e o
+     formulário, mais os tokens que o shell não tem.
+
+     SEM @media, de propósito — regra do OS para esta página. A adaptação a
+     ecrã estreito faz-se com min()/clamp(), overflow-x:auto e coluna sticky.
+     ====================================================================== */
+
+  /* ---------- Tokens próprios da página ----------
+     Nomes que não existem no shell. Todos com par claro/escuro: são fundos e
+     texto, e sem o par a grelha ficava ilegível no tema escuro. Os que o shell
+     já tem (--red, --ink, --dough, --white, --line, --muted, --green, --amber)
+     NÃO são redeclarados aqui. */
   :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-    --amber:#B8860B;
-    --blue:#1D5C8A;
+    --blue:#1D5C8A;          /* cor de pessoa por omissão no seed; não existe no shell */
+    --zebra:#EDE8DD;         /* hover de célula, cabeçalhos da vista mensal, semana no mini-calendário */
+    --zebra-hoje:#EFDFDD;    /* o mesmo, na coluna de hoje */
+    --faint:#948d80;         /* texto muito fraco: célula vazia, dias fora do mês */
+    --fechado-bg:#EDEAE2;    /* célula/turno fechado */
+    --fechado-bg-hover:#E3DFD4;
+    --fechado-stripe:rgba(20,20,20,0.08);  /* riscas diagonais do fechado */
+    --banda:#E3DDCE;         /* banda que marca o início de cada semana na vista mensal */
+    --banda-forte:#D6CFBC;
   }
 
-  *{box-sizing:border-box;}
-
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
+  body[data-theme="dark"]{
+    --blue:#6FB2E8;
+    --zebra:#242019;
+    --zebra-hoje:#2e2320;
+    --faint:#7c7466;
+    --fechado-bg:#26221c;
+    --fechado-bg-hover:#302b23;
+    --fechado-stripe:rgba(255,255,255,0.10);
+    --banda:#2b261e;
+    --banda-forte:#39332a;
   }
 
-  h1,h2,h3,.mono{
-    font-family:'Space Mono', monospace;
+  body{ -webkit-font-smoothing:antialiased; }
+
+  /* Os itens do menu são links reais (<a>), estilizados pelo .nav-row do shell. */
+  .nav-row{ text-decoration:none; }
+
+  /* Rodapé da sidebar: utilizador fixo, sem sessões nem logout. */
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
   }
 
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
+  /* Mesma largura de leitura das outras páginas do OS. */
+  .page{ max-width:1200px; }
 
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
+  /* ---------- Adaptação a ecrã estreito, sem @media ----------
+     O shell foi desenhado para width=1200 com a sidebar fixa a 84px. Aqui a
+     página é width=device-width, por isso a sidebar e as folgas encolhem com o
+     viewport em vez de roubarem largura fixa à grelha. Em desktop os valores
+     min() dão exactamente os do shell, logo nada muda a partir dos ~600px. */
+  .shell{ gap:min(20px, 3vw); }
+  .sidebar.collapsed{ width:min(84px, 19vw); padding:22px min(12px, 2.6vw); }
+  .main{ padding-right:min(28px, 4vw); }
 
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
+  /* Sem hover ao toque: a sidebar também abre por foco (teclado ou toque no
+     botão/nav), senão ao telemóvel ficava presa nos ícones. */
+  .sidebar.collapsed:focus-within{ width:min(230px, 74vw); padding:22px 16px; }
+  .sidebar.collapsed:focus-within .brand{ justify-content:flex-start; }
+  .sidebar.collapsed:focus-within .nav-row{ justify-content:flex-start; }
+  .sidebar.collapsed:focus-within .brand .word,
+  .sidebar.collapsed:focus-within .foot-user span,
+  .sidebar.collapsed:focus-within .nav-row span{
+    transform:translateX(0); opacity:1; max-width:200px;
   }
+  .sidebar.collapsed:focus-within .mark-logo{ display:block; }
+  .sidebar.collapsed:focus-within .mark-collapsed{ display:none; }
 
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:40px 24px 80px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
+  .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
 
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:6px 0 0;
     font-size:12px;
-    color:var(--red);
-    letter-spacing:2px;
+    font-weight:600;
+    /* --red-ink, não --red: no shell o --red é cor de superfície e o --red-ink
+       é o vermelho de texto, que clareia no tema escuro. */
+    color:var(--red-ink);
+    letter-spacing:.14em;
     text-transform:uppercase;
   }
+
+  /* ---------- Separadores Escala / Pessoas / Recibos ----------
+     Mesmo padrão do receitas.html: pílula dos .cat-chip sem o círculo do ícone. */
+  .tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:26px;
+  }
+
+  .tab-btn{
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    background:var(--white);
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:9px 20px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, color .15s ease;
+  }
+
+  .tab-btn:hover{ border-color:var(--red); }
+
+  .tab-btn.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--dough);
+  }
+
+  .tab-count{
+    font-weight:400;
+    opacity:0.65;
+    margin-left:6px;
+  }
+
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* Placeholder do separador Recibos (construído no passo seguinte). */
+  .em-breve{
+    margin-top:24px;
+    text-align:center;
+    padding:60px 20px;
+    font-size:13.5px;
+    color:var(--muted);
+  }
+
+  .em-breve strong{
+    display:block;
+    font-family:'Antonio', sans-serif;
+    text-transform:uppercase;
+    font-size:22px;
+    color:var(--ink);
+    margin-bottom:8px;
+  }
+
+  h2,h3{ font-family:'Inter', sans-serif; }
 
   .section{
     margin-top:36px;
@@ -107,9 +177,10 @@
 
   .section-title{
     margin:0 0 12px;
-    font-size:13px;
-    font-family:'Space Mono', monospace;
-    letter-spacing:1px;
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
   }
@@ -119,24 +190,6 @@
     padding:20px 16px;
     color:var(--muted);
     font-size:13px;
-  }
-
-  .btn-registar{
-    padding:11px 20px;
-    font-family:'Space Mono', monospace;
-    font-size:13px;
-    font-weight:700;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    background:var(--black);
-    color:var(--white);
-    border:2px solid var(--black);
-    cursor:pointer;
-  }
-
-  .btn-registar:hover{
-    background:var(--red);
-    border-color:var(--red);
   }
 
   /* ---------- Pessoas ---------- */
@@ -151,7 +204,8 @@
     align-items:center;
     gap:12px;
     background:var(--white);
-    border:2px solid var(--line);
+    border:1px solid var(--line);
+    border-radius:12px;
     padding:12px;
   }
 
@@ -188,7 +242,7 @@
 
   .pessoa-contacts a{
     font-size:12px;
-    color:var(--black);
+    color:var(--ink);
     text-decoration:none;
     border-bottom:1px solid var(--line);
   }
@@ -200,7 +254,9 @@
 
   .btn-editar-pessoa{
     background:none;
-    border:2px solid var(--line);
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    color:var(--ink);
     width:34px;
     height:34px;
     cursor:pointer;
@@ -209,7 +265,7 @@
   }
 
   .btn-editar-pessoa:hover{
-    border-color:var(--black);
+    border-color:var(--ink);
   }
 
   .inactive-details{
@@ -218,7 +274,7 @@
 
   .inactive-details summary{
     cursor:pointer;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
     color:var(--muted);
     text-transform:uppercase;
@@ -235,18 +291,20 @@
   }
 
   .week-nav-btn{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-weight:700;
     font-size:14px;
     padding:9px 14px;
-    border:2px solid var(--black);
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
+    color:var(--ink);
     cursor:pointer;
   }
 
   .week-nav-btn:hover{
-    background:var(--black);
-    color:var(--white);
+    border-color:var(--red);
+    color:var(--red);
   }
 
   .week-label{
@@ -258,24 +316,27 @@
   }
 
   .btn-hoje{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
     font-weight:700;
     padding:9px 16px;
-    border:2px solid var(--black);
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
+    color:var(--ink);
     cursor:pointer;
   }
 
   .btn-hoje:hover{
-    background:var(--black);
-    color:var(--white);
+    border-color:var(--red);
+    color:var(--red);
   }
 
   /* ---------- Grelha semanal ---------- */
   .grelha-wrap{
     margin-top:14px;
-    border:3px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:14px;
     background:var(--white);
     overflow-x:auto;
     -webkit-overflow-scrolling:touch;
@@ -310,7 +371,7 @@
   }
 
   .grelha thead th{
-    background:var(--bg);
+    background:var(--dough);
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
@@ -325,8 +386,8 @@
     position:sticky;
     left:0;
     z-index:2;
-    background:var(--bg);
-    border-right:3px solid var(--black);
+    background:var(--dough);
+    border-right:2px solid var(--line);
   }
 
   .grelha thead .col-sticky{
@@ -384,11 +445,11 @@
   }
 
   td.celula:hover{
-    background:#EDE8DD;
+    background:var(--zebra);
   }
 
   td.celula.hoje:hover{
-    background:#EFDFDD;
+    background:var(--zebra-hoje);
   }
 
   .celula-inner{
@@ -448,13 +509,31 @@
   .celula-vazia{
     font-family:'Space Mono', monospace;
     font-size:16px;
-    color:#c4bfb3;
+    color:var(--faint);
     text-align:center;
     line-height:52px;
   }
 
   td.celula:hover .celula-vazia{
     color:var(--red);
+  }
+
+  /* A cor da pessoa chega por --p-cor (inline) e é aplicada aqui, não no
+     próprio style= — um valor inline ganhava sempre à regra do tema escuro.
+     Tema claro: a cor tal como está gravada, como sempre foi. */
+  .p-chip-previsto{
+    color:var(--p-cor);
+    border-color:var(--p-cor);
+  }
+
+  /* Tema escuro: as cores das pessoas são escolhidas para fundo claro. O chip
+     "previsto" pinta-as como TEXTO, por isso as escuras caíam a ~2,4:1 sobre o
+     fundo quase preto. Clareiam-se a partir de --p-cor, mantendo a identidade
+     da cor. Sem color-mix o browser ignora estas duas linhas e fica com a
+     regra de cima, que é o comportamento de hoje. */
+  body[data-theme="dark"] .p-chip-previsto{
+    color:color-mix(in srgb, var(--p-cor) 45%, #FFFFFF 55%);
+    border-color:color-mix(in srgb, var(--p-cor) 60%, #FFFFFF 40%);
   }
 
   /* ---------- Resumo de horas ---------- */
@@ -467,7 +546,8 @@
 
   .resumo-card{
     background:var(--white);
-    border:3px solid var(--black);
+    border:1px solid var(--line);
+    border-radius:14px;
     padding:18px 20px;
   }
 
@@ -513,7 +593,7 @@
 
   .resumo-table tr.resumo-total td{
     border-bottom:none;
-    border-top:2px solid var(--black);
+    border-top:1px solid var(--line);
     padding-top:9px;
     font-weight:700;
   }
@@ -539,14 +619,15 @@
     align-items:center;
     gap:10px;
     padding:9px 10px;
-    border:2px solid var(--line);
+    border-radius:10px;
+    border:1.5px solid var(--line);
     background:var(--white);
     font-size:14px;
     cursor:pointer;
   }
 
   .check-item:hover{
-    border-color:var(--black);
+    border-color:var(--red);
   }
 
   .check-item input{
@@ -559,7 +640,7 @@
     font-size:11px;
     color:var(--muted);
     margin-left:auto;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
   }
 
   /* Pessoa de férias nesta data: não pode ser marcada */
@@ -580,7 +661,7 @@
     font-size:11px;
     color:var(--amber);
     margin-left:auto;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     white-space:nowrap;
   }
 
@@ -602,8 +683,9 @@
   }
 
   .modal{
-    background:var(--bg);
-    border:3px solid var(--black);
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:16px;
     max-width:480px;
     width:100%;
     padding:28px;
@@ -625,9 +707,10 @@
   .modal-close{
     background:none;
     border:none;
+    color:var(--ink);
     font-size:22px;
     cursor:pointer;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     line-height:1;
   }
 
@@ -637,7 +720,7 @@
 
   .field-label{
     display:block;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:10px;
     letter-spacing:1px;
     text-transform:uppercase;
@@ -649,17 +732,18 @@
   .field select{
     width:100%;
     padding:10px 12px;
-    border:2px solid var(--line);
-    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--dough);
     font-family:'Inter', sans-serif;
     font-size:14px;
-    color:var(--black);
+    color:var(--ink);
   }
 
   .field input:focus,
   .field select:focus{
     outline:none;
-    border-color:var(--black);
+    border-color:var(--red);
   }
 
   .field input[type="color"]{
@@ -702,32 +786,35 @@
   }
 
   .btn{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:12px;
     font-weight:700;
-    border:2px solid var(--black);
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
-    color:var(--black);
-    padding:9px 14px;
+    color:var(--ink);
+    padding:9px 16px;
     cursor:pointer;
     letter-spacing:0.3px;
     white-space:nowrap;
   }
 
   .btn:hover{
-    background:var(--black);
-    color:var(--white);
+    border-color:var(--red);
+    color:var(--red);
   }
 
   .btn-primary{
     background:var(--red);
     border-color:var(--red);
-    color:var(--white);
+    color:var(--on-red);
   }
 
   .btn-primary:hover{
-    background:var(--black);
-    border-color:var(--black);
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+    filter:brightness(1.08);
   }
 
   .btn-mr-auto{
@@ -757,7 +844,7 @@
     font-family:'Space Mono', monospace;
     font-weight:700;
     font-size:10px;
-    background:var(--bg);
+    background:var(--dough);
     text-transform:uppercase;
   }
 
@@ -765,7 +852,7 @@
     font-family:'Space Mono', monospace;
     font-weight:700;
     font-size:10px;
-    background:var(--bg);
+    background:var(--dough);
     white-space:nowrap;
   }
 
@@ -836,23 +923,23 @@
     background:var(--white);
     font-family:'Inter', sans-serif;
     font-size:13px;
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
     padding:0;
   }
 
   .cal-day:hover{
-    background:var(--bg);
-    border-color:var(--black);
+    background:var(--dough);
+    border-color:var(--red);
   }
 
   .cal-day-out{
-    color:#c4bfb3;
-    background:var(--bg);
+    color:var(--faint);
+    background:var(--dough);
   }
 
   .cal-day-semana{
-    background:#EDE8DD;
+    background:var(--zebra);
   }
 
   .cal-day-today{
@@ -861,23 +948,25 @@
   }
 
   .cal-day-semana.cal-day-today{
-    background:#EFDFDD;
+    background:var(--zebra-hoje);
   }
 
   .btn-vista-mensal{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
     font-weight:700;
     padding:9px 16px;
-    border:2px solid var(--black);
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
+    color:var(--ink);
     cursor:pointer;
     white-space:nowrap;
   }
 
   .btn-vista-mensal:hover{
-    background:var(--black);
-    color:var(--white);
+    border-color:var(--red);
+    color:var(--red);
   }
 
   /* "Vista mensal" encosta à direita; "Ir para data" fica colado ao "Hoje" */
@@ -897,20 +986,21 @@
   /* Rótulos curtos + title, e padding apertado: os três cabem numa só linha mesmo
      a 375px (sem media queries, proibidas no OS). Se não couberem, quebram. */
   .btn-acao-semana{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
     font-weight:700;
     padding:9px 12px;
-    border:2px solid var(--black);
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
     white-space:nowrap;
   }
 
   .btn-acao-semana:hover{
-    background:var(--black);
-    color:var(--white);
+    border-color:var(--red);
+    color:var(--red);
   }
 
   .btn-acao-semana:disabled{
@@ -920,7 +1010,7 @@
 
   .btn-acao-semana:disabled:hover{
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
   }
 
   /* ---------- Editar semana (edição em lote) ---------- */
@@ -991,14 +1081,14 @@
     font-size:9px;
     font-weight:700;
     line-height:1.4;
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .semana-turno-label{
     font-family:'Space Mono', monospace;
     font-size:9px;
     font-weight:700;
-    background:var(--bg);
+    background:var(--dough);
     white-space:nowrap;
   }
 
@@ -1009,7 +1099,7 @@
   }
 
   .semana-mini-grelha td.cel-ferias{
-    background:#EDE8DD;
+    background:var(--zebra);
   }
 
   /* ---------- Férias (dentro do modal de pessoa) ---------- */
@@ -1023,7 +1113,8 @@
     display:flex;
     align-items:center;
     gap:10px;
-    border:2px solid var(--line);
+    border-radius:10px;
+    border:1px solid var(--line);
     background:var(--white);
     padding:8px 10px;
     min-width:0;
@@ -1049,7 +1140,9 @@
     margin-left:auto;
     flex-shrink:0;
     background:none;
-    border:2px solid var(--line);
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    color:var(--ink);
     width:28px;
     height:28px;
     cursor:pointer;
@@ -1075,7 +1168,8 @@
 
   /* ---------- Remuneração (bloqueada por palavra-passe) ---------- */
   .rem-box{
-    border:2px solid var(--line);
+    border:1px solid var(--line);
+    border-radius:12px;
     background:var(--white);
     padding:12px;
   }
@@ -1148,7 +1242,7 @@
 
   .grelha thead th.dia-head:hover,
   td.turno-label:hover{
-    background:#EDE8DD;
+    background:var(--zebra);
   }
 
   .head-lock{
@@ -1160,14 +1254,14 @@
 
   /* Especificidade (0,2,1) para ganhar a 'td.celula.hoje' — tem de vir depois */
   td.celula.celula-fechada{
-    background-color:#EDEAE2;
+    background-color:var(--fechado-bg);
     background-image:repeating-linear-gradient(45deg,
-      rgba(20,20,20,0.08) 0, rgba(20,20,20,0.08) 5px,
+      var(--fechado-stripe) 0, var(--fechado-stripe) 5px,
       rgba(0,0,0,0) 5px, rgba(0,0,0,0) 11px);
   }
 
   td.celula.celula-fechada:hover{
-    background-color:#E3DFD4;
+    background-color:var(--fechado-bg-hover);
   }
 
   .celula-fechada .celula-inner{
@@ -1189,9 +1283,9 @@
 
   /* Mesmas riscas na mini-grelha do modal "Editar semana" */
   .semana-mini-grelha td.cel-fechada{
-    background-color:#EDEAE2;
+    background-color:var(--fechado-bg);
     background-image:repeating-linear-gradient(45deg,
-      rgba(20,20,20,0.08) 0, rgba(20,20,20,0.08) 4px,
+      var(--fechado-stripe) 0, var(--fechado-stripe) 4px,
       rgba(0,0,0,0) 4px, rgba(0,0,0,0) 9px);
   }
 
@@ -1216,7 +1310,7 @@
     display:block;
     background:var(--white);
     padding:14px 16px;
-    border-bottom:3px solid var(--black);
+    border-bottom:1px solid var(--line);
   }
 
   /* Fora com botões de edição e placeholders — a imagem é para partilhar */
@@ -1232,7 +1326,7 @@
 
   .export-header-title{
     display:block;
-    font-family:'Space Mono', monospace;
+    font-family:'Antonio', sans-serif;
     font-size:15px;
     font-weight:700;
   }
@@ -1265,8 +1359,8 @@
   .mensal-modal-header{
     margin:0;
     padding:12px 14px;
-    border-bottom:3px solid var(--black);
-    background:var(--bg);
+    border-bottom:1px solid var(--line);
+    background:var(--dough);
     flex-shrink:0;
   }
 
@@ -1300,7 +1394,7 @@
     top:0;
     z-index:6;
     padding:9px 14px;
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -1339,7 +1433,7 @@
 
   /* Nomes dos dias: uma só vez por mês, logo abaixo do separador */
   .mensal-dias-header th{
-    background:#EDE8DD;
+    background:var(--zebra);
     font-family:'Space Mono', monospace;
     font-size:10px;
     font-weight:700;
@@ -1360,13 +1454,13 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    background:#E3DDCE;
+    background:var(--banda);
     cursor:pointer;
     vertical-align:middle;
   }
 
   .mensal-data-cell:hover{
-    background:#D6CFBC;
+    background:var(--banda-forte);
   }
 
   .mensal-data-cell.hoje{
@@ -1385,14 +1479,14 @@
     position:sticky;
     left:0;
     z-index:2;
-    background:var(--bg);
-    border-right:3px solid var(--black);
+    background:var(--dough);
+    border-right:2px solid var(--line);
   }
 
   /* Acompanha o tom da linha de datas, para a banda da semana ler como uma só
      (no cabeçalho dos nomes dos dias, a regra '.mensal-dias-header th' ganha) */
   .mensal-acoes-vazia{
-    background:#E3DDCE;
+    background:var(--banda);
   }
 
   .mensal-acoes-cell{
@@ -1407,7 +1501,9 @@
     margin:4px auto;
     padding:0;
     border:1px solid var(--line);
+    border-radius:7px;
     background:var(--white);
+    color:var(--ink);
     cursor:pointer;
     font-size:12px;
     line-height:1;
@@ -1425,7 +1521,7 @@
   .mensal-loading{
     text-align:center;
     padding:16px;
-    font-family:'Space Mono', monospace;
+    font-family:'Inter', sans-serif;
     font-size:11px;
     color:var(--muted);
     text-transform:uppercase;
@@ -1434,72 +1530,133 @@
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
-  </div>
-</header>
+<div class="shell">
 
-<main>
-  <h1 class="page-title">GIOCO · Equipa</h1>
-  <p class="page-subtitle">Turnos e Pessoas</p>
-
-  <div class="section">
-    <p class="section-title">Pessoas</p>
-    <div class="pessoas-list" id="pessoasList"></div>
-    <button type="button" class="btn-registar" id="btnNovaPessoa" style="margin-top:14px;">+ Nova pessoa</button>
-
-    <details class="inactive-details" id="inativosDetails" style="display:none;">
-      <summary id="inativosSummary">Pessoas inativas (0)</summary>
-      <div class="pessoas-list" id="pessoasInativasList" style="margin-top:10px;"></div>
-    </details>
-  </div>
-
-  <div class="section">
-    <p class="section-title">Turnos</p>
-    <div class="week-nav">
-      <button type="button" class="week-nav-btn" id="prevWeekBtn" title="Semana anterior" aria-label="Semana anterior">←</button>
-      <span class="week-label" id="weekLabel"></span>
-      <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
-      <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
-      <button type="button" class="btn-vista-mensal" id="btnIrParaData">📅 Ir para data</button>
-      <button type="button" class="btn-vista-mensal" id="btnAlternarVista">🗓️ Vista mensal</button>
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
     </div>
-
-    <!-- Vista semana: uma semana de cada vez (comportamento original) -->
-    <div id="vistaSemanaContainer">
-      <div class="grelha-wrap" id="grelhaWrap">
-        <!-- Só visível durante a exportação para imagem -->
-        <div class="export-header">
-          <span class="export-header-title">● GIOCO® · Turnos</span>
-          <span class="export-header-sub" id="exportHeaderSub"></span>
-        </div>
-        <table class="grelha" id="grelhaTurnos"></table>
-      </div>
-
-      <!-- Ações da semana visível: ficam coladas à grelha, não à navegação -->
-      <div class="semana-acoes">
-        <button type="button" class="btn-acao-semana" id="btnEditarSemana" title="Editar os turnos desta semana em lote">✏️ Editar</button>
-        <button type="button" class="btn-acao-semana" id="btnConfirmarSemana" title="Trancar esta semana: o previsto pelo padrão passa a confirmado">🔒 Confirmar</button>
-        <button type="button" class="btn-acao-semana" id="btnExportarSemana" title="Exportar a grelha desta semana como imagem PNG">🖼️ Exportar</button>
-      </div>
-
-      <div class="resumo-grid">
-        <div class="resumo-card">
-          <h3 class="mono">Esta semana</h3>
-          <div id="resumoSemana"></div>
-        </div>
-        <div class="resumo-card">
-          <h3 class="mono">Este mês · <span id="mesLabel"></span></h3>
-          <div id="resumoMes"></div>
-        </div>
+    <nav>
+      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Dashboard</span></a>
+      <a class="nav-row" href="receitas.html"><svg class="icon" width="17" height="17"><use href="#i-chef-hat"/></svg> <span>Receitas</span></a>
+      <a class="nav-row" href="compras.html"><svg class="icon" width="17" height="17"><use href="#i-shopping-cart"/></svg> <span>Compras</span></a>
+      <a class="nav-row" href="pagamentos.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Pagamentos</span></a>
+      <a class="nav-row" href="vendas.html"><svg class="icon" width="17" height="17"><use href="#i-bar-chart-2"/></svg> <span>Vendas</span></a>
+      <a class="nav-row active" href="equipa.html"><svg class="icon" width="17" height="17"><use href="#i-users"/></svg> <span>Equipa</span></a>
+      <!-- Definições ainda não tem página. Link morto de propósito: fica à vista
+           no menu, mas não navega para lado nenhum. -->
+      <a class="nav-row" href="#"><svg class="icon" width="17" height="17"><use href="#i-settings"/></svg> <span>Definições</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
       </div>
     </div>
-
   </div>
-</main>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-users"/></svg>GIOCO · <b>Equipa</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Escala, pessoas e recibos</p>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tabEscala" data-tab="escala">Escala</button>
+        <button class="tab-btn" id="tabPessoas" data-tab="pessoas">Pessoas<span class="tab-count" id="countPessoas"></span></button>
+        <button class="tab-btn" id="tabRecibos" data-tab="recibos">Recibos</button>
+      </div>
+
+      <!-- ================= Separador ESCALA ================= -->
+      <div class="tab-panel active" id="painelEscala">
+        <div class="section">
+          <div class="week-nav">
+            <button type="button" class="week-nav-btn" id="prevWeekBtn" title="Semana anterior" aria-label="Semana anterior">←</button>
+            <span class="week-label" id="weekLabel"></span>
+            <button type="button" class="week-nav-btn" id="nextWeekBtn" title="Semana seguinte" aria-label="Semana seguinte">→</button>
+            <button type="button" class="btn-hoje" id="btnHoje">Hoje</button>
+            <button type="button" class="btn-vista-mensal" id="btnIrParaData">📅 Ir para data</button>
+            <button type="button" class="btn-vista-mensal" id="btnAlternarVista">🗓️ Vista mensal</button>
+          </div>
+
+          <!-- Vista semana: uma semana de cada vez (comportamento original) -->
+          <div id="vistaSemanaContainer">
+            <div class="grelha-wrap" id="grelhaWrap">
+              <!-- Só visível durante a exportação para imagem -->
+              <div class="export-header">
+                <span class="export-header-title">● GIOCO® · Turnos</span>
+                <span class="export-header-sub" id="exportHeaderSub"></span>
+              </div>
+              <table class="grelha" id="grelhaTurnos"></table>
+            </div>
+
+            <!-- Ações da semana visível: ficam coladas à grelha, não à navegação -->
+            <div class="semana-acoes">
+              <button type="button" class="btn-acao-semana" id="btnEditarSemana" title="Editar os turnos desta semana em lote">✏️ Editar</button>
+              <button type="button" class="btn-acao-semana" id="btnConfirmarSemana" title="Trancar esta semana: o previsto pelo padrão passa a confirmado">🔒 Confirmar</button>
+              <button type="button" class="btn-acao-semana" id="btnExportarSemana" title="Exportar a grelha desta semana como imagem PNG">🖼️ Exportar</button>
+            </div>
+
+            <div class="resumo-grid">
+              <div class="resumo-card">
+                <h3>Esta semana</h3>
+                <div id="resumoSemana"></div>
+              </div>
+              <div class="resumo-card">
+                <h3>Este mês · <span id="mesLabel"></span></h3>
+                <div id="resumoMes"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= Separador PESSOAS ================= -->
+      <div class="tab-panel" id="painelPessoas">
+        <div class="section">
+          <p class="section-title">Pessoas ativas</p>
+          <div class="pessoas-list" id="pessoasList"></div>
+          <button type="button" class="btn-add" id="btnNovaPessoa" style="margin-top:14px;"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Nova pessoa</button>
+
+          <details class="inactive-details" id="inativosDetails" style="display:none;">
+            <summary id="inativosSummary">Pessoas inativas (0)</summary>
+            <div class="pessoas-list" id="pessoasInativasList" style="margin-top:10px;"></div>
+          </details>
+        </div>
+      </div>
+
+      <!-- ================= Separador RECIBOS =================
+           Placeholder. A importação de recibos de vencimento em PDF entra
+           no passo seguinte, com pdf.js — nunca Azure. -->
+      <div class="tab-panel" id="painelRecibos">
+        <div class="em-breve card glass-light">
+          <strong>Em breve</strong>
+          Importação de recibos de vencimento em PDF, extração de valores,
+          histórico por pessoa e custo mensal.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
 
 <!-- Vista mensal: modal quase full-screen, várias semanas coladas em scroll contínuo,
      separadas só por mês. Cada semana é desenhada por buildMensalSemanaTableHtml(), que
@@ -1557,6 +1714,25 @@
       <input type="color" id="pessoaCor" value="#D91124">
     </div>
 
+    <!-- Campos administrativos. Todos OPCIONAIS: vazios não são gravados, para
+         os registos que já existem manterem a forma que têm no nó 'pessoas'.
+         'categoria' no SINGULAR — 'categorias' (plural) é um campo
+         descontinuado que o caminho de gravação apaga a cada guardar. -->
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label">NIF</label>
+        <input type="text" id="pessoaNif" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label">Data de admissão</label>
+        <input type="date" id="pessoaDataAdmissao">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Categoria</label>
+      <input type="text" id="pessoaCategoria" placeholder="ex: Empregado de balcão">
+    </div>
+
     <div class="field">
       <label class="field-label">Padrão semanal</label>
       <div class="padrao-grid-wrap" id="padraoGridWrap"></div>
@@ -1606,6 +1782,15 @@
             <label class="field-label" id="remValorLabel">Salário mensal (€)</label>
             <input type="number" id="pessoaValor" min="0" step="0.01">
           </div>
+        </div>
+        <!-- Vencimento base do recibo. Fica atrás do mesmo travão visual que o
+             salário: deixá-lo à vista anulava o efeito de esconder o outro. -->
+        <div class="rem-linha" id="remFieldsExtra" style="display:none; margin-top:14px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Vencimento base (€)</label>
+            <input type="number" id="pessoaVencimentoBase" min="0" step="0.01">
+          </div>
+          <div class="field" style="margin-bottom:0;"></div>
         </div>
       </div>
     </div>
@@ -1732,6 +1917,24 @@
 </div>
 
 <script>
+window.addEventListener('load', function () {
+
+  /* ---------- Separadores Escala / Pessoas / Recibos ----------
+     Mesmo padrão do receitas.html. Fica FORA do autenticarEContinuar de
+     propósito: alternar separadores é só DOM, e assim continua a funcionar
+     mesmo que a sessão anónima falhe e o resto da página não arranque. */
+  Array.prototype.slice.call(document.querySelectorAll('.tab-btn')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var alvo = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (p) {
+        p.classList.toggle('active', p.id === 'painel' + alvo.charAt(0).toUpperCase() + alvo.slice(1));
+      });
+    });
+  });
+
   var firebaseConfig = {
     apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
     authDomain: "gioco-fornecedores.firebaseapp.com",
@@ -1965,6 +2168,9 @@
     var ativas = pessoasAtivasArray();
     var inativas = pessoasInativasArray();
 
+    /* Contador na pílula do separador; só as ativas, como a lista. */
+    document.getElementById('countPessoas').textContent = ativas.length ? ativas.length : '';
+
     document.getElementById('pessoasList').innerHTML = ativas.length
       ? ativas.map(renderPessoaCard).join('')
       : '<p class="empty-state">Sem pessoas ativas.</p>';
@@ -2088,6 +2294,7 @@
   function aplicarRemuneracaoUI(){
     document.getElementById('remLocked').style.display = remuneracaoDesbloqueada ? 'none' : 'flex';
     document.getElementById('remFields').style.display = remuneracaoDesbloqueada ? 'grid' : 'none';
+    document.getElementById('remFieldsExtra').style.display = remuneracaoDesbloqueada ? 'grid' : 'none';
     aplicarTipoContratoUI();
   }
 
@@ -2108,6 +2315,14 @@
     document.getElementById('pessoaTelefone').value = p ? (p.telefone || '') : '';
     document.getElementById('pessoaEmail').value = p ? (p.email || '') : '';
     document.getElementById('pessoaCor').value = (p && p.cor) ? p.cor : '#D91124';
+    /* Campos opcionais: ausentes no registo aparecem vazios, e vazios não voltam
+       a ser gravados — ver o caminho de gravação mais abaixo. */
+    document.getElementById('pessoaNif').value = (p && p.nif) ? p.nif : '';
+    document.getElementById('pessoaCategoria').value = (p && p.categoria) ? p.categoria : '';
+    document.getElementById('pessoaDataAdmissao').value = (p && p.dataAdmissao) ? p.dataAdmissao : '';
+    document.getElementById('pessoaVencimentoBase').value =
+      (p && p.vencimentoBase !== undefined && p.vencimentoBase !== null && p.vencimentoBase !== '')
+        ? String(p.vencimentoBase) : '';
     document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
     document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
 
@@ -2174,6 +2389,28 @@
       valorHora: numOuZero(remValores.valorHora)
     });
     delete dados.categorias;   /* campo descontinuado — limpa registos antigos ao gravar */
+
+    /* Campos administrativos opcionais. Preenchidos, entram no registo; apagados
+       no formulário, saem do registo. Nunca se grava string vazia nem 0 falso —
+       assim uma pessoa sem NIF continua sem a chave 'nif', tal como hoje.
+       NOTA: 'categoria' no singular. 'categorias' (plural) é o campo
+       descontinuado apagado na linha acima — não trocar um pelo outro. */
+    var textoOpcional = function(id){ return document.getElementById(id).value.trim(); };
+    [['nif', 'pessoaNif'], ['categoria', 'pessoaCategoria'], ['dataAdmissao', 'pessoaDataAdmissao']]
+      .forEach(function(par){
+        var v = textoOpcional(par[1]);
+        if (v) dados[par[0]] = v; else delete dados[par[0]];
+      });
+
+    /* O vencimento base vive atrás do travão da remuneração. Com o travão
+       fechado o input está vazio mesmo quando o registo tem valor, por isso
+       gravá-lo apagava o que lá estava: só se toca no campo com o travão aberto. */
+    if (remuneracaoDesbloqueada){
+      var vbRaw = document.getElementById('pessoaVencimentoBase').value.trim();
+      var vb = parseFloat(vbRaw);
+      if (vbRaw !== '' && !isNaN(vb) && vb >= 0) dados.vencimentoBase = vb;
+      else delete dados.vencimentoBase;
+    }
     var pad = lerPadraoDoFormulario();
     var feriasParaGravar = pessoaFeriasEdit.slice();
 
@@ -2418,8 +2655,14 @@
           html += ' style="background:' + info.cor + ';color:' + textoContraste(info.cor) + '">';
           html += (conflitoFerias ? '⚠️ ' : '') + escapeHtml(label) + '</span>';
         } else {
+          /* --p-cor leva a cor crua da pessoa para o CSS. O 'color'/'border-color'
+             inline continuam a ser o valor de base (e o fallback para browsers
+             sem color-mix); no tema escuro o CSS clareia-os a partir de --p-cor,
+             senão uma cor escura (ex: o azul #1D5C8A) ficava a ~2,6:1 sobre o
+             fundo quase preto. O chip confirmado não precisa: tem fundo sólido
+             com o texto calculado por textoContraste(). */
           html += '<span class="p-chip p-chip-previsto" title="' + escapeHtml(info.nome) + ' (previsto pelo padrão)"';
-          html += ' style="color:' + info.cor + ';border-color:' + info.cor + '">';
+          html += ' style="--p-cor:' + info.cor + '">';
           html += escapeHtml(label) + '</span>';
         }
       });
@@ -3485,6 +3728,8 @@
 
   renderGrelha();
   }); // fim de autenticarEContinuar
+
+});
 </script>
 
 </body>

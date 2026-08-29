@@ -19,8 +19,9 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
 - **Excepção: `equipa.html`.** A grelha de turnos tem de ser usável ao telemóvel, por isso
   usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Mesmo assim
-  não tem `@media` — adapta-se só com `overflow-x:auto` + coluna sticky e grelhas
-  `minmax(min(Xpx,100%),1fr)`.
+  não tem `@media` — adapta-se só com `overflow-x:auto` + coluna sticky, grelhas
+  `minmax(min(Xpx,100%),1fr)` e, desde a migração para o shell, `min()`/`clamp()` na
+  sidebar e nas folgas (`.sidebar.collapsed{width:min(84px,19vw)}` e afins).
 
 ## Ficheiros do repositório
 
@@ -31,7 +32,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
-| `equipa.html` | Pessoas e turnos (escala semanal) | Equipa |
+| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores) e Recibos (placeholder — importação de recibos em PDF com pdf.js, por construir) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `mrn-dashboard.html` | Dashboard privado: pagamentos, tarefas, Instagram, pedidos espelhados | Só Manel |
@@ -47,7 +48,10 @@ equipamentos          — equipamentos da loja (nome, zona, tipo, limite, ordem,
                          nunca apagados, só desativados — lojaTemperaturas referencia-os por id
 lojaTemperaturas / lojaTemperaturasFotos      — registos HACCP (fotos em base64)
 lojaPedidos           — pedidos/sugestões do staff
-pessoas               — membros da equipa
+pessoas               — membros da equipa; campos opcionais nif, categoria (SINGULAR),
+                         dataAdmissao (YYYY-MM-DD) e vencimentoBase só são gravados
+                         quando preenchidos. 'categorias' (plural) é descontinuado e
+                         apagado a cada gravação — não confundir com 'categoria'
 turnos                — escala semanal (confirmações manuais, chave {data}_{turnoId})
 padroes               — padrão semanal recorrente por pessoa
 ferias                — períodos de férias por pessoa

@@ -47,6 +47,7 @@
     '<symbol id="i-trash-2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>',
     '<symbol id="i-trending-down" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></symbol>',
     '<symbol id="i-trending-up" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>',
+    '<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -57,7 +58,7 @@
     'bar-chart-2', 'bell', 'chef-hat', 'chevron-down', 'chevron-right',
     'layout-dashboard', 'log-out', 'message-square', 'moon', 'more-vertical',
     'menu', 'panel-left', 'pencil', 'plus', 'receipt', 'search', 'settings',
-    'shopping-cart', 'sun', 'trash-2', 'trending-down', 'trending-up'
+    'shopping-cart', 'sun', 'trash-2', 'trending-down', 'trending-up', 'users'
   ];
 
   function injectSprite() {
