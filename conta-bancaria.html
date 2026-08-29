@@ -312,6 +312,8 @@
   <div class="estado estado-erro" id="estadoErro" style="display:none;">
     <h2 id="estadoErroTitulo">Conta não encontrada ou ainda não ligada</h2>
     <p id="estadoErroTexto"></p>
+
+  <button type="button" id="btnAuthRetry" style="display:none;font-family:'Space Mono',monospace;font-size:12px;margin-top:12px;padding:8px 14px;border:1px solid var(--black,#141414);background:var(--white,#fff);color:var(--black,#141414);cursor:pointer;">Tentar novamente</button>
   </div>
 
   <div id="conteudo" style="display:none;">
@@ -436,15 +438,77 @@ window.addEventListener('load', function () {
     appId: "1:441783294427:web:51a362d4f91d0e2149effe"
   });
 
+  /* Em browsers embutidos (Instagram, etc.) o signInAnonymously() pode nunca
+     resolver — o storage está bloqueado e a promise fica pendurada. Sem este
+     timeout a página ficava presa "a carregar" para sempre e sem erro nenhum. */
+  var AUTH_TIMEOUT_MS = 8000;
+  var authConcluida = false;   // garante que o callback só corre uma vez
+  var authCallback = null;     // guardado para o botão "Tentar novamente"
+  var authRetryLigado = false;
+
+  function authTexto(id, valor){
+    var e = document.getElementById(id);
+    if (e) e.textContent = valor;
+  }
+
+  function esconderErroAuth(){
+    var a = document.getElementById('authErro');
+    if (a) a.style.display = 'none';
+    if (!authConcluida){
+      var e = document.getElementById('estadoErro');
+      if (e) e.style.display = 'none';
+      var r = document.getElementById('btnAuthRetry');
+      if (r) r.style.display = 'none';
+      authTexto('subtituloConta', 'A carregar…');
+    }
+  }
+
+  function mostrarErroAuth(){
+    /* Reaproveita o mostrarErro() da página (definido fora do callback da
+       auth), que já esconde o #conteudo e escreve o subtítulo. */
+    mostrarErro('Sem ligação ao Firebase',
+      'Não foi possível ligar ao Firebase. Verifica a ligação ou tenta abrir no Safari (não num browser embutido).');
+    var rb = document.getElementById('btnAuthRetry');
+    if (rb) rb.style.display = 'inline-block';
+    var a = document.getElementById('authErro');
+    if (a) a.style.display = 'block';
+
+    if (authRetryLigado) return;
+    authRetryLigado = true;
+    var b = document.getElementById('btnAuthRetry');
+    if (b) b.addEventListener('click', function(){ autenticarEContinuar(authCallback); });
+  }
+
   // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
   // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
   function autenticarEContinuar(callback) {
+    if (authConcluida) return;              // já há sessão, nada a refazer
+    if (callback) authCallback = callback;
+    esconderErroAuth();
+
+    var expirou = false;
+    var timer = setTimeout(function () {
+      if (authConcluida) return;            // só dispara se ainda não houve resposta
+      expirou = true;
+      console.error('Timeout na autenticação anónima (' + AUTH_TIMEOUT_MS + 'ms)');
+      mostrarErroAuth();
+    }, AUTH_TIMEOUT_MS);
+
     firebase.auth().signInAnonymously()
-      .then(() => callback())
-      .catch((erro) => {
+      .then(function () {
+        clearTimeout(timer);
+        if (authConcluida) return;          // outra tentativa já entrou
+        authConcluida = true;
+        esconderErroAuth();
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
         console.error('Falha na autenticação anónima:', erro);
         // Não continuar sem sessão — evita escritas/leituras que vão
         // falhar de qualquer forma quando as rules apertarem.
+        if (authConcluida || expirou) return;   // erro já reportado
+        mostrarErroAuth();
       });
   }
 

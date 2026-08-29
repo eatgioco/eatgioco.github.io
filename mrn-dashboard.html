@@ -1754,7 +1754,14 @@
     </div>
   </div>
 
-  <h2 class="section-heading">Vista Rápida</h2>
+<!-- Só aparece quando a autenticação anónima falha ou estoura o timeout. -->
+<div id="authErro" style="display:none;border:1px solid var(--red);background:var(--white,#fff);color:var(--ink,#141414);padding:14px 16px;margin:0 0 16px;">
+  <div style="font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--red-ink,#D91124);margin-bottom:6px;">Sem ligação ao Firebase</div>
+  <div style="font-size:14px;line-height:1.5;margin-bottom:10px;">Não foi possível ligar ao Firebase. Verifica a ligação ou tenta abrir no Safari (não num browser embutido).</div>
+  <button type="button" id="btnAuthRetry" style="font-family:'Space Mono',monospace;font-size:12px;padding:8px 14px;border:1px solid var(--ink,#141414);background:var(--white,#fff);color:var(--ink,#141414);cursor:pointer;">Tentar novamente</button>
+</div>
+
+    <h2 class="section-heading">Vista Rápida</h2>
   <div class="grid-quick">
     <!-- Contas Bancárias: alimentado por contasBancarias/, escrito pelo
          eb_sync.py. As linhas são geradas em JS a partir das contas que
@@ -2069,15 +2076,77 @@ window.addEventListener('load', function () {
 
   firebase.initializeApp(firebaseConfig);
 
+  /* Em browsers embutidos (Instagram, etc.) o signInAnonymously() pode nunca
+     resolver — o storage está bloqueado e a promise fica pendurada. Sem este
+     timeout a página ficava presa "a carregar" para sempre e sem erro nenhum. */
+  var AUTH_TIMEOUT_MS = 8000;
+  var authConcluida = false;   // garante que o callback só corre uma vez
+  var authCallback = null;     // guardado para o botão "Tentar novamente"
+  var authRetryLigado = false;
+
+  function authTexto(id, valor){
+    var e = document.getElementById(id);
+    if (e) e.textContent = valor;
+  }
+
+  function esconderErroAuth(){
+    var a = document.getElementById('authErro');
+    if (a) a.style.display = 'none';
+    if (!authConcluida){
+      authTexto('cardContasSub', 'A carregar…');
+      authTexto('cardVendasSubtitulo', 'A carregar…');
+      authTexto('paymentsLoading', 'A carregar...');
+      authTexto('pedidosLoading', 'A carregar...');
+      authTexto('depositosLoading', 'A carregar...');
+    }
+  }
+
+  function mostrarErroAuth(){
+    authTexto('cardContasSub', 'Sem ligação');
+    authTexto('cardContasTotal', '—');
+    authTexto('cardVendasSubtitulo', 'Sem ligação');
+    authTexto('paymentsLoading', 'Erro de ligação — toca em "Tentar novamente" acima.');
+    authTexto('pedidosLoading', 'Erro de ligação — toca em "Tentar novamente" acima.');
+    authTexto('depositosLoading', 'Erro de ligação — toca em "Tentar novamente" acima.');
+    var a = document.getElementById('authErro');
+    if (a) a.style.display = 'block';
+
+    if (authRetryLigado) return;
+    authRetryLigado = true;
+    var b = document.getElementById('btnAuthRetry');
+    if (b) b.addEventListener('click', function(){ autenticarEContinuar(authCallback); });
+  }
+
   // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
   // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
   function autenticarEContinuar(callback) {
+    if (authConcluida) return;              // já há sessão, nada a refazer
+    if (callback) authCallback = callback;
+    esconderErroAuth();
+
+    var expirou = false;
+    var timer = setTimeout(function () {
+      if (authConcluida) return;            // só dispara se ainda não houve resposta
+      expirou = true;
+      console.error('Timeout na autenticação anónima (' + AUTH_TIMEOUT_MS + 'ms)');
+      mostrarErroAuth();
+    }, AUTH_TIMEOUT_MS);
+
     firebase.auth().signInAnonymously()
-      .then(() => callback())
-      .catch((erro) => {
+      .then(function () {
+        clearTimeout(timer);
+        if (authConcluida) return;          // outra tentativa já entrou
+        authConcluida = true;
+        esconderErroAuth();
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
         console.error('Falha na autenticação anónima:', erro);
         // Não continuar sem sessão — evita escritas/leituras que vão
         // falhar de qualquer forma quando as rules apertarem.
+        if (authConcluida || expirou) return;   // erro já reportado
+        mostrarErroAuth();
       });
   }
 
