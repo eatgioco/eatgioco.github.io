@@ -4502,6 +4502,35 @@ window.addEventListener('load', function () {
     });
   }
 
+  /* ---------- Texto espaçado letra a letra ----------
+     Estes recibos escrevem os rótulos com espaçamento entre glifos e o pdf.js
+     devolve-os assim: "N º F u ncio n á rio", "To t al su j eit o". Sem tratar
+     isto, NENHUM rótulo casa. Duas defesas:
+       · recDesEspacar reconstrói o texto para leitura — cola tudo o que vem a
+         seguir a um espaço e não é maiúscula ("A n a C ar d os a" volta a ser
+         "Ana Cardosa", "1 . 3 3 6 , 9 3" volta a "1.336,93");
+       · recSemEspacos dá a chave de comparação, e é contra ela que os rótulos
+         são testados quando o texto cru falha. Por isso os padrões deste módulo
+         usam \s* e nunca \s+: na chave não há espaço nenhum para casar. */
+  function recSemEspacos(t){
+    return String(t === null || t === undefined ? '' : t).replace(/\s+/g, '');
+  }
+
+  function recDesEspacar(t){
+    var toks = String(t).split(' ').filter(Boolean);
+    if (toks.length < 3) return t;
+    var soltos = 0;
+    toks.forEach(function(x){ if (x.length === 1) soltos++; });
+    var media = t.replace(/ /g, '').length / toks.length;
+    if (media > 2.2 || soltos < toks.length / 2) return t;
+    return t.replace(/ (.)/g, function(m, c){ return /[A-ZÀ-Þ]/.test(c) ? ' ' + c : c; });
+  }
+
+  /* Um padrão casa numa linha se casar no texto como está OU já sem espaços. */
+  function recCasa(re, texto){
+    return re.test(texto) || re.test(recSemEspacos(texto));
+  }
+
   function recItensParaLinhas(itens, pagina){
     var brutos = [];
     (itens || []).forEach(function(it){
@@ -4537,9 +4566,13 @@ window.addEventListener('load', function () {
           celulas.push({ x: it.x, x2: it.x + it.w, texto: it.texto });
         }
       });
-      celulas.forEach(function(c){ c.texto = c.texto.replace(/\s+/g, ' ').trim(); });
+      celulas.forEach(function(c){
+        c.texto = recDesEspacar(c.texto.replace(/\s+/g, ' ').trim());
+        c.chave = recSemEspacos(c.texto);
+      });
       celulas = celulas.filter(function(c){ return c.texto !== ''; });
-      return { pagina: pagina, y: g.y, celulas: celulas, texto: celulas.map(function(c){ return c.texto; }).join('  ') };
+      var texto = celulas.map(function(c){ return c.texto; }).join('  ');
+      return { pagina: pagina, y: g.y, celulas: celulas, texto: texto, chave: recSemEspacos(texto) };
     }).filter(function(l){ return l.celulas.length; });
   }
 
@@ -4609,10 +4642,12 @@ window.addEventListener('load', function () {
     for (var i = 0; i < linhas.length; i++){
       var cels = linhas[i].celulas;
       for (var j = 0; j < cels.length; j++){
-        var m = cels[j].texto.match(rotuloRe);
+        /* O rótulo é procurado no texto e, se falhar, na chave sem espaços */
+        var alvo = cels[j].texto, m = alvo.match(rotuloRe);
+        if (!m){ alvo = cels[j].chave; m = alvo.match(rotuloRe); }
         if (!m) continue;
-        var v, k, d, q, encontrado = false;
-        var resto = cels[j].texto.slice(m.index + m[0].length).replace(/^[\s:.·\-–]+/, '');
+        var v, k, encontrado = false;
+        var resto = alvo.slice(m.index + m[0].length).replace(/^[\s:.·\-–]+/, '');
         if (resto){
           v = valida(resto);
           if (v !== null && v !== undefined){ achados.push(v); continue; }
@@ -4622,11 +4657,15 @@ window.addEventListener('load', function () {
           if (v !== null && v !== undefined){ achados.push(v); encontrado = true; }
         }
         if (encontrado || soMesmaLinha) continue;
-        for (d = 1; d <= 2 && i + d < linhas.length && !encontrado; d++){
-          var abaixo = linhas[i + d].celulas;
-          for (q = 0; q < abaixo.length && !encontrado; q++){
-            if (Math.abs(abaixo[q].x - cels[j].x) > 25) continue;
-            v = valida(abaixo[q].texto);
+        /* Formulário em coluna: o valor está na linha de baixo, à mesma altura
+           de X. Vale a célula MAIS PRÓXIMA — não a primeira que serve —, senão
+           o "Nº Contribuinte" ia buscar o valor da coluna do lado. */
+        for (var d = 1; d <= 2 && i + d < linhas.length && !encontrado; d++){
+          var perto = linhas[i + d].celulas
+            .filter(function(c){ return Math.abs(c.x - cels[j].x) <= 40; })
+            .sort(function(c1, c2){ return Math.abs(c1.x - cels[j].x) - Math.abs(c2.x - cels[j].x); });
+          for (k = 0; k < perto.length && !encontrado; k++){
+            v = valida(perto[k].texto);
             if (v !== null && v !== undefined){ achados.push(v); encontrado = true; }
           }
         }
@@ -4656,7 +4695,7 @@ window.addEventListener('load', function () {
   }
 
   function recVInteiro(t){
-    var s = String(t).trim().replace(/^n[.ºo]*\s*/i, '');
+    var s = recSemEspacos(t).replace(/^n[.ºo]*/i, '');
     return /^\d{1,6}$/.test(s) ? s : null;
   }
 
@@ -4668,8 +4707,8 @@ window.addEventListener('load', function () {
   function recVTexto(t){
     var s = String(t).trim().replace(/[:\-–]+$/, '').trim();
     if (s.length < 2) return null;
-    if (/^\d+([.,]\d+)?$/.test(s)) return null;
-    if (/^(nome|nif|niss|categoria|sec[çc][ãa]o|morada|data|contribuinte)$/i.test(s)) return null;
+    if (/^[\d.,\s]+$/.test(s)) return null;
+    if (/^(nome|nif|niss|categoria|sec[çc][ãa]o|morada|data|contribuinte|seguradora|banco|ap[óo]lice)$/i.test(recSemEspacos(s))) return null;
     return s;
   }
 
@@ -4690,13 +4729,18 @@ window.addEventListener('load', function () {
     m = s.match(/\b(20\d{2})\s*[\/\-.]\s*(0?[1-9]|1[0-2])\b/);
     if (m) return m[1] + '-' + pad2(parseInt(m[2], 10));
     var baixo = s.toLowerCase();
-    for (var i = 0; i < REC_MESES.length; i++){
-      var re = new RegExp('\\b' + REC_MESES[i] + '\\b[^\\d]{0,12}(20\\d{2})', 'i');
-      var mm = baixo.match(re);
+    var i, mm;
+    for (i = 0; i < REC_MESES.length; i++){
+      mm = baixo.match(new RegExp('\\b' + REC_MESES[i] + '\\b[^\\d]{0,12}(20\\d{2})', 'i'));
       if (mm) return mm[1] + '-' + pad2(i + 1);
-      var re2 = new RegExp('\\b' + REC_MESES_CURTOS[i] + '\\.?\\b[^\\d]{0,8}(20\\d{2})', 'i');
-      var mm2 = baixo.match(re2);
-      if (mm2) return mm2[1] + '-' + pad2(i + 1);
+      mm = baixo.match(new RegExp('\\b' + REC_MESES_CURTOS[i] + '\\.?\\b[^\\d]{0,8}(20\\d{2})', 'i'));
+      if (mm) return mm[1] + '-' + pad2(i + 1);
+    }
+    /* Sem fronteiras de palavra: é assim que o mês aparece quando a linha vem
+       colada, como em "recibodevencimentodejunho/2026". */
+    for (i = 0; i < REC_MESES.length; i++){
+      mm = baixo.match(new RegExp(REC_MESES[i] + '[^\\d]{0,12}(20\\d{2})', 'i'));
+      if (mm) return mm[1] + '-' + pad2(i + 1);
     }
     return null;
   }
@@ -4706,13 +4750,15 @@ window.addEventListener('load', function () {
      que é pelo sítio onde está, não pela ordem em que o pdf.js o cuspiu. */
   function recPapelDaColuna(txt){
     var t = String(txt).toLowerCase();
-    if (/n[ãa]o\s*sujeit|isent/.test(t)) return 'naoSujeito';
-    if (/descont|reten[çc]/.test(t)) return 'desconto';
-    if (/taxa|%/.test(t)) return 'taxa';
-    if (/quant|dias|horas|n\.?[ºo]?\s*(de\s*)?(dias|horas)/.test(t)) return 'quantidade';
-    if (/unit|pre[çc]o|val\.?\s*un/.test(t)) return 'valorUnitario';
-    if (/sujeit|incid/.test(t)) return 'sujeito';
-    if (/remunera|abono|vencimento|import[âa]ncia|montante|valor/.test(t)) return 'valor';
+    var sem = recSemEspacos(t);
+    function tem(re){ return re.test(t) || re.test(sem); }
+    if (tem(/n[ãa]o\s*sujeit|isent/)) return 'naoSujeito';
+    if (tem(/descont|reten[çc]/)) return 'desconto';
+    if (tem(/taxa|%/)) return 'taxa';
+    if (tem(/quant|dias|horas|n\.?[ºo]?\s*(de\s*)?(dias|horas)/)) return 'quantidade';
+    if (tem(/unit|pre[çc]o|val\.?\s*un/)) return 'valorUnitario';
+    if (tem(/sujeit|incid/)) return 'sujeito';
+    if (tem(/remunera|abono|vencimento|import[âa]ncia|montante|valor/)) return 'valor';
     return null;
   }
 
@@ -4724,11 +4770,22 @@ window.addEventListener('load', function () {
         var p = recPapelDaColuna(cels[j].texto);
         if (p) papeis.push({ papel: p, x: cels[j].x, x2: cels[j].x2 });
       }
-      var temDescricao = cels.some(function(c){ return /descri|rubrica|abonos|remunera/i.test(c.texto); });
+      /* Só as colunas de DESCRIÇÃO propriamente ditas: "Valor Unit. Remuneração"
+         também casa com /remunera/, e contá-la punha o corte entre as metades
+         no sítio errado. */
+      var descricoes = cels.filter(function(c){ return /^(descri[çc][ãa]o|rubrica|abonos?)/i.test(c.chave); });
       var distintos = {};
       papeis.forEach(function(p){ distintos[p.papel] = true; });
-      if (Object.keys(distintos).length >= 2 && (temDescricao || Object.keys(distintos).length >= 3)){
-        return { linha: i, colunas: papeis };
+      if (Object.keys(distintos).length >= 2 && (descricoes.length || Object.keys(distintos).length >= 3)){
+        /* Recibo em duas metades: descrição+valor das remunerações à esquerda,
+           descrição+valor dos descontos à direita, NA MESMA LINHA. Sem este
+           corte, a linha "Ordenado Base 920,00 | Segurança Social 11% 140,02"
+           virava um desconto chamado "Ordenado Base" e a rubrica desaparecia.
+           O corte fica um pouco à esquerda da segunda "Descrição", porque a
+           descrição do desconto começa antes do próprio cabeçalho. */
+        var corte = null;
+        if (descricoes.length >= 2) corte = descricoes[1].x - 15;
+        return { linha: i, colunas: papeis, corte: corte };
       }
     }
     return null;
@@ -4746,11 +4803,13 @@ window.addEventListener('load', function () {
     return melhorD <= 40 ? melhor.papel : null;
   }
 
-  var REC_NAO_SUJEITO_RE = /(subs[íi]dio\s+de\s+refei|refei[çc][ãa]o|ajudas?\s+de\s+custo|\bkm\b|quil[óo]metr|viatura\s+pr[óo]pria|desloca[çc]|abono\s+para\s+falhas|senhas?\s+de)/i;
-  var REC_DESCONTO_RE = /(seguran[çc]a\s+social|seg\.?\s*social|\bs\.?s\.?\b|\birs\b|reten[çc][ãa]o|sindicat|penhora|adiantament|sobretaxa|quotiza|caixa\s+geral|previd[êe]nc)/i;
+  /* Padrões com \s* (nunca \s+): são testados também contra o texto já sem
+     espaços, por causa dos rótulos espaçados letra a letra. */
+  var REC_NAO_SUJEITO_RE = /(subs[íi]dio\s*de\s*refei|refei[çc][ãa]o|ajudas?\s*de\s*custo|\bkm\b|^km|quil[óo]metr|viatura\s*pr[óo]pria|desloca[çc]|abono\s*para\s*falhas|senhas?\s*de)/i;
+  var REC_DESCONTO_RE = /(seguran[çc]a\s*social|seg\.?\s*social|\bs\.?s\.?\b|\birs\b|reten[çc][ãa]o|sindicat|penhora|adiantament|sobretaxa|quotiza|caixa\s*geral|previd[êe]nc)/i;
   var REC_SS_RE = /(seguran[çc]a\s*social|seg\.?\s*social|\bs\.?s\.?\b|\btsu\b)/i;
-  var REC_FIM_TABELA_RE = /(totais?\b|total\s|l[íi]quido|a\s+receber|forma\s+de\s+pagamento)/i;
-  var REC_IGNORAR_LINHA_RE = /(total|l[íi]quido|transporte|iban|nib|contribuinte|declara|assinatura|entidade|patronal|a\s+reportar|resumo|acumulados?|recebido|forma\s+de\s+pagamento|transfer[êe]ncia|dep[óo]sito|venc\.?\s*(base|di[áa]ri))/i;
+  var REC_FIM_TABELA_RE = /(totais?\b|total\s*(sujeito|n[ãa]o|de|em|\()|l[íi]quido|a\s*receber|forma\s*de\s*pagamento)/i;
+  var REC_IGNORAR_LINHA_RE = /(total|l[íi]quido|transporte|iban|nib|contribuinte|declara|assinatura|entidade|patronal|a\s*reportar|resumo|acumulados?|recebido|forma\s*de\s*pagamento|transfer[êe]ncia|dep[óo]sito|venc\.?\s*(base|di[áa]ri)|vencimento\s*(base|di[áa]ri)|processado\s*por|p[áa]gina|extenso|seguradora|ap[óo]lice)/i;
 
   /* ---------- 6. Rubricas e descontos ---------- */
   function recExtrairTabela(linhas, colunas){
@@ -4764,123 +4823,125 @@ window.addEventListener('load', function () {
          campo do cabeçalho, e começar aí apanhava a categoria como rubrica.
          Começar no topo apanhava o número da porta da morada. */
       for (var z = 0; z < linhas.length; z++){
-        if (!/(ordenado|vencimento\s+base|venc\.?\s*base|sal[áa]rio\s+base|remunera[çc][ãa]o\s+base)/i.test(linhas[z].texto)) continue;
+        if (!recCasa(/(ordenado|vencimento\s*base|venc\.?\s*base|sal[áa]rio\s*base|remunera[çc][ãa]o\s*base)/i, linhas[z].texto)) continue;
         var temValor = linhas[z].celulas.some(function(c){ return recNum(c.texto) !== null && /^[\d.,\s€]+$/.test(c.texto); });
         if (temValor){ inicio = z; break; }
       }
     }
+    var corte = colunas && colunas.corte !== null && colunas.corte !== undefined ? colunas.corte : null;
+    var cols = colunas && colunas.colunas;
 
     /* A partir da primeira linha de totais acaba a tabela. Depois dela só se
        aceitam linhas de desconto (há recibos que os listam por baixo dos
-       totais); tudo o resto — "Cartão Refeição", "Transferência" — é a zona do
-       pagamento e entrava como rubrica a dobrar. */
+       totais); tudo o resto — "Recebido em cartão", "Transferência" — é a zona
+       do pagamento e entrava como rubrica a dobrar. */
     var fimDaTabela = false;
     for (var i = inicio; i < linhas.length; i++){
       var linha = linhas[i];
-      var texto = linha.texto;
-      if (!fimDaTabela && out.linhas.length && REC_FIM_TABELA_RE.test(texto)) fimDaTabela = true;
-      if (REC_IGNORAR_LINHA_RE.test(texto)) continue;
-      if (fimDaTabela && !REC_DESCONTO_RE.test(texto)) continue;
+      if (!fimDaTabela && out.linhas.length && recCasa(REC_FIM_TABELA_RE, linha.texto)) fimDaTabela = true;
 
-      /* Descrição: as células de texto mais à esquerda, antes do primeiro número */
-      var descricao = '';
-      var numeros = [];
-      linha.celulas.forEach(function(c){
-        var n = recNum(c.texto);
-        var soNumero = n !== null && /^[\d.,\s€%\-()]+$/.test(c.texto);
-        if (soNumero){
-          numeros.push({ x: c.x, x2: c.x2, valor: n, texto: c.texto, papel: recPapelPorX(colunas && colunas.colunas, c) });
-        } else if (!numeros.length && !/^[\d.,]+\s*%$/.test(c.texto)){
-          descricao += (descricao ? ' ' : '') + c.texto;
-        }
-      });
-      descricao = descricao.replace(/^\d{1,5}\s+/, '').trim();   /* código da rubrica à esquerda */
-      if (!numeros.length) continue;
-      if (descricao.length < 3) continue;
+      var ladoA = corte === null ? linha.celulas : linha.celulas.filter(function(c){ return c.x < corte; });
+      var ladoB = corte === null ? [] : linha.celulas.filter(function(c){ return c.x >= corte; });
 
-      /* "11,00%" não é um número solto: é a taxa da linha. Sem isto ia parar à
-         descrição e a taxa do desconto ficava vazia. */
-      var taxaPercent = null;
-      linha.celulas.forEach(function(c){
-        var mp = c.texto.match(/^([\d.,]+)\s*%$/);
-        if (mp && taxaPercent === null) taxaPercent = recNum(mp[1]);
-      });
-      var taxaCel = null;
-      numeros.forEach(function(n){ if (/%/.test(n.texto)) taxaCel = n; });
-      numeros.forEach(function(n){ if (n.papel === 'taxa') taxaCel = n; });
-
-      var temColunaDesconto = numeros.some(function(n){ return n.papel === 'desconto'; });
-      var ehDesconto = temColunaDesconto || (!colunas && REC_DESCONTO_RE.test(descricao)) ||
-                       (colunas && !numeros.some(function(n){ return n.papel && n.papel !== 'taxa' && n.papel !== 'desconto'; }) && REC_DESCONTO_RE.test(descricao));
-
-      if (ehDesconto){
-        var valorD = null;
-        numeros.forEach(function(n){ if (n.papel === 'desconto') valorD = n.valor; });
-        if (valorD === null){
-          var candidatos = numeros.filter(function(n){ return n !== taxaCel; });
-          valorD = candidatos.length ? candidatos[candidatos.length - 1].valor : null;
-        }
-        if (valorD === null) continue;
-        out.descontos.push({
-          descricao: descricao.replace(/\s*[\d.,]+\s*%$/, '').trim(),
-          taxa: taxaPercent !== null ? taxaPercent : (taxaCel ? taxaCel.valor : null),
-          valor: valorD
-        });
-        continue;
+      if (!fimDaTabela){
+        var rub = recLerLadoRubrica(ladoA, cols, corte !== null);
+        if (rub) out.linhas.push(rub);
       }
+      var desc = recLerLadoDesconto(ladoB.length ? ladoB : (corte === null ? linha.celulas : []), cols, corte !== null, fimDaTabela);
+      if (desc) out.descontos.push(desc);
+    }
+    return out;
+  }
 
-      /* Rubrica. Papéis por coluna quando existem; caso contrário, deduz-se pelo
-         produto: entre três números, o par cujo produto dá o terceiro é
-         quantidade × valor unitário. */
-      var qtd = null, unit = null, valor = null, sujeito = null;
-      numeros.forEach(function(n){
-        if (n.papel === 'quantidade') qtd = n.valor;
-        else if (n.papel === 'valorUnitario') unit = n.valor;
-        else if (n.papel === 'sujeito' || n.papel === 'valor'){ valor = n.valor; if (n.papel === 'sujeito') sujeito = true; }
-        else if (n.papel === 'naoSujeito'){ valor = n.valor; sujeito = false; }
-      });
+  /* Parte comum aos dois lados: descrição à esquerda, números com o papel que a
+     posição lhes der. */
+  function recLerCelulas(celulas, cols){
+    var descricao = '', numeros = [], taxaPercent = null;
+    celulas.forEach(function(c){
+      var mp = c.texto.match(/^([\d.,]+)\s*%$/);
+      if (mp){ if (taxaPercent === null) taxaPercent = recNum(mp[1]); return; }
+      var n = recNum(c.texto);
+      var soNumero = n !== null && /^[\d.,\s€\-()]+$/.test(c.texto);
+      if (soNumero) numeros.push({ x: c.x, x2: c.x2, valor: n, texto: c.texto, papel: recPapelPorX(cols, c) });
+      else if (!numeros.length) descricao += (descricao ? ' ' : '') + c.texto;
+    });
+    descricao = descricao.replace(/^\d{1,5}\s+/, '').replace(/\s*[\d.,]+\s*%$/, '').trim();
+    return { descricao: descricao, numeros: numeros, taxaPercent: taxaPercent };
+  }
 
-      if (valor === null){
-        var livres = numeros.filter(function(n){ return n !== taxaCel; });
-        if (livres.length === 1){
-          valor = livres[0].valor;
-        } else if (livres.length >= 3){
-          var achou = false;
-          for (var a = 0; a < livres.length && !achou; a++){
-            for (var b = 0; b < livres.length && !achou; b++){
-              if (a === b) continue;
-              for (var c2 = 0; c2 < livres.length; c2++){
-                if (c2 === a || c2 === b) continue;
-                if (Math.abs(livres[a].valor * livres[b].valor - livres[c2].valor) <= REC_TOL &&
-                    livres[c2].valor !== 0){
-                  qtd = livres[Math.min(a,b)].valor;
-                  unit = livres[Math.max(a,b)].valor;
-                  valor = livres[c2].valor;
-                  achou = true;
-                  break;
-                }
+  function recLerLadoRubrica(celulas, cols, temCorte){
+    var p = recLerCelulas(celulas, cols);
+    if (!p.numeros.length || p.descricao.length < 3) return null;
+    if (recCasa(REC_IGNORAR_LINHA_RE, p.descricao)) return null;
+    /* Sem corte não há lado: uma linha de desconto é reconhecida pela coluna ou
+       pela descrição. */
+    if (!temCorte){
+      if (p.numeros.some(function(n){ return n.papel === 'desconto'; })) return null;
+      if (recCasa(REC_DESCONTO_RE, p.descricao)) return null;
+    }
+
+    var qtd = null, unit = null, valor = null, sujeito = null;
+    p.numeros.forEach(function(n){
+      if (n.papel === 'quantidade') qtd = n.valor;
+      else if (n.papel === 'valorUnitario') unit = n.valor;
+      else if (n.papel === 'sujeito' || n.papel === 'valor'){ valor = n.valor; if (n.papel === 'sujeito') sujeito = true; }
+      else if (n.papel === 'naoSujeito'){ valor = n.valor; sujeito = false; }
+    });
+
+    /* Quando as colunas não chegam para dizer qual é o valor (acontece quando o
+       cabeçalho junta "Valor Unit." e "Remuneração" numa célula só), deduz-se
+       pelo produto: entre três números, o par cujo produto dá o terceiro é
+       quantidade × valor unitário. */
+    if (valor === null){
+      qtd = null; unit = null;
+      var livres = p.numeros;
+      if (livres.length === 1){
+        valor = livres[0].valor;
+      } else if (livres.length >= 3){
+        var achou = false;
+        for (var a = 0; a < livres.length && !achou; a++){
+          for (var b = 0; b < livres.length && !achou; b++){
+            if (a === b) continue;
+            for (var c2 = 0; c2 < livres.length; c2++){
+              if (c2 === a || c2 === b) continue;
+              if (livres[c2].valor !== 0 && Math.abs(livres[a].valor * livres[b].valor - livres[c2].valor) <= REC_TOL){
+                qtd = livres[Math.min(a, b)].valor;
+                unit = livres[Math.max(a, b)].valor;
+                valor = livres[c2].valor;
+                achou = true;
+                break;
               }
             }
           }
-          if (!achou) valor = livres[livres.length - 1].valor;
-        } else if (livres.length === 2){
-          valor = livres[livres.length - 1].valor;
-          qtd = livres[0].valor;
         }
+        if (!achou) valor = livres[livres.length - 1].valor;
+      } else {
+        qtd = livres[0].valor;
+        valor = livres[livres.length - 1].valor;
       }
-      if (valor === null) continue;
-
-      if (sujeito === null) sujeito = !REC_NAO_SUJEITO_RE.test(descricao);
-
-      out.linhas.push({
-        descricao: descricao,
-        quantidade: qtd,
-        valorUnitario: unit,
-        valor: valor,
-        sujeito: sujeito
-      });
     }
-    return out;
+    if (valor === null) return null;
+    if (sujeito === null) sujeito = !recCasa(REC_NAO_SUJEITO_RE, p.descricao);
+    return { descricao: p.descricao, quantidade: qtd, valorUnitario: unit, valor: valor, sujeito: sujeito };
+  }
+
+  function recLerLadoDesconto(celulas, cols, temCorte, fimDaTabela){
+    if (!celulas.length) return null;
+    var p = recLerCelulas(celulas, cols);
+    if (!p.numeros.length || p.descricao.length < 3) return null;
+    if (recCasa(REC_IGNORAR_LINHA_RE, p.descricao)) return null;
+    var temColuna = p.numeros.some(function(n){ return n.papel === 'desconto'; });
+    if (!temCorte && !temColuna && !recCasa(REC_DESCONTO_RE, p.descricao)) return null;
+    if (fimDaTabela && !recCasa(REC_DESCONTO_RE, p.descricao)) return null;
+
+    var valor = null;
+    p.numeros.forEach(function(n){ if (n.papel === 'desconto') valor = n.valor; });
+    if (valor === null) valor = p.numeros[p.numeros.length - 1].valor;
+    var taxa = p.taxaPercent;
+    if (taxa === null){
+      p.numeros.forEach(function(n){ if (n.papel === 'taxa') taxa = n.valor; });
+    }
+    return { descricao: p.descricao, taxa: taxa, valor: valor };
   }
 
   /* Se a classificação sujeito/não sujeito não fechar com os totais lidos,
@@ -4930,6 +4991,17 @@ window.addEventListener('load', function () {
     /* "RECIBO DE VENCIMENTO" (o título) não é um rótulo de número: o rótulo tem
        de trazer o "n.º" colado, senão o título arrastava um número qualquer. */
     var nrRecibo = recAcharCampo(cabecalho, /((recibo|documento)\s*(n[.ºo]{1,3}\.?|:)|n[.ºo]{1,3}\.?\s*(do\s*)?(recibo|documento))/i, recVInteiro);
+    if (!nrRecibo){
+      /* Há recibos em que o título ("Recibo de Vencimento de junho/2026") e o
+         número ficam em linhas diferentes, e o rótulo do número é só "Nº". */
+      for (var nr = 0; nr < Math.min(8, linhas.length) && !nrRecibo; nr++){
+        var celsNr = linhas[nr].celulas;
+        for (var nc = 0; nc < celsNr.length - 1 && !nrRecibo; nc++){
+          if (!/^n[.ºo]{1,2}\.?$/i.test(celsNr[nc].chave)) continue;
+          nrRecibo = recVInteiro(celsNr[nc + 1].texto);
+        }
+      }
+    }
     var nrFuncionario = recAcharCampo(cabecalho, /((n[.ºo]*|c[óo]d(igo)?\.?)\s*(de\s*)?(funcion[áa]rio|empregado|colaborador|trabalhador)|funcion[áa]rio\s*n[.ºo]*)/i, recVInteiro);
 
     /* O NIF conhecido de uma pessoa é o desempate mais forte: se um dos números
@@ -4953,18 +5025,41 @@ window.addEventListener('load', function () {
 
     var nome = recAcharCampo(cabecalho, /\bnome\b/i, recVTexto);
     var morada = recAcharCampo(cabecalho, /(morada|endere[çc]o)/i, recVTexto);
+    if (!nome){
+      /* Sem rótulo "Nome": o trabalhador é o destinatário, na coluna por baixo
+         do "Exmo(a). Sr(a).". A morada são as linhas seguintes dessa coluna. */
+      for (var ex = 0; ex < cabecalho.length && !nome; ex++){
+        var celsEx = cabecalho[ex].celulas;
+        for (var ec = 0; ec < celsEx.length && !nome; ec++){
+          if (!/(exmo|sr\(a\)|trabalhador|colaborador)/i.test(celsEx[ec].chave)) continue;
+          var colX = celsEx[ec].x;
+          var abaixo = [];
+          for (var eb = ex + 1; eb < Math.min(ex + 7, cabecalho.length); eb++){
+            cabecalho[eb].celulas.forEach(function(c){
+              if (Math.abs(c.x - colX) <= 40) abaixo.push(c.texto.replace(/[,\s]+$/, ''));
+            });
+          }
+          if (abaixo.length){
+            nome = recVTexto(abaixo[0]);
+            if (!morada && abaixo.length > 1) morada = abaixo.slice(1).join(', ');
+          }
+        }
+      }
+    }
     var categoria = recAcharCampo(cabecalho, /(categoria(\s*profissional)?|profiss[ãa]o)/i, recVTexto);
     var seccao = recAcharCampo(cabecalho, /(sec[çc][ãa]o|departamento|centro\s*de\s*custo)/i, recVTexto);
     var vencimentoBase = recAcharCampo(linhas, /(venc(imento)?\.?\s*(base|mensal|il[íi]quido)|remunera[çc][ãa]o\s*base|sal[áa]rio\s*base)/i, recVNumero);
     var vencimentoDiario = recAcharCampo(linhas, /(venc(imento)?\.?\s*di[áa]ri|remunera[çc][ãa]o\s*di[áa]ri|valor\s*dia)/i, recVNumero);
     var data = recAcharCampo(cabecalho, /(data|emiss[ãa]o|processad)/i, recVData);
     if (!data){
-      for (var di = 0; di < cabecalho.length && !data; di++) data = recVData(cabecalho[di].texto);
+      for (var di = 0; di < cabecalho.length && !data; di++) data = recVData(cabecalho[di].chave) || recVData(cabecalho[di].texto);
     }
 
     var periodo = recAcharCampo(cabecalho, /(refer[êe]ncia|referente|per[íi]odo|m[êe]s\s*(de)?|processamento)/i, recPeriodoDoTexto);
     if (!periodo){
-      for (var pi = 0; pi < cabecalho.length && !periodo; pi++) periodo = recPeriodoDoTexto(cabecalho[pi].texto);
+      for (var pi = 0; pi < cabecalho.length && !periodo; pi++){
+        periodo = recPeriodoDoTexto(cabecalho[pi].texto) || recPeriodoDoTexto(cabecalho[pi].chave);
+      }
     }
     if (!periodo && data) periodo = data.slice(0, 7);
 
@@ -4976,7 +5071,16 @@ window.addEventListener('load', function () {
     /* Os totais procuram-se PRIMEIRO nas linhas de totais. Fora delas, o rótulo
        "Não Sujeito" é o cabeçalho de uma coluna, e a procura por baixo do
        rótulo trazia o valor da primeira rubrica em vez do total. */
-    var linhasTotais = linhas.filter(function(l){ return /(total|l[íi]quido|a\s*receber|a\s*pagar)/i.test(l.texto); });
+    /* A sub-lista leva também as duas linhas seguintes a cada linha de totais:
+       nestes recibos os rótulos estão numa linha e os valores na de baixo, e um
+       filtro simples deixava os valores de fora. */
+    var linhasTotais = [];
+    linhas.forEach(function(l, idx){
+      if (!recCasa(/(total|l[íi]quido|a\s*receber|a\s*pagar)/i, l.texto)) return;
+      for (var k = idx; k < Math.min(idx + 3, linhas.length); k++){
+        if (linhasTotais.indexOf(linhas[k]) === -1) linhasTotais.push(linhas[k]);
+      }
+    });
     function totalPorRotulo(re){
       var v = recAcharCampo(linhasTotais, re, recVNumero, true);
       if (v === null) v = recAcharCampo(linhasTotais, re, recVNumero);
@@ -4988,9 +5092,9 @@ window.addEventListener('load', function () {
     var totalDescontos = totalPorRotulo(/(total\s*(de\s*)?descontos|descontos\s*totais)/i);
     var liquido = null;
     for (var li = 0; li < linhas.length && liquido === null; li++){
-      if (/il[íi]quido/i.test(linhas[li].texto)) continue;
-      if (!/(l[íi]quido|a\s*receber|total\s*a\s*pagar)/i.test(linhas[li].texto)) continue;
-      liquido = recAcharCampo([linhas[li]], /(l[íi]quido[^\d]*|a\s*receber|total\s*a\s*pagar)/i, recVNumero);
+      if (recCasa(/il[íi]quido/i, linhas[li].texto)) continue;
+      if (!recCasa(/(l[íi]quido|a\s*receber|total\s*a\s*pagar)/i, linhas[li].texto)) continue;
+      liquido = recAcharCampo(linhas.slice(li, li + 3), /(l[íi]quido|a\s*receber|total\s*a\s*pagar)/i, recVNumero);
     }
 
     var totais = {
@@ -5025,7 +5129,7 @@ window.addEventListener('load', function () {
        apanhava a rubrica "Subsídio Refeição Cartão" e trazia a quantidade dela. */
     var inicioPag = 0;
     for (var pz = 0; pz < linhas.length; pz++){
-      if (/(l[íi]quido|a\s*receber|forma\s*de\s*pagamento|recebido|transfer[êe]ncia)/i.test(linhas[pz].texto)){ inicioPag = pz; break; }
+      if (recCasa(/(l[íi]quido|a\s*receber|forma\s*de\s*pagamento|recebido|transfer[êe]ncia)/i, linhas[pz].texto)){ inicioPag = pz; break; }
     }
     var linhasPag = linhas.slice(inicioPag);
     var cartao = recAcharCampo(linhasPag, /(recebido\s*em\s*cart|cart[ãa]o(\s*refei[çc][ãa]o)?)/i, recVNumero, true);
