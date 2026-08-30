@@ -18,10 +18,14 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
 - **Excepção: `equipa.html`.** A grelha de turnos tem de ser usável ao telemóvel, por isso
-  usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Mesmo assim
-  não tem `@media` — adapta-se só com `overflow-x:auto` + coluna sticky, grelhas
-  `minmax(min(Xpx,100%),1fr)` e, desde a migração para o shell, `min()`/`clamp()` na
-  sidebar e nas folgas (`.sidebar.collapsed{width:min(84px,19vw)}` e afins).
+  usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Adapta-se com
+  `overflow-x:auto` + coluna sticky e grelhas `minmax(min(Xpx,100%),1fr)`, e tem os ÚNICOS
+  `@media` do OS fora do `@media print`: `(hover: hover)` / `(hover: none)`. O critério é a
+  existência de hover, nunca a largura. Em `(hover: none)` a sidebar do shell deixa de ser
+  lateral e passa a barra fixa no fundo, e o `#sidebarPinBtn` abre um painel para cima em vez
+  de fixar a barra fechada — ao toque não há hover, e os itens do menu são `<a>`, por isso
+  tocar neles navegava em vez de abrir. Isto vive só no `<style>` da equipa.html: o
+  `gioco-shell.css`/`.js` não tem mobile, e esta página é o rascunho que mais tarde lá sobe.
 
 ## Ficheiros do repositório
 

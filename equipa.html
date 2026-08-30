@@ -77,29 +77,111 @@
   /* Mesma largura de leitura das outras páginas do OS. */
   .page{ max-width:1200px; }
 
-  /* ---------- Adaptação a ecrã estreito, sem @media ----------
-     O shell foi desenhado para width=1200 com a sidebar fixa a 84px. Aqui a
-     página é width=device-width, por isso a sidebar e as folgas encolhem com o
-     viewport em vez de roubarem largura fixa à grelha. Em desktop os valores
-     min() dão exactamente os do shell, logo nada muda a partir dos ~600px. */
-  .shell{ gap:min(20px, 3vw); }
-  .sidebar.collapsed{ width:min(84px, 19vw); padding:22px min(12px, 2.6vw); }
-  .main{ padding-right:min(28px, 4vw); }
+  /* ---------- Rato vs toque: dois comportamentos separados ----------
+     O critério é (hover), NÃO a largura do ecrã: um portátil de 1280px com
+     rato tem de manter o hover-collapse e o pin do shell tal e qual, e um
+     telemóvel de 430px não os pode ter, porque ao toque não existe hover.
 
-  /* Sem hover ao toque: a sidebar também abre por foco (teclado ou toque no
-     botão/nav), senão ao telemóvel ficava presa nos ícones. */
-  .sidebar.collapsed:focus-within{ width:min(230px, 74vw); padding:22px 16px; }
-  .sidebar.collapsed:focus-within .brand{ justify-content:flex-start; }
-  .sidebar.collapsed:focus-within .nav-row{ justify-content:flex-start; }
-  .sidebar.collapsed:focus-within .brand .word,
-  .sidebar.collapsed:focus-within .foot-user span,
-  .sidebar.collapsed:focus-within .nav-row span{
-    transform:translateX(0); opacity:1; max-width:200px;
+     Com rato não há aqui regra nenhuma: vale o gioco-shell.css sem alterações.
+
+     Isto é a única excepção ao "sem @media" desta página, e é deliberada. A
+     tentativa anterior (:focus-within) não servia: ao toque só disparava ao
+     tocar num item do menu e, como os itens são <a>, isso navegava em vez de
+     abrir — confirmado em iPhone. Enquanto o shell não tiver mobile próprio,
+     esta página é o rascunho; nada disto toca no gioco-shell.css/.js. */
+
+  /* Overlay do painel do menu ao toque. Escondido por omissão em todo o lado. */
+  .nav-overlay{ display:none; }
+
+  @media (hover: none){
+
+    /* A barra sai do fluxo (position:fixed), por isso o .main fica com a
+       largura toda — são os ~71px que a barra lateral roubava à grelha. */
+    .shell{ display:block; min-height:100vh; min-height:100dvh; }
+    .main{ padding:20px 16px 0; }
+    .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
+
+    /* Folga no fundo para a barra: sem isto os botões de ação da escala
+       (Editar / Confirmar / Exportar) ficavam tapados por ela. */
+    .page{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+
+    /* ---------- A sidebar passa a barra horizontal fixa no fundo ----------
+       O .hidden entra na lista de propósito: é o estado que o pin do shell
+       aplica em desktop, e ao toque não pode fazer a barra desaparecer. */
+    .sidebar,
+    .sidebar.collapsed,
+    .sidebar.hidden{
+      position:fixed;
+      top:auto; right:0; bottom:0; left:0;
+      width:auto; height:auto; min-height:0; margin:0;
+      flex-direction:row; align-items:stretch;
+      border:none; border-top:1px solid var(--sidebar-line); border-radius:0;
+      /* env() protege o indicador de home do iPhone */
+      padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+      box-shadow:0 -10px 30px rgba(0,0,0,0.16);
+      opacity:1; pointer-events:auto;
+      overflow:visible;
+      transition:none;
+      z-index:70;
+    }
+
+    /* Marca e rodapé não cabem numa barra de 49px; o vidro (.glass +
+       .glass-bend) mantém-se. */
+    .sidebar .brand,
+    .sidebar .sidebar-foot{ display:none; }
+
+    /* flex-direction explícito: o shell tem `nav{ flex-direction:column }`
+       e sem o repor aqui os 7 ícones ficavam empilhados. */
+    .sidebar nav{ display:flex; flex-direction:row; width:100%; gap:2px; }
+
+    /* Ícones lado a lado, distribuídos por igual */
+    .sidebar .nav-row{
+      flex:1 1 0; min-width:0;
+      justify-content:center;
+      padding:10px 4px;
+      border-radius:12px;
+    }
+
+    /* Na barra só ícones. display:none em vez do max-width:0 do shell, para
+       não herdar a animação de deslize, que aqui não faz sentido. */
+    .sidebar .nav-row span{ display:none; }
+
+    /* ---------- Painel: a mesma barra a abrir para cima ----------
+       É o mesmo <nav>, empilhado e com os nomes por extenso. Como a barra é
+       position:fixed com bottom:0, crescer significa crescer para cima: passa
+       por cima do .main sem lhe mexer no layout — a grelha não faz reflow. */
+    .sidebar.painel-aberto{
+      flex-direction:column;
+      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+      max-height:80dvh;
+      overflow-y:auto;
+    }
+
+    .sidebar.painel-aberto nav{ flex-direction:column; gap:4px; }
+
+    .sidebar.painel-aberto .nav-row{
+      justify-content:flex-start;
+      padding:12px 14px;
+    }
+
+    .sidebar.painel-aberto .nav-row span{
+      display:inline-block;
+      transform:none; opacity:1; max-width:none;
+    }
+
+    /* O botão fica acima do overlay: é ele que fecha o painel, e sem isto o
+       overlay apanhava o toque e o segundo toque não fazia nada. */
+    .sidebar-pin-btn{ position:relative; z-index:66; }
+
+    /* Tocar fora fecha. Fica por baixo da barra e do botão, por cima do resto. */
+    .nav-overlay.aberto{
+      display:block;
+      position:fixed;
+      inset:0;
+      background:rgba(20,20,20,0.45);
+      z-index:65;
+    }
   }
-  .sidebar.collapsed:focus-within .mark-logo{ display:block; }
-  .sidebar.collapsed:focus-within .mark-collapsed{ display:none; }
-
-  .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
 
   .page-subtitle{
     margin:6px 0 0;
@@ -1017,6 +1099,9 @@
   .modal-lg{
     max-width:760px;
     max-height:calc(100vh - 80px);
+    /* dvh: em iOS a barra do Safari aparece/desaparece com o scroll e o 100vh
+       fica maior do que o que se vê. A linha em vh acima é o fallback. */
+    max-height:calc(100dvh - 80px);
     display:flex;
     flex-direction:column;
   }
@@ -1351,6 +1436,7 @@
     max-width:1400px;
     width:100%;
     height:calc(100vh - 32px);
+    height:calc(100dvh - 32px);
     padding:0;
     display:flex;
     flex-direction:column;
@@ -1565,7 +1651,9 @@
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+        <!-- Um botão só, dois papéis: com rato faz o pin do shell (inalterado);
+             ao toque abre/fecha o painel do menu a partir da barra inferior. -->
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="equipaToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-users"/></svg>GIOCO · <b>Equipa</b></h1>
@@ -1657,6 +1745,10 @@
   </div>
 
 </div>
+
+<!-- Fundo semitransparente do painel do menu ao toque. Tocar aqui fecha.
+     Fora do .shell de propósito: é fixed e não deve entrar no layout. -->
+<div class="nav-overlay" id="navOverlay"></div>
 
 <!-- Vista mensal: modal quase full-screen, várias semanas coladas em scroll contínuo,
      separadas só por mês. Cada semana é desenhada por buildMensalSemanaTableHtml(), que
@@ -1918,6 +2010,65 @@
 
 <script>
 window.addEventListener('load', function () {
+
+  /* ---------- Menu ao toque: barra inferior + painel para cima ----------
+     O gioco-shell.js expande a sidebar no mouseenter e o #sidebarPinBtn
+     fixa-a fechada. Nada disso existe ao toque: não há hover, e a tentativa
+     anterior (:focus-within no CSS) só disparava ao tocar num item do menu —
+     que é um <a> e navegava. Aqui o mesmo botão passa a ter dois papéis, e o
+     shell fica intacto: com rato continua a chamar toggleSidebarPin(). */
+  var mqToque = window.matchMedia ? window.matchMedia('(hover: none)') : null;
+
+  function ehToque(){ return !!(mqToque && mqToque.matches); }
+
+  function painelAberto(){
+    var sb = document.getElementById('sidebarEl');
+    return !!(sb && sb.classList.contains('painel-aberto'));
+  }
+
+  function mostrarPainel(abrir){
+    var sb = document.getElementById('sidebarEl');
+    var ov = document.getElementById('navOverlay');
+    if (sb) sb.classList.toggle('painel-aberto', !!abrir);
+    if (ov) ov.classList.toggle('aberto', !!abrir);
+    var btn = document.getElementById('sidebarPinBtn');
+    if (btn && ehToque()) btn.setAttribute('title', abrir ? 'Fechar o menu' : 'Abrir o menu');
+  }
+
+  window.equipaToggleMenu = function(){
+    if (!ehToque()){
+      /* Com rato: comportamento do shell, sem desvios. */
+      if (typeof window.toggleSidebarPin === 'function') window.toggleSidebarPin();
+      return;
+    }
+    mostrarPainel(!painelAberto());
+  };
+
+  var navOverlay = document.getElementById('navOverlay');
+  if (navOverlay) navOverlay.addEventListener('click', function(){ mostrarPainel(false); });
+
+  /* O link "Definições" é href="#": sem isto o painel ficava aberto por cima
+     do conteúdo depois de o tocar. Os outros navegam e a página recarrega. */
+  document.querySelectorAll('#sidebarEl .nav-row').forEach(function(a){
+    a.addEventListener('click', function(){ mostrarPainel(false); });
+  });
+
+  /* Voltar atrás pode restaurar a página do bfcache com o painel como estava.
+     O estado vive só numa classe, nunca é gravado — aqui só se garante que uma
+     página restaurada aparece sempre com o menu fechado. */
+  window.addEventListener('pageshow', function(){ mostrarPainel(false); });
+
+  /* Ligar um rato (ou rodar para um contexto com hover) não pode deixar o
+     painel preso: fecha-se e devolve-se o título de origem ao botão. */
+  if (mqToque && mqToque.addEventListener){
+    mqToque.addEventListener('change', function(){
+      mostrarPainel(false);
+      var btn = document.getElementById('sidebarPinBtn');
+      if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
+    });
+  }
+
+  if (ehToque()) mostrarPainel(false);
 
   /* ---------- Separadores Escala / Pessoas / Recibos ----------
      Mesmo padrão do receitas.html. Fica FORA do autenticarEContinuar de
