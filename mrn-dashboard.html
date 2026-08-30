@@ -2093,10 +2093,19 @@ window.addEventListener('load', function () {
   // por período. Chave: {compromissoId}_{ano}-{mes}, ex. "renda_2026-8".
   var pagamentosConcluidosRef = db.ref('pagamentosConcluidos');
 
+  // Recibos e pessoas entram aqui só em LEITURA: alimentam os compromissos
+  // de categoria Pessoal ligados a uma pessoa (líquido real do mês ou média
+  // dos últimos recibos) e o compromisso derivado da TSU. Nada nesta página
+  // escreve nestes nós.
+  var recibosRef = db.ref('recibos');
+  var pessoasRef = db.ref('pessoas');
+
   var loadingEl = document.getElementById('paymentsLoading');
   var allPaymentRequests = {};
   var allCompromissos = {};
   var allPagamentosConcluidos = {};
+  var allRecibos = {};   // recibos/{pessoaId}/{AAAA-MM}
+  var allPessoas = {};   // pessoas/{id} — só leitura, para o vencimento base
 
   // Flags de carregamento partilhadas com a central de notificações,
   // declaradas aqui para não serem repostas por declarações posteriores.
@@ -2358,13 +2367,15 @@ window.addEventListener('load', function () {
     ocorrenciasCompromissos(ano, mes).forEach(function(o){
       var d = new Date(ano, mes - 1, o.dia);
       d.setHours(0, 0, 0, 0);
-      var c = allCompromissos[o.id] || {};
+      var c = compromissoPorId(o.id) || {};
       out.push({
         tipo: 'fixo',
         tipoCusto: tipoDe(c),
         compromissoId: o.id,
         fornecedor: o.nome,
         montante: o.montante,
+        estado: o.estado,
+        nota: o.nota,
         prazo: formatDateDDMMYYYY(d),
         prazoDate: d,
         dia: o.dia,
@@ -2453,6 +2464,13 @@ window.addEventListener('load', function () {
 
     h += '<div class="card-row"><span>Montante: ' + formatEuro(l.montante) +
          '<button type="button" class="copy-icon-btn" data-copiar="montante" title="Copiar montante">📋</button></span></div>';
+
+    // Compromissos derivados dos recibos (pessoais e TSU): de onde vem o
+    // número, e se é o valor real ou uma estimativa.
+    if (l.estado){
+      h += '<div class="card-row"><span class="pay-detalhe-nota">' + escapeHtml(rotuloEstado(l.estado)) +
+           (l.nota ? ' — ' + escapeHtml(l.nota) : '') + '</span></div>';
+    }
 
     h += '<div class="card-row"><span>Prazo: ' + escapeHtml(l.prazo || 'n/d') + '</span></div>';
 
@@ -2724,17 +2742,255 @@ window.addEventListener('load', function () {
     return total;
   }
 
-  // Valor de um compromisso num mês concreto. Com 'valorDiario' preenchido
-  // o valor é calculado (dias úteis × valor diário) e o campo 'valor' é
-  // ignorado; sem ele, comporta-se como sempre e usa 'valor'. Ponto único
-  // de leitura do montante de um compromisso.
-  function valorCompromisso(c, ano, mes){
-    if (!c) return 0;
+  /* ---------- Recibos → compromissos pessoais ----------
+     Um compromisso de categoria 'Pessoal' ligado a uma pessoa (pessoaId)
+     deixa de usar valor/valorDiario: o montante passa a vir dos recibos.
+     Mês COM recibo gravado usa o líquido real (confirmado); mês SEM recibo
+     usa a média dos últimos 3 recibos (estimado). Os valores nunca se
+     somam — a existência do recibo desliga a estimativa desse mês. Pessoa
+     sem recibos mantém exactamente o comportamento antigo.
+     ATENÇÃO: este bloco está duplicado em tesouraria.html e em
+     mrn-dashboard.html e tem de ser igual nos dois. */
+
+  // Taxa social única: 23,75% a cargo da empresa + 11% de quotização já
+  // retida ao trabalhador no recibo. A empresa entrega as duas partes num
+  // só pagamento, por isso o compromisso de tesouraria é o total.
+  var TSU_TAXA_TOTAL = 0.3475;
+  var TSU_TAXA_PATRONAL = 0.2375;
+  var TSU_ID = 'tsu';
+  var TSU_DIA = 20; // vence no dia 20 do mês SEGUINTE ao dos recibos
+
+  // Nome longo de propósito: mrn-dashboard.html já tem um centimos() que
+  // devolve cêntimos inteiros para a reconciliação da caixa.
+  function arredCentimos(v){
+    var n = Number(v);
+    return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+  }
+
+  // Os recibos são indexados por AAAA-MM COM zero à esquerda. O 'periodo'
+  // de pagamentosConcluidos é AAAA-M SEM zero (ver periodoCompromisso) —
+  // são formatos diferentes e nunca se misturam.
+  function periodoRecibo(ano, mes){
+    return ano + '-' + (mes < 10 ? '0' + mes : String(mes));
+  }
+
+  function mesAnterior(ano, mes){
+    return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano: ano, mes: mes - 1 };
+  }
+
+  function labelPeriodoRecibo(periodo){
+    var p = String(periodo).split('-');
+    var m = parseInt(p[1], 10);
+    if (!p[0] || isNaN(m) || m < 1 || m > 12) return String(periodo);
+    return MESES_PT[m - 1] + ' ' + p[0];
+  }
+
+  function reciboDoMes(pessoaId, ano, mes){
+    var m = allRecibos[pessoaId];
+    return (m && m[periodoRecibo(ano, mes)]) || null;
+  }
+
+  // Recibos da pessoa ANTERIORES ao mês pedido, do mais recente para o mais
+  // antigo. AAAA-MM ordena alfabeticamente na ordem cronológica.
+  function recibosAnteriores(pessoaId, ano, mes){
+    var m = allRecibos[pessoaId] || {};
+    var limite = periodoRecibo(ano, mes);
+    return Object.keys(m)
+      .filter(function(p){ return p < limite; })
+      .sort().reverse()
+      .map(function(p){ var r = m[p] || {}; return { periodo: p, totais: r.totais || {}, pessoa: r.pessoa || {} }; });
+  }
+
+  function liquidoDoRecibo(r){
+    var v = r && r.totais ? r.totais.liquido : null;
+    return (v === null || v === undefined || v === '') ? null : Number(v);
+  }
+
+  function baseDoRecibo(r){
+    var v = r && r.pessoa ? r.pessoa.vencimentoBase : null;
+    return (v === null || v === undefined || v === '') ? null : Number(v);
+  }
+
+  function baseAtualDaPessoa(pessoaId){
+    var p = allPessoas[pessoaId];
+    var v = p ? p.vencimentoBase : null;
+    return (v === null || v === undefined || v === '') ? null : Number(v);
+  }
+
+  function temRecibos(){
+    return Object.keys(allRecibos).some(function(pid){
+      return allRecibos[pid] && Object.keys(allRecibos[pid]).length > 0;
+    });
+  }
+
+  // Base agregada da Segurança Social de um mês de recibos: soma dos
+  // 'totais.sujeito' de TODOS os recibos desse mês, sem arredondar pelo
+  // caminho — a SS arredonda no agregado, e somar valores já arredondados
+  // por pessoa dá um cêntimo a mais (julho 2026: 749,03 e não 749,04).
+  function baseSSDoMes(ano, mes){
+    var periodo = periodoRecibo(ano, mes);
+    var total = 0, n = 0;
+    Object.keys(allRecibos).forEach(function(pessoaId){
+      var r = allRecibos[pessoaId] && allRecibos[pessoaId][periodo];
+      var s = r && r.totais ? r.totais.sujeito : null;
+      if (s === null || s === undefined || s === '') return;
+      total += Number(s);
+      n++;
+    });
+    return n ? { base: total, n: n, periodo: periodo } : null;
+  }
+
+  // Mês de recibos mais recente que existe, usado como base estimada quando
+  // o mês pedido ainda não tem recibos nenhuns.
+  function ultimaBaseSS(){
+    var periodos = {};
+    Object.keys(allRecibos).forEach(function(pessoaId){
+      Object.keys(allRecibos[pessoaId] || {}).forEach(function(p){ periodos[p] = true; });
+    });
+    var ordenados = Object.keys(periodos).sort().reverse();
+    for (var i = 0; i < ordenados.length; i++){
+      var p = ordenados[i].split('-');
+      var agg = baseSSDoMes(parseInt(p[0], 10), parseInt(p[1], 10));
+      if (agg) return agg;
+    }
+    return null;
+  }
+
+  // A TSU que se paga no mês (ano, mes) refere-se aos recibos do mês
+  // ANTERIOR. Sem recibos desse mês, estima com a base mais recente.
+  function detalheTSU(ano, mes){
+    var ref = mesAnterior(ano, mes);
+    var agg = baseSSDoMes(ref.ano, ref.mes);
+    if (agg){
+      return {
+        valor: arredCentimos(agg.base * TSU_TAXA_TOTAL),
+        estado: 'confirmado',
+        nota: '34,75% sobre ' + formatEuro(arredCentimos(agg.base)) + ' · ' + agg.n +
+              (agg.n === 1 ? ' recibo de ' : ' recibos de ') + labelPeriodoRecibo(agg.periodo)
+      };
+    }
+    var ultima = ultimaBaseSS();
+    if (ultima){
+      return {
+        valor: arredCentimos(ultima.base * TSU_TAXA_TOTAL),
+        estado: 'estimado',
+        nota: 'sem recibos de ' + labelPeriodoRecibo(periodoRecibo(ref.ano, ref.mes)) +
+              ' · base de ' + labelPeriodoRecibo(ultima.periodo) + ' (' + formatEuro(arredCentimos(ultima.base)) + ')'
+      };
+    }
+    return { valor: 0, estado: null, nota: '' };
+  }
+
+  // Compromisso virtual: a TSU não existe no nó compromissosFixos, é
+  // derivada inteiramente dos recibos. Só aparece quando há recibos.
+  function compromissoTSU(){
+    return {
+      id: TSU_ID,
+      derivado: 'tsu',
+      nome: 'Segurança Social (TSU)',
+      categoria: 'Estado',
+      tipo: 'fixo',
+      periodicidade: 'mensal',
+      dia: TSU_DIA,
+      meses: [],
+      ativo: true,
+      metodoPagamento: 'iban',
+      iban: '',
+      notas: '34,75% sobre o total sujeito dos recibos do mês anterior (23,75% da empresa + 11% retidos ao trabalhador).'
+    };
+  }
+
+  function ehTSU(c){
+    return !!(c && (c.derivado === 'tsu' || c.id === TSU_ID));
+  }
+
+  // allCompromissos vive no Firebase; a TSU é sintética. Toda a leitura de
+  // um compromisso por id passa por aqui para as duas coexistirem.
+  function compromissoPorId(id){
+    if (id === TSU_ID) return compromissoTSU();
+    return allCompromissos[id];
+  }
+
+  function idsCompromissos(){
+    var ids = Object.keys(allCompromissos);
+    if (temRecibos()) ids.push(TSU_ID);
+    return ids;
+  }
+
+  // Montante de um compromisso num mês concreto, com a origem do número:
+  //   'confirmado'     — recibo desse mês gravado, líquido real
+  //   'estimado'       — média dos últimos 3 recibos da pessoa
+  //   'estimado-base'  — média corrigida por um vencimento base novo que
+  //                      ainda não apareceu em nenhum recibo
+  //   null             — regra do próprio registo (valorDiario ou valor)
+  // Ponto ÚNICO de leitura do montante: alterar aqui, em mais lado nenhum.
+  function detalheCompromisso(c, ano, mes){
+    if (!c) return { valor: 0, estado: null, nota: '' };
+    if (ehTSU(c)) return detalheTSU(ano, mes);
+
+    if (c.pessoaId && allRecibos[c.pessoaId]){
+      var doMes = reciboDoMes(c.pessoaId, ano, mes);
+      var liq = liquidoDoRecibo(doMes);
+      if (liq !== null){
+        return {
+          valor: arredCentimos(liq),
+          estado: 'confirmado',
+          nota: 'líquido do recibo de ' + labelPeriodoRecibo(periodoRecibo(ano, mes))
+        };
+      }
+
+      var anteriores = recibosAnteriores(c.pessoaId, ano, mes).filter(function(r){
+        return liquidoDoRecibo(r) !== null;
+      });
+      if (anteriores.length){
+        var usados = anteriores.slice(0, 3);
+        var soma = usados.reduce(function(acc, r){ return acc + liquidoDoRecibo(r); }, 0);
+        var media = soma / usados.length;
+        var quantos = usados.length + (usados.length === 1 ? ' recibo' : ' recibos');
+
+        // Se o vencimento base ATUAL da pessoa já não é o do último recibo,
+        // houve aumento (ou redução) ainda não refletido em recibo nenhum e
+        // a média está obsoleta. Ajusta-se só a parte fixa: as rubricas
+        // variáveis (KM, suplementar) continuam a vir da média.
+        var baseAtual = baseAtualDaPessoa(c.pessoaId);
+        var baseUltimo = baseDoRecibo(anteriores[0]);
+        if (baseAtual !== null && baseUltimo !== null && Math.abs(baseAtual - baseUltimo) >= 0.005){
+          return {
+            valor: arredCentimos(media + (baseAtual - baseUltimo)),
+            estado: 'estimado-base',
+            nota: 'média de ' + quantos + ' (' + formatEuro(arredCentimos(media)) + ') · base ' +
+                  formatEuro(arredCentimos(baseUltimo)) + ' → ' + formatEuro(arredCentimos(baseAtual))
+          };
+        }
+
+        return {
+          valor: arredCentimos(media),
+          estado: 'estimado',
+          nota: 'média dos últimos ' + quantos
+        };
+      }
+    }
+
+    // Comportamento antigo, intacto: com 'valorDiario' preenchido o valor é
+    // calculado (dias úteis × valor diário) e o campo 'valor' é ignorado;
+    // sem ele, usa 'valor'.
     var diario = parseMontante(c.valorDiario);
     if (c.valorDiario !== undefined && c.valorDiario !== null && c.valorDiario !== '' && diario > 0){
-      return diasUteis(ano, mes) * diario;
+      return { valor: diasUteis(ano, mes) * diario, estado: null, nota: '' };
     }
-    return parseMontante(c.valor);
+    return { valor: parseMontante(c.valor), estado: null, nota: '' };
+  }
+
+  function valorCompromisso(c, ano, mes){
+    return detalheCompromisso(c, ano, mes).valor;
+  }
+
+  // Etiqueta curta para mostrar ao lado do número.
+  function rotuloEstado(estado){
+    if (estado === 'confirmado') return 'confirmado';
+    if (estado === 'estimado') return 'estimado';
+    if (estado === 'estimado-base') return 'estimado · base atualizada';
+    return '';
   }
 
   // Firebase devolve arrays contíguos como array, mas com buracos devolve
@@ -2747,11 +3003,12 @@ window.addEventListener('load', function () {
 
   // Gera as ocorrências dos compromissos fixos ativos que caem no mês
   // pedido. 'meses' vazio = todos os meses; 'dia' em falta = por confirmar,
-  // não gera ocorrência.
+  // não gera ocorrência. Inclui a TSU, que é derivada dos recibos e não
+  // existe no nó compromissosFixos.
   function ocorrenciasCompromissos(ano, mes){
     var out = [];
-    Object.keys(allCompromissos).forEach(function(id){
-      var c = allCompromissos[id];
+    idsCompromissos().forEach(function(id){
+      var c = compromissoPorId(id);
       if (!c || !c.ativo) return;
 
       var meses = mesesArray(c.meses);
@@ -2769,6 +3026,10 @@ window.addEventListener('load', function () {
         dia = Math.max(1, Math.min(dia, nd));
       }
 
+      var det = detalheCompromisso(c, ano, mes);
+      // A TSU sem base nenhuma não é um pagamento: não gera ocorrência.
+      if (ehTSU(c) && det.valor <= 0) return;
+
       out.push({
         tipo: 'fixo',
         // 'tipo' aqui é a origem (pedido vs compromisso); 'tipoCusto' é a
@@ -2777,7 +3038,9 @@ window.addEventListener('load', function () {
         id: id,
         nome: c.nome || id,
         categoria: c.categoria || 'Outros',
-        montante: valorCompromisso(c, ano, mes),
+        montante: det.valor,
+        estado: det.estado,
+        nota: det.nota,
         dia: dia
       });
     });
@@ -2795,6 +3058,18 @@ window.addEventListener('load', function () {
   // pagamentosConcluidos que diz quais dessas ocorrências já saíram.
   compromissosRef.on('value', function(snapshot){
     allCompromissos = snapshot.val() || {};
+    if (pagamentosCarregados) renderPagamentosCard();
+  });
+
+  // Os compromissos pessoais e a TSU derivam destes dois nós — mudam o
+  // montante mostrado, por isso repintam o cartão como qualquer outro.
+  recibosRef.on('value', function(snapshot){
+    allRecibos = snapshot.val() || {};
+    if (pagamentosCarregados) renderPagamentosCard();
+  });
+
+  pessoasRef.on('value', function(snapshot){
+    allPessoas = snapshot.val() || {};
     if (pagamentosCarregados) renderPagamentosCard();
   });
 

@@ -75,7 +75,20 @@ recibos               — recibos de vencimento importados: recibos/{pessoaId}/{
                          da mesma pessoa substitui o registo
 compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância;
                          com valorDiario preenchido o montante é calculado por mês
-                         (dias úteis seg-sex × valorDiario) e o campo valor é ignorado
+                         (dias úteis seg-sex × valorDiario) e o campo valor é ignorado.
+                         Campo opcional pessoaId (push key de pessoas), só para a
+                         categoria 'Pessoal': ligado a uma pessoa, o montante deixa de
+                         vir de valor/valorDiario e passa a derivar dos recibos —
+                         líquido real no mês com recibo (confirmado), média dos últimos
+                         3 nos meses sem (estimado), corrigida pela diferença de
+                         vencimentoBase quando há aumento ainda sem recibo. Sem
+                         pessoaId, ou pessoa sem recibos, nada muda.
+                         A Segurança Social (TSU) é um compromisso VIRTUAL de id 'tsu':
+                         não existe no nó, é derivado dos recibos (34,75% sobre a soma
+                         dos totais.sujeito do mês anterior, arredondado uma só vez no
+                         agregado) e vence no dia 20.
+                         ATENÇÃO: esta lógica está duplicada em tesouraria.html e em
+                         mrn-dashboard.html e tem de ser igual nos dois ficheiros
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 ```
