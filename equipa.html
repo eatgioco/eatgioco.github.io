@@ -4518,11 +4518,15 @@ window.addEventListener('load', function () {
 
   function recDesEspacar(t){
     var toks = String(t).split(' ').filter(Boolean);
-    if (toks.length < 3) return t;
+    if (toks.length < 4) return t;
     var soltos = 0;
     toks.forEach(function(x){ if (x.length === 1) soltos++; });
     var media = t.replace(/ /g, '').length / toks.length;
-    if (media > 2.2 || soltos < toks.length / 2) return t;
+    /* Dois sinais ao mesmo tempo: muitas peças de uma letra só E peças curtas
+       em média. "Alfr e do Gia n g asp ero" tem 3 de 8 soltas e média 2,4 —
+       passa; "IRS a reportar" tem 1 de 3 mas média 4 — não passa, e ainda bem,
+       que colá-lo dava "IRS areportar". */
+    if (media > 2.6 || soltos / toks.length < 0.3) return t;
     return t.replace(/ (.)/g, function(m, c){ return /[A-ZÀ-Þ]/.test(c) ? ' ' + c : c; });
   }
 
@@ -4857,7 +4861,21 @@ window.addEventListener('load', function () {
      posição lhes der. */
   function recLerCelulas(celulas, cols){
     var descricao = '', numeros = [], taxaPercent = null;
+    /* O pdf.js às vezes entrega a descrição e a quantidade no MESMO item de
+       texto ("...Viatura Própria 1390"), e aí o número ficava dentro da
+       descrição. Separa-se o número do fim, exigindo vírgula decimal para não
+       partir descrições que acabem num ano ou num código. */
+    var partidas = [];
     celulas.forEach(function(c){
+      var ms = c.texto.match(/^(.*[^\d.,\s])\s+(\d[\d.]*,\d+)$/);
+      if (ms){
+        partidas.push({ x: c.x, x2: c.x, texto: ms[1] });
+        partidas.push({ x: c.x2, x2: c.x2, texto: ms[2] });
+      } else {
+        partidas.push(c);
+      }
+    });
+    partidas.forEach(function(c){
       var mp = c.texto.match(/^([\d.,]+)\s*%$/);
       if (mp){ if (taxaPercent === null) taxaPercent = recNum(mp[1]); return; }
       var n = recNum(c.texto);
@@ -5036,7 +5054,12 @@ window.addEventListener('load', function () {
           var abaixo = [];
           for (var eb = ex + 1; eb < Math.min(ex + 7, cabecalho.length); eb++){
             cabecalho[eb].celulas.forEach(function(c){
-              if (Math.abs(c.x - colX) <= 40) abaixo.push(c.texto.replace(/[,\s]+$/, ''));
+              if (Math.abs(c.x - colX) > 40) return;
+              /* A coluna do destinatário acaba onde começa o cabeçalho dos
+                 campos ("Nº Beneficiário", "Nº Contribuinte", "Data"…) — sem
+                 isto, a morada engolia o rótulo da coluna seguinte. */
+              if (/^(n[.ºo]{0,3}(contribuinte|benefici|funcion)|contribuinte|data|sec[çc][ãa]o|categoria|vencimento|banco|seguradora)/i.test(c.chave)) return;
+              abaixo.push(c.texto.replace(/[,\s]+$/, ''));
             });
           }
           if (abaixo.length){
