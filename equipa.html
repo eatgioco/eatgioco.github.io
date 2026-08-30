@@ -5680,6 +5680,24 @@ window.addEventListener('load', function () {
   });
 
   /* ---------- 12. Histórico ---------- */
+  /* As duas saídas de um recibo: transferência para a conta e carregamento
+     do cartão de refeição. O cartão é o valor lido (é o carregamento exacto)
+     e a conta é o resto do líquido, para que conta + cartão dê SEMPRE o
+     líquido. É a mesma regra que a tesouraria usa em partesDoRecibo(). */
+  function recPartes(r){
+    var pg = (r && r.pagamento) || {};
+    var t = (r && r.totais) || {};
+    var cartao = recNumOuNull(pg.cartao);
+    var conta = recNumOuNull(pg.conta);
+    var liq = recNumOuNull(t.liquido);
+    if (liq === null) liq = (cartao || 0) + (conta || 0);
+    liq = recRound(liq);
+    if (cartao === null) cartao = (conta === null) ? 0 : liq - conta;
+    cartao = recRound(cartao);
+    if (liq >= 0) cartao = Math.min(Math.max(cartao, 0), liq);
+    return { conta: recRound(liq - cartao), cartao: cartao, liquido: liq };
+  }
+
   function recRenderHistorico(){
     var wrap = document.getElementById('recHistorico');
     if (!wrap) return;
@@ -5706,13 +5724,16 @@ window.addEventListener('load', function () {
         var nb = (pessoas[b.pessoaId] && pessoas[b.pessoaId].nome) || (b.pessoa && b.pessoa.nome) || '';
         return String(na).localeCompare(String(nb), 'pt');
       });
-      var tot = { sujeito:0, naoSujeito:0, descontos:0, liquido:0 };
+      var tot = { sujeito:0, naoSujeito:0, descontos:0, liquido:0, conta:0, cartao:0 };
       linhas.forEach(function(r){
         var t = r.totais || {};
+        var p = recPartes(r);
         tot.sujeito += t.sujeito || 0;
         tot.naoSujeito += t.naoSujeito || 0;
         tot.descontos += t.descontos || 0;
         tot.liquido += t.liquido || 0;
+        tot.conta += p.conta;
+        tot.cartao += p.cartao;
       });
       /* A Segurança Social arredonda no AGREGADO: a base é a soma dos totais
          sujeitos de todos os recibos do mês e o arredondamento é feito UMA
@@ -5728,6 +5749,7 @@ window.addEventListener('load', function () {
       html += '<span class="rec-hist-mes-nome">' + escapeHtml(recPeriodoLabel(periodo)) + '</span>';
       html += '<span class="rec-hist-custo">' + linhas.length + (linhas.length === 1 ? ' recibo' : ' recibos') +
               ' · líquido pago <strong>' + recFmt(tot.liquido) + '</strong>' +
+              ' (conta ' + recFmt(recRound(tot.conta)) + ' + cartão ' + recFmt(recRound(tot.cartao)) + ')' +
               ' · custo real <strong>' + recFmt(custoReal) + '</strong>' +
               '<span class="rec-hist-custo-detalhe">bruto ' + recFmt(tot.sujeito + tot.naoSujeito) +
               ' (sujeito ' + recFmt(tot.sujeito) + ' + não sujeito ' + recFmt(tot.naoSujeito) + ')' +
@@ -5735,7 +5757,8 @@ window.addEventListener('load', function () {
       html += '</div>';
       html += '<div class="rec-tabela-wrap"><table class="rec-tabela rec-hist-tabela"><thead><tr>' +
               '<th>Pessoa</th><th>Nº recibo</th><th class="rec-num">Sujeito</th><th class="rec-num">Não sujeito</th>' +
-              '<th class="rec-num">Descontos</th><th class="rec-num">Líquido</th><th>Estado</th>' +
+              '<th class="rec-num">Descontos</th><th class="rec-num">Líquido</th>' +
+              '<th class="rec-num">Para conta</th><th class="rec-num">Para cartão</th><th>Estado</th>' +
               '</tr></thead><tbody>';
       linhas.forEach(function(r){
         var t = r.totais || {};
@@ -5747,6 +5770,8 @@ window.addEventListener('load', function () {
         html += '<td class="rec-num">' + recFmt(t.naoSujeito) + '</td>';
         html += '<td class="rec-num">' + recFmt(t.descontos) + '</td>';
         html += '<td class="rec-num">' + recFmt(t.liquido) + '</td>';
+        html += '<td class="rec-num">' + recFmt(recPartes(r).conta) + '</td>';
+        html += '<td class="rec-num">' + recFmt(recPartes(r).cartao) + '</td>';
         html += '<td>' + (r.validacao && r.validacao.ok
           ? '<span class="rec-selo rec-selo-ok">OK</span>'
           : '<span class="rec-selo rec-selo-erro">Por rever</span>') + '</td>';
@@ -5756,13 +5781,15 @@ window.addEventListener('load', function () {
               '<td class="rec-num">' + recFmt(tot.sujeito) + '</td>' +
               '<td class="rec-num">' + recFmt(tot.naoSujeito) + '</td>' +
               '<td class="rec-num">' + recFmt(tot.descontos) + '</td>' +
-              '<td class="rec-num">' + recFmt(tot.liquido) + '</td><td></td></tr>';
+              '<td class="rec-num">' + recFmt(tot.liquido) + '</td>' +
+              '<td class="rec-num">' + recFmt(recRound(tot.conta)) + '</td>' +
+              '<td class="rec-num">' + recFmt(recRound(tot.cartao)) + '</td><td></td></tr>';
       /* Linha de custo: não é um recibo nem um total de recibos, é o que a
          empresa suporta — por isso não se encaixa nas colunas de cima e
          ocupa-as com a explicação, deixando só o número na do total. */
       html += '<tr class="rec-hist-custo-linha"><td colspan="5">Custo real da empresa · bruto ' +
               recFmt(tot.sujeito + tot.naoSujeito) + ' + TSU patronal 23,75% ' + recFmt(tsuPatronal) + '</td>' +
-              '<td class="rec-num">' + recFmt(custoReal) + '</td><td></td></tr>';
+              '<td class="rec-num">' + recFmt(custoReal) + '</td><td></td><td></td><td></td></tr>';
       html += '</tbody></table></div></div>';
     });
     wrap.innerHTML = html;

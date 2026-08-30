@@ -83,6 +83,14 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          3 nos meses sem (estimado), corrigida pela diferença de
                          vencimentoBase quando há aumento ainda sem recibo. Sem
                          pessoaId, ou pessoa sem recibos, nada muda.
+                         Ligado aos recibos, o compromisso gera DUAS ocorrências por
+                         mês — transferência (pagamento.conta) e carregamento do cartão
+                         de refeição (pagamento.cartao) — cuja soma é sempre o líquido.
+                         A ocorrência do cartão tem id {compromissoId}~cartao (o '~' é
+                         chave válida no RTDB e não colide com o '_' do período) e dia
+                         próprio no campo opcional diaCartao, que por defeito é o dia da
+                         transferência. As médias são feitas por destino e o ajuste de
+                         vencimentoBase entra só na transferência.
                          A Segurança Social (TSU) é um compromisso VIRTUAL de id 'tsu':
                          não existe no nó, é derivado dos recibos (34,75% sobre a soma
                          dos totais.sujeito do mês anterior, arredondado uma só vez no
