@@ -36,7 +36,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
-| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores) e Recibos (placeholder — importação de recibos em PDF com pdf.js, por construir) | Equipa |
+| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `mrn-dashboard.html` | Dashboard privado: pagamentos, tarefas, Instagram, pedidos espelhados | Só Manel |
@@ -67,6 +67,12 @@ preparacoes           — fichas técnicas de preparações internas (molhos, pe
                          custoManualPorUnidade quando custoManual=true
 receitas              — fichas técnicas dos artigos vendidos (componentes =
                          ingredientes + preparações, pvp, avisos por confirmar)
+recibos               — recibos de vencimento importados: recibos/{pessoaId}/{AAAA-MM}
+                         (AAAA-MM COM zero à esquerda — NÃO é o formato AAAA-M do
+                         periodo de pagamentosConcluidos). Guarda meta, pessoa,
+                         linhas[], descontos[], totais, pagamento, textoBruto e
+                         validacao. O PDF NÃO é guardado. Reimportar o mesmo mês
+                         da mesma pessoa substitui o registo
 compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância;
                          com valorDiario preenchido o montante é calculado por mês
                          (dias úteis seg-sex × valorDiario) e o campo valor é ignorado

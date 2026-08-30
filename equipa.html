@@ -20,6 +20,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- pdf.js: extração dos recibos de vencimento em PDF. Decisão fechada — nunca
+     Azure Document Intelligence. Só lê o texto; o PDF não sai do browser. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   /* ======================================================================
      equipa.html — estilos próprios da página.
@@ -287,22 +290,291 @@
   .tab-panel{ display:none; }
   .tab-panel.active{ display:block; }
 
-  /* Placeholder do separador Recibos (construído no passo seguinte). */
-  .em-breve{
-    margin-top:24px;
+  /* ---------- Separador RECIBOS ----------
+     Importação de recibos de vencimento em PDF (pdf.js). Sem @media, como o
+     resto da página: a adaptação a ecrã estreito é só overflow-x:auto nos
+     invólucros de tabela e larguras em min()/clamp(). */
+  .rec-drop{
+    border:2px dashed var(--line);
+    border-radius:14px;
+    background:var(--white);
+    padding:32px 20px;
     text-align:center;
-    padding:60px 20px;
-    font-size:13.5px;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+
+  .rec-drop:hover{ border-color:var(--red); }
+
+  .rec-drop.rec-drop-ativo{
+    border-color:var(--green);
+    background:var(--green-bg);
+  }
+
+  .rec-drop-titulo{
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    font-weight:700;
+  }
+
+  .rec-drop-sub{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  /* ---------- Fila de ficheiros por conferir ---------- */
+  .rec-fila{ margin-top:16px; }
+
+  .rec-fila:empty{ display:none; }
+
+  .rec-fila-item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--white);
+    margin-bottom:8px;
+    font-size:13px;
+  }
+
+  .rec-fila-nome{
+    font-weight:600;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .rec-fila-sub{
+    font-size:11.5px;
     color:var(--muted);
   }
 
-  .em-breve strong{
+  .rec-fila-espaco{ flex:1 1 20px; }
+
+  /* ---------- Selos de estado ---------- */
+  .rec-selo{
+    font-size:10.5px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:100px;
+    white-space:nowrap;
+  }
+
+  .rec-selo-ok{ background:var(--green-bg); color:var(--green); }
+  .rec-selo-erro{ background:var(--amber-bg); color:var(--amber); }
+
+  /* ---------- Modal de conferência ----------
+     Mais largo que o modal padrão: leva duas tabelas editáveis. */
+  /* Dupla classe de propósito: o .modal genérico (480px) está definido MAIS
+     ABAIXO nesta folha e, com a mesma especificidade, ganhava a este. */
+  .modal.modal-recibo{ max-width:920px; }
+
+  .rec-conf-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+    gap:12px;
+    margin-bottom:18px;
+  }
+
+  .rec-bloco-titulo{
+    margin:22px 0 10px;
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .rec-tabela-wrap{
+    overflow-x:auto;
+    border:1px solid var(--line);
+    border-radius:12px;
+  }
+
+  .rec-tabela{
+    width:100%;
+    min-width:640px;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+
+  .rec-tabela th{
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+    text-align:left;
+    padding:8px 10px;
+    background:var(--dough);
+    white-space:nowrap;
+  }
+
+  .rec-tabela td{
+    padding:5px 8px;
+    border-top:1px solid var(--line);
+    vertical-align:middle;
+  }
+
+  .rec-tabela td.rec-num,
+  .rec-tabela th.rec-num{ text-align:right; }
+
+  .rec-tabela input[type="text"],
+  .rec-tabela input[type="number"]{
+    width:100%;
+    padding:6px 8px;
+    font-size:12.5px;
+    border:1px solid transparent;
+    border-radius:8px;
+    background:transparent;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+  }
+
+  .rec-tabela input:hover{ border-color:var(--line); }
+
+  .rec-tabela input:focus{
+    outline:none;
+    border-color:var(--red);
+    background:var(--white);
+  }
+
+  .rec-tabela input.rec-num{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .rec-tabela input[type="checkbox"]{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+  }
+
+  .rec-tabela .rec-apagar-linha{
+    border:none;
+    background:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:15px;
+    line-height:1;
+    padding:2px 6px;
+  }
+
+  .rec-tabela .rec-apagar-linha:hover{ color:var(--red); }
+
+  /* ---------- Validações ---------- */
+  .rec-validacoes{
+    margin-top:18px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+  }
+
+  .rec-val-item{
+    display:flex;
+    gap:10px;
+    align-items:baseline;
+    padding:9px 12px;
+    font-size:12.5px;
+    border-top:1px solid var(--line);
+  }
+
+  .rec-val-item:first-child{ border-top:none; }
+
+  .rec-val-item.rec-val-erro{ background:var(--amber-bg); }
+
+  .rec-val-icon{ flex-shrink:0; }
+
+  .rec-val-detalhe{
+    color:var(--muted);
+    font-size:11.5px;
     display:block;
+    margin-top:2px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .rec-aviso{
+    margin-top:12px;
+    font-size:12px;
+    color:var(--amber);
+    line-height:1.5;
+  }
+
+  .rec-bruto{
+    margin-top:16px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .rec-bruto pre{
+    margin:8px 0 0;
+    max-height:260px;
+    overflow:auto;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    line-height:1.5;
+    background:var(--dough);
+    border-radius:10px;
+    padding:10px 12px;
+  }
+
+  /* ---------- Histórico ---------- */
+  .rec-hist-mes{
+    margin-bottom:22px;
+  }
+
+  .rec-hist-cab{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+
+  .rec-hist-mes-nome{
     font-family:'Antonio', sans-serif;
     text-transform:uppercase;
-    font-size:22px;
-    color:var(--ink);
-    margin-bottom:8px;
+    font-size:18px;
+  }
+
+  .rec-hist-custo{
+    font-size:12.5px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .rec-hist-tabela tr.rec-hist-total td{
+    font-weight:700;
+    background:var(--dough);
+  }
+
+  .rec-hist-tabela tbody tr.rec-hist-pessoa{ cursor:pointer; }
+  .rec-hist-tabela tbody tr.rec-hist-pessoa:hover td{ background:var(--zebra); }
+
+  .rec-vazio{
+    padding:34px 20px;
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .btn-danger{
+    border-color:var(--red);
+    color:var(--red);
+  }
+
+  .btn-danger:hover{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
   }
 
   h2,h3{ font-family:'Inter', sans-serif; }
@@ -1785,13 +2057,25 @@
       </div>
 
       <!-- ================= Separador RECIBOS =================
-           Placeholder. A importação de recibos de vencimento em PDF entra
-           no passo seguinte, com pdf.js — nunca Azure. -->
+           Importação de recibos de vencimento em PDF com pdf.js (nunca Azure).
+           O PDF NÃO é guardado: fica só o texto extraído e os valores lidos. -->
       <div class="tab-panel" id="painelRecibos">
-        <div class="em-breve card glass-light">
-          <strong>Em breve</strong>
-          Importação de recibos de vencimento em PDF, extração de valores,
-          histórico por pessoa e custo mensal.
+        <div class="section">
+          <p class="section-title">Importar recibos</p>
+          <div class="rec-drop" id="recDrop">
+            <div class="rec-drop-titulo">Arrasta aqui os recibos em PDF</div>
+            <div class="rec-drop-sub">
+              ou clica para escolher — vários de uma vez.<br>
+              O PDF não é guardado: ficam só o texto lido e os valores.
+            </div>
+          </div>
+          <input type="file" id="recFileInput" accept="application/pdf" multiple style="display:none;">
+          <div class="rec-fila" id="recFila"></div>
+        </div>
+
+        <div class="section">
+          <p class="section-title">Histórico</p>
+          <div id="recHistorico"></div>
         </div>
       </div>
 
@@ -2058,6 +2342,153 @@
     <div class="modal-actions">
       <button type="button" class="btn" id="fecharTurnoSemanaCancel">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btnGuardarFecharTurnoSemana">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de conferência do recibo: valores lidos (todos editáveis) + as cinco
+     validações. Nada é gravado sem passar por aqui. -->
+<div class="modal-overlay" id="recConfOverlay">
+  <div class="modal modal-recibo">
+    <div class="modal-header">
+      <h2 id="recConfTitulo">Conferir recibo</h2>
+      <button class="modal-close" id="recConfClose">×</button>
+    </div>
+
+    <div class="rec-conf-grid">
+      <div class="field">
+        <label class="field-label">Pessoa *</label>
+        <select id="recPessoaSelect"></select>
+      </div>
+      <div class="field">
+        <label class="field-label">Mês de referência *</label>
+        <input type="month" id="recPeriodo">
+      </div>
+      <div class="field">
+        <label class="field-label">Nº recibo</label>
+        <input type="text" id="recNrRecibo">
+      </div>
+      <div class="field">
+        <label class="field-label">Data</label>
+        <input type="date" id="recData">
+      </div>
+    </div>
+
+    <p class="rec-bloco-titulo">Dados do recibo</p>
+    <div class="rec-conf-grid">
+      <div class="field">
+        <label class="field-label">Nome</label>
+        <input type="text" id="recNome">
+      </div>
+      <div class="field">
+        <label class="field-label">NIF</label>
+        <input type="text" id="recNif" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label class="field-label">NISS</label>
+        <input type="text" id="recNiss" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label class="field-label">Nº funcionário</label>
+        <input type="text" id="recNrFuncionario" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label class="field-label">Categoria</label>
+        <input type="text" id="recCategoria">
+      </div>
+      <div class="field">
+        <label class="field-label">Secção</label>
+        <input type="text" id="recSeccao">
+      </div>
+      <div class="field">
+        <label class="field-label">Vencimento base (€)</label>
+        <input type="number" step="0.01" id="recVencimentoBase" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Vencimento diário (€)</label>
+        <input type="number" step="0.01" id="recVencimentoDiario" class="rec-num">
+      </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label class="field-label">Morada</label>
+        <input type="text" id="recMorada">
+      </div>
+    </div>
+
+    <p class="rec-bloco-titulo">Rubricas</p>
+    <div class="rec-tabela-wrap">
+      <table class="rec-tabela" id="recLinhasTabela">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th class="rec-num">Quantidade</th>
+            <th class="rec-num">Valor unitário</th>
+            <th class="rec-num">Valor</th>
+            <th>Sujeito</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="recLinhasBody"></tbody>
+      </table>
+    </div>
+    <button type="button" class="btn" id="recAddLinha" style="margin-top:10px;">+ Rubrica</button>
+
+    <p class="rec-bloco-titulo">Descontos</p>
+    <div class="rec-tabela-wrap">
+      <table class="rec-tabela" id="recDescontosTabela">
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th class="rec-num">Taxa (%)</th>
+            <th class="rec-num">Valor</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="recDescontosBody"></tbody>
+      </table>
+    </div>
+    <button type="button" class="btn" id="recAddDesconto" style="margin-top:10px;">+ Desconto</button>
+
+    <p class="rec-bloco-titulo">Totais e pagamento</p>
+    <div class="rec-conf-grid">
+      <div class="field">
+        <label class="field-label">Total sujeito (€)</label>
+        <input type="number" step="0.01" id="recTotalSujeito" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Total não sujeito (€)</label>
+        <input type="number" step="0.01" id="recTotalNaoSujeito" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Total descontos (€)</label>
+        <input type="number" step="0.01" id="recTotalDescontos" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Líquido (€)</label>
+        <input type="number" step="0.01" id="recTotalLiquido" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Recebido em cartão (€)</label>
+        <input type="number" step="0.01" id="recPagCartao" class="rec-num">
+      </div>
+      <div class="field">
+        <label class="field-label">Recebido na conta (€)</label>
+        <input type="number" step="0.01" id="recPagConta" class="rec-num">
+      </div>
+    </div>
+
+    <p class="rec-bloco-titulo">Validações</p>
+    <div class="rec-validacoes" id="recValidacoes"></div>
+    <div class="rec-aviso" id="recAviso" style="display:none;"></div>
+
+    <details class="rec-bruto">
+      <summary>Texto extraído do PDF</summary>
+      <pre id="recTextoBruto"></pre>
+    </details>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-mr-auto btn-danger" id="recApagar" style="display:none;">Apagar recibo</button>
+      <button type="button" class="btn" id="recCancelar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="recGravar">Gravar</button>
     </div>
   </div>
 </div>
@@ -2657,6 +3088,8 @@ window.addEventListener('load', function () {
     dadosProntos.pessoas = true;
     renderPessoas();
     renderTudo();
+    /* O histórico de recibos mostra nomes de pessoas: repinta quando elas mudam. */
+    recRenderHistorico();
     tentarFechoAutomatico();
   });
 
@@ -3911,6 +4344,10 @@ window.addEventListener('load', function () {
   /* Esc fecha primeiro o calendário de "Ir para data", que abre por cima do mensal */
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Escape') return;
+    if (document.getElementById('recConfOverlay').classList.contains('open')){
+      recFecharConferencia();
+      return;
+    }
     if (document.getElementById('calModalOverlay').classList.contains('open')){
       closeCalModal();
       return;
@@ -3930,6 +4367,1273 @@ window.addEventListener('load', function () {
     renderGrelha();
     atualizarBlocosMensaisExistentes();
   }
+
+  /* ======================================================================
+     RECIBOS — importação de recibos de vencimento em PDF
+     ======================================================================
+
+     REGRAS DESTE MÓDULO (decisões fechadas, não reabrir):
+       · extração com pdf.js via CDN — nunca Azure Document Intelligence;
+       · o PDF NÃO é guardado: fica o texto extraído e os valores lidos;
+       · escreve só em 'recibos' (e o NIF em 'pessoas', quando falta). Nunca
+         toca em compromissosFixos, pagamentosConcluidos, tesouraria ou
+         mrn-dashboard.
+
+     O texto sai do pdf.js desordenado. Um parser sequencial linha a linha
+     FALHA: no cabeçalho o nº de recibo, o NIF, o NISS e o nº de funcionário
+     aparecem dispersos e trocam-se entre si. Por isso todo o trabalho aqui é
+     feito sobre GEOMETRIA: agrupa-se por coordenada Y para formar linhas,
+     ordena-se por X dentro de cada linha, e os campos são procurados a partir
+     do rótulo (à direita dele, ou por baixo na mesma coluna), com um validador
+     de forma por campo (NIF 9 dígitos, NISS 11, etc.).
+     ====================================================================== */
+
+  /* O pdf.js precisa do worker; sem isto ou bloqueia o interface ou nem corre. */
+  if (typeof pdfjsLib !== 'undefined'){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  var recibosRef = db.ref('recibos');
+  var recibos = {};            /* { pessoaId: { 'AAAA-MM': registo } } */
+  var recFila = [];            /* recibos lidos à espera de conferência */
+  var recConf = null;          /* recibo aberto no modal de conferência */
+  var recSeqId = 0;
+
+  var REC_MESES = ['janeiro','fevereiro','março','abril','maio','junho',
+                   'julho','agosto','setembro','outubro','novembro','dezembro'];
+  var REC_MESES_CURTOS = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+  /* Taxa da contribuição do trabalhador para a Segurança Social. Fixa: é o que
+     a validação (b) confere contra o recibo, não é para calcular nada. */
+  var REC_TAXA_SS = 0.11;
+  var REC_TOL = 0.011;         /* tolerância de 1 cêntimo, com folga de vírgula flutuante */
+
+  /* ---------- Números em português ----------
+     "1.073,34" → 1073.34 · "10,20" → 10.2 · "1.330,0" → 1330 */
+  function recNum(txt){
+    if (txt === null || txt === undefined) return null;
+    var t = String(txt).replace(/[€\s ]/g, '');
+    if (!t) return null;
+    var neg = /^\(.+\)$/.test(t) || /^-/.test(t) || /-$/.test(t);
+    t = t.replace(/[()\-+]/g, '');
+    if (!/^[\d.,]+$/.test(t) || !/\d/.test(t)) return null;
+    var temVirgula = t.indexOf(',') >= 0;
+    var temPonto = t.indexOf('.') >= 0;
+    if (temVirgula && temPonto) t = t.replace(/\./g, '').replace(',', '.');
+    else if (temVirgula) t = t.replace(',', '.');
+    else if (temPonto){
+      var partes = t.split('.');
+      /* "1.330" é milhar; "10.20" é decimal. O critério é o tamanho do último grupo. */
+      if (partes.length > 2 || partes[partes.length - 1].length === 3) t = partes.join('');
+    }
+    var n = parseFloat(t);
+    if (isNaN(n)) return null;
+    return neg ? -n : n;
+  }
+
+  function recRound(n){
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
+  function recFmt(n){
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return Number(n).toLocaleString('pt-PT', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+  }
+
+  function recNumOuNull(v){
+    if (v === '' || v === null || v === undefined) return null;
+    var n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+
+  /* Rótulo legível de um período AAAA-MM */
+  function recPeriodoLabel(periodo){
+    var p = String(periodo || '').split('-');
+    if (p.length !== 2) return periodo || '—';
+    var mi = parseInt(p[1], 10) - 1;
+    var nome = REC_MESES[mi] || p[1];
+    return nome.charAt(0).toUpperCase() + nome.slice(1) + ' ' + p[0];
+  }
+
+  /* ---------- 1. PDF → linhas com geometria ----------
+     Cada linha é { pagina, y, celulas:[{x, x2, texto}], texto }. As células são
+     fragmentos do pdf.js já colados: fragmentos com folga pequena entre si
+     pertencem à mesma célula (palavras da mesma coluna); folgas grandes separam
+     colunas, que é o que permite distinguir "sujeito" de "não sujeito" e o
+     valor de um desconto do valor de uma remuneração. */
+  var REC_TOL_Y = 2.5;         /* mesma linha quando o Y difere menos do que isto */
+  var REC_GAP_CELULA = 4;      /* folga em X a partir da qual começa outra célula */
+
+  function recLerArrayBuffer(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(reader.error || new Error('Falha a ler o ficheiro.')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function recPdfParaLinhas(file){
+    if (typeof pdfjsLib === 'undefined') {
+      return Promise.reject(new Error('O pdf.js não carregou (verifica a ligação à Internet).'));
+    }
+    return recLerArrayBuffer(file).then(function(buf){
+      return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    }).then(function(pdf){
+      var paginas = [];
+      var seq = Promise.resolve();
+      for (var i = 1; i <= pdf.numPages; i++){
+        (function(n){
+          seq = seq.then(function(){
+            return pdf.getPage(n)
+              .then(function(p){ return p.getTextContent(); })
+              .then(function(tc){ paginas.push({ n:n, itens:tc.items }); });
+          });
+        })(i);
+      }
+      return seq.then(function(){
+        paginas.sort(function(a,b){ return a.n - b.n; });
+        var linhas = [];
+        paginas.forEach(function(pag){
+          linhas = linhas.concat(recItensParaLinhas(pag.itens, pag.n));
+        });
+        return linhas;
+      });
+    });
+  }
+
+  function recItensParaLinhas(itens, pagina){
+    var brutos = [];
+    (itens || []).forEach(function(it){
+      var texto = String(it.str === undefined ? '' : it.str);
+      if (!texto.trim()) return;
+      var tr = it.transform || [1,0,0,1,0,0];
+      brutos.push({
+        x: tr[4],
+        y: tr[5],
+        w: typeof it.width === 'number' ? it.width : texto.length * 4,
+        texto: texto
+      });
+    });
+    /* Agrupar por Y (de cima para baixo) */
+    brutos.sort(function(a,b){ return b.y - a.y || a.x - b.x; });
+    var grupos = [];
+    brutos.forEach(function(it){
+      var g = grupos.length ? grupos[grupos.length - 1] : null;
+      if (g && Math.abs(g.y - it.y) <= REC_TOL_Y) g.itens.push(it);
+      else grupos.push({ y: it.y, itens: [it] });
+    });
+    /* Ordenar por X e colar fragmentos em células */
+    return grupos.map(function(g){
+      g.itens.sort(function(a,b){ return a.x - b.x; });
+      var celulas = [];
+      g.itens.forEach(function(it){
+        var ult = celulas.length ? celulas[celulas.length - 1] : null;
+        var gap = ult ? it.x - ult.x2 : Infinity;
+        if (ult && gap < REC_GAP_CELULA){
+          ult.texto += (gap > 0.7 ? ' ' : '') + it.texto;
+          ult.x2 = it.x + it.w;
+        } else {
+          celulas.push({ x: it.x, x2: it.x + it.w, texto: it.texto });
+        }
+      });
+      celulas.forEach(function(c){ c.texto = c.texto.replace(/\s+/g, ' ').trim(); });
+      celulas = celulas.filter(function(c){ return c.texto !== ''; });
+      return { pagina: pagina, y: g.y, celulas: celulas, texto: celulas.map(function(c){ return c.texto; }).join('  ') };
+    }).filter(function(l){ return l.celulas.length; });
+  }
+
+  /* ---------- 2. Cortar a segunda cópia ----------
+     Cada PDF traz o recibo duas vezes (ORIGINAL e DUPLICADO). Tudo a partir da
+     segunda ocorrência é lixo: se ficasse, cada rubrica entrava a dobrar e
+     nenhuma soma fechava. */
+  function recCortarSegundaCopia(linhas){
+    var i, j;
+
+    /* Onde é que cada texto apareceu pela primeira vez. Serve para reconhecer o
+       início do bloco repetido — que é o que interessa cortar, e não a linha do
+       carimbo "DUPLICADO", que já vem alguns milímetros dentro da cópia. */
+    var vistas = {};
+    for (i = 0; i < linhas.length; i++){
+      if (linhas[i].texto.length >= 8 && vistas[linhas[i].texto] === undefined) vistas[linhas[i].texto] = i;
+    }
+    function repeteAPartirDe(i){
+      var repetidas = 0;
+      for (var k = i; k < Math.min(i + 8, linhas.length); k++){
+        if (vistas[linhas[k].texto] !== undefined && vistas[linhas[k].texto] < i) repetidas++;
+      }
+      return repetidas >= 4;
+    }
+    function recuarAteAoInicio(i){
+      while (i > 1){
+        var anterior = linhas[i - 1].texto;
+        if (anterior.length >= 8 && vistas[anterior] !== undefined && vistas[anterior] < i - 1) i--;
+        else break;
+      }
+      return i;
+    }
+
+    /* (a) início de um bloco que repete linhas já vistas */
+    for (i = 5; i < linhas.length; i++){
+      var t = linhas[i].texto;
+      if (t.length >= 8 && vistas[t] !== undefined && vistas[t] < i && repeteAPartirDe(i)) return linhas.slice(0, i);
+    }
+
+    /* (b) carimbo DUPLICADO, recuando até ao início da cópia */
+    for (i = 3; i < linhas.length; i++){
+      if (/\bDUPLICADO\b/i.test(linhas[i].texto) && linhas.length - i >= 5) return linhas.slice(0, recuarAteAoInicio(i));
+    }
+
+    /* (c) marcador de cabeçalho repetido */
+    var marcadores = [
+      /RECIBO\s+DE\s+(VENCIMENTO|REMUNERA)/i,
+      /\bORIGINAL\b/i,
+      /RECIBO\s+N/i
+    ];
+    for (j = 0; j < marcadores.length; j++){
+      var ocorrencias = [];
+      for (i = 0; i < linhas.length; i++) if (marcadores[j].test(linhas[i].texto)) ocorrencias.push(i);
+      if (ocorrencias.length >= 2 && ocorrencias[1] > 3) return linhas.slice(0, recuarAteAoInicio(ocorrencias[1]));
+    }
+
+    return linhas;
+  }
+
+  /* ---------- 3. Procura de campos a partir do rótulo ----------
+     Ordem de tentativa: resto da própria célula → células à direita na mesma
+     linha → células por baixo na mesma coluna (formulários em coluna). O
+     validador decide o que é um valor aceitável para aquele campo — é isso que
+     impede o NISS de entrar no lugar do NIF. */
+  function recAcharCampos(linhas, rotuloRe, valida, soMesmaLinha){
+    var achados = [];
+    for (var i = 0; i < linhas.length; i++){
+      var cels = linhas[i].celulas;
+      for (var j = 0; j < cels.length; j++){
+        var m = cels[j].texto.match(rotuloRe);
+        if (!m) continue;
+        var v, k, d, q, encontrado = false;
+        var resto = cels[j].texto.slice(m.index + m[0].length).replace(/^[\s:.·\-–]+/, '');
+        if (resto){
+          v = valida(resto);
+          if (v !== null && v !== undefined){ achados.push(v); continue; }
+        }
+        for (k = j + 1; k < cels.length && !encontrado; k++){
+          v = valida(cels[k].texto);
+          if (v !== null && v !== undefined){ achados.push(v); encontrado = true; }
+        }
+        if (encontrado || soMesmaLinha) continue;
+        for (d = 1; d <= 2 && i + d < linhas.length && !encontrado; d++){
+          var abaixo = linhas[i + d].celulas;
+          for (q = 0; q < abaixo.length && !encontrado; q++){
+            if (Math.abs(abaixo[q].x - cels[j].x) > 25) continue;
+            v = valida(abaixo[q].texto);
+            if (v !== null && v !== undefined){ achados.push(v); encontrado = true; }
+          }
+        }
+      }
+    }
+    return achados;
+  }
+
+  function recAcharCampo(linhas, rotuloRe, valida, soMesmaLinha){
+    var todos = recAcharCampos(linhas, rotuloRe, valida, soMesmaLinha);
+    return todos.length ? todos[0] : null;
+  }
+
+  /* O NIF e o NISS da EMPRESA aparecem no topo, antes dos do trabalhador. Por
+     isso, nestes dois campos, vale a ÚLTIMA ocorrência, não a primeira. */
+  function recAcharCampoUltimo(linhas, rotuloRe, valida){
+    var todos = recAcharCampos(linhas, rotuloRe, valida);
+    return todos.length ? todos[todos.length - 1] : null;
+  }
+
+  function recVDigitos(n){
+    return function(t){
+      var s = String(t).trim();
+      var so = s.replace(/[\s.\-]/g, '');
+      return /^\d+$/.test(so) && so.length === n ? so : null;
+    };
+  }
+
+  function recVInteiro(t){
+    var s = String(t).trim().replace(/^n[.ºo]*\s*/i, '');
+    return /^\d{1,6}$/.test(s) ? s : null;
+  }
+
+  function recVNumero(t){
+    var n = recNum(t);
+    return n === null ? null : n;
+  }
+
+  function recVTexto(t){
+    var s = String(t).trim().replace(/[:\-–]+$/, '').trim();
+    if (s.length < 2) return null;
+    if (/^\d+([.,]\d+)?$/.test(s)) return null;
+    if (/^(nome|nif|niss|categoria|sec[çc][ãa]o|morada|data|contribuinte)$/i.test(s)) return null;
+    return s;
+  }
+
+  function recVData(t){
+    var m = String(t).match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (!m) return null;
+    var ano = m[3].length === 2 ? '20' + m[3] : m[3];
+    return ano + '-' + pad2(parseInt(m[2], 10)) + '-' + pad2(parseInt(m[1], 10));
+  }
+
+  /* ---------- 4. Período (AAAA-MM, com zero à esquerda) ----------
+     ATENÇÃO: este AAAA-MM não é o formato do 'periodo' de pagamentosConcluidos
+     (AAAA-M, sem zero). São nós independentes — não misturar. */
+  function recPeriodoDoTexto(txt){
+    var s = String(txt || '');
+    var m = s.match(/\b(0?[1-9]|1[0-2])\s*[\/\-.]\s*(20\d{2})\b/);
+    if (m) return m[2] + '-' + pad2(parseInt(m[1], 10));
+    m = s.match(/\b(20\d{2})\s*[\/\-.]\s*(0?[1-9]|1[0-2])\b/);
+    if (m) return m[1] + '-' + pad2(parseInt(m[2], 10));
+    var baixo = s.toLowerCase();
+    for (var i = 0; i < REC_MESES.length; i++){
+      var re = new RegExp('\\b' + REC_MESES[i] + '\\b[^\\d]{0,12}(20\\d{2})', 'i');
+      var mm = baixo.match(re);
+      if (mm) return mm[1] + '-' + pad2(i + 1);
+      var re2 = new RegExp('\\b' + REC_MESES_CURTOS[i] + '\\.?\\b[^\\d]{0,8}(20\\d{2})', 'i');
+      var mm2 = baixo.match(re2);
+      if (mm2) return mm2[1] + '-' + pad2(i + 1);
+    }
+    return null;
+  }
+
+  /* ---------- 5. Colunas da tabela ----------
+     O cabeçalho da tabela dá o X de cada coluna; a partir daí um número sabe o
+     que é pelo sítio onde está, não pela ordem em que o pdf.js o cuspiu. */
+  function recPapelDaColuna(txt){
+    var t = String(txt).toLowerCase();
+    if (/n[ãa]o\s*sujeit|isent/.test(t)) return 'naoSujeito';
+    if (/descont|reten[çc]/.test(t)) return 'desconto';
+    if (/taxa|%/.test(t)) return 'taxa';
+    if (/quant|dias|horas|n\.?[ºo]?\s*(de\s*)?(dias|horas)/.test(t)) return 'quantidade';
+    if (/unit|pre[çc]o|val\.?\s*un/.test(t)) return 'valorUnitario';
+    if (/sujeit|incid/.test(t)) return 'sujeito';
+    if (/remunera|abono|vencimento|import[âa]ncia|montante|valor/.test(t)) return 'valor';
+    return null;
+  }
+
+  function recAcharColunas(linhas){
+    for (var i = 0; i < linhas.length; i++){
+      var cels = linhas[i].celulas;
+      var papeis = [];
+      for (var j = 0; j < cels.length; j++){
+        var p = recPapelDaColuna(cels[j].texto);
+        if (p) papeis.push({ papel: p, x: cels[j].x, x2: cels[j].x2 });
+      }
+      var temDescricao = cels.some(function(c){ return /descri|rubrica|abonos|remunera/i.test(c.texto); });
+      var distintos = {};
+      papeis.forEach(function(p){ distintos[p.papel] = true; });
+      if (Object.keys(distintos).length >= 2 && (temDescricao || Object.keys(distintos).length >= 3)){
+        return { linha: i, colunas: papeis };
+      }
+    }
+    return null;
+  }
+
+  /* Papel de um número pela sua posição: a coluna cujo intervalo está mais perto.
+     Compara-se pelo bordo direito porque os números vêm alinhados à direita. */
+  function recPapelPorX(colunas, cel){
+    if (!colunas) return null;
+    var melhor = null, melhorD = Infinity;
+    colunas.forEach(function(c){
+      var d = Math.min(Math.abs(c.x2 - cel.x2), Math.abs(c.x - cel.x));
+      if (d < melhorD){ melhorD = d; melhor = c; }
+    });
+    return melhorD <= 40 ? melhor.papel : null;
+  }
+
+  var REC_NAO_SUJEITO_RE = /(subs[íi]dio\s+de\s+refei|refei[çc][ãa]o|ajudas?\s+de\s+custo|\bkm\b|quil[óo]metr|viatura\s+pr[óo]pria|desloca[çc]|abono\s+para\s+falhas|senhas?\s+de)/i;
+  var REC_DESCONTO_RE = /(seguran[çc]a\s+social|seg\.?\s*social|\bs\.?s\.?\b|\birs\b|reten[çc][ãa]o|sindicat|penhora|adiantament|sobretaxa|quotiza|caixa\s+geral|previd[êe]nc)/i;
+  var REC_SS_RE = /(seguran[çc]a\s*social|seg\.?\s*social|\bs\.?s\.?\b|\btsu\b)/i;
+  var REC_FIM_TABELA_RE = /(totais?\b|total\s|l[íi]quido|a\s+receber|forma\s+de\s+pagamento)/i;
+  var REC_IGNORAR_LINHA_RE = /(total|l[íi]quido|transporte|iban|nib|contribuinte|declara|assinatura|entidade|patronal|a\s+reportar|resumo|acumulados?|recebido|forma\s+de\s+pagamento|transfer[êe]ncia|dep[óo]sito|venc\.?\s*(base|di[áa]ri))/i;
+
+  /* ---------- 6. Rubricas e descontos ---------- */
+  function recExtrairTabela(linhas, colunas){
+    var out = { linhas: [], descontos: [] };
+    var inicio = 0;
+    if (colunas){
+      inicio = colunas.linha + 1;
+    } else {
+      /* Sem cabeçalho de colunas, começa-se na primeira rubrica reconhecível —
+         e tem de trazer um valor: "Vencimento Base" sozinho é o RÓTULO de um
+         campo do cabeçalho, e começar aí apanhava a categoria como rubrica.
+         Começar no topo apanhava o número da porta da morada. */
+      for (var z = 0; z < linhas.length; z++){
+        if (!/(ordenado|vencimento\s+base|venc\.?\s*base|sal[áa]rio\s+base|remunera[çc][ãa]o\s+base)/i.test(linhas[z].texto)) continue;
+        var temValor = linhas[z].celulas.some(function(c){ return recNum(c.texto) !== null && /^[\d.,\s€]+$/.test(c.texto); });
+        if (temValor){ inicio = z; break; }
+      }
+    }
+
+    /* A partir da primeira linha de totais acaba a tabela. Depois dela só se
+       aceitam linhas de desconto (há recibos que os listam por baixo dos
+       totais); tudo o resto — "Cartão Refeição", "Transferência" — é a zona do
+       pagamento e entrava como rubrica a dobrar. */
+    var fimDaTabela = false;
+    for (var i = inicio; i < linhas.length; i++){
+      var linha = linhas[i];
+      var texto = linha.texto;
+      if (!fimDaTabela && out.linhas.length && REC_FIM_TABELA_RE.test(texto)) fimDaTabela = true;
+      if (REC_IGNORAR_LINHA_RE.test(texto)) continue;
+      if (fimDaTabela && !REC_DESCONTO_RE.test(texto)) continue;
+
+      /* Descrição: as células de texto mais à esquerda, antes do primeiro número */
+      var descricao = '';
+      var numeros = [];
+      linha.celulas.forEach(function(c){
+        var n = recNum(c.texto);
+        var soNumero = n !== null && /^[\d.,\s€%\-()]+$/.test(c.texto);
+        if (soNumero){
+          numeros.push({ x: c.x, x2: c.x2, valor: n, texto: c.texto, papel: recPapelPorX(colunas && colunas.colunas, c) });
+        } else if (!numeros.length && !/^[\d.,]+\s*%$/.test(c.texto)){
+          descricao += (descricao ? ' ' : '') + c.texto;
+        }
+      });
+      descricao = descricao.replace(/^\d{1,5}\s+/, '').trim();   /* código da rubrica à esquerda */
+      if (!numeros.length) continue;
+      if (descricao.length < 3) continue;
+
+      /* "11,00%" não é um número solto: é a taxa da linha. Sem isto ia parar à
+         descrição e a taxa do desconto ficava vazia. */
+      var taxaPercent = null;
+      linha.celulas.forEach(function(c){
+        var mp = c.texto.match(/^([\d.,]+)\s*%$/);
+        if (mp && taxaPercent === null) taxaPercent = recNum(mp[1]);
+      });
+      var taxaCel = null;
+      numeros.forEach(function(n){ if (/%/.test(n.texto)) taxaCel = n; });
+      numeros.forEach(function(n){ if (n.papel === 'taxa') taxaCel = n; });
+
+      var temColunaDesconto = numeros.some(function(n){ return n.papel === 'desconto'; });
+      var ehDesconto = temColunaDesconto || (!colunas && REC_DESCONTO_RE.test(descricao)) ||
+                       (colunas && !numeros.some(function(n){ return n.papel && n.papel !== 'taxa' && n.papel !== 'desconto'; }) && REC_DESCONTO_RE.test(descricao));
+
+      if (ehDesconto){
+        var valorD = null;
+        numeros.forEach(function(n){ if (n.papel === 'desconto') valorD = n.valor; });
+        if (valorD === null){
+          var candidatos = numeros.filter(function(n){ return n !== taxaCel; });
+          valorD = candidatos.length ? candidatos[candidatos.length - 1].valor : null;
+        }
+        if (valorD === null) continue;
+        out.descontos.push({
+          descricao: descricao.replace(/\s*[\d.,]+\s*%$/, '').trim(),
+          taxa: taxaPercent !== null ? taxaPercent : (taxaCel ? taxaCel.valor : null),
+          valor: valorD
+        });
+        continue;
+      }
+
+      /* Rubrica. Papéis por coluna quando existem; caso contrário, deduz-se pelo
+         produto: entre três números, o par cujo produto dá o terceiro é
+         quantidade × valor unitário. */
+      var qtd = null, unit = null, valor = null, sujeito = null;
+      numeros.forEach(function(n){
+        if (n.papel === 'quantidade') qtd = n.valor;
+        else if (n.papel === 'valorUnitario') unit = n.valor;
+        else if (n.papel === 'sujeito' || n.papel === 'valor'){ valor = n.valor; if (n.papel === 'sujeito') sujeito = true; }
+        else if (n.papel === 'naoSujeito'){ valor = n.valor; sujeito = false; }
+      });
+
+      if (valor === null){
+        var livres = numeros.filter(function(n){ return n !== taxaCel; });
+        if (livres.length === 1){
+          valor = livres[0].valor;
+        } else if (livres.length >= 3){
+          var achou = false;
+          for (var a = 0; a < livres.length && !achou; a++){
+            for (var b = 0; b < livres.length && !achou; b++){
+              if (a === b) continue;
+              for (var c2 = 0; c2 < livres.length; c2++){
+                if (c2 === a || c2 === b) continue;
+                if (Math.abs(livres[a].valor * livres[b].valor - livres[c2].valor) <= REC_TOL &&
+                    livres[c2].valor !== 0){
+                  qtd = livres[Math.min(a,b)].valor;
+                  unit = livres[Math.max(a,b)].valor;
+                  valor = livres[c2].valor;
+                  achou = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (!achou) valor = livres[livres.length - 1].valor;
+        } else if (livres.length === 2){
+          valor = livres[livres.length - 1].valor;
+          qtd = livres[0].valor;
+        }
+      }
+      if (valor === null) continue;
+
+      if (sujeito === null) sujeito = !REC_NAO_SUJEITO_RE.test(descricao);
+
+      out.linhas.push({
+        descricao: descricao,
+        quantidade: qtd,
+        valorUnitario: unit,
+        valor: valor,
+        sujeito: sujeito
+      });
+    }
+    return out;
+  }
+
+  /* Se a classificação sujeito/não sujeito não fechar com os totais lidos,
+     procura-se o subconjunto de rubricas que fecha (são poucas rubricas, a
+     procura exaustiva é instantânea). Escolhe-se o mais parecido com o que já
+     lá estava. Se nada fechar, deixa-se como está e a validação acusa. */
+  function recReconciliarSujeito(linhas, totais){
+    if (totais.sujeito === null || totais.sujeito === undefined) return false;
+    if (!linhas.length || linhas.length > 16) return false;
+    var soma = function(mask){
+      var s = 0;
+      for (var i = 0; i < linhas.length; i++) if (mask & (1 << i)) s += (linhas[i].valor || 0);
+      return s;
+    };
+    var atual = 0;
+    for (var i = 0; i < linhas.length; i++) if (linhas[i].sujeito) atual |= (1 << i);
+    if (Math.abs(soma(atual) - totais.sujeito) <= REC_TOL) return false;
+
+    var totalGeral = 0;
+    linhas.forEach(function(l){ totalGeral += (l.valor || 0); });
+    var melhor = null, melhorDist = Infinity;
+    for (var mask = 0; mask < (1 << linhas.length); mask++){
+      if (Math.abs(soma(mask) - totais.sujeito) > REC_TOL) continue;
+      if (totais.naoSujeito !== null && totais.naoSujeito !== undefined &&
+          Math.abs((totalGeral - soma(mask)) - totais.naoSujeito) > REC_TOL) continue;
+      var dist = 0, dif = mask ^ atual;
+      while (dif){ dist += dif & 1; dif >>= 1; }
+      if (dist < melhorDist){ melhorDist = dist; melhor = mask; }
+    }
+    if (melhor === null) return false;
+    for (var k = 0; k < linhas.length; k++) linhas[k].sujeito = !!(melhor & (1 << k));
+    return true;
+  }
+
+  /* ---------- 7. Extração completa ---------- */
+  function recExtrair(linhasTodas, nomeFicheiro){
+    var linhas = recCortarSegundaCopia(linhasTodas);
+    var textoBruto = linhas.map(function(l){ return l.texto; }).join('\n');
+    var cabecalho = linhas.slice(0, Math.min(linhas.length, 30));
+    var avisos = [];
+
+    /* --- Cabeçalho ---
+       O NIF e o NISS distinguem-se pela FORMA (9 vs 11 dígitos), não pela ordem
+       em que aparecem: é aqui que um parser sequencial se engana. */
+    var nif = recAcharCampoUltimo(cabecalho, /(n\.?\s*contribuinte|contribuinte|n\.?\s*i\.?\s*f\.?|\bnif\b)/i, recVDigitos(9));
+    var niss = recAcharCampoUltimo(cabecalho, /(seg\.?\s*social|seguran[çc]a\s*social|\bniss\b|n\.?\s*i\.?\s*s\.?\s*s\.?|benefici[áa]rio)/i, recVDigitos(11));
+    /* "RECIBO DE VENCIMENTO" (o título) não é um rótulo de número: o rótulo tem
+       de trazer o "n.º" colado, senão o título arrastava um número qualquer. */
+    var nrRecibo = recAcharCampo(cabecalho, /((recibo|documento)\s*(n[.ºo]{1,3}\.?|:)|n[.ºo]{1,3}\.?\s*(do\s*)?(recibo|documento))/i, recVInteiro);
+    var nrFuncionario = recAcharCampo(cabecalho, /((n[.ºo]*|c[óo]d(igo)?\.?)\s*(de\s*)?(funcion[áa]rio|empregado|colaborador|trabalhador)|funcion[áa]rio\s*n[.ºo]*)/i, recVInteiro);
+
+    /* O NIF conhecido de uma pessoa é o desempate mais forte: se um dos números
+       de 9 dígitos do cabeçalho for de alguém do nó 'pessoas', é esse. */
+    var nifsConhecidos = {};
+    Object.keys(pessoas || {}).forEach(function(id){
+      var v = pessoas[id] && pessoas[id].nif ? String(pessoas[id].nif).replace(/\D/g, '') : '';
+      if (v) nifsConhecidos[v] = id;
+    });
+    var candidatos9 = [];
+    cabecalho.forEach(function(l){
+      l.celulas.forEach(function(c){
+        var so = c.texto.replace(/[\s.\-]/g, '');
+        if (/^\d{9}$/.test(so)) candidatos9.push(so);
+      });
+    });
+    for (var ci = 0; ci < candidatos9.length; ci++){
+      if (nifsConhecidos[candidatos9[ci]]){ nif = candidatos9[ci]; break; }
+    }
+    if (!nif && candidatos9.length) nif = candidatos9[candidatos9.length - 1];
+
+    var nome = recAcharCampo(cabecalho, /\bnome\b/i, recVTexto);
+    var morada = recAcharCampo(cabecalho, /(morada|endere[çc]o)/i, recVTexto);
+    var categoria = recAcharCampo(cabecalho, /(categoria(\s*profissional)?|profiss[ãa]o)/i, recVTexto);
+    var seccao = recAcharCampo(cabecalho, /(sec[çc][ãa]o|departamento|centro\s*de\s*custo)/i, recVTexto);
+    var vencimentoBase = recAcharCampo(linhas, /(venc(imento)?\.?\s*(base|mensal|il[íi]quido)|remunera[çc][ãa]o\s*base|sal[áa]rio\s*base)/i, recVNumero);
+    var vencimentoDiario = recAcharCampo(linhas, /(venc(imento)?\.?\s*di[áa]ri|remunera[çc][ãa]o\s*di[áa]ri|valor\s*dia)/i, recVNumero);
+    var data = recAcharCampo(cabecalho, /(data|emiss[ãa]o|processad)/i, recVData);
+    if (!data){
+      for (var di = 0; di < cabecalho.length && !data; di++) data = recVData(cabecalho[di].texto);
+    }
+
+    var periodo = recAcharCampo(cabecalho, /(refer[êe]ncia|referente|per[íi]odo|m[êe]s\s*(de)?|processamento)/i, recPeriodoDoTexto);
+    if (!periodo){
+      for (var pi = 0; pi < cabecalho.length && !periodo; pi++) periodo = recPeriodoDoTexto(cabecalho[pi].texto);
+    }
+    if (!periodo && data) periodo = data.slice(0, 7);
+
+    /* --- Corpo --- */
+    var colunas = recAcharColunas(linhas);
+    var tabela = recExtrairTabela(linhas, colunas);
+
+    /* --- Totais --- */
+    /* Os totais procuram-se PRIMEIRO nas linhas de totais. Fora delas, o rótulo
+       "Não Sujeito" é o cabeçalho de uma coluna, e a procura por baixo do
+       rótulo trazia o valor da primeira rubrica em vez do total. */
+    var linhasTotais = linhas.filter(function(l){ return /(total|l[íi]quido|a\s*receber|a\s*pagar)/i.test(l.texto); });
+    function totalPorRotulo(re){
+      var v = recAcharCampo(linhasTotais, re, recVNumero, true);
+      if (v === null) v = recAcharCampo(linhasTotais, re, recVNumero);
+      if (v === null) v = recAcharCampo(linhas, re, recVNumero, true);
+      return v;
+    }
+    var totalSujeito = totalPorRotulo(/(total\s*(de\s*)?(remunera[çc][õo]es\s*)?sujeit|remunera[çc][õo]es\s*sujeitas|base\s*de\s*incid[êe]ncia|total\s*il[íi]quido\s*sujeito)/i);
+    var totalNaoSujeito = totalPorRotulo(/(total\s*(de\s*)?(remunera[çc][õo]es\s*)?n[ãa]o\s*sujeit|n[ãa]o\s*sujeit|isent)/i);
+    var totalDescontos = totalPorRotulo(/(total\s*(de\s*)?descontos|descontos\s*totais)/i);
+    var liquido = null;
+    for (var li = 0; li < linhas.length && liquido === null; li++){
+      if (/il[íi]quido/i.test(linhas[li].texto)) continue;
+      if (!/(l[íi]quido|a\s*receber|total\s*a\s*pagar)/i.test(linhas[li].texto)) continue;
+      liquido = recAcharCampo([linhas[li]], /(l[íi]quido[^\d]*|a\s*receber|total\s*a\s*pagar)/i, recVNumero);
+    }
+
+    var totais = {
+      sujeito: totalSujeito,
+      naoSujeito: totalNaoSujeito,
+      descontos: totalDescontos,
+      liquido: liquido
+    };
+
+    if (recReconciliarSujeito(tabela.linhas, totais)){
+      avisos.push('A separação entre rubricas sujeitas e não sujeitas foi ajustada para fechar com os totais lidos. Confere linha a linha.');
+    }
+
+    /* Totais em falta: calculam-se a partir das rubricas, e diz-se que foram
+       calculados — nunca em silêncio. */
+    var somaSujeitas = 0, somaNaoSujeitas = 0, somaDescontos = 0;
+    tabela.linhas.forEach(function(l){
+      if (l.sujeito) somaSujeitas += (l.valor || 0); else somaNaoSujeitas += (l.valor || 0);
+    });
+    tabela.descontos.forEach(function(d){ somaDescontos += (d.valor || 0); });
+
+    if (totais.sujeito === null && tabela.linhas.length){ totais.sujeito = recRound(somaSujeitas); avisos.push('Total sujeito não foi encontrado no PDF: está somado a partir das rubricas.'); }
+    if (totais.naoSujeito === null && tabela.linhas.length){ totais.naoSujeito = recRound(somaNaoSujeitas); avisos.push('Total não sujeito não foi encontrado no PDF: está somado a partir das rubricas.'); }
+    if (totais.descontos === null && tabela.descontos.length){ totais.descontos = recRound(somaDescontos); avisos.push('Total de descontos não foi encontrado no PDF: está somado a partir das linhas de desconto.'); }
+    if (totais.liquido === null && totais.sujeito !== null && totais.naoSujeito !== null && totais.descontos !== null){
+      totais.liquido = recRound(totais.sujeito + totais.naoSujeito - totais.descontos);
+      avisos.push('Líquido não foi encontrado no PDF: está calculado a partir dos totais.');
+    }
+
+    /* --- Pagamento --- */
+    /* A zona do pagamento começa no líquido. Procurar "cartão" no documento todo
+       apanhava a rubrica "Subsídio Refeição Cartão" e trazia a quantidade dela. */
+    var inicioPag = 0;
+    for (var pz = 0; pz < linhas.length; pz++){
+      if (/(l[íi]quido|a\s*receber|forma\s*de\s*pagamento|recebido|transfer[êe]ncia)/i.test(linhas[pz].texto)){ inicioPag = pz; break; }
+    }
+    var linhasPag = linhas.slice(inicioPag);
+    var cartao = recAcharCampo(linhasPag, /(recebido\s*em\s*cart|cart[ãa]o(\s*refei[çc][ãa]o)?)/i, recVNumero, true);
+    var conta = recAcharCampo(linhasPag, /(recebido\s*na\s*conta|na\s*conta|transfer[êe]ncia|dep[óo]sito|banco|numer[áa]rio)/i, recVNumero, true);
+    if (cartao === null){
+      var somaCartao = 0, achouCartao = false;
+      tabela.linhas.forEach(function(l){
+        if (/cart[ãa]o/i.test(l.descricao)){ somaCartao += (l.valor || 0); achouCartao = true; }
+      });
+      if (achouCartao){ cartao = recRound(somaCartao); avisos.push('O valor recebido em cartão não foi encontrado: está somado a partir das rubricas de cartão.'); }
+    }
+    if (conta === null && totais.liquido !== null && cartao !== null){
+      conta = recRound(totais.liquido - cartao);
+      avisos.push('O valor recebido na conta não foi encontrado: está calculado como líquido menos cartão.');
+    }
+
+    var pessoaId = nif && nifsConhecidos[nif] ? nifsConhecidos[nif] : null;
+
+    return {
+      id: 'rec' + (++recSeqId),
+      ficheiro: nomeFicheiro,
+      pessoaId: pessoaId,
+      periodo: periodo,
+      meta: { nrRecibo: nrRecibo, data: data },
+      pessoa: {
+        nome: nome, nif: nif, niss: niss, nrFuncionario: nrFuncionario,
+        categoria: categoria, seccao: seccao, morada: morada,
+        vencimentoBase: vencimentoBase, vencimentoDiario: vencimentoDiario
+      },
+      linhas: tabela.linhas,
+      descontos: tabela.descontos,
+      totais: totais,
+      pagamento: { cartao: cartao, conta: conta },
+      textoBruto: textoBruto,
+      avisos: avisos
+    };
+  }
+
+  /* ---------- 8. As cinco validações ----------
+     Correm sempre e o resultado vai para o ecrã e para o registo gravado. Um
+     parser que erra em silêncio é pior do que não ter parser. */
+  function recValidar(rec){
+    var erros = [];
+    var t = rec.totais || {};
+    var somaSujeitas = 0, somaNaoSujeitas = 0, somaDescontos = 0;
+    (rec.linhas || []).forEach(function(l){
+      if (l.sujeito) somaSujeitas += (l.valor || 0); else somaNaoSujeitas += (l.valor || 0);
+    });
+    (rec.descontos || []).forEach(function(d){ somaDescontos += (d.valor || 0); });
+
+    var ss = null;
+    (rec.descontos || []).forEach(function(d){
+      if (ss === null && REC_SS_RE.test(d.descricao || '')) ss = d.valor;
+    });
+
+    function checa(chave, titulo, ok, detalhe){
+      erros.push({ chave: chave, titulo: titulo, ok: !!ok, detalhe: detalhe });
+    }
+    function perto(a, b){ return a !== null && b !== null && a !== undefined && b !== undefined && Math.abs(a - b) <= REC_TOL; }
+
+    checa('a', 'Soma das rubricas sujeitas = total sujeito',
+      perto(recRound(somaSujeitas), t.sujeito),
+      'rubricas ' + recFmt(somaSujeitas) + ' · total ' + recFmt(t.sujeito));
+
+    var esperadoSS = t.sujeito === null || t.sujeito === undefined ? null : recRound(t.sujeito * REC_TAXA_SS);
+    checa('b', 'Total sujeito × 11% = desconto de Segurança Social',
+      ss !== null && perto(esperadoSS, recRound(ss)),
+      ss === null ? 'não foi encontrado nenhum desconto de Segurança Social'
+                  : 'esperado ' + recFmt(esperadoSS) + ' · recibo ' + recFmt(ss));
+
+    checa('c', 'Soma das rubricas não sujeitas = total não sujeito',
+      perto(recRound(somaNaoSujeitas), t.naoSujeito),
+      'rubricas ' + recFmt(somaNaoSujeitas) + ' · total ' + recFmt(t.naoSujeito));
+
+    var esperadoLiquido = (t.sujeito === null || t.naoSujeito === null || t.descontos === null ||
+                           t.sujeito === undefined || t.naoSujeito === undefined || t.descontos === undefined)
+      ? null : recRound(t.sujeito + t.naoSujeito - t.descontos);
+    checa('d', 'Sujeito + não sujeito − descontos = líquido',
+      perto(esperadoLiquido, t.liquido),
+      'esperado ' + recFmt(esperadoLiquido) + ' · recibo ' + recFmt(t.liquido));
+
+    var p = rec.pagamento || {};
+    var somaPag = (p.cartao === null || p.cartao === undefined || p.conta === null || p.conta === undefined)
+      ? null : recRound(p.cartao + p.conta);
+    checa('e', 'Cartão + conta = líquido',
+      perto(somaPag, t.liquido),
+      'cartão + conta ' + recFmt(somaPag) + ' · líquido ' + recFmt(t.liquido));
+
+    /* Coerência extra: total de descontos declarado vs soma das linhas. Não é
+       uma das cinco, por isso só entra como aviso quando falha. */
+    var extra = [];
+    if (t.descontos !== null && t.descontos !== undefined && (rec.descontos || []).length &&
+        Math.abs(recRound(somaDescontos) - t.descontos) > REC_TOL){
+      extra.push('A soma das linhas de desconto (' + recFmt(somaDescontos) + ') não bate com o total de descontos (' + recFmt(t.descontos) + ').');
+    }
+
+    var falhas = erros.filter(function(e){ return !e.ok; });
+    return { ok: falhas.length === 0, checks: erros, erros: falhas.map(function(e){ return e.titulo + ' — ' + e.detalhe; }).concat(extra) };
+  }
+
+  /* ---------- 9. Importação: drop-zone com vários ficheiros ---------- */
+  var recDrop = document.getElementById('recDrop');
+  var recFileInput = document.getElementById('recFileInput');
+
+  recDrop.addEventListener('click', function(){
+    recFileInput.value = '';
+    recFileInput.click();
+  });
+
+  recFileInput.addEventListener('change', function(){
+    recProcessarFicheiros(recFileInput.files);
+  });
+
+  ['dragenter', 'dragover'].forEach(function(evt){
+    recDrop.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      recDrop.classList.add('rec-drop-ativo');
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(function(evt){
+    recDrop.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      recDrop.classList.remove('rec-drop-ativo');
+    });
+  });
+
+  recDrop.addEventListener('drop', function(e){
+    e.preventDefault(); e.stopPropagation();
+    recDrop.classList.remove('rec-drop-ativo');
+    recProcessarFicheiros(e.dataTransfer && e.dataTransfer.files);
+  });
+
+  function recProcessarFicheiros(fileList){
+    var ficheiros = Array.prototype.slice.call(fileList || []).filter(function(f){
+      return /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+    });
+    if (!ficheiros.length) return;
+
+    var seq = Promise.resolve();
+    ficheiros.forEach(function(file){
+      seq = seq.then(function(){
+        return recPdfParaLinhas(file).then(function(linhas){
+          var rec = recExtrair(linhas, file.name);
+          rec.validacao = recValidar(rec);
+          recFila.push(rec);
+          recRenderFila();
+        }).catch(function(err){
+          console.error('Recibo', file.name, err);
+          recFila.push({ id:'rec' + (++recSeqId), ficheiro:file.name, falhou:true, mensagem:(err && err.message) || String(err) });
+          recRenderFila();
+        });
+      });
+    });
+    seq.then(function(){
+      var primeiro = recFila.filter(function(r){ return !r.falhou; })[0];
+      if (primeiro) recAbrirConferencia(primeiro, 'fila');
+    });
+  }
+
+  function recRenderFila(){
+    var wrap = document.getElementById('recFila');
+    if (!recFila.length){ wrap.innerHTML = ''; return; }
+    var html = '';
+    recFila.forEach(function(r){
+      html += '<div class="rec-fila-item">';
+      html += '<span class="rec-fila-nome">' + escapeHtml(r.ficheiro) + '</span>';
+      if (r.falhou){
+        html += '<span class="rec-selo rec-selo-erro">Não foi possível ler</span>';
+        html += '<span class="rec-fila-sub">' + escapeHtml(r.mensagem || '') + '</span>';
+        html += '<span class="rec-fila-espaco"></span>';
+      } else {
+        html += '<span class="rec-fila-sub">' + escapeHtml((r.pessoa && r.pessoa.nome) || 'pessoa por identificar') +
+                ' · ' + escapeHtml(recPeriodoLabel(r.periodo)) + '</span>';
+        html += '<span class="rec-fila-espaco"></span>';
+        html += r.validacao && r.validacao.ok
+          ? '<span class="rec-selo rec-selo-ok">Validações OK</span>'
+          : '<span class="rec-selo rec-selo-erro">' + ((r.validacao && r.validacao.erros.length) || 0) + ' a rever</span>';
+        html += '<button type="button" class="btn" data-rec-conferir="' + r.id + '">Conferir</button>';
+      }
+      html += '<button type="button" class="btn btn-danger" data-rec-descartar="' + r.id + '">Descartar</button>';
+      html += '</div>';
+    });
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('[data-rec-conferir]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var r = recFila.filter(function(x){ return x.id === btn.getAttribute('data-rec-conferir'); })[0];
+        if (r) recAbrirConferencia(r, 'fila');
+      });
+    });
+    wrap.querySelectorAll('[data-rec-descartar]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-rec-descartar');
+        recFila = recFila.filter(function(x){ return x.id !== id; });
+        recRenderFila();
+      });
+    });
+  }
+
+  /* ---------- 10. Ecrã de conferência ---------- */
+  var recConfOverlay = document.getElementById('recConfOverlay');
+
+  function recSetVal(id, valor){
+    document.getElementById(id).value = (valor === null || valor === undefined) ? '' : valor;
+  }
+
+  function recAbrirConferencia(rec, origem){
+    recConf = { rec: rec, origem: origem };
+    document.getElementById('recConfTitulo').textContent =
+      origem === 'historico' ? 'Recibo · ' + recPeriodoLabel(rec.periodo) : 'Conferir recibo';
+    document.getElementById('recApagar').style.display = origem === 'historico' ? '' : 'none';
+    document.getElementById('recGravar').textContent = origem === 'historico' ? 'Gravar alterações' : 'Gravar';
+
+    recPreencherSelectPessoas(rec.pessoaId);
+    recSetVal('recPeriodo', rec.periodo);
+    recSetVal('recNrRecibo', rec.meta && rec.meta.nrRecibo);
+    recSetVal('recData', rec.meta && rec.meta.data);
+
+    var p = rec.pessoa || {};
+    recSetVal('recNome', p.nome);
+    recSetVal('recNif', p.nif);
+    recSetVal('recNiss', p.niss);
+    recSetVal('recNrFuncionario', p.nrFuncionario);
+    recSetVal('recCategoria', p.categoria);
+    recSetVal('recSeccao', p.seccao);
+    recSetVal('recVencimentoBase', p.vencimentoBase);
+    recSetVal('recVencimentoDiario', p.vencimentoDiario);
+    recSetVal('recMorada', p.morada);
+
+    var t = rec.totais || {};
+    recSetVal('recTotalSujeito', t.sujeito);
+    recSetVal('recTotalNaoSujeito', t.naoSujeito);
+    recSetVal('recTotalDescontos', t.descontos);
+    recSetVal('recTotalLiquido', t.liquido);
+    var pg = rec.pagamento || {};
+    recSetVal('recPagCartao', pg.cartao);
+    recSetVal('recPagConta', pg.conta);
+
+    document.getElementById('recTextoBruto').textContent = rec.textoBruto || '(sem texto)';
+    recRenderLinhas(rec.linhas || []);
+    recRenderDescontos(rec.descontos || []);
+    recRevalidar();
+    recConfOverlay.classList.add('open');
+  }
+
+  function recFecharConferencia(){
+    recConfOverlay.classList.remove('open');
+    recConf = null;
+  }
+
+  function recPreencherSelectPessoas(selecionado){
+    var sel = document.getElementById('recPessoaSelect');
+    var lista = Object.keys(pessoas || {})
+      .map(function(id){ return Object.assign({ id:id }, pessoas[id]); })
+      .sort(function(a,b){ return String(a.nome||'').localeCompare(String(b.nome||''), 'pt'); });
+    var html = '<option value="">— escolher pessoa —</option>';
+    lista.forEach(function(p){
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome || '(sem nome)') +
+              (p.nif ? ' · ' + escapeHtml(String(p.nif)) : '') + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = selecionado || '';
+  }
+
+  function recLinhaHtml(i, l){
+    return '<tr data-linha="' + i + '">' +
+      '<td><input type="text" data-campo="descricao" value="' + escapeHtml(l.descricao || '') + '"></td>' +
+      '<td class="rec-num"><input type="text" class="rec-num" data-campo="quantidade" value="' + (l.quantidade === null || l.quantidade === undefined ? '' : l.quantidade) + '"></td>' +
+      '<td class="rec-num"><input type="text" class="rec-num" data-campo="valorUnitario" value="' + (l.valorUnitario === null || l.valorUnitario === undefined ? '' : l.valorUnitario) + '"></td>' +
+      '<td class="rec-num"><input type="text" class="rec-num" data-campo="valor" value="' + (l.valor === null || l.valor === undefined ? '' : l.valor) + '"></td>' +
+      '<td><input type="checkbox" data-campo="sujeito"' + (l.sujeito ? ' checked' : '') + '></td>' +
+      '<td><button type="button" class="rec-apagar-linha" title="Remover">×</button></td>' +
+      '</tr>';
+  }
+
+  function recDescontoHtml(i, d){
+    return '<tr data-desconto="' + i + '">' +
+      '<td><input type="text" data-campo="descricao" value="' + escapeHtml(d.descricao || '') + '"></td>' +
+      '<td class="rec-num"><input type="text" class="rec-num" data-campo="taxa" value="' + (d.taxa === null || d.taxa === undefined ? '' : d.taxa) + '"></td>' +
+      '<td class="rec-num"><input type="text" class="rec-num" data-campo="valor" value="' + (d.valor === null || d.valor === undefined ? '' : d.valor) + '"></td>' +
+      '<td><button type="button" class="rec-apagar-linha" title="Remover">×</button></td>' +
+      '</tr>';
+  }
+
+  function recRenderLinhas(linhas){
+    var body = document.getElementById('recLinhasBody');
+    body.innerHTML = linhas.map(function(l, i){ return recLinhaHtml(i, l); }).join('');
+    recLigarRemocoes(body, 'linhas');
+  }
+
+  function recRenderDescontos(descontos){
+    var body = document.getElementById('recDescontosBody');
+    body.innerHTML = descontos.map(function(d, i){ return recDescontoHtml(i, d); }).join('');
+    recLigarRemocoes(body, 'descontos');
+  }
+
+  function recLigarRemocoes(body, tipo){
+    body.querySelectorAll('.rec-apagar-linha').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var tr = btn.closest('tr');
+        var idx = Array.prototype.indexOf.call(body.children, tr);
+        recLerFormulario();
+        recConf.rec[tipo].splice(idx, 1);
+        if (tipo === 'linhas') recRenderLinhas(recConf.rec.linhas);
+        else recRenderDescontos(recConf.rec.descontos);
+        recRevalidar();
+      });
+    });
+  }
+
+  document.getElementById('recAddLinha').addEventListener('click', function(){
+    if (!recConf) return;
+    recLerFormulario();
+    recConf.rec.linhas.push({ descricao:'', quantidade:null, valorUnitario:null, valor:null, sujeito:true });
+    recRenderLinhas(recConf.rec.linhas);
+    recRevalidar();
+  });
+
+  document.getElementById('recAddDesconto').addEventListener('click', function(){
+    if (!recConf) return;
+    recLerFormulario();
+    recConf.rec.descontos.push({ descricao:'', taxa:null, valor:null });
+    recRenderDescontos(recConf.rec.descontos);
+    recRevalidar();
+  });
+
+  /* Lê o formulário todo de volta para o objeto: o que vale é sempre o que está
+     no ecrã, para as correções à mão contarem para as validações e para o que
+     se grava. */
+  function recLerFormulario(){
+    if (!recConf) return null;
+    var rec = recConf.rec;
+    var txt = function(id){ return document.getElementById(id).value.trim() || null; };
+    var num = function(id){ return recNumOuNull(document.getElementById(id).value.trim()); };
+
+    rec.pessoaId = document.getElementById('recPessoaSelect').value || null;
+    rec.periodo = txt('recPeriodo');
+    rec.meta = { nrRecibo: txt('recNrRecibo'), data: txt('recData') };
+    rec.pessoa = {
+      nome: txt('recNome'), nif: txt('recNif'), niss: txt('recNiss'),
+      nrFuncionario: txt('recNrFuncionario'), categoria: txt('recCategoria'),
+      seccao: txt('recSeccao'), morada: txt('recMorada'),
+      vencimentoBase: num('recVencimentoBase'), vencimentoDiario: num('recVencimentoDiario')
+    };
+    rec.totais = {
+      sujeito: num('recTotalSujeito'), naoSujeito: num('recTotalNaoSujeito'),
+      descontos: num('recTotalDescontos'), liquido: num('recTotalLiquido')
+    };
+    rec.pagamento = { cartao: num('recPagCartao'), conta: num('recPagConta') };
+
+    rec.linhas = Array.prototype.slice.call(document.getElementById('recLinhasBody').children).map(function(tr){
+      var v = function(campo){ return tr.querySelector('[data-campo="' + campo + '"]'); };
+      return {
+        descricao: v('descricao').value.trim(),
+        quantidade: recNumOuNull(v('quantidade').value.trim()),
+        valorUnitario: recNumOuNull(v('valorUnitario').value.trim()),
+        valor: recNumOuNull(v('valor').value.trim()),
+        sujeito: v('sujeito').checked
+      };
+    });
+    rec.descontos = Array.prototype.slice.call(document.getElementById('recDescontosBody').children).map(function(tr){
+      var v = function(campo){ return tr.querySelector('[data-campo="' + campo + '"]'); };
+      return {
+        descricao: v('descricao').value.trim(),
+        taxa: recNumOuNull(v('taxa').value.trim()),
+        valor: recNumOuNull(v('valor').value.trim())
+      };
+    });
+    return rec;
+  }
+
+  function recRevalidar(){
+    if (!recConf) return;
+    var rec = recLerFormulario();
+    rec.validacao = recValidar(rec);
+    var html = '';
+    rec.validacao.checks.forEach(function(c){
+      html += '<div class="rec-val-item' + (c.ok ? '' : ' rec-val-erro') + '">';
+      html += '<span class="rec-val-icon">' + (c.ok ? '✅' : '⚠️') + '</span>';
+      html += '<span><strong>' + escapeHtml(c.titulo) + '</strong>';
+      html += '<span class="rec-val-detalhe">' + escapeHtml(c.detalhe) + '</span></span>';
+      html += '</div>';
+    });
+    document.getElementById('recValidacoes').innerHTML = html;
+
+    var avisos = (rec.avisos || []).slice();
+    var jaGravado = rec.pessoaId && recibos[rec.pessoaId] && rec.periodo && recibos[rec.pessoaId][rec.periodo];
+    if (jaGravado && recConf.origem !== 'historico'){
+      avisos.push('Já existe um recibo desta pessoa para ' + recPeriodoLabel(rec.periodo) + '. Gravar substitui o que lá está.');
+    }
+    if (!rec.pessoaId){
+      avisos.push('Este recibo ainda não está ligado a ninguém: escolhe a pessoa em cima.' +
+        (rec.pessoa.nif ? ' O NIF ' + rec.pessoa.nif + ' não está em nenhuma ficha do nó pessoas.' : ''));
+    }
+    var pSel = rec.pessoaId ? pessoas[rec.pessoaId] : null;
+    if (pSel && rec.pessoa.nif && !pSel.nif){
+      avisos.push('A pessoa escolhida não tem NIF: ao gravar, fica com o NIF ' + rec.pessoa.nif + '.');
+    }
+    var av = document.getElementById('recAviso');
+    av.innerHTML = avisos.map(function(a){ return '⚠️ ' + escapeHtml(a); }).join('<br>');
+    av.style.display = avisos.length ? '' : 'none';
+  }
+
+  /* Qualquer alteração no modal recalcula as validações ao vivo */
+  recConfOverlay.addEventListener('input', recRevalidar);
+  recConfOverlay.addEventListener('change', recRevalidar);
+
+  document.getElementById('recConfClose').addEventListener('click', recFecharConferencia);
+  document.getElementById('recCancelar').addEventListener('click', recFecharConferencia);
+  recConfOverlay.addEventListener('click', function(e){
+    if (e.target === this) recFecharConferencia();
+  });
+
+  /* ---------- 11. Gravar ---------- */
+  /* O RTDB rejeita undefined e não vale a pena guardar nulos: limpa-se antes. */
+  function recLimpar(obj){
+    if (Array.isArray(obj)) return obj.map(recLimpar);
+    if (obj && typeof obj === 'object'){
+      var out = {};
+      Object.keys(obj).forEach(function(k){
+        var v = obj[k];
+        if (v === null || v === undefined || v === '') return;
+        out[k] = (typeof v === 'object') ? recLimpar(v) : v;
+      });
+      return out;
+    }
+    return obj;
+  }
+
+  document.getElementById('recGravar').addEventListener('click', function(){
+    if (!recConf) return;
+    var rec = recLerFormulario();
+    rec.validacao = recValidar(rec);
+
+    if (!rec.pessoaId){ alert('Escolhe a pessoa a que este recibo pertence.'); return; }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(rec.periodo || ''))){
+      alert('Indica o mês de referência do recibo.');
+      return;
+    }
+    if (!rec.validacao.ok){
+      var lista = rec.validacao.erros.map(function(e){ return '· ' + e; }).join('\n');
+      if (!confirm('Este recibo não passa em todas as validações:\n\n' + lista +
+                   '\n\nGravar mesmo assim? Fica marcado como por rever.')) return;
+    }
+
+    var registo = recLimpar({
+      meta: {
+        nrRecibo: rec.meta.nrRecibo,
+        data: rec.meta.data,
+        periodo: rec.periodo,
+        ficheiro: rec.ficheiro,
+        importadoEm: new Date().toISOString()
+      },
+      pessoa: {
+        nome: rec.pessoa.nome, nif: rec.pessoa.nif, niss: rec.pessoa.niss,
+        nrFuncionario: rec.pessoa.nrFuncionario, categoria: rec.pessoa.categoria,
+        seccao: rec.pessoa.seccao, morada: rec.pessoa.morada,
+        vencimentoBase: rec.pessoa.vencimentoBase, vencimentoDiario: rec.pessoa.vencimentoDiario
+      },
+      linhas: (rec.linhas || []).map(function(l){
+        return { descricao:l.descricao, quantidade:l.quantidade, valorUnitario:l.valorUnitario, valor:l.valor, sujeito:!!l.sujeito };
+      }),
+      descontos: rec.descontos || [],
+      totais: rec.totais || {},
+      pagamento: rec.pagamento || {},
+      textoBruto: rec.textoBruto || '',
+      validacao: { ok: rec.validacao.ok, erros: rec.validacao.erros }
+    });
+    /* recLimpar corta os false, e 'sujeito:false' é informação — repõe-se. */
+    registo.linhas = (rec.linhas || []).map(function(l){
+      var o = { descricao:l.descricao || '', sujeito: !!l.sujeito };
+      if (l.quantidade !== null && l.quantidade !== undefined) o.quantidade = l.quantidade;
+      if (l.valorUnitario !== null && l.valorUnitario !== undefined) o.valorUnitario = l.valorUnitario;
+      if (l.valor !== null && l.valor !== undefined) o.valor = l.valor;
+      return o;
+    });
+    registo.validacao = { ok: rec.validacao.ok, erros: rec.validacao.erros };
+
+    var pessoaId = rec.pessoaId;
+    /* Reimportar o mesmo mês da mesma pessoa SUBSTITUI: set() no mesmo caminho. */
+    recibosRef.child(pessoaId).child(rec.periodo).set(registo).then(function(){
+      /* Se a pessoa ainda não tinha NIF, fica com o do recibo — é o que passa a
+         ligar automaticamente os recibos seguintes. */
+      var pes = pessoas[pessoaId];
+      if (rec.pessoa.nif && pes && !pes.nif){
+        return pessoasRef.child(pessoaId).set(Object.assign({}, pes, { nif: rec.pessoa.nif }));
+      }
+    }).then(function(){
+      var id = rec.id;
+      recFila = recFila.filter(function(x){ return x.id !== id; });
+      recRenderFila();
+      recFecharConferencia();
+      var proximo = recFila.filter(function(r){ return !r.falhou; })[0];
+      if (proximo) recAbrirConferencia(proximo, 'fila');
+    }).catch(function(err){
+      alert('Erro ao gravar o recibo: ' + err.message);
+    });
+  });
+
+  document.getElementById('recApagar').addEventListener('click', function(){
+    if (!recConf || recConf.origem !== 'historico') return;
+    var rec = recConf.rec;
+    if (!confirm('Apagar o recibo de ' + recPeriodoLabel(rec.periodo) + '?')) return;
+    recibosRef.child(rec.pessoaId).child(rec.periodo).remove().then(recFecharConferencia).catch(function(err){
+      alert('Erro ao apagar: ' + err.message);
+    });
+  });
+
+  /* ---------- 12. Histórico ---------- */
+  function recRenderHistorico(){
+    var wrap = document.getElementById('recHistorico');
+    if (!wrap) return;
+
+    var porMes = {};
+    Object.keys(recibos || {}).forEach(function(pessoaId){
+      var meses = recibos[pessoaId] || {};
+      Object.keys(meses).forEach(function(periodo){
+        if (!porMes[periodo]) porMes[periodo] = [];
+        porMes[periodo].push(Object.assign({ pessoaId: pessoaId, periodo: periodo }, meses[periodo]));
+      });
+    });
+
+    var periodos = Object.keys(porMes).sort().reverse();
+    if (!periodos.length){
+      wrap.innerHTML = '<div class="card glass-light rec-vazio">Ainda não há recibos importados.</div>';
+      return;
+    }
+
+    var html = '';
+    periodos.forEach(function(periodo){
+      var linhas = porMes[periodo].sort(function(a,b){
+        var na = (pessoas[a.pessoaId] && pessoas[a.pessoaId].nome) || (a.pessoa && a.pessoa.nome) || '';
+        var nb = (pessoas[b.pessoaId] && pessoas[b.pessoaId].nome) || (b.pessoa && b.pessoa.nome) || '';
+        return String(na).localeCompare(String(nb), 'pt');
+      });
+      var tot = { sujeito:0, naoSujeito:0, descontos:0, liquido:0 };
+      linhas.forEach(function(r){
+        var t = r.totais || {};
+        tot.sujeito += t.sujeito || 0;
+        tot.naoSujeito += t.naoSujeito || 0;
+        tot.descontos += t.descontos || 0;
+        tot.liquido += t.liquido || 0;
+      });
+
+      html += '<div class="rec-hist-mes">';
+      html += '<div class="rec-hist-cab">';
+      html += '<span class="rec-hist-mes-nome">' + escapeHtml(recPeriodoLabel(periodo)) + '</span>';
+      html += '<span class="rec-hist-custo">' + linhas.length + (linhas.length === 1 ? ' recibo' : ' recibos') +
+              ' · custo do mês (sujeito + não sujeito) <strong>' + recFmt(tot.sujeito + tot.naoSujeito) + '</strong></span>';
+      html += '</div>';
+      html += '<div class="rec-tabela-wrap"><table class="rec-tabela rec-hist-tabela"><thead><tr>' +
+              '<th>Pessoa</th><th>Nº recibo</th><th class="rec-num">Sujeito</th><th class="rec-num">Não sujeito</th>' +
+              '<th class="rec-num">Descontos</th><th class="rec-num">Líquido</th><th>Estado</th>' +
+              '</tr></thead><tbody>';
+      linhas.forEach(function(r){
+        var t = r.totais || {};
+        var nome = (pessoas[r.pessoaId] && pessoas[r.pessoaId].nome) || (r.pessoa && r.pessoa.nome) || '(pessoa apagada)';
+        html += '<tr class="rec-hist-pessoa" data-pessoa="' + escapeHtml(r.pessoaId) + '" data-periodo="' + escapeHtml(periodo) + '">';
+        html += '<td>' + escapeHtml(nome) + '</td>';
+        html += '<td>' + escapeHtml((r.meta && r.meta.nrRecibo) || '—') + '</td>';
+        html += '<td class="rec-num">' + recFmt(t.sujeito) + '</td>';
+        html += '<td class="rec-num">' + recFmt(t.naoSujeito) + '</td>';
+        html += '<td class="rec-num">' + recFmt(t.descontos) + '</td>';
+        html += '<td class="rec-num">' + recFmt(t.liquido) + '</td>';
+        html += '<td>' + (r.validacao && r.validacao.ok
+          ? '<span class="rec-selo rec-selo-ok">OK</span>'
+          : '<span class="rec-selo rec-selo-erro">Por rever</span>') + '</td>';
+        html += '</tr>';
+      });
+      html += '<tr class="rec-hist-total"><td>Total do mês</td><td></td>' +
+              '<td class="rec-num">' + recFmt(tot.sujeito) + '</td>' +
+              '<td class="rec-num">' + recFmt(tot.naoSujeito) + '</td>' +
+              '<td class="rec-num">' + recFmt(tot.descontos) + '</td>' +
+              '<td class="rec-num">' + recFmt(tot.liquido) + '</td><td></td></tr>';
+      html += '</tbody></table></div></div>';
+    });
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('tr.rec-hist-pessoa').forEach(function(tr){
+      tr.addEventListener('click', function(){
+        var pid = tr.getAttribute('data-pessoa');
+        var per = tr.getAttribute('data-periodo');
+        var guardado = recibos[pid] && recibos[pid][per];
+        if (!guardado) return;
+        var copia = JSON.parse(JSON.stringify(guardado));
+        recAbrirConferencia({
+          id: 'hist_' + pid + '_' + per,
+          ficheiro: (copia.meta && copia.meta.ficheiro) || '',
+          pessoaId: pid,
+          periodo: per,
+          meta: copia.meta || {},
+          pessoa: copia.pessoa || {},
+          linhas: copia.linhas || [],
+          descontos: copia.descontos || [],
+          totais: copia.totais || {},
+          pagamento: copia.pagamento || {},
+          textoBruto: copia.textoBruto || '',
+          avisos: []
+        }, 'historico');
+      });
+    });
+  }
+
+  recibosRef.on('value', function(snapshot){
+    recibos = snapshot.val() || {};
+    recRenderHistorico();
+  });
 
   renderGrelha();
   }); // fim de autenticarEContinuar
