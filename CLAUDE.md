@@ -39,7 +39,13 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
-| `mrn-dashboard.html` | Dashboard privado: pagamentos, tarefas, Instagram, pedidos espelhados | Só Manel |
+| `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
+| `gioco-shell.js` | Sprite de 23 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
+| `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
+| `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU | Só Manel |
+| `tarefas.html` | Tarefas, prazos e fixados do dia | Só Manel |
+| `conta-bancaria.html` | Movimentos e saldo de uma conta (`?conta={slug}`) | Só Manel |
+| `mrn-dashboard.html` | Dashboard privado: contas bancárias, vendas, pagamentos e compromissos, tarefas, pedidos da loja espelhados, depósitos bancários e reconciliação, central de notificações, armazenamento, e placeholders (Calendário Outlook, Instagram, Google Reviews) | Só Manel |
 
 ## Nós Firebase (RTDB)
 
@@ -133,6 +139,78 @@ pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas com
 - Sem frameworks JS (sem React, Vue, etc.)
 - Sem build step, sem package.json
 - Após editar, fazer `git add`, `git commit`, `git push` directamente
+
+### Design system (`gioco-shell.css` / `gioco-shell.js`)
+
+Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
+`equipa.html`, `mrn-dashboard.html`. Por migrar: `compras.html`, `caixa.html`,
+`loja-sao-bento.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`,
+`leitura-faturas.html`, `index.html`.
+
+Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
+(`Antonio` + `Inter`, mais `Space Mono` só se a página tiver números
+monoespaçados) e `<link rel="stylesheet" href="gioco-shell.css">`. A seguir a
+`<body>`, `<script src="gioco-shell.js"></script>` — antes de qualquer markup
+com `<use href="#i-...">`, para o sprite já estar no DOM.
+
+**Tokens.** Nunca redeclarar num `<style>` de página o que o shell já dá. A
+semântica é o que interessa, não o nome:
+
+| Token | Papel |
+|---|---|
+| `--dough` | fundo da página |
+| `--ink` | texto principal **e** superfície que inverte com o tema (`.cat-chip.active`) |
+| `--white` | **superfície**, não branco: no tema escuro resolve para `#1f1c17` |
+| `--red` | superfície vermelha e **títulos** — igual nos dois temas, decisão do Manel |
+| `--red-ink` | vermelho **em texto** secundário: clareia no escuro (o `--red` dá lá 3,35:1) |
+| `--on-red` | texto **por cima** de vermelho: branco fixo. Nunca `--white` aqui |
+| `--lime` `--mustard` `--blush` `--navy` | superfícies de selo (continuam claras no escuro) |
+| `--green` `--amber` (+ `-bg`) | cores de **estado** em texto e rebordo |
+| `--muted` `--line` | texto secundário e riscas |
+
+Sobre um selo cuja superfície não inverte, o texto é um literal fixo
+(`#141414` / `#FFFFFF`) com par `[data-theme="dark"]` quando o fundo clareia —
+é o que o shell já faz em `.status.ok/.warn/.high`.
+
+**Armadilhas conhecidas** (todas já custaram uma sessão):
+
+- `<button>` sem `color` explícita herda o preto do browser, não o `--ink`:
+  ilegível no tema escuro. Aconteceu no `.cat-chip` (receitas) e no
+  `.notif-item` (dashboard).
+- O `.card` do shell **não tem fundo**: dá só raio e folga. O vidro vem de
+  `.glass-light` (ou `.glass`), que tem de estar na mesma tag.
+- O `::before` do `.glass-light` pinta por cima do conteúdo estático. Empurrar
+  o conteúdo com `.card > *{ position:relative; z-index:1 }`.
+- O shell dá `table{width:100%}`, `th{}` e `td{}` a elementos nus. Uma tabela
+  estreita da página precisa de `width:auto` explícito.
+- As regras `:nth-child` da sidebar param na **7ª** entrada: uma nav com mais
+  perde a animação escalonada nas seguintes.
+- O `<style>` da página vem **depois** do `<link>`: em empate de
+  especificidade, o local ganha. Uma classe local com o nome de uma do shell
+  (`.card`, `.num`) anula-a em silêncio.
+
+**Regra da navegação.** A lista de links da sidebar é declarada **página a
+página**, no `<body>`. Não está no `gioco-shell.css` nem no `.js` — o shell só
+lhe dá estilo (`nav`, `.nav-row`). As páginas públicas partilham a mesma lista
+de 7 entradas, copiada à mão.
+
+O `mrn-dashboard.html` é a **excepção e tem de continuar a ser**: é privado, o
+link não é partilhado, e tem lista própria (Home, Tesouraria, Tarefas, Conta
+bancária) que **nunca se lista a si própria**. A primeira entrada chama-se
+"Home" e não "Dashboard" de propósito — nas páginas públicas há um
+`Dashboard → index.html` que convida a ser "corrigido" para
+`mrn-dashboard.html`, e era assim que o link privado sairia. Se um dia a nav
+subir ao shell, tem de ser **allow-list** (cada página declara o que quer ver),
+nunca deny-list: numa deny-list, esquecer a flag expõe a página.
+
+Depois de mexer em navegação, correr:
+
+```
+grep -rn 'href=[^>]*mrn-dashboard' --include=*.html .
+```
+
+Só `tesouraria.html` e `conta-bancaria.html` podem aparecer (os back-links
+`← Dashboard`). Mais alguma coisa é fuga do link privado.
 
 ## Equipa (referência)
 - **Manel** — Fundador
