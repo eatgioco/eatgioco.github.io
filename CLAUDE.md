@@ -115,7 +115,13 @@ pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas com
 3. **mailto: falha no POS** — o computador da loja não tem cliente de email. Não usar mailto para fluxos críticos do staff.
 4. **Microsoft 365 write tools indisponíveis** — só leitura. Sem automações cloud que dependam de M365.
 5. **Firebase Auth adiado** — não implementar auth sem instrução explícita.
-6. **PWA/notificações push** — adiado para fase posterior.
+6. **Notificações push adiadas** — sem service worker e sem Web Push. Não implementar sem instrução explícita.
+   O que já está feito é o **ícone de ecrã principal (iOS)**: `manifest.json` na raiz, `icons/` com os PNG
+   120→1024, e o bloco de tags (`manifest`, `apple-touch-icon` 180/167/152, `icon` 192/512, `theme-color`,
+   `apple-mobile-web-app-*`) no `<head>` das 14 páginas activas, logo a seguir ao `<meta charset>`.
+   Ao criar uma página nova, copiar esse bloco e pôr o `apple-mobile-web-app-title` curto (é o nome debaixo
+   do ícone no iPhone). Status bar fica em `black`: não há padding de safe-area, e com `black-translucent`
+   o relógio/bateria sobrepunham-se ao header vermelho fixo.
 
 ## Padrão de desenvolvimento
 
