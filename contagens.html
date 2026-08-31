@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Contagens">
+<!-- 2a excepcao ao padrao desktop-only do OS (a 1a e a equipa.html): o uso principal
+     e desktop - o Alfredo regista ao computador enquanto o Bishnu conta - mas a
+     contagem tambem se faz com o telemovel na mao em frente a arca. Segue a doutrina
+     da equipa.html: width=device-width e ZERO media queries de largura. As linhas
+     adaptam-se sozinhas com flex-wrap + clamp(); a 1200px ficam numa linha densa, a
+     375px empilham. As unicas @media sao (hover:hover), nunca (max-width). -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Contagens</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#F5F2EC;
+    --red:#D91124;
+    --black:#141414;
+    --white:#FFFFFF;
+    --line:#E2DDD1;
+    --muted:#6b6660;
+    --green:#1E7A46;
+    --amber:#B8860B;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.mono{
+    font-family:'Space Mono', monospace;
+  }
+
+  header{
+    background:var(--red);
+    color:var(--white);
+    padding:20px 24px;
+  }
+
+  .header-inner{
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  .home-link{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--white);
+    text-decoration:none;
+    border:2px solid var(--white);
+    padding:6px 10px;
+    white-space:nowrap;
+  }
+
+  .brand-mark{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  .page-title{
+    margin:0;
+    font-size:clamp(22px, 5vw, 30px);
+    font-weight:700;
+    letter-spacing:-0.5px;
+  }
+
+  .page-subtitle{
+    margin:8px 0 0;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--red);
+    letter-spacing:2px;
+    text-transform:uppercase;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .btn{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    border:2px solid var(--black);
+    background:var(--white);
+    color:var(--black);
+    padding:9px 14px;
+    min-height:40px;
+    cursor:pointer;
+    letter-spacing:0.3px;
+    white-space:nowrap;
+  }
+
+  .btn:disabled{
+    opacity:0.6;
+    cursor:default;
+  }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--white);
+  }
+
+  /* Unica excepcao ao "sem @media": o criterio e a existencia de hover, nunca a
+     largura. Ao toque nao ha hover, e nada de essencial pode depender dele. */
+  @media (hover: hover){
+    .home-link:hover{ background:var(--white); color:var(--red); }
+    .btn:not(:disabled):hover{ background:var(--black); color:var(--white); }
+    .btn-primary:not(:disabled):hover{ background:var(--black); border-color:var(--black); }
+    .cat-head:hover{ background:var(--red); border-color:var(--red); }
+    .contagem-card:hover{ border-color:var(--red); }
+    .btn-cfg:hover{ background:var(--black); color:var(--white); }
+  }
+
+  /* ---------- Erro de autenticacao ---------- */
+  #authErro{
+    display:none;
+    max-width:1200px;
+    margin:24px auto 0;
+    padding:0 24px;
+  }
+
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    background:var(--white);
+    border:3px solid var(--red);
+    padding:20px;
+  }
+
+  .auth-box h2{
+    margin:0 0 8px;
+    font-size:16px;
+    color:var(--red);
+  }
+
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:14px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  /* ---------- Ecra inicial: lista de contagens ---------- */
+  .nova-card{
+    background:var(--white);
+    border:2px solid var(--black);
+    padding:16px;
+    margin-top:28px;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:12px;
+  }
+
+  .field-label{
+    display:block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .nova-card .campo{ flex:1 1 200px; min-width:0; }
+
+  input[type="date"], input[type="text"], input[type="number"], select{
+    width:100%;
+    padding:10px 12px;
+    min-height:44px;
+    border:2px solid var(--line);
+    background:var(--bg);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--black);
+  }
+
+  input:focus, select:focus{ outline:none; border-color:var(--black); }
+
+  .lista-contagens{ margin-top:32px; }
+
+  .contagem-card{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px 16px;
+    width:100%;
+    text-align:left;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:14px 16px;
+    margin-bottom:8px;
+    cursor:pointer;
+    color:var(--black);
+    font-family:'Inter', sans-serif;
+  }
+
+  .contagem-data{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:700;
+    flex:0 0 auto;
+  }
+
+  .contagem-meta{
+    font-size:13px;
+    color:var(--muted);
+    flex:1 1 160px;
+  }
+
+  .selo{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:4px 8px;
+    border:2px solid currentColor;
+    flex:0 0 auto;
+  }
+
+  .selo-rascunho{ color:var(--amber); }
+  .selo-fechada{ color:var(--green); }
+
+  .vazio{
+    font-size:14px;
+    color:var(--muted);
+    padding:16px 0;
+    line-height:1.5;
+  }
+
+  /* ---------- Ecra de contagem ---------- */
+  .conta-topo{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px 14px;
+    margin-bottom:4px;
+  }
+
+  .conta-topo .page-title{ flex:0 0 auto; }
+  .conta-acoes{ display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
+
+  .barra{
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:var(--bg);
+    border-bottom:2px solid var(--black);
+    padding:12px 0;
+    margin:20px 0 4px;
+  }
+
+  .barra-linha{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px 12px;
+  }
+
+  .barra .busca{ flex:1 1 220px; min-width:0; }
+
+  .prog-texto{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+    flex:0 0 auto;
+  }
+
+  .prog-track{
+    height:10px;
+    background:var(--line);
+    border:2px solid var(--black);
+    margin-top:10px;
+  }
+
+  .prog-fill{
+    height:100%;
+    background:var(--red);
+    width:0;
+  }
+
+  .cat-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    min-height:44px;
+    background:var(--black);
+    color:var(--white);
+    border:2px solid var(--black);
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:10px 12px;
+    margin:22px 0 8px;
+    cursor:pointer;
+    text-align:left;
+  }
+
+  .cat-head .seta{ flex:0 0 auto; font-size:11px; width:12px; }
+  .cat-head .cat-label{ flex:1 1 auto; min-width:0; }
+  .cat-head .cat-cont{ flex:0 0 auto; font-weight:400; opacity:0.85; }
+
+  .linha{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px 12px;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:8px 12px;
+    margin-bottom:6px;
+    scroll-margin-top:150px;
+    scroll-margin-bottom:40px;
+  }
+
+  .linha.ativa{ border-color:var(--red); background:#FFF7F7; }
+  .linha.contado{ box-shadow:inset 6px 0 0 var(--green); }
+
+  .linha-nome{ flex:1 1 240px; min-width:0; }
+
+  .linha-nome b{
+    display:block;
+    font-size:14px;
+    font-weight:600;
+    line-height:1.3;
+  }
+
+  .linha-alias{
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .aviso-unidade{
+    display:inline-block;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--amber);
+    border:1px solid var(--amber);
+    padding:2px 5px;
+    margin-top:4px;
+  }
+
+  .linha-campos{
+    flex:0 1 auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  input.qtd{
+    width:clamp(88px, 20vw, 116px);
+    padding:8px 10px;
+    min-height:44px;
+    text-align:right;
+    font-family:'Space Mono', monospace;
+    font-size:18px;
+    font-weight:700;
+    border:2px solid var(--line);
+    background:var(--bg);
+    color:var(--black);
+  }
+
+  input.qtd:focus{
+    outline:none;
+    border-color:var(--red);
+    box-shadow:0 0 0 3px rgba(217,17,36,0.25);
+  }
+
+  input.qtd:disabled{ background:var(--line); color:var(--muted); }
+  input.qtd.erro{ border-color:var(--red); background:#FFECEC; }
+
+  .uni{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    width:clamp(50px, 12vw, 72px);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .base{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    width:clamp(70px, 16vw, 104px);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .btn-cfg{
+    flex:0 0 auto;
+    width:36px;
+    height:36px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--black);
+    cursor:pointer;
+    font-size:14px;
+    line-height:1;
+    padding:0;
+  }
+
+  /* ---------- Modais ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{ display:flex; }
+
+  .modal{
+    background:var(--bg);
+    border:3px solid var(--black);
+    max-width:480px;
+    width:100%;
+    padding:clamp(18px, 5vw, 28px);
+    cursor:default;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:18px;
+  }
+
+  .modal-header h2{ margin:0; font-size:18px; min-width:0; }
+
+  .modal-close{
+    background:none;
+    border:none;
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Space Mono', monospace;
+    line-height:1;
+    color:var(--black);
+    min-width:36px;
+    min-height:36px;
+  }
+
+  .modal .field{ margin-bottom:14px; }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+
+  .modal-nota{
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.5;
+    margin:0 0 14px;
+  }
+
+  .fator-preview{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:10px 12px;
+  }
+
+  .resumo-linha{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    font-size:14px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+
+  .resumo-linha b{ font-family:'Space Mono', monospace; }
+
+  .sr-only{
+    position:absolute;
+    width:1px; height:1px;
+    padding:0; margin:-1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+    white-space:nowrap;
+    border:0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="home-link">🏠 Home</a>
+    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+  </div>
+</header>
+
+<div id="authErro">
+  <div class="auth-box">
+    <h2>Sem ligação ao Firebase</h2>
+    <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+    <button type="button" class="btn btn-primary" id="authRetryBtn">Tentar de novo</button>
+  </div>
+</div>
+
+<main id="app" hidden>
+
+  <!-- ================= ECRÃ INICIAL ================= -->
+  <section id="vistaLista">
+    <h1 class="page-title">Contagens</h1>
+    <p class="page-subtitle">Stock físico</p>
+
+    <div class="nova-card">
+      <div class="campo">
+        <label class="field-label" for="novaData">Data da contagem</label>
+        <input type="date" id="novaData">
+      </div>
+      <button type="button" class="btn btn-primary" id="novaBtn">Nova contagem</button>
+    </div>
+
+    <div class="lista-contagens">
+      <p class="section-title">Contagens registadas</p>
+      <div id="listaContagens"><p class="vazio">A carregar…</p></div>
+    </div>
+  </section>
+
+  <!-- ================= ECRÃ DE CONTAGEM ================= -->
+  <section id="vistaContagem" hidden>
+    <div class="conta-topo">
+      <button type="button" class="btn" id="voltarBtn">← Contagens</button>
+      <h1 class="page-title" id="contaData">—</h1>
+      <span class="selo" id="contaSelo">—</span>
+      <div class="conta-acoes">
+        <button type="button" class="btn btn-primary" id="fecharBtn">Fechar contagem</button>
+        <button type="button" class="btn" id="reabrirBtn" hidden>Reabrir</button>
+      </div>
+    </div>
+
+    <div class="barra">
+      <div class="barra-linha">
+        <div class="busca">
+          <label class="sr-only" for="busca">Pesquisar ingrediente</label>
+          <input type="text" id="busca" placeholder="Pesquisar por nome ou alias   (tecla /)" autocomplete="off">
+        </div>
+        <span class="prog-texto" id="progTexto">0 de 0 contados</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+
+    <div id="linhas"></div>
+  </section>
+
+</main>
+
+<!-- ================= MINI-MODAL: unidade de contagem + fator ================= -->
+<div class="modal-overlay" id="uniOverlay">
+  <form class="modal" id="uniForm" autocomplete="off">
+    <div class="modal-header">
+      <h2 id="uniTitulo">Unidade de contagem</h2>
+      <button type="button" class="modal-close" id="uniFechar" aria-label="Cancelar">×</button>
+    </div>
+
+    <p class="modal-nota" id="uniNota"></p>
+
+    <div class="field" id="uniBaseCampo" hidden>
+      <label class="field-label" for="uniBase">Unidade base do ingrediente</label>
+      <input type="text" id="uniBase" list="unidadesBase" placeholder="kg">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="uniContagem">Unidade de contagem</label>
+      <input type="text" id="uniContagem" list="unidadesContagem" placeholder="caixa">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="uniFator">Fator de conversão</label>
+      <input type="text" id="uniFator" inputmode="decimal" placeholder="10">
+      <div class="fator-preview" id="uniPreview">1 unidade = ?</div>
+    </div>
+
+    <p class="modal-nota" id="uniErro" style="color:var(--red);" hidden></p>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="uniCancelar">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Confirmar</button>
+    </div>
+  </form>
+</div>
+
+<datalist id="unidadesBase">
+  <option value="kg"></option>
+  <option value="lt"></option>
+  <option value="un"></option>
+  <option value="gr"></option>
+  <option value="ml"></option>
+</datalist>
+
+<datalist id="unidadesContagem">
+  <option value="kg"></option>
+  <option value="lt"></option>
+  <option value="un"></option>
+  <option value="gr"></option>
+  <option value="ml"></option>
+  <option value="caixa"></option>
+  <option value="saco"></option>
+  <option value="pacote"></option>
+  <option value="garrafa"></option>
+  <option value="lata"></option>
+  <option value="balde"></option>
+  <option value="grade"></option>
+  <option value="barril"></option>
+</datalist>
+
+<!-- ================= MODAL: fechar contagem ================= -->
+<div class="modal-overlay" id="fecharOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Fechar contagem</h2>
+      <button type="button" class="modal-close" id="fecharFechar" aria-label="Cancelar">×</button>
+    </div>
+    <div id="fecharResumo"></div>
+    <p class="modal-nota" style="margin-top:14px;">Depois de fechada a contagem abre em modo de leitura. Podes sempre reabri-la.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="fecharCancelar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="fecharConfirmar">Fechar contagem</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: reabrir contagem ================= -->
+<div class="modal-overlay" id="reabrirOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Reabrir contagem</h2>
+      <button type="button" class="modal-close" id="reabrirFechar" aria-label="Cancelar">×</button>
+    </div>
+    <p class="modal-nota">A contagem volta a rascunho e fica outra vez editável. O registo de fecho é removido; os itens contados mantêm-se todos.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="reabrirCancelar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="reabrirConfirmar">Reabrir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  //
+  // Esta página vai mais longe do que as outras 12: a versão delas só faz
+  // console.error() no catch, por isso uma falha de rede deixa a página em
+  // branco e muda. Aqui há um timeout de 8s (o signInAnonymously fica
+  // pendurado indefinidamente sem rede, nunca rejeita) e um #authErro com
+  // retry. Está por fazer o retrofit deste padrão às restantes páginas.
+  var authArrancou = false;
+
+  function autenticarEContinuar(callback) {
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      detalhe.textContent = msg;
+      caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a
+        // montar a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        callback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  document.getElementById('authRetryBtn').addEventListener('click', function () {
+    document.getElementById('authErroDetalhe').textContent = 'A ligar…';
+    autenticarEContinuar(arrancar);
+  });
+
+  autenticarEContinuar(arrancar);
+
+  function arrancar() {
+  document.getElementById('app').hidden = false;
+
+  var db = firebase.database();
+  var ingredientesRef = db.ref('ingredientes');
+  var categoriasRef = db.ref('categoriasIngredientes');
+  var contagensRef = db.ref('contagens');
+
+  // Categorias que arrancam colapsadas: fichas técnicas e preparados internos.
+  // Não se compram nem se contam na arca, mas ficam visíveis e expansíveis —
+  // esconder dados nunca; poupar o percurso ao teclado, sim.
+  var CATS_COLAPSADAS_POR_OMISSAO = ['Receitas', 'Base', 'BR', 'SA'];
+
+  var allIngredientes = {};
+  var CATEGORIAS = {};
+  var allContagens = {};
+  var ingredientesCarregados = false;
+  var categoriasCarregadas = false;
+  var contagensCarregadas = false;
+
+  var dataAtual = null;              // data da contagem aberta, ou null
+  var colapsadas = {};               // { catKey: true }
+  var filtro = '';
+  var ultimoInputId = null;          // para o Esc da pesquisa devolver o foco
+  var modalSuprimidoPara = null;     // ingrediente cujo modal o utilizador cancelou
+
+  // ---------- utilitários ----------
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function hojeISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  // Aceita vírgula decimal (é o que se escreve em português) e devolve null
+  // quando o texto não é um número — o campo fica marcado e nada é gravado.
+  function parseNum(txt) {
+    var t = String(txt == null ? '' : txt).trim().replace(',', '.');
+    if (t === '') return null;
+    if (!/^-?\d*\.?\d+$/.test(t)) return NaN;
+    var n = parseFloat(t);
+    return isNaN(n) ? NaN : n;
+  }
+
+  function arred(n) {
+    return Math.round(n * 1000) / 1000;
+  }
+
+  function fmtNum(n) {
+    if (n == null || isNaN(n)) return '';
+    return String(arred(n)).replace('.', ',');
+  }
+
+  // A contagem só está pronta quando há unidade base E unidade/fator de
+  // contagem. Sem os dois não dá para calcular qtdBase.
+  function configPronta(ing) {
+    if (!ing) return false;
+    if (!ing.unidade) return false;
+    var c = ing.contagem;
+    return !!(c && c.unidade && typeof c.fator === 'number' && isFinite(c.fator));
+  }
+
+  function labelCat(key) {
+    if (!key) return 'Sem categoria';
+    return CATEGORIAS[key] || key;
+  }
+
+  function ingredienteMatches(ing, q) {
+    if (!q) return true;
+    if (String(ing.nome || '').toLowerCase().indexOf(q) !== -1) return true;
+    var aliases = ing.aliases || [];
+    for (var i = 0; i < aliases.length; i++) {
+      if (String(aliases[i] || '').toLowerCase().indexOf(q) !== -1) return true;
+    }
+    return false;
+  }
+
+  function contagemAtual() {
+    return (dataAtual && allContagens[dataAtual]) || null;
+  }
+
+  function itensAtuais() {
+    var c = contagemAtual();
+    return (c && c.itens) || {};
+  }
+
+  function editavel() {
+    var c = contagemAtual();
+    return !!c && c.estado !== 'fechada';
+  }
+
+  // Ordem das categorias: alfabética pelo label, como no compras.html — o nó
+  // categoriasIngredientes não tem campo de ordem. "Sem categoria" fica no fim.
+  function ordemCategorias() {
+    var usadas = {};
+    Object.keys(allIngredientes).forEach(function (id) {
+      usadas[allIngredientes[id].categoria || ''] = true;
+    });
+    return Object.keys(usadas).sort(function (a, b) {
+      if (!a) return 1;
+      if (!b) return -1;
+      return labelCat(a).localeCompare(labelCat(b), 'pt');
+    });
+  }
+
+  function ingredientesDaCat(cat) {
+    return Object.keys(allIngredientes)
+      .filter(function (id) { return (allIngredientes[id].categoria || '') === cat; })
+      .map(function (id) { return Object.assign({ id: id }, allIngredientes[id]); })
+      .sort(function (a, b) { return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt'); });
+  }
+
+  // ===================================================================
+  // ECRÃ INICIAL — lista de contagens
+  // ===================================================================
+
+  var listaContagensEl = document.getElementById('listaContagens');
+
+  function renderLista() {
+    if (!contagensCarregadas || !ingredientesCarregados) {
+      listaContagensEl.innerHTML = '<p class="vazio">A carregar…</p>';
+      return;
+    }
+    var datas = Object.keys(allContagens).sort().reverse();
+    var total = Object.keys(allIngredientes).length;
+    if (!datas.length) {
+      listaContagensEl.innerHTML = '<p class="vazio">Ainda não há contagens. Escolhe a data e carrega em «Nova contagem».</p>';
+      return;
+    }
+    var html = '';
+    datas.forEach(function (d) {
+      var c = allContagens[d] || {};
+      var n = Object.keys(c.itens || {}).length;
+      var fechada = c.estado === 'fechada';
+      html += '<button type="button" class="contagem-card" data-data="' + escapeHtml(d) + '">' +
+        '<span class="contagem-data">' + escapeHtml(d) + '</span>' +
+        '<span class="selo ' + (fechada ? 'selo-fechada' : 'selo-rascunho') + '">' +
+        (fechada ? 'Fechada' : 'Rascunho') + '</span>' +
+        '<span class="contagem-meta">' + n + ' de ' + total + ' contados</span>' +
+        '</button>';
+    });
+    listaContagensEl.innerHTML = html;
+  }
+
+  listaContagensEl.addEventListener('click', function (e) {
+    var card = e.target.closest('.contagem-card');
+    if (!card) return;
+    abrirContagem(card.getAttribute('data-data'));
+  });
+
+  document.getElementById('novaBtn').addEventListener('click', function () {
+    var d = document.getElementById('novaData').value;
+    if (!d) return;
+    if (!allContagens[d]) {
+      // Duas escritas independentes, uma por chave — nunca um update()
+      // multi-chave (ver decisão de Ago/2026 sobre escritas multi-chave).
+      //
+      // criadaEm fica numa variável local de propósito: o listener de
+      // contagens dispara SINCRONAMENTE no eco local do primeiro set() e
+      // substitui allContagens pelo que veio do servidor. Ler
+      // allContagens[d].criadaEm na linha seguinte dava undefined, e um
+      // set(undefined) rebenta antes de a página chegar a abrir a contagem.
+      var criadaEm = new Date().toISOString();
+      allContagens[d] = { estado: 'rascunho', criadaEm: criadaEm };
+      contagensRef.child(d).child('estado').set('rascunho');
+      contagensRef.child(d).child('criadaEm').set(criadaEm);
+    }
+    abrirContagem(d);
+  });
+
+  // ===================================================================
+  // ECRÃ DE CONTAGEM
+  // ===================================================================
+
+  var vistaLista = document.getElementById('vistaLista');
+  var vistaContagem = document.getElementById('vistaContagem');
+  var linhasEl = document.getElementById('linhas');
+  var buscaEl = document.getElementById('busca');
+  var estadoRenderizado = null;
+
+  function abrirContagem(d) {
+    dataAtual = d;
+    filtro = '';
+    buscaEl.value = '';
+    ultimoInputId = null;
+    modalSuprimidoPara = null;
+    colapsadas = {};
+    CATS_COLAPSADAS_POR_OMISSAO.forEach(function (k) { colapsadas[k] = true; });
+    vistaLista.hidden = true;
+    vistaContagem.hidden = false;
+    window.scrollTo(0, 0);
+    renderContagem();
+  }
+
+  function mostrarLista() {
+    dataAtual = null;
+    estadoRenderizado = null;
+    vistaContagem.hidden = true;
+    vistaLista.hidden = false;
+    renderLista();
+  }
+
+  document.getElementById('voltarBtn').addEventListener('click', mostrarLista);
+
+  function renderContagem() {
+    var c = contagemAtual();
+    if (!c) { mostrarLista(); return; }
+    estadoRenderizado = c.estado || 'rascunho';
+    var fechada = c.estado === 'fechada';
+    document.getElementById('contaData').textContent = dataAtual;
+    var selo = document.getElementById('contaSelo');
+    selo.textContent = fechada ? 'Fechada' : 'Rascunho';
+    selo.className = 'selo ' + (fechada ? 'selo-fechada' : 'selo-rascunho');
+    document.getElementById('fecharBtn').hidden = fechada;
+    document.getElementById('reabrirBtn').hidden = !fechada;
+    renderLinhas();
+    renderProgresso();
+  }
+
+  function textoBase(ing, item) {
+    if (item) return fmtNum(item.qtdBase) + ' ' + (item.unidadeBase || '');
+    if (configPronta(ing) && ing.contagem.fator !== 1) {
+      return '×' + fmtNum(ing.contagem.fator) + ' ' + ing.unidade;
+    }
+    return '';
+  }
+
+  function linhaHtml(ing, item, ed) {
+    var pronto = configPronta(ing);
+    var uni = (ing.contagem && ing.contagem.unidade) || (ing.unidade || '—');
+    var aliases = (ing.aliases || []).filter(Boolean);
+    var titulo = pronto ? 'Definir unidade de contagem' : 'Definir unidade de contagem (por definir)';
+    return '<div class="linha' + (item ? ' contado' : '') + '" data-id="' + escapeHtml(ing.id) + '">' +
+      '<span class="linha-nome"><b>' + escapeHtml(ing.nome || '(sem nome)') + '</b>' +
+      (aliases.length ? '<span class="linha-alias">' + escapeHtml(aliases.join(' · ')) + '</span>' : '') +
+      (ing.unidade ? '' : '<span class="aviso-unidade">Sem unidade base</span>') +
+      '</span>' +
+      '<span class="linha-campos">' +
+      '<input class="qtd" type="text" inputmode="decimal" autocomplete="off" ' +
+      'data-id="' + escapeHtml(ing.id) + '" aria-label="Quantidade contada de ' + escapeHtml(ing.nome || '') + '" ' +
+      'value="' + escapeHtml(item ? fmtNum(item.qtdContada) : '') + '"' + (ed ? '' : ' disabled') + '>' +
+      '<span class="uni" title="' + escapeHtml(uni) + '">' + escapeHtml(uni) + '</span>' +
+      '<span class="base">' + escapeHtml(textoBase(ing, item)) + '</span>' +
+      '<button type="button" class="btn-cfg" data-cfg="' + escapeHtml(ing.id) + '" ' +
+      'title="' + titulo + '" aria-label="' + titulo + '"' + (ed ? '' : ' disabled') + '>⚙</button>' +
+      '</span></div>';
+  }
+
+  function renderLinhas() {
+    var itens = itensAtuais();
+    var ed = editavel();
+    var q = filtro;
+    var html = '';
+    var algum = false;
+
+    ordemCategorias().forEach(function (cat) {
+      var ings = ingredientesDaCat(cat).filter(function (i) { return ingredienteMatches(i, q); });
+      if (!ings.length) return;
+      algum = true;
+      // Com pesquisa activa a categoria abre à força: senão os resultados
+      // ficavam escondidos dentro de uma categoria colapsada.
+      var aberta = q ? true : !colapsadas[cat];
+      var contados = ings.filter(function (i) { return itens[i.id] !== undefined; }).length;
+      html += '<button type="button" class="cat-head" data-cat="' + escapeHtml(cat) + '" aria-expanded="' + aberta + '">' +
+        '<span class="seta">' + (aberta ? '▾' : '▸') + '</span>' +
+        '<span class="cat-label">' + escapeHtml(labelCat(cat)) + '</span>' +
+        '<span class="cat-cont">' + contados + '/' + ings.length + '</span>' +
+        '</button>';
+      if (!aberta) return;
+      ings.forEach(function (ing) { html += linhaHtml(ing, itens[ing.id], ed); });
+    });
+
+    if (!algum) {
+      html = '<p class="vazio">Nenhum ingrediente corresponde a «' + escapeHtml(q) + '».</p>';
+    }
+    linhasEl.innerHTML = html;
+  }
+
+  function renderProgresso() {
+    var total = Object.keys(allIngredientes).length;
+    var n = Object.keys(itensAtuais()).length;
+    document.getElementById('progTexto').textContent = n + ' de ' + total + ' contados';
+    document.getElementById('progFill').style.width = total ? (n / total * 100) + '%' : '0';
+  }
+
+  function renderCatContadores() {
+    var itens = itensAtuais();
+    Array.prototype.forEach.call(linhasEl.querySelectorAll('.cat-head'), function (h) {
+      var cat = h.getAttribute('data-cat');
+      var ings = ingredientesDaCat(cat).filter(function (i) { return ingredienteMatches(i, filtro); });
+      var contados = ings.filter(function (i) { return itens[i.id] !== undefined; }).length;
+      var alvo = h.querySelector('.cat-cont');
+      if (alvo) alvo.textContent = contados + '/' + ings.length;
+    });
+  }
+
+  // Re-render que devolve o foco ao campo onde estava. Sem isto, qualquer
+  // escrita nossa (ou de outro separador) atirava o Alfredo para fora do
+  // campo a meio da contagem.
+  function comFocoPreservado(fn) {
+    var ae = document.activeElement;
+    var id = (ae && ae.classList && ae.classList.contains('qtd')) ? ae.getAttribute('data-id') : null;
+    fn();
+    if (!id) return;
+    var novo = linhasEl.querySelector('input.qtd[data-id="' + id + '"]');
+    if (novo) { novo.focus(); try { novo.select(); } catch (e) {} }
+  }
+
+  // ===================================================================
+  // Gravação item a item
+  // ===================================================================
+
+  function gravarItem(ingId, el) {
+    if (!dataAtual || !editavel()) return;
+    var ing = allIngredientes[ingId];
+    if (!ing || !el) return;
+
+    var itens = itensAtuais();
+    var itemRef = contagensRef.child(dataAtual).child('itens').child(ingId);
+    var n = parseNum(el.value);
+    el.classList.remove('erro');
+
+    // Campo vazio: o item fica simplesmente AUSENTE de itens/ — não se
+    // gravam zeros implícitos. Um 0 escrito à mão grava-se como 0.
+    if (n === null) {
+      if (itens[ingId] !== undefined) {
+        delete itens[ingId];
+        itemRef.set(null);
+        aplicarItemNaLinha(ingId, undefined);
+      }
+      return;
+    }
+
+    if (isNaN(n) || n < 0) { el.classList.add('erro'); return; }
+    if (!configPronta(ing)) { el.classList.add('erro'); return; }
+
+    var ant = itens[ingId];
+    var item = {
+      qtdContada: arred(n),
+      unidadeContagem: ing.contagem.unidade,
+      qtdBase: arred(n * ing.contagem.fator),
+      unidadeBase: ing.unidade,
+      registadoEm: new Date().toISOString()
+    };
+
+    if (ant && ant.qtdContada === item.qtdContada &&
+        ant.unidadeContagem === item.unidadeContagem &&
+        ant.qtdBase === item.qtdBase &&
+        ant.unidadeBase === item.unidadeBase) {
+      return; // nada mudou, não vale uma escrita
+    }
+
+    // UM path, UM set. Nunca um update() multi-chave, e nunca um set no nó
+    // itens/ inteiro — pode haver duas sessões abertas em simultâneo.
+    itemRef.set(item);
+    itens[ingId] = item;
+    aplicarItemNaLinha(ingId, item);
+  }
+
+  function aplicarItemNaLinha(ingId, item) {
+    var linha = linhasEl.querySelector('.linha[data-id="' + ingId + '"]');
+    if (!linha) return;
+    var ing = allIngredientes[ingId];
+    linha.classList.toggle('contado', item !== undefined);
+    var base = linha.querySelector('.base');
+    if (base) base.textContent = textoBase(ing, item);
+    var uni = linha.querySelector('.uni');
+    if (uni) {
+      var u = (ing.contagem && ing.contagem.unidade) || (ing.unidade || '—');
+      uni.textContent = u;
+      uni.setAttribute('title', u);
+    }
+    var aviso = linha.querySelector('.aviso-unidade');
+    if (aviso && ing.unidade) aviso.remove();
+    renderProgresso();
+    renderCatContadores();
+  }
+
+  // ===================================================================
+  // Navegação ao teclado
+  // ===================================================================
+
+  // Só devolve os campos que estão realmente no DOM: as categorias
+  // colapsadas não são renderizadas, por isso o Enter/Tab salta-as sem
+  // precisar de as conhecer.
+  function inputsAtivos() {
+    return Array.prototype.slice.call(linhasEl.querySelectorAll('input.qtd:not([disabled])'));
+  }
+
+  function focarInput(el) {
+    el.focus();
+    try { el.select(); } catch (e) {}
+    var linha = el.closest('.linha');
+    if (linha) linha.scrollIntoView({ block: 'center' });
+  }
+
+  function saltar(atual, delta) {
+    var arr = inputsAtivos();
+    var i = arr.indexOf(atual);
+    if (i === -1) { if (arr.length) focarInput(arr[0]); return; }
+    var j = i + delta;
+    if (j < 0 || j >= arr.length) { atual.blur(); return; }
+    focarInput(arr[j]);
+  }
+
+  linhasEl.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (!el.classList || !el.classList.contains('qtd')) return;
+    var id = el.getAttribute('data-id');
+    var linha = el.closest('.linha');
+    if (linha) linha.classList.add('ativa');
+    ultimoInputId = id;
+    if (modalSuprimidoPara && modalSuprimidoPara !== id) modalSuprimidoPara = null;
+    // Primeira vez que este ingrediente é contado sem configuração: o modal
+    // abre ao ENTRAR no campo, e o Enter devolve o foco aqui.
+    if (!configPronta(allIngredientes[id]) && modalSuprimidoPara !== id) {
+      abrirModalUnidade(id, true);
+    }
+  });
+
+  linhasEl.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (!el.classList || !el.classList.contains('qtd')) return;
+    var linha = el.closest('.linha');
+    if (linha) linha.classList.remove('ativa');
+    gravarItem(el.getAttribute('data-id'), el);
+  });
+
+  linhasEl.addEventListener('keydown', function (e) {
+    var el = e.target;
+    if (!el.classList || !el.classList.contains('qtd')) return;
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      gravarItem(el.getAttribute('data-id'), el);
+      saltar(el, e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      el.blur();
+    }
+  });
+
+  linhasEl.addEventListener('click', function (e) {
+    var cfg = e.target.closest('.btn-cfg');
+    if (cfg) { abrirModalUnidade(cfg.getAttribute('data-cfg'), false); return; }
+    var head = e.target.closest('.cat-head');
+    if (head) {
+      var cat = head.getAttribute('data-cat');
+      colapsadas[cat] = !colapsadas[cat];
+      renderLinhas();
+      var novo = linhasEl.querySelector('.cat-head[data-cat="' + cat + '"]');
+      if (novo) novo.focus();
+    }
+  });
+
+  buscaEl.addEventListener('input', function () {
+    filtro = buscaEl.value.trim().toLowerCase();
+    renderLinhas();
+  });
+
+  buscaEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      buscaEl.blur();
+      var alvo = ultimoInputId && linhasEl.querySelector('input.qtd[data-id="' + ultimoInputId + '"]');
+      if (alvo && !alvo.disabled) focarInput(alvo);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      var arr = inputsAtivos();
+      if (arr.length) focarInput(arr[0]);
+    }
+  });
+
+  // Atalho "/" para a pesquisa. Só quando o foco não está num campo — senão
+  // não dava para escrever uma barra em lado nenhum.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (vistaContagem.hidden) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (document.querySelector('.modal-overlay.open')) return;
+    e.preventDefault();
+    buscaEl.focus();
+    buscaEl.select();
+  });
+
+  // ===================================================================
+  // Mini-modal: unidade de contagem + fator (e unidade base, se faltar)
+  // ===================================================================
+
+  var uniOverlay = document.getElementById('uniOverlay');
+  var uniForm = document.getElementById('uniForm');
+  var uniBaseCampo = document.getElementById('uniBaseCampo');
+  var uniBase = document.getElementById('uniBase');
+  var uniContagem = document.getElementById('uniContagem');
+  var uniFator = document.getElementById('uniFator');
+  var uniPreview = document.getElementById('uniPreview');
+  var uniErro = document.getElementById('uniErro');
+  var uniAlvo = null;
+  var uniDevolverFoco = false;
+
+  function baseNoModal() {
+    var ing = allIngredientes[uniAlvo];
+    if (uniBaseCampo.hidden) return (ing && ing.unidade) || '';
+    return uniBase.value.trim();
+  }
+
+  function atualizarPreview() {
+    var b = baseNoModal() || '?';
+    var c = uniContagem.value.trim() || '?';
+    var f = parseNum(uniFator.value);
+    var ft = (f === null || isNaN(f)) ? '?' : fmtNum(f);
+    uniPreview.textContent = '1 ' + c + ' = ' + ft + ' ' + b;
+  }
+
+  function abrirModalUnidade(ingId, devolverFoco) {
+    var ing = allIngredientes[ingId];
+    if (!ing || !editavel()) return;
+    uniAlvo = ingId;
+    uniDevolverFoco = !!devolverFoco;
+
+    var temBase = !!ing.unidade;
+    document.getElementById('uniTitulo').textContent = ing.nome || 'Ingrediente';
+    uniBaseCampo.hidden = temBase;
+    uniBase.value = ing.unidade || '';
+    uniContagem.value = (ing.contagem && ing.contagem.unidade) || '';
+    uniFator.value = (ing.contagem && typeof ing.contagem.fator === 'number') ? fmtNum(ing.contagem.fator) : '';
+    document.getElementById('uniNota').textContent = temBase
+      ? 'Em que unidade se conta este ingrediente? A unidade base é «' + ing.unidade + '».'
+      : 'Este ingrediente ainda não tem unidade base. Define-a e diz em que unidade se conta.';
+    uniErro.hidden = true;
+    atualizarPreview();
+    uniOverlay.classList.add('open');
+    var primeiro = temBase ? uniContagem : uniBase;
+    setTimeout(function () { primeiro.focus(); try { primeiro.select(); } catch (e) {} }, 0);
+  }
+
+  function fecharModalUnidade() {
+    uniOverlay.classList.remove('open');
+    uniAlvo = null;
+  }
+
+  // Unidade de contagem igual à base: o fator é 1 por definição. Preenche-se
+  // sozinho para o Enter poder confirmar sem escrever nada.
+  function autoFator() {
+    var b = baseNoModal().toLowerCase();
+    var c = uniContagem.value.trim().toLowerCase();
+    if (b && c && b === c && uniFator.value.trim() === '') uniFator.value = '1';
+  }
+
+  uniBase.addEventListener('input', function () { autoFator(); atualizarPreview(); });
+  uniContagem.addEventListener('input', function () { autoFator(); atualizarPreview(); });
+  uniFator.addEventListener('input', atualizarPreview);
+
+  uniForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ingId = uniAlvo;
+    var ing = allIngredientes[ingId];
+    if (!ing) { fecharModalUnidade(); return; }
+
+    var baseVal = baseNoModal();
+    var contVal = uniContagem.value.trim();
+    autoFator();
+    var f = parseNum(uniFator.value);
+
+    function erro(msg) { uniErro.textContent = msg; uniErro.hidden = false; }
+
+    if (!baseVal) { erro('Falta a unidade base.'); uniBase.focus(); return; }
+    if (!contVal) { erro('Falta a unidade de contagem.'); uniContagem.focus(); return; }
+    if (f === null || isNaN(f) || f <= 0) { erro('O fator tem de ser um número maior do que zero.'); uniFator.focus(); return; }
+
+    // Duas escritas independentes, cada uma num path próprio. NUNCA um set
+    // em ingredientes/{id} inteiro nem um update() multi-chave: isso
+    // apagaria precoUltimaCompra e o resto da ficha.
+    if (!ing.unidade) {
+      // Só se estiver vazia — nunca sobrepor uma unidade base já definida.
+      ingredientesRef.child(ingId).child('unidade').set(baseVal);
+      ing.unidade = baseVal;
+    }
+    ingredientesRef.child(ingId).child('contagem').set({ unidade: contVal, fator: arred(f) });
+    ing.contagem = { unidade: contVal, fator: arred(f) };
+
+    fecharModalUnidade();
+    modalSuprimidoPara = null;
+
+    // A configuração mudou: a linha passa a mostrar a unidade certa, e o
+    // valor já lá escrito é reconvertido com o fator novo.
+    var el = linhasEl.querySelector('input.qtd[data-id="' + ingId + '"]');
+    aplicarItemNaLinha(ingId, itensAtuais()[ingId]);
+    if (el && parseNum(el.value) !== null) gravarItem(ingId, el);
+    if (uniDevolverFoco && el && !el.disabled) focarInput(el);
+  });
+
+  function cancelarModalUnidade() {
+    var ingId = uniAlvo;
+    var devolver = uniDevolverFoco;
+    fecharModalUnidade();
+    if (!ingId) return;
+    // Cancelar = saltar este ingrediente. O modal não se reabre até o foco
+    // sair da linha, e o fluxo de teclado segue para o campo seguinte em vez
+    // de ficar preso num campo que não dá para gravar.
+    modalSuprimidoPara = ingId;
+    var el = linhasEl.querySelector('input.qtd[data-id="' + ingId + '"]');
+    if (devolver && el && !el.disabled) saltar(el, 1);
+  }
+
+  document.getElementById('uniCancelar').addEventListener('click', cancelarModalUnidade);
+  document.getElementById('uniFechar').addEventListener('click', cancelarModalUnidade);
+  uniOverlay.addEventListener('click', function (e) { if (e.target === uniOverlay) cancelarModalUnidade(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (uniOverlay.classList.contains('open')) { e.preventDefault(); cancelarModalUnidade(); }
+    else if (fecharOverlay.classList.contains('open')) fecharOverlay.classList.remove('open');
+    else if (reabrirOverlay.classList.contains('open')) reabrirOverlay.classList.remove('open');
+  });
+
+  // ===================================================================
+  // Fechar / reabrir contagem
+  // ===================================================================
+
+  var fecharOverlay = document.getElementById('fecharOverlay');
+  var reabrirOverlay = document.getElementById('reabrirOverlay');
+
+  document.getElementById('fecharBtn').addEventListener('click', function () {
+    if (!dataAtual) return;
+    var total = Object.keys(allIngredientes).length;
+    var n = Object.keys(itensAtuais()).length;
+    document.getElementById('fecharResumo').innerHTML =
+      '<div class="resumo-linha"><span>Data</span><b>' + escapeHtml(dataAtual) + '</b></div>' +
+      '<div class="resumo-linha"><span>Contados</span><b>' + n + '</b></div>' +
+      '<div class="resumo-linha"><span>Em falta</span><b>' + (total - n) + '</b></div>' +
+      '<div class="resumo-linha"><span>Total de ingredientes</span><b>' + total + '</b></div>';
+    fecharOverlay.classList.add('open');
+    document.getElementById('fecharConfirmar').focus();
+  });
+
+  document.getElementById('fecharConfirmar').addEventListener('click', function () {
+    if (!dataAtual) return;
+    // Duas chaves, duas escritas independentes.
+    contagensRef.child(dataAtual).child('estado').set('fechada');
+    contagensRef.child(dataAtual).child('fechadaEm').set(new Date().toISOString());
+    fecharOverlay.classList.remove('open');
+  });
+
+  document.getElementById('fecharCancelar').addEventListener('click', function () { fecharOverlay.classList.remove('open'); });
+  document.getElementById('fecharFechar').addEventListener('click', function () { fecharOverlay.classList.remove('open'); });
+  fecharOverlay.addEventListener('click', function (e) { if (e.target === fecharOverlay) fecharOverlay.classList.remove('open'); });
+
+  document.getElementById('reabrirBtn').addEventListener('click', function () {
+    if (!dataAtual) return;
+    reabrirOverlay.classList.add('open');
+    document.getElementById('reabrirConfirmar').focus();
+  });
+
+  document.getElementById('reabrirConfirmar').addEventListener('click', function () {
+    if (!dataAtual) return;
+    contagensRef.child(dataAtual).child('estado').set('rascunho');
+    contagensRef.child(dataAtual).child('fechadaEm').set(null);
+    reabrirOverlay.classList.remove('open');
+  });
+
+  document.getElementById('reabrirCancelar').addEventListener('click', function () { reabrirOverlay.classList.remove('open'); });
+  document.getElementById('reabrirFechar').addEventListener('click', function () { reabrirOverlay.classList.remove('open'); });
+  reabrirOverlay.addEventListener('click', function (e) { if (e.target === reabrirOverlay) reabrirOverlay.classList.remove('open'); });
+
+  // ===================================================================
+  // Listeners do Firebase
+  // ===================================================================
+
+  // Actualiza as linhas já renderizadas sem refazer o DOM — é isto que
+  // permite ter dois separadores abertos a contar itens diferentes sem que
+  // um atire o outro para fora do campo.
+  function reconciliar() {
+    var itens = itensAtuais();
+    Array.prototype.forEach.call(linhasEl.querySelectorAll('.linha'), function (l) {
+      var id = l.getAttribute('data-id');
+      var el = l.querySelector('input.qtd');
+      if (!el) return;
+      var it = itens[id];
+      if (document.activeElement !== el) {
+        var novo = it !== undefined ? fmtNum(it.qtdContada) : '';
+        if (el.value !== novo) { el.value = novo; el.classList.remove('erro'); }
+      }
+      l.classList.toggle('contado', it !== undefined);
+      var base = l.querySelector('.base');
+      if (base) base.textContent = textoBase(allIngredientes[id], it);
+    });
+    renderProgresso();
+    renderCatContadores();
+  }
+
+  ingredientesRef.on('value', function (snap) {
+    allIngredientes = snap.val() || {};
+    ingredientesCarregados = true;
+    if (!vistaLista.hidden) { renderLista(); return; }
+    if (dataAtual) comFocoPreservado(function () { renderLinhas(); renderProgresso(); });
+  });
+
+  categoriasRef.on('value', function (snap) {
+    var val = snap.val() || {};
+    CATEGORIAS = {};
+    Object.keys(val).forEach(function (k) { CATEGORIAS[k] = (val[k] && val[k].label) || k; });
+    categoriasCarregadas = true;
+    if (vistaLista.hidden && dataAtual) comFocoPreservado(renderLinhas);
+  });
+
+  contagensRef.on('value', function (snap) {
+    allContagens = snap.val() || {};
+    contagensCarregadas = true;
+    if (!vistaLista.hidden) { renderLista(); return; }
+    if (!dataAtual) return;
+    var c = allContagens[dataAtual];
+    if (!c) { mostrarLista(); return; }          // apagada à mão no Firebase
+    if ((c.estado || 'rascunho') !== estadoRenderizado) {
+      comFocoPreservado(renderContagem);
+      return;
+    }
+    reconciliar();
+  });
+
+  document.getElementById('novaData').value = hojeISO();
+  renderLista();
+
+  } // fim de arrancar()
+</script>
+
+</body>
+</html>

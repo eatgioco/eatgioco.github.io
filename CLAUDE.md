@@ -17,6 +17,12 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   `main` com `padding:40px 24px 80px`, e `<meta name="viewport" content="width=1200">`.
   Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
+- **Excepção: `contagens.html`.** O uso principal é desktop (o Alfredo regista ao computador
+  enquanto o Bishnu conta), mas a contagem também se faz com o telemóvel na mão em frente à
+  arca. Usa `width=device-width` e, como a equipa.html, **zero `@media` de largura**: as linhas
+  são flex com wrap (`flex:1 1 240px` no nome), por isso a 1200px ficam numa linha densa e a
+  375px empilham sozinhas. As únicas `@media` são `(hover: hover)` — nada de essencial pode
+  depender de hover, e o realce do campo activo é `:focus`, nunca `:hover`.
 - **Excepção: `equipa.html`.** A grelha de turnos tem de ser usável ao telemóvel, por isso
   usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Adapta-se com
   `overflow-x:auto` + coluna sticky e grelhas `minmax(min(Xpx,100%),1fr)`, e tem os ÚNICOS
@@ -36,6 +42,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
+| `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
@@ -112,7 +119,27 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          só para o aviso de desativação
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
+contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
+                         { estado: 'rascunho'|'fechada', criadaEm, fechadaEm,
+                           itens: { {ingredienteId}: { qtdContada, unidadeContagem,
+                           qtdBase, unidadeBase, registadoEm } } }.
+                         qtdContada é o número tal como foi escrito na unidade de
+                         contagem; qtdBase é esse número × o fator, na unidade base.
+                         unidadeBase fica CONGELADA no item de propósito: sem ela, mudar
+                         a unidade base do ingrediente mais tarde punha as contagens
+                         antigas a mentir. Um ingrediente NÃO contado fica simplesmente
+                         ausente de itens/ — nunca se gravam zeros implícitos; um 0
+                         escrito à mão grava-se como 0. Cada item é um set() num path
+                         próprio (podem estar duas sessões abertas ao mesmo tempo), e
+                         estado/fechadaEm são duas escritas independentes.
+                         Sem botão de apagar: só o Manel apaga, à mão, no Firebase.
 ```
+
+O `contagens.html` também escreve **`ingredientes/{id}/contagem`** = `{ unidade, fator }`
+(o fator converte 1 unidade de contagem em unidades base; se forem a mesma, fator = 1) e,
+**só quando está vazio**, `ingredientes/{id}/unidade`. São dois `set()` em dois paths
+próprios — nunca um `set` em `ingredientes/{id}` inteiro nem um `update()` multi-chave,
+que apagariam `precoUltimaCompra` e o resto da ficha.
 
 ## Restrições críticas (não ignorar)
 
@@ -121,6 +148,15 @@ pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas com
 3. **mailto: falha no POS** — o computador da loja não tem cliente de email. Não usar mailto para fluxos críticos do staff.
 4. **Microsoft 365 write tools indisponíveis** — só leitura. Sem automações cloud que dependam de M365.
 5. **Firebase Auth adiado** — não implementar auth sem instrução explícita.
+   **PENDENTE: retrofit do padrão de auth às restantes 12 páginas.** O
+   `autenticarEContinuar()` que 12 páginas partilham só faz `console.error()` no `catch`
+   e não tem timeout — sem rede, o `signInAnonymously` fica pendurado para sempre e a
+   página fica em branco e muda, sem dizer nada a quem está ao balcão. O
+   `contagens.html` (Ago/2026) é o único com a versão boa: timeout de 8 s, caixa
+   `#authErro` visível e botão "Tentar de novo" que volta a tentar sem recarregar (com
+   guarda `authArrancou` para o retry não montar a página duas vezes). Copiar de lá para
+   `compras`, `pagamentos`, `caixa`, `loja-sao-bento`, `receitas`, `vendas`, `equipa`,
+   `tarefas`, `tesouraria`, `conta-bancaria`, `leitura-faturas` e `mrn-dashboard`.
 6. **Notificações push adiadas** — sem service worker e sem Web Push. Não implementar sem instrução explícita.
    O que já está feito é o **ícone de ecrã principal (iOS)**: `icons/` com os PNG 120→1024, e o bloco de tags
    (`apple-touch-icon` 180/167/152, `icon` 192/512, `theme-color`, `apple-mobile-web-app-*`) no `<head>` das
