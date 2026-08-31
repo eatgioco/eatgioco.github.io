@@ -268,6 +268,72 @@
      do bloco é o centro real. */
   .payment-line-detail:last-child .btn-line-done{ top:50%; }
 
+  /* Reenviar o email de confirmação de uma linha já paga. Em fluxo normal —
+     ao contrário do .btn-line-done, que é absoluto e centrado — para nunca
+     disputar o mesmo canto. As duas condições são exclusivas hoje, mas o
+     layout aguenta se deixarem de ser. */
+  .btn-line-resend{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:8px;
+    width:30px;
+    height:30px;
+    padding:0;
+    border-radius:50%;
+    font-size:12px;
+    line-height:1;
+    background:var(--white);
+    border:1.5px solid var(--line);
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+
+  .btn-line-resend:hover{ border-color:var(--red); }
+  .btn-line-resend:active{ transform:scale(0.92); }
+
+  /* ---------- Painel de email (reenvio) ----------
+     Só mostra texto reconstruído a partir do que já está gravado. Nada neste
+     painel escreve no Firebase. */
+  .email-meta{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    font-size:12.5px;
+    color:var(--ink);
+    word-break:break-word;
+  }
+
+  .email-meta-label{
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:inline-block;
+    min-width:38px;
+  }
+
+  .email-subject{
+    font-size:13.5px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--white);
+    user-select:text;
+    word-break:break-word;
+  }
+
+  .email-body{
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:12.5px;
+    line-height:1.5;
+    white-space:pre-wrap;
+    resize:vertical;
+    min-height:200px;
+  }
+
   /* ---------- Botão de copiar (emoji) ----------
      Sem equivalente no conjunto de 22 ícones do shell — fica emoji. */
   .copy-icon-btn{
@@ -587,6 +653,40 @@
       <button type="button" class="btn" id="paymentModalCancel">Cancelar</button>
       <div class="modal-actions-right">
         <button type="button" class="btn-add" id="btnEnviarPagamento">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Painel de visualização de email. Reconstrói o texto a partir do que está
+     gravado, para recuperar um email perdido. Estritamente leitura. -->
+<div class="modal-overlay" id="emailModalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 class="modal-title" id="emailModalTitle">Email</h3>
+      <button class="modal-close" id="emailModalClose">×</button>
+    </div>
+
+    <div class="email-meta">
+      <div><span class="email-meta-label">Para</span><span id="emailModalTo"></span></div>
+      <div id="emailModalCcRow"><span class="email-meta-label">CC</span><span id="emailModalCc"></span></div>
+    </div>
+
+    <div class="field" style="margin-top:16px;">
+      <span class="field-label">Assunto</span>
+      <div class="email-subject" id="emailModalSubject"></div>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
+      <span class="field-label">Corpo</span>
+      <textarea id="emailModalBody" class="email-body" rows="14" readonly></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="emailModalCancel">Fechar</button>
+      <div class="modal-actions-right">
+        <button type="button" class="btn" id="emailModalCopy">📋 Copiar texto</button>
+        <button type="button" class="btn-add" id="emailModalMailto">✉️ Abrir no email</button>
       </div>
     </div>
   </div>
@@ -970,20 +1070,14 @@ window.addEventListener('load', function () {
     var dateStr = formatDateDDMMYYYY(new Date());
     var numeroReferencia = nextNumeroReferencia(new Date());
     var autor = resolvePessoaSelecao(document.getElementById('paymentCriadoPor'));
-    var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
 
-    var bodyLines = [];
-    bodyLines.push("Boa tarde,");
-    bodyLines.push("");
-    bodyLines.push("Segue pedido de pagamento:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
-    bodyLines.push("");
-    bodyLines.push("Pedido criado por: " + autor.criadoPor);
-    bodyLines.push("");
-    bodyLines.push("Obrigado,");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
+    // O pedido é montado em memória primeiro para o builder ler sempre a mesma
+    // forma de objeto, venha ele daqui ou do Firebase num reenvio.
+    var pedido = {
+      numeroReferencia: numeroReferencia,
+      criadoPor: autor.criadoPor,
+      lines: lines
+    };
 
     paymentRequestsRef.push({
       date: dateStr,
@@ -995,8 +1089,7 @@ window.addEventListener('load', function () {
       lines: lines
     });
 
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
+    mailtoFromEmail(buildEmailPedido(pedido));
 
     mostrarAvisoEnvio();
   }
@@ -1016,17 +1109,7 @@ window.addEventListener('load', function () {
 
     paymentRequestsRef.child(id).update({ lines: lines });
 
-    var subject = "Pedido de pagamento EDITADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
-    var bodyLines = [];
-    bodyLines.push("O pedido #" + numeroReferencia + " foi editado. Novos dados:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines));
-    bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
-
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
+    mailtoFromEmail(buildEmailEditado({ numeroReferencia: numeroReferencia }, lines));
 
     closePaymentModal();
   }
@@ -1043,8 +1126,86 @@ window.addEventListener('load', function () {
     return bodyLines;
   }
 
-  function enviarEmailConcluido(p) {
-    var subject = "Pagamento Concluído | Fornecedores | – Data: " + formatSubjectDate(new Date());
+  // ── Emails: construção pura ─────────────────────────────────────────────
+  // Os builders devolvem { to, cc, subject, body } e não têm efeitos
+  // secundários: não escrevem no Firebase, não tocam no DOM, não abrem mailto.
+  // Servem tanto o envio original como o reenvio a partir do que já está
+  // gravado — é isto que permite recuperar um email que se perdeu.
+
+  var EMAIL_ASSINATURA = "GIOCO — Rua de São Bento 154, Lisboa";
+  var EMAIL_TO_PEDIDOS = "manel.reymao@eatgioco.com";
+  var EMAIL_TO_FINANCE = "finance@eatgioco.com";
+  var EMAIL_CC_FINANCE = "alfredo.giangaspero@eatgioco.com";
+
+  // Data para o assunto. Num reenvio interessa a data do evento original e não
+  // a de hoje: `ts` é o timestamp gravado (ex.: linha.concluidoEm) e `dateStr`
+  // o "DD/MM/YYYY" do pedido. Sem nenhum dos dois, cai em hoje.
+  function resolveDataAssunto(ts, dateStr) {
+    if (typeof ts === 'number' && isFinite(ts) && ts > 0) {
+      var d = new Date(ts);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (typeof dateStr === 'string') {
+      var parts = dateStr.split('/');
+      if (parts.length === 3) {
+        var dia = parseInt(parts[0], 10);
+        var mes = parseInt(parts[1], 10);
+        var ano = parseInt(parts[2], 10);
+        if (!isNaN(dia) && !isNaN(mes) && !isNaN(ano)) {
+          var parsed = new Date(ano, mes - 1, dia);
+          // Rejeita datas que o Date "corrigiu" (ex.: 32/01) em vez de aceitar.
+          if (!isNaN(parsed.getTime()) && parsed.getDate() === dia &&
+              parsed.getMonth() === mes - 1 && parsed.getFullYear() === ano) {
+            return parsed;
+          }
+        }
+      }
+    }
+    return new Date();
+  }
+
+  function dataAssunto(dataRef) {
+    var d = (dataRef instanceof Date && !isNaN(dataRef.getTime())) ? dataRef : new Date();
+    return formatSubjectDate(d);
+  }
+
+  function buildEmailPedido(p, dataRef) {
+    var numeroReferencia = p.numeroReferencia || "";
+    var subject = "Pedido Pagamento | Fornecedores | #" + numeroReferencia +
+      " – Data: " + dataAssunto(dataRef);
+
+    var bodyLines = [];
+    bodyLines.push("Boa tarde,");
+    bodyLines.push("");
+    bodyLines.push("Segue pedido de pagamento:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildPaymentLinesBlock(p.lines || []));
+    bodyLines.push("");
+    bodyLines.push("Pedido criado por: " + (p.criadoPor || ""));
+    bodyLines.push("");
+    bodyLines.push("Obrigado,");
+    bodyLines.push(EMAIL_ASSINATURA);
+
+    return { to: EMAIL_TO_PEDIDOS, cc: "", subject: subject, body: bodyLines.join("\n") };
+  }
+
+  function buildEmailEditado(p, lines, dataRef) {
+    var numeroReferencia = p.numeroReferencia || "";
+    var subject = "Pedido de pagamento EDITADO | #" + numeroReferencia +
+      " – Data: " + dataAssunto(dataRef);
+
+    var bodyLines = [];
+    bodyLines.push("O pedido #" + numeroReferencia + " foi editado. Novos dados:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildPaymentLinesBlock(lines || []));
+    bodyLines.push("");
+    bodyLines.push(EMAIL_ASSINATURA);
+
+    return { to: EMAIL_TO_PEDIDOS, cc: "", subject: subject, body: bodyLines.join("\n") };
+  }
+
+  function buildEmailConcluido(p, dataRef) {
+    var subject = "Pagamento Concluído | Fornecedores | – Data: " + dataAssunto(dataRef);
 
     var bodyLines = [];
     bodyLines.push("O seguinte pagamento foi concluído:");
@@ -1053,13 +1214,54 @@ window.addEventListener('load', function () {
     bodyLines.push("");
     bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
     bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
+    bodyLines.push(EMAIL_ASSINATURA);
 
-    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
-      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
+    return { to: EMAIL_TO_FINANCE, cc: EMAIL_CC_FINANCE, subject: subject, body: bodyLines.join("\n") };
+  }
 
+  function buildEmailConcluidoLinha(p, linha, dataRef) {
+    var subject = "Pagamento Concluído | " + linha.fornecedor + " | Pedido #" +
+      (p.numeroReferencia || "") + " – Data: " + dataAssunto(dataRef);
+
+    var bodyLines = [];
+    bodyLines.push("O seguinte pagamento foi concluído:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildConcluidoLinesBlock([linha]));
+    bodyLines.push("");
+    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
+    bodyLines.push("");
+    bodyLines.push(EMAIL_ASSINATURA);
+
+    return { to: EMAIL_TO_FINANCE, cc: EMAIL_CC_FINANCE, subject: subject, body: bodyLines.join("\n") };
+  }
+
+  function buildEmailAnulado(p, dataRef) {
+    var numeroReferencia = p.numeroReferencia || "";
+    var subject = "Pedido de pagamento ANULADO | #" + numeroReferencia +
+      " – Data: " + dataAssunto(dataRef);
+
+    var bodyLines = [];
+    bodyLines.push("O pedido #" + numeroReferencia + " foi anulado:");
+    bodyLines.push("");
+    bodyLines = bodyLines.concat(buildPaymentLinesBlock(p.lines || []));
+    bodyLines.push("");
+    bodyLines.push(EMAIL_ASSINATURA);
+
+    return { to: EMAIL_TO_PEDIDOS, cc: "", subject: subject, body: bodyLines.join("\n") };
+  }
+
+  // Único ponto com efeito secundário do caminho de email. Sem cc, o parâmetro
+  // é omitido por completo — nada de "?cc=&subject=".
+  function mailtoFromEmail(e) {
+    var url = "mailto:" + e.to + "?";
+    if (e.cc) url += "cc=" + encodeURIComponent(e.cc) + "&";
+    url += "subject=" + encodeURIComponent(e.subject) + "&body=" + encodeURIComponent(e.body);
+    window.location.href = url;
+    return url;
+  }
+
+  function enviarEmailConcluido(p) {
+    mailtoFromEmail(buildEmailConcluido(p));
     mostrarAvisoConcluido();
   }
 
@@ -1104,23 +1306,7 @@ window.addEventListener('load', function () {
   }
 
   function enviarEmailConcluidoLinha(p, linha) {
-    var subject = "Pagamento Concluído | " + linha.fornecedor + " | Pedido #" + (p.numeroReferencia || "") +
-      " – Data: " + formatSubjectDate(new Date());
-
-    var bodyLines = [];
-    bodyLines.push("O seguinte pagamento foi concluído:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildConcluidoLinesBlock([linha]));
-    bodyLines.push("");
-    bodyLines.push("⚠️ Não esquecer de anexar o comprovativo de transferência a este email antes de enviar.");
-    bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
-
-    var mailto = "mailto:finance@eatgioco.com?cc=" + encodeURIComponent("alfredo.giangaspero@eatgioco.com") +
-      "&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
-
+    mailtoFromEmail(buildEmailConcluidoLinha(p, linha));
     mostrarAvisoConcluido();
   }
 
@@ -1134,18 +1320,110 @@ window.addEventListener('load', function () {
   function cancelPaymentRequest(p) {
     paymentRequestsRef.child(p.id).update({ status: 'anulado' });
 
-    var numeroReferencia = p.numeroReferencia || "";
-    var subject = "Pedido de pagamento ANULADO | #" + numeroReferencia + " – Data: " + formatSubjectDate(new Date());
-    var bodyLines = [];
-    bodyLines.push("O pedido #" + numeroReferencia + " foi anulado:");
-    bodyLines.push("");
-    bodyLines = bodyLines.concat(buildPaymentLinesBlock(p.lines || []));
-    bodyLines.push("");
-    bodyLines.push("GIOCO — Rua de São Bento 154, Lisboa");
-    var body = bodyLines.join("\n");
+    mailtoFromEmail(buildEmailAnulado(p));
+  }
 
-    var mailto = "mailto:manel.reymao@eatgioco.com?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-    window.location.href = mailto;
+  // ── Painel de email ─────────────────────────────────────────────────────
+  // Mostra o email reconstruído pelos builders. Caminho estritamente de
+  // leitura: não escreve no Firebase, não muda status, não grava timestamps.
+
+  var emailModalOverlay = document.getElementById('emailModalOverlay');
+  var emailModalTitle = document.getElementById('emailModalTitle');
+  var emailModalTo = document.getElementById('emailModalTo');
+  var emailModalCc = document.getElementById('emailModalCc');
+  var emailModalCcRow = document.getElementById('emailModalCcRow');
+  var emailModalSubject = document.getElementById('emailModalSubject');
+  var emailModalBody = document.getElementById('emailModalBody');
+  var emailModalCopy = document.getElementById('emailModalCopy');
+  var emailModalMailto = document.getElementById('emailModalMailto');
+  var emailModalClose = document.getElementById('emailModalClose');
+  var emailModalCancel = document.getElementById('emailModalCancel');
+
+  var emailAtual = null;
+  var emailCopyTimer = null;
+
+  function resetBotaoCopiar() {
+    emailModalCopy.textContent = '📋 Copiar texto';
+  }
+
+  function feedbackCopiado() {
+    emailModalCopy.textContent = 'Copiado ✓';
+    if (emailCopyTimer) clearTimeout(emailCopyTimer);
+    emailCopyTimer = setTimeout(resetBotaoCopiar, 2000);
+  }
+
+  // navigator.clipboard não existe em contextos não seguros nem em alguns
+  // webviews — daí o execCommand como rede de segurança.
+  function copiarComFallback(texto) {
+    var ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function abrirPainelEmail(email, titulo) {
+    emailAtual = email;
+    emailModalTitle.textContent = titulo || 'Email';
+    emailModalTo.textContent = email.to;
+    if (email.cc) {
+      emailModalCc.textContent = email.cc;
+      emailModalCcRow.style.display = '';
+    } else {
+      emailModalCc.textContent = '';
+      emailModalCcRow.style.display = 'none';
+    }
+    emailModalSubject.textContent = email.subject;
+    emailModalBody.value = email.body;
+    resetBotaoCopiar();
+    emailModalOverlay.classList.add('open');
+  }
+
+  function fecharPainelEmail() {
+    emailModalOverlay.classList.remove('open');
+    emailAtual = null;
+  }
+
+  emailModalCopy.addEventListener('click', function () {
+    if (!emailAtual) return;
+    var texto = emailAtual.subject + "\n\n" + emailAtual.body;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(feedbackCopiado, function () {
+        if (copiarComFallback(texto)) feedbackCopiado();
+      });
+    } else if (copiarComFallback(texto)) {
+      feedbackCopiado();
+    }
+  });
+
+  emailModalMailto.addEventListener('click', function () {
+    if (emailAtual) mailtoFromEmail(emailAtual);
+  });
+
+  emailModalClose.addEventListener('click', fecharPainelEmail);
+  emailModalCancel.addEventListener('click', fecharPainelEmail);
+  emailModalOverlay.addEventListener('click', function (e) {
+    if (e.target === emailModalOverlay) fecharPainelEmail();
+  });
+
+  // O email de um pedido depende do estado em que ele está: um pedido anulado
+  // reenvia a anulação, um concluído a conclusão, um pendente o pedido original.
+  function emailDoPedido(p) {
+    var status = p.status || 'pendente';
+    var dataRef = resolveDataAssunto(null, p.date);
+    if (status === 'concluido') {
+      return { email: buildEmailConcluido(p, dataRef), titulo: 'Email de conclusão' };
+    }
+    if (status === 'anulado') {
+      return { email: buildEmailAnulado(p, dataRef), titulo: 'Email de anulação' };
+    }
+    return { email: buildEmailPedido(p, dataRef), titulo: 'Email do pedido' };
   }
 
   function buildPaymentCard(p) {
@@ -1230,11 +1508,19 @@ window.addEventListener('load', function () {
         html += '<button type="button" class="btn-line-done" data-line="' + idx + '" title="Marcar esta linha como paga" aria-label="Marcar esta linha como paga">✓</button>';
       }
 
+      // Linha já paga: o email de confirmação pode ser recuperado a qualquer
+      // altura, inclusive num pedido já fechado.
+      if (linhaPaga) {
+        html += '<button type="button" class="btn-line-resend" data-line="' + idx + '" title="Ver / reenviar email de confirmação" aria-label="Ver ou reenviar email de confirmação">✉️</button>';
+      }
+
       html += '</div>';
     });
     html += '</div>';
 
     html += '<div class="card-actions">';
+    // Fora do if (isPending): o email do pedido reconstrói-se em qualquer estado.
+    html += '<button type="button" class="btn-small btn-resend-request">✉️ Ver email</button>';
     if (isPending) {
       // Assim que a primeira linha é paga, o pedido só fecha linha a linha.
       if (linhasConcluidas === 0) {
@@ -1290,6 +1576,27 @@ window.addEventListener('load', function () {
         } else {
           cancelPaymentRequest(p);
         }
+      });
+    }
+
+    // Reenvio — bloco próprio, fora do if (isPending), porque os cards
+    // concluídos e anulados também precisam destes botões. Só lê.
+    card.querySelectorAll('.btn-line-resend').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var linha = (p.lines || [])[parseInt(btn.getAttribute('data-line'), 10)];
+        if (!linha) return;
+        abrirPainelEmail(
+          buildEmailConcluidoLinha(p, linha, resolveDataAssunto(linha.concluidoEm, p.date)),
+          'Email de confirmação — ' + linha.fornecedor
+        );
+      });
+    });
+
+    var resendRequestBtn = card.querySelector('.btn-resend-request');
+    if (resendRequestBtn) {
+      resendRequestBtn.addEventListener('click', function () {
+        var r = emailDoPedido(p);
+        abrirPainelEmail(r.email, r.titulo);
       });
     }
 
