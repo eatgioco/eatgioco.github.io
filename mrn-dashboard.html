@@ -154,15 +154,10 @@
     white-space:nowrap;
   }
 
-  /* Sem nenhuma conta ligada não há para onde ir: tira o cursor de mão
-     e o levantar no hover, como o cartão de Pagamentos já faz. */
+  /* Sem nenhuma conta ligada não há para onde ir: cartão inerte. O cursor e
+     o hover são desligados na regra partilhada dos cartões que não navegam. */
   .card-contas-inerte{
     cursor:default;
-  }
-
-  .card-contas-inerte:hover{
-    transform:none;
-    box-shadow:none;
   }
 
   /* Conta ainda não ligada: presente na lista, mas apagada e sem link. */
@@ -826,11 +821,6 @@
     margin-top:20px;
   }
 
-  .card-pedidos:hover{
-    transform:none;
-    box-shadow:none;
-  }
-
   .status-badge-danger{
     background:var(--red);
     color:var(--on-red);
@@ -1124,11 +1114,6 @@
     border-color:var(--line);
   }
 
-  .card-storage:hover{
-    transform:none;
-    box-shadow:none;
-  }
-
   .storage-row{
     margin-top:14px;
   }
@@ -1223,11 +1208,6 @@
   /* ---------- Pagamentos: totais + filtro de período ---------- */
   .card-pagamentos{
     cursor:pointer;
-  }
-
-  .card-pagamentos:hover{
-    transform:none;
-    box-shadow:4px 4px 0 var(--red);
   }
 
   .pay-totals{
@@ -1583,6 +1563,8 @@
      ser declarada por inteiro. */
   .tes-block-banco{
     border:1px dashed var(--muted);
+    /* sem a moldura do shell: o outline pinta por cima do border e tapava o tracejado */
+    outline:none;
   }
 
   .tes-saldo-stale{
@@ -1591,6 +1573,8 @@
 
   .tes-recon{
     border:1px solid var(--red);
+    /* sem a moldura do shell: o outline pinta por cima do border e tapava o vermelho de alerta */
+    outline:none;
   }
 
   .tes-recon-badge{
