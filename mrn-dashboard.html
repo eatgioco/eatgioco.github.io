@@ -25,97 +25,62 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --amber:#C08A2E;
-    --green:#1E7A46;
-    --blue:#1D5C8A;
+  /* ======================================================================
+     mrn-dashboard.html — estilos proprios da pagina.
+     O layout, a sidebar, o vidro, o tema claro/escuro, a tipografia, o
+     .card, a .status, as tabelas e TODOS os tokens de cor vem do
+     gioco-shell.css. Aqui fica so o que e especifico deste painel:
+     pagamentos e compromissos, tarefas, pedidos da loja, notificacoes,
+     contas bancarias, depositos e armazenamento.
+
+     Mapa dos tokens que esta pagina tinha em duplicado e deixou de ter:
+       --bg    -> --dough   --black -> --ink     --blue  -> --navy
+       --white/--line/--muted/--red/--green -> nomes iguais no shell
+     O --amber do shell (#8A6508) e cor de TEXTO/rebordo; onde aqui era
+     fundo de selo passa a --mustard, que e o token de superficie.
+     Texto POR CIMA de vermelho e --on-red, nunca --white: o --white e um
+     token de superficie e no tema escuro resolve para #1f1c17.
+     Vermelho EM texto e --red-ink (clareia no escuro; o --red da la 3,35:1).
+     A unica excepcao e o .page-subtitle: o shell diz que os TITULOS ficam
+     --red nos dois temas, e as outras paginas migradas fazem o mesmo.
+     ====================================================================== */
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  /* Os itens do menu sao links reais (<a>), estilizados pelo .nav-row do shell. */
+  .nav-row{ text-decoration:none; }
+
+  /* Rodape da sidebar: utilizador fixo, sem sessoes nem logout. */
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
   }
 
-  *{box-sizing:border-box;}
+  /* Mesma largura de leitura das outras paginas do OS. */
+  .page{ max-width:1200px; }
 
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
+  /* Space Mono deixou de ser a fonte da pagina: fica so onde o monoespacado
+     tem funcao — montantes, datas, referencias. Tudo o resto e o Inter do
+     shell, e os titulos sao o Antonio do .greet-row h1. */
+  .mono{ font-family:'Space Mono', monospace; }
 
-  h1,h2,h3,.mono,.card-title,.tag,.field-label,button{
-    font-family:'Space Mono', monospace;
-  }
-
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
-
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
-
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:48px 24px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:34px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
-
+  /* Mesmo subtitulo das outras paginas migradas: Inter, nao Space Mono. */
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:6px 0 0;
     font-size:12px;
+    font-weight:600;
     color:var(--red);
-    letter-spacing:2px;
+    letter-spacing:.14em;
     text-transform:uppercase;
   }
 
   .section-heading{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
+    font-size:10.5px;
+    font-weight:600;
     text-transform:uppercase;
-    letter-spacing:2px;
+    letter-spacing:.08em;
     color:var(--muted);
     margin:32px 0 14px;
   }
@@ -164,7 +129,7 @@
 
   a.conta-linha:hover .conta-nome,
   a.conta-linha:hover .conta-saldo{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .conta-nome{
@@ -217,46 +182,32 @@
     gap:20px;
   }
 
-  .page-title-row{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:16px;
-    flex-wrap:wrap;
-  }
-
   .quicklinks-row{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
-    padding-top:4px;
+    margin:14px 0 0;
   }
 
+  /* Mesma pilula dos .cat-chip do shell, sem o circulo do icone a esquerda. */
   .quicklink-pill{
     display:inline-block;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    padding:8px 16px;
-    border:1.5px solid var(--black);
-    border-radius:999px;
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 16px;
+    border:1.5px solid var(--line);
+    border-radius:100px;
     text-decoration:none;
-    color:var(--black);
-    background:transparent;
+    color:var(--ink);
+    background:var(--white);
     cursor:pointer;
-    transition:background .12s ease, color .12s ease, border-color .12s ease;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
   }
 
   .quicklink-pill:hover{
     background:var(--red);
     border-color:var(--red);
-    color:var(--white);
-  }
-
-  @media (max-width:700px){
-    .quicklinks-row{
-      width:100%;
-    }
+    color:var(--on-red);
   }
 
   .card-compact{
@@ -280,29 +231,42 @@
     margin-top:10px;
   }
 
+  /* .card e .glass-light vem do shell (raio 14px, vidro, hover que levanta).
+     Aqui so o que o shell nao da: ser <a> sem sublinhado e herdar a cor. */
   .card{
     display:block;
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:24px;
     text-decoration:none;
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
-    transition:transform .12s ease, box-shadow .12s ease;
   }
 
-  .card:hover{
-    transform:translate(-2px,-2px);
-    box-shadow:4px 4px 0 var(--red);
-  }
+  /* O ::before do .glass-light e absolute e pinta por cima do conteudo
+     estatico. Empurrar o conteudo para z-index:1 — mesmo truque que o shell
+     usa em .sidebar > *:not(.glass-bend) e que o pagamentos.html ja aplica. */
+  .card > *{ position:relative; z-index:1; }
 
-  .card-pagamentos{
+  /* Cartoes que nao navegam: desligar o levantar do .glass-light e o cursor
+     de mao. Uma regra so, em vez das quatro que existiam (uma por cartao). */
+  .card-tasks,
+  .card-pedidos,
+  .card-storage,
+  .card-contas-inerte{
     cursor:default;
   }
 
-  .card-pagamentos:hover{
+  .card-tasks:hover,
+  .card-pedidos:hover,
+  .card-storage:hover,
+  .card-contas-inerte:hover{
     transform:none;
-    box-shadow:none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.03), 0 6px 20px rgba(20,20,20,0.045);
+  }
+
+  [data-theme="dark"] .card-tasks:hover,
+  [data-theme="dark"] .card-pedidos:hover,
+  [data-theme="dark"] .card-storage:hover,
+  [data-theme="dark"] .card-contas-inerte:hover{
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 20px rgba(0,0,0,0.22);
   }
 
   .card-icon{
@@ -323,19 +287,22 @@
     color:var(--muted);
   }
 
+  /* Selos de estado: geometria do .status do shell, com a folga de topo que
+     estes precisam por virem debaixo de texto dentro do cartao. As cores sao
+     as do shell (.status.warn = --mustard); o vermelho solido nao tem
+     equivalente la, fica aqui como .status.danger. */
   .status-badge{
     display:inline-block;
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    text-transform:uppercase;
-    letter-spacing:0.5px;
-    padding:4px 8px;
-    color:var(--white);
+    font-size:10.5px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:100px;
     margin-top:14px;
   }
 
   .status-badge-warning{
-    background:var(--amber);
+    background:var(--mustard);
+    color:#141414;
   }
 
   /* Cartão Vendas (Vista Rápida) — números do mês mais recente importado */
@@ -368,7 +335,7 @@
   }
 
   .vendas-metric-value.positiva{ color:var(--green); }
-  .vendas-metric-value.negativa{ color:var(--red); }
+  .vendas-metric-value.negativa{ color:var(--red-ink); }
 
   /* Data da importação — discreta, não compete com os números acima */
   .vendas-importado{
@@ -386,57 +353,40 @@
     gap:12px;
   }
 
-  .btn{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
-    padding:9px 14px;
-    cursor:pointer;
-    letter-spacing:0.3px;
-    white-space:nowrap;
-  }
-
-  .btn:hover{
-    background:var(--black);
-    color:var(--white);
-  }
-
-  .btn-primary{
-    background:var(--red);
-    border-color:var(--red);
-    color:var(--white);
-  }
-
-  .btn-primary:hover{
-    background:var(--black);
-    border-color:var(--black);
-  }
-
+  /* O shell so tem o .btn-add (pilula vermelha, accao principal). O botao
+     secundario de contorno fica local, como no vendas.html. O primario da
+     pagina (Novo Pagamento) usa o .btn-add do shell. */
+  .btn,
   .btn-small{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    font-weight:700;
-    padding:6px 9px;
-    border:2px solid var(--black);
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
-    letter-spacing:0.3px;
     white-space:nowrap;
+    transition:border-color .15s ease, transform .1s ease;
   }
 
-  .btn-small:hover{
-    background:var(--black);
-    color:var(--white);
-  }
+  .btn{ font-size:12.5px; padding:9px 16px; }
+  .btn-small{ font-size:11px; padding:6px 12px; }
 
+  .btn:hover,
+  .btn-small:hover{ border-color:var(--red); }
+
+  .btn:active,
+  .btn-small:active{ transform:scale(0.97); }
+
+  .btn:disabled,
   .btn-small:disabled{
-    opacity:0.7;
-    cursor:default;
+    opacity:0.45;
+    cursor:not-allowed;
+    transform:none;
   }
+
+  .btn:disabled:hover,
+  .btn-small:disabled:hover{ border-color:var(--line); }
 
   .payments-tabs{
     display:flex;
@@ -444,52 +394,41 @@
     margin-top:16px;
   }
 
-  .payments-tab{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    font-weight:700;
-    padding:7px 12px;
-    border:2px solid var(--black);
+  /* ---------- Pilulas de filtro ----------
+     Uma unica regra para os tres grupos de filtros da pagina: separadores dos
+     Pedidos da Loja, periodos do cartao de Pagamentos e categorias das
+     Notificacoes. Eram tres copias da mesma coisa (e uma quarta, .filter-chip,
+     que ja nao estava em uso nenhum e saiu).
+     Os TRES nomes ficam: o JS delega por eles
+     (classList.contains('payments-tab'), closest('.pay-pill'),
+     querySelectorAll('.notif-filter-chip')). Consolidou-se a regra, nao o
+     nome — trocar o nome obrigava a mexer no JS. */
+  .payments-tab,
+  .pay-pill,
+  .notif-filter-chip{
+    font-family:'Inter', sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    padding:6px 14px;
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
-    text-transform:uppercase;
-    letter-spacing:0.3px;
+    white-space:nowrap;
+    transition:border-color .15s ease, background .15s ease;
   }
 
-  .payments-tab.active{
-    background:var(--black);
+  .payments-tab:hover,
+  .pay-pill:hover,
+  .notif-filter-chip:hover{ border-color:var(--red); }
+
+  .payments-tab.active,
+  .pay-pill.active,
+  .notif-filter-chip.active{
+    background:var(--ink);
+    border-color:var(--ink);
     color:var(--white);
-  }
-
-  .payments-subfilters{
-    display:flex;
-    gap:16px;
-    margin-top:8px;
-    justify-content:flex-end;
-  }
-
-  .filter-chip{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    font-weight:700;
-    padding:2px 0;
-    border:none;
-    border-bottom:2px solid transparent;
-    background:none;
-    color:var(--muted);
-    cursor:pointer;
-    text-transform:uppercase;
-    letter-spacing:0.3px;
-  }
-
-  .filter-chip:hover{
-    color:var(--black);
-  }
-
-  .filter-chip.active{
-    color:var(--red);
-    border-bottom-color:var(--red);
   }
 
   .payments-summary{
@@ -580,7 +519,7 @@
   .ticket-ref{
     font-family:'Space Mono', monospace;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     font-size:11px;
     margin-left:6px;
   }
@@ -650,7 +589,7 @@
     font-family:'Space Mono', monospace;
     font-size:10px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     text-transform:uppercase;
     letter-spacing:0.3px;
     align-self:center;
@@ -681,9 +620,9 @@
     margin-top:10px;
     padding:8px 10px;
     border:1px solid var(--amber);
-    background:#FBF4E7;
+    background:var(--amber-bg);
     font-size:12px;
-    color:#6d4e12;
+    color:var(--amber);
   }
 
   .task-sugestao span{
@@ -697,19 +636,21 @@
     padding:5px 8px;
     border:1px solid var(--amber);
     background:var(--white);
-    color:#6d4e12;
+    color:var(--amber);
     cursor:pointer;
     white-space:nowrap;
   }
 
   .btn-sugestao:hover{
     background:var(--amber);
-    color:var(--white);
+    /* O --amber e escuro nos dois temas (e cor de texto, nao de superficie):
+       o branco fixo e o unico que aguenta os dois. */
+    color:#FFFFFF;
   }
 
   .task-hoje{
     margin-top:18px;
-    background:var(--black);
+    background:var(--ink);
     padding:6px 14px 8px;
   }
 
@@ -731,7 +672,7 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     flex-shrink:0;
   }
 
@@ -757,7 +698,7 @@
     font-family:'Space Mono', monospace;
     font-size:12px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     margin:12px 0 0;
   }
 
@@ -766,7 +707,7 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     letter-spacing:0.3px;
   }
 
@@ -795,8 +736,8 @@
   }
 
   .modal{
-    background:var(--bg);
-    border:3px solid var(--black);
+    background:var(--dough);
+    border:3px solid var(--ink);
     max-width:480px;
     width:100%;
     padding:28px;
@@ -851,9 +792,9 @@
     font-family:'Inter', sans-serif;
     font-size:14px;
     padding:10px 12px;
-    border:2px solid var(--black);
+    border:2px solid var(--ink);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     width:100%;
   }
 
@@ -882,24 +823,38 @@
 
   .status-badge-danger{
     background:var(--red);
+    color:var(--on-red);
   }
 
+  /* Cinco fundos saturados e um so texto por cima. O --white nao serve (no
+     tema escuro resolve para #1f1c17) e o --ink tambem nao (inverte com o
+     tema, e estes fundos nao invertem). Branco fixo, como o --on-red faz
+     para o vermelho. Contraste no pior caso (--mustard, #FFCC02 claro):
+     por isso o "em analise" leva preto fixo. */
   .pedido-badge{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
+    font-size:10.5px;
     font-weight:700;
-    letter-spacing:0.5px;
+    letter-spacing:0.4px;
     text-transform:uppercase;
-    color:var(--white);
-    padding:3px 8px;
+    color:#FFFFFF;
+    border-radius:100px;
+    padding:3px 9px;
     white-space:nowrap;
   }
 
   .pedido-badge-novo{ background:var(--red); }
-  .pedido-badge-analise{ background:var(--amber); }
-  .pedido-badge-aprovado{ background:var(--blue); }
-  .pedido-badge-feito{ background:var(--green); }
+  .pedido-badge-analise{ background:var(--mustard); color:#141414; }
+  .pedido-badge-aprovado{ background:var(--navy); }
+  .pedido-badge-feito{ background:var(--green); color:#FFFFFF; }
   .pedido-badge-naoavancar{ background:var(--muted); }
+
+  /* No tema escuro o --green, o --navy e o --muted clareiam (sao tokens de
+     texto) e o branco por cima deixa de passar: nesse caso o texto e que
+     escurece. Medido: 'nao avancar' a branco sobre o --muted escuro da
+     3,51:1; a preto da 5,99:1. */
+  [data-theme="dark"] .pedido-badge-aprovado,
+  [data-theme="dark"] .pedido-badge-feito,
+  [data-theme="dark"] .pedido-badge-naoavancar{ color:#141414; }
 
   .pedido-ticket{
     border:1px solid var(--line);
@@ -935,8 +890,8 @@
   .pedido-resposta{
     margin-top:8px;
     padding:6px 8px;
-    background:var(--bg);
-    border-left:3px solid var(--black);
+    background:var(--dough);
+    border-left:3px solid var(--ink);
     font-size:12px;
   }
 
@@ -955,9 +910,9 @@
     font-size:12px;
     padding:6px;
     font-family:'Inter', sans-serif;
-    border:2px solid var(--black);
+    border:2px solid var(--ink);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
   }
 
   .pedido-edit-row input[type="text"]{
@@ -979,7 +934,7 @@
   }
 
   .link-view-loja:hover{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   /* ---------- Notificações ---------- */
@@ -988,34 +943,22 @@
     margin-left:auto;
   }
 
-  .notif-bell{
-    position:relative;
-    background:none;
-    border:2px solid var(--white);
-    color:var(--white);
-    font-size:16px;
-    line-height:1;
-    padding:6px 10px;
-    cursor:pointer;
-  }
-
-  .notif-bell:hover{
-    background:var(--white);
-  }
-
+  /* E o .ping do shell com o numero dentro. Encostado ao canto do .icon-btn,
+     com o rebordo da cor do fundo da pagina (ja nao ha header vermelho por
+     baixo) e o texto em --on-red, nunca --white: sobre vermelho o --white
+     resolveria para #1f1c17 no tema escuro. */
   .notif-badge{
     position:absolute;
-    top:-8px;
-    right:-8px;
-    min-width:19px;
-    height:19px;
-    padding:0 5px;
-    border-radius:10px;
+    top:-3px;
+    right:-3px;
+    min-width:17px;
+    height:17px;
+    padding:0 4px;
+    border-radius:100px;
     background:var(--red);
-    border:2px solid var(--white);
-    color:var(--white);
-    font-family:'Space Mono', monospace;
-    font-size:10px;
+    border:2px solid var(--dough);
+    color:var(--on-red);
+    font-size:9.5px;
     font-weight:700;
     display:flex;
     align-items:center;
@@ -1030,8 +973,8 @@
     width:330px;
     max-width:calc(100vw - 32px);
     background:var(--white);
-    border:2px solid var(--black);
-    color:var(--black);
+    border:2px solid var(--ink);
+    color:var(--ink);
     z-index:200;
     box-shadow:4px 4px 0 rgba(20,20,20,0.15);
   }
@@ -1046,7 +989,7 @@
     justify-content:space-between;
     gap:8px;
     padding:12px 14px;
-    border-bottom:2px solid var(--black);
+    border-bottom:2px solid var(--ink);
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
@@ -1067,7 +1010,7 @@
   }
 
   .notif-clear:hover{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .notif-filters{
@@ -1078,24 +1021,6 @@
     border-bottom:1px solid var(--line);
   }
 
-  .notif-filter-chip{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    font-weight:700;
-    padding:5px 9px;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
-    cursor:pointer;
-    text-transform:uppercase;
-    letter-spacing:0.3px;
-  }
-
-  .notif-filter-chip.active{
-    background:var(--black);
-    color:var(--white);
-  }
-
   .notif-modulo{
     display:inline-block;
     font-family:'Space Mono', monospace;
@@ -1103,7 +1028,7 @@
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:0.3px;
-    color:var(--red);
+    color:var(--red-ink);
     margin-top:3px;
   }
 
@@ -1112,7 +1037,11 @@
     overflow-y:auto;
   }
 
+  /* E um <button>: sem cor explicita ficava com o preto que o browser da por
+     omissao, ilegivel sobre o painel escuro (1,24:1). Mesmo caso dos
+     .cat-chip no receitas.html. */
   .notif-item{
+    color:var(--ink);
     display:flex;
     gap:10px;
     padding:12px 14px;
@@ -1128,7 +1057,7 @@
   }
 
   .notif-item:hover{
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .notif-item:last-child{
@@ -1268,7 +1197,7 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     letter-spacing:0.3px;
   }
 
@@ -1321,7 +1250,7 @@
 
   .pay-total-vencido .pay-total-value,
   .pay-total-vencido .pay-total-label{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .pay-total-periodo{
@@ -1330,31 +1259,13 @@
   }
 
   .pay-total-periodo .pay-total-value{
-    color:var(--blue);
+    color:var(--navy);
   }
 
   .pay-pills{
     display:flex;
     gap:6px;
     margin-top:16px;
-  }
-
-  .pay-pill{
-    font-family:'Space Mono', monospace;
-    font-size:11px;
-    font-weight:700;
-    padding:7px 13px;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
-    cursor:pointer;
-    text-transform:uppercase;
-    letter-spacing:0.3px;
-  }
-
-  .pay-pill.active{
-    background:var(--black);
-    color:var(--white);
   }
 
   .pay-lines{
@@ -1381,7 +1292,7 @@
   }
 
   .pay-line:hover{
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .pay-line-caret{
@@ -1415,13 +1326,15 @@
     white-space:nowrap;
   }
 
+  /* O rebordo fica --red (e superficie); o texto passa a --red-ink, que e o
+     vermelho de leitura — o --red da 3,35:1 sobre o fundo escuro. */
   .pay-line-wrap.vencido{
     border-color:var(--red);
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .pay-line-wrap.vencido .pay-line-caret{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   /* ---------- Detalhe expansível de uma linha de pagamento ---------- */
@@ -1433,7 +1346,7 @@
     gap:16px;
     padding:10px 12px 12px 34px;
     border-top:1px dashed var(--line);
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .pay-detalhe-info{
@@ -1475,7 +1388,11 @@
     font-style:italic;
   }
 
+  /* O shell da table{width:100%}, que esta nao quer: e uma tabela estreita
+     dentro do bloco de detalhe, com scroll horizontal proprio no .tsu-detalhe.
+     Sem o width:auto passava a esticar-se ao contentor. */
   .tsu-tabela{
+    width:auto;
     border-collapse:collapse;
     font-size:12px;
     min-width:520px;
@@ -1486,6 +1403,9 @@
     padding:4px 10px 4px 0;
     text-align:left;
     white-space:nowrap;
+    border-bottom:none;
+    text-transform:none;
+    letter-spacing:0;
   }
 
   .tsu-tabela th{
@@ -1548,7 +1468,7 @@
     bottom:100%;
     left:50%;
     transform:translateX(-50%) translateY(-4px);
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
     font-family:'Space Mono', monospace;
     font-size:10px;
@@ -1573,7 +1493,7 @@
     font-family:'Space Mono', monospace;
     font-size:11px;
     font-weight:700;
-    color:var(--red);
+    color:var(--red-ink);
     letter-spacing:0.3px;
   }
 
@@ -1596,7 +1516,7 @@
 
   .tes-block{
     background:var(--white);
-    border:2px solid var(--black);
+    border:2px solid var(--ink);
     padding:22px;
     margin-bottom:20px;
   }
@@ -1645,7 +1565,7 @@
   }
 
   .tes-saldo-stale{
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .tes-recon{
@@ -1659,7 +1579,7 @@
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:1px;
-    color:var(--white);
+    color:var(--on-red);
     background:var(--red);
     padding:2px 7px;
     margin-left:8px;
@@ -1692,7 +1612,7 @@
     color:var(--muted);
     text-align:left;
     padding:6px 10px;
-    border-bottom:2px solid var(--black);
+    border-bottom:2px solid var(--ink);
   }
 
   .tes-table td{
@@ -1715,7 +1635,7 @@
 
   .tes-details{
     background:var(--white);
-    border:2px solid var(--black);
+    border:2px solid var(--ink);
     padding:22px;
     margin-bottom:20px;
   }
@@ -1737,7 +1657,7 @@
 
   .tes-details > summary::before{
     content:'▸ ';
-    color:var(--red);
+    color:var(--red-ink);
   }
 
   .tes-details[open] > summary::before{
@@ -1769,9 +1689,9 @@
     font-family:'Inter', sans-serif;
     font-size:14px;
     padding:10px 12px;
-    border:2px solid var(--black);
+    border:2px solid var(--ink);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     width:100%;
   }
 
@@ -1879,7 +1799,7 @@
     <!-- Contas Bancárias: alimentado por contasBancarias/, escrito pelo
          eb_sync.py. As linhas são geradas em JS a partir das contas que
          existirem no nó — o Revolut entra sem tocar neste HTML. -->
-    <div class="card card-compact card-contas" id="cardContas">
+    <div class="card glass-light card-compact card-contas" id="cardContas">
       <div class="card-icon">🏦</div>
       <h3 class="card-title">Contas Bancárias</h3>
       <div class="contas-total" id="cardContasTotal">—</div>
@@ -1888,7 +1808,7 @@
       <p class="pay-card-hint" id="cardContasHint" style="display:none;">→ Ver movimentos</p>
     </div>
 
-    <a class="card card-compact card-vendas" id="cardVendas" href="vendas.html">
+    <a class="card glass-light card-compact card-vendas" id="cardVendas" href="vendas.html">
       <div class="card-icon">📊</div>
       <h3 class="card-title">Vendas</h3>
       <p class="card-subtitle" id="cardVendasSubtitulo">A carregar…</p>
@@ -1910,21 +1830,21 @@
       <span class="status-badge status-badge-warning vendas-oculto" id="cardVendasBadge">Em configuração</span>
     </a>
 
-    <div class="card card-compact card-calendario" id="cardCalendario">
+    <div class="card glass-light card-compact card-calendario" id="cardCalendario">
       <div class="card-icon">📅</div>
       <h3 class="card-title">Calendário</h3>
       <p class="card-subtitle">Outlook — em breve</p>
       <span class="status-badge status-badge-warning">Em configuração</span>
     </div>
 
-    <a class="card card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
+    <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
       <div class="card-icon">📸</div>
       <h3 class="card-title">Instagram</h3>
       <p class="card-subtitle">Crescimento e métricas — em breve</p>
       <span class="status-badge status-badge-warning">Em configuração</span>
     </a>
 
-    <a class="card card-compact card-reviews" id="cardReviews" href="https://www.google.com/maps/search/?api=1&query=GIOCO+Rua+de+S%C3%A3o+Bento+154+Lisboa" target="_blank" rel="noopener">
+    <a class="card glass-light card-compact card-reviews" id="cardReviews" href="https://www.google.com/maps/search/?api=1&query=GIOCO+Rua+de+S%C3%A3o+Bento+154+Lisboa" target="_blank" rel="noopener">
       <div class="card-icon">⭐</div>
       <h3 class="card-title">Google Reviews</h3>
       <p class="card-subtitle">Avaliações e rating — em breve</p>
@@ -1934,13 +1854,13 @@
 
   <h2 class="section-heading section-heading-gap">Trabalho Ativo</h2>
   <div class="grid-active">
-    <div class="card card-pagamentos" id="cardPagamentos">
+    <div class="card glass-light card-pagamentos" id="cardPagamentos">
       <div class="card-header-row">
         <div>
           <div class="card-icon">💰</div>
           <h3 class="card-title">Pagamentos</h3>
         </div>
-        <button type="button" class="btn" id="btnNovoPagamento">+ Novo Pagamento</button>
+        <button type="button" class="btn-add" id="btnNovoPagamento"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Novo Pagamento</button>
       </div>
 
       <p class="loading-state" id="paymentsLoading">A carregar...</p>
@@ -1970,11 +1890,11 @@
       <div class="pay-lines" id="payLines"></div>
 
       <p class="empty-state-inline" id="paymentsEmptyInline" style="display:none;"></p>
-      <p id="dashConcluidoAviso" style="display:none; margin:14px 0 0; padding:12px 14px; border:2px solid var(--green); background:#eef6f1; font-size:13px; line-height:1.5;"></p>
+      <p id="dashConcluidoAviso" style="display:none; margin:14px 0 0; padding:12px 14px; border-left:4px solid var(--green); border-radius:10px; background:var(--green-bg); font-size:13px; line-height:1.5;"></p>
       <p class="pay-card-hint">→ Abrir tesouraria</p>
     </div>
 
-    <div class="card card-tasks" id="cardTasks">
+    <div class="card glass-light card-tasks" id="cardTasks">
       <div class="card-icon">✅</div>
       <h3 class="card-title">Tarefas</h3>
 
@@ -1994,7 +1914,7 @@
     </div>
   </div>
 
-  <div class="card card-pedidos" id="cardPedidos">
+  <div class="card glass-light card-pedidos" id="cardPedidos">
     <div class="card-header-row">
       <div>
         <div class="card-icon">📝</div>
@@ -2017,7 +1937,7 @@
     <a href="loja-sao-bento.html" class="link-view-loja">→ Ver na página da loja</a>
   </div>
 
-  <div class="card card-depositos" id="cardDepositos">
+  <div class="card glass-light card-depositos" id="cardDepositos">
     <div class="card-icon">🏦</div>
     <h3 class="card-title">Depósitos Bancários</h3>
 
@@ -2033,7 +1953,7 @@
     <p class="dep-card-hint">→ Ver detalhe</p>
   </div>
 
-  <div class="card card-storage" id="cardStorage">
+  <div class="card glass-light card-storage" id="cardStorage">
     <div class="card-icon">💾</div>
     <h3 class="card-title">Armazenamento</h3>
 
@@ -2141,7 +2061,7 @@
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" id="novoPagamentoCancel">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="btnGuardarNovoPagamento">Guardar</button>
+      <button type="button" class="btn-add" id="btnGuardarNovoPagamento">Guardar</button>
     </div>
   </div>
 </div>
@@ -2156,7 +2076,7 @@
     <p class="modal-contexto" id="ficouPagoContexto"></p>
     <div class="modal-actions">
       <button type="button" class="btn" id="ficouPagoNao">Ainda não</button>
-      <button type="button" class="btn btn-primary" id="ficouPagoSim">Sim, ficou pago</button>
+      <button type="button" class="btn-add" id="ficouPagoSim">Sim, ficou pago</button>
     </div>
   </div>
 </div>
@@ -2172,7 +2092,7 @@
     <p class="modal-contexto" id="depositadoContexto"></p>
     <div class="modal-actions">
       <button type="button" class="btn" id="depositadoNao">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="depositadoSim">✓ Marcar como depositado</button>
+      <button type="button" class="btn-add" id="depositadoSim">✓ Marcar como depositado</button>
     </div>
   </div>
 </div>
