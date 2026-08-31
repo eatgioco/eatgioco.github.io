@@ -545,6 +545,13 @@
     font-size:18px;
   }
 
+  .comp-hint{
+    margin:8px 0 0;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+
   .rec-hist-custo{
     font-size:12.5px;
     color:var(--muted);
@@ -2233,7 +2240,27 @@
             <label class="field-label">Vencimento base (€)</label>
             <input type="number" id="pessoaVencimentoBase" min="0" step="0.01">
           </div>
-          <div class="field" style="margin-bottom:0;"></div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label">Cartão refeição · valor diário (€)</label>
+            <input type="number" id="pessoaSementeCartao" min="0" step="0.01">
+          </div>
+        </div>
+        <!-- Compromissos de tesouraria. Os valores acima são SEMENTE: servem
+             para estimar enquanto a pessoa não tiver recibo nenhum. A partir
+             do primeiro recibo mandam os recibos e a semente nunca mais
+             conta. Fica dentro do travão da remuneração porque são valores
+             de salário como os outros. -->
+        <div id="compBloco" style="display:none; margin-top:14px;">
+          <div class="rem-linha">
+            <div class="field" style="margin-bottom:0;">
+              <label class="field-label">Dia de pagamento</label>
+              <input type="text" id="pessoaSementeDia" placeholder="1-31 ou «ultimo»" value="5">
+            </div>
+            <div class="field" style="margin-bottom:0; align-self:end;">
+              <button type="button" class="btn" id="btnGerarCompromissos">⚙ Gerar compromissos</button>
+            </div>
+          </div>
+          <p class="comp-hint" id="compHint"></p>
         </div>
       </div>
     </div>
@@ -2614,9 +2641,18 @@ window.addEventListener('load', function () {
   var padroesRef = db.ref('padroes');
   var feriasRef = db.ref('ferias');
   var fechadosRef = db.ref('fechados');
+  /* Tesouraria: criar uma pessoa gera os compromissos dela, e desativá-la
+     desativa-os. Escreve-se em compromissosFixos só a partir do separador
+     Pessoas — o importador de recibos continua a não lhe tocar.
+     pagamentosConcluidos entra apenas em leitura, para o aviso de
+     desativação saber o que ainda está por pagar. */
+  var compromissosRef = db.ref('compromissosFixos');
+  var pagamentosConcluidosRef = db.ref('pagamentosConcluidos');
 
   var pessoas = {};
   var pessoasCarregadas = false;
+  var compromissos = {};
+  var pagamentosConcluidos = {};
   var turnos = {};
   var padroes = {};
   var ferias = {};
@@ -2940,10 +2976,71 @@ window.addEventListener('load', function () {
     document.getElementById('pessoaValor').value = remValores[fixo ? 'salario' : 'valorHora'];
   }
 
+  /* Texto e botão do bloco de compromissos: numa pessoa nova diz o que vai
+     ser gerado ao guardar; numa existente diz o que já existe e deixa gerar
+     o que falte. */
+  function atualizarBlocoCompromissos(){
+    var bloco = document.getElementById('compBloco');
+    if (!bloco) return;
+    bloco.style.display = remuneracaoDesbloqueada ? 'block' : 'none';
+
+    var btn = document.getElementById('btnGerarCompromissos');
+    var hint = document.getElementById('compHint');
+
+    if (!editingPessoaId){
+      btn.style.display = 'none';
+      hint.textContent = 'Ao guardar são criados dois compromissos na tesouraria: «Salário — {iniciais}» e «Cartão refeição — {iniciais}». Os valores acima são semente: assim que houver o primeiro recibo desta pessoa, são os recibos a mandar.';
+      return;
+    }
+
+    var jaTem = compromissosDaPessoa(editingPessoaId);
+    var faltam = [];
+    if (!jaTem.conta) faltam.push('salário');
+    if (!jaTem.cartao) faltam.push('cartão refeição');
+
+    btn.style.display = faltam.length ? 'inline-block' : 'none';
+    if (!faltam.length){
+      hint.textContent = 'Compromissos na tesouraria: ' + jaTem.todos.map(function(c){ return c.nome; }).join(' · ') + '.';
+    } else {
+      hint.textContent = 'Esta pessoa ainda não tem compromisso de ' + faltam.join(' nem de ') +
+        ' na tesouraria. Gerar cria só o que falta — nada é apagado nem alterado.';
+    }
+  }
+
+  document.getElementById('btnGerarCompromissos').addEventListener('click', function(){
+    if (!editingPessoaId) return;
+    var nome = document.getElementById('pessoaNome').value.trim() || (pessoas[editingPessoaId] || {}).nome || '';
+    gerarCompromissosPessoa(editingPessoaId, nome, lerSementes()).then(function(criados){
+      atualizarBlocoCompromissos();
+      if (criados.length) alert('Criado na tesouraria:\n\n· ' + criados.join('\n· '));
+    }).catch(function(err){
+      alert('Erro ao gerar os compromissos: ' + err.message);
+    });
+  });
+
+  /* Os três valores que semeiam os compromissos. Vazios contam como zero:
+     o compromisso é criado na mesma, é a estimativa que fica a zero. */
+  function lerSementes(){
+    var num = function(id){
+      var n = parseFloat(document.getElementById(id).value);
+      return isNaN(n) || n < 0 ? 0 : n;
+    };
+    var diaRaw = document.getElementById('pessoaSementeDia').value.trim().toLowerCase();
+    var dia = 5;
+    if (diaRaw === 'ultimo' || diaRaw === 'último'){
+      dia = 'ultimo';
+    } else if (diaRaw !== ''){
+      var n = parseInt(diaRaw, 10);
+      if (!isNaN(n) && n >= 1 && n <= 31) dia = n;
+    }
+    return { base: num('pessoaVencimentoBase'), cartaoDiario: num('pessoaSementeCartao'), dia: dia };
+  }
+
   function aplicarRemuneracaoUI(){
     document.getElementById('remLocked').style.display = remuneracaoDesbloqueada ? 'none' : 'flex';
     document.getElementById('remFields').style.display = remuneracaoDesbloqueada ? 'grid' : 'none';
     document.getElementById('remFieldsExtra').style.display = remuneracaoDesbloqueada ? 'grid' : 'none';
+    atualizarBlocoCompromissos();
     aplicarTipoContratoUI();
   }
 
@@ -2972,6 +3069,8 @@ window.addEventListener('load', function () {
     document.getElementById('pessoaVencimentoBase').value =
       (p && p.vencimentoBase !== undefined && p.vencimentoBase !== null && p.vencimentoBase !== '')
         ? String(p.vencimentoBase) : '';
+    document.getElementById('pessoaSementeCartao').value = '';
+    document.getElementById('pessoaSementeDia').value = '5';
     document.getElementById('pessoaAtivo').checked = p ? (p.ativo !== false) : true;
     document.getElementById('btnDesativarPessoa').style.display = (p && p.ativo !== false) ? 'inline-block' : 'none';
 
@@ -3063,6 +3162,11 @@ window.addEventListener('load', function () {
     var pad = lerPadraoDoFormulario();
     var feriasParaGravar = pessoaFeriasEdit.slice();
 
+    /* Criar uma pessoa gera os compromissos dela na tesouraria. As sementes
+       são lidas antes da escrita porque o modal fecha a seguir. */
+    var ehNova = !pessoaId;
+    var sementes = lerSementes();
+
     var promise;
     if (pessoaId){
       promise = pessoasRef.child(pessoaId).set(dados);
@@ -3076,15 +3180,220 @@ window.addEventListener('load', function () {
       return salvarPadrao(pessoaId, pad);
     }).then(function(){
       return salvarFerias(pessoaId, feriasParaGravar);
+    }).then(function(){
+      /* Só para pessoas criadas agora: as que já existiam ganham os
+         compromissos pelo botão da ficha, nunca por baixo do pano. */
+      if (!ehNova) return null;
+      return gerarCompromissosPessoa(pessoaId, nome, sementes);
     }).then(closePessoaModal).catch(function(err){
       alert('Erro ao guardar pessoa: ' + err.message);
     });
   });
 
+
+  /* ======================================================================
+     COMPROMISSOS DA PESSOA (tesouraria)
+     ======================================================================
+     Criar uma pessoa gera dois compromissos em compromissosFixos — a
+     transferência do salário e o carregamento do cartão de refeição —
+     ligados a ela por pessoaId e distinguidos por parteRecibo. Enquanto
+     não houver recibos dessa pessoa valem as sementes deixadas aqui
+     (valor / valorDiario); a partir do primeiro recibo mandam os recibos.
+
+     A TSU NÃO é gerada por pessoa: é uma entrada única da empresa, criada
+     na tesouraria e marcada com derivaDe:'tsu'.
+
+     O cálculo do montante vive na tesouraria (detalheCompromisso, duplicado
+     em tesouraria.html e mrn-dashboard.html). Aqui só se precisa dele para
+     dizer, no aviso de desativação, o que fica por pagar — por isso há uma
+     versão reduzida, valorCompromissoDaPessoa(), com a mesma precedência:
+     recibo do mês → média dos últimos 3 → semente. Se a precedência mudar
+     lá, muda aqui.
+     ====================================================================== */
+
+  /* "Alfredo Giangaspero" → "AG"; um nome só → as duas primeiras letras. */
+  function iniciaisDe(nome){
+    var partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return '??';
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+  }
+
+  /* Os compromissos ligados a uma pessoa, por parte do recibo. */
+  function compromissosDaPessoa(pessoaId){
+    var out = { conta: null, cartao: null, todos: [] };
+    Object.keys(compromissos).forEach(function(id){
+      var c = compromissos[id];
+      if (!c || c.pessoaId !== pessoaId) return;
+      out.todos.push(Object.assign({ id: id }, c));
+      if (c.parteRecibo === 'conta') out.conta = id;
+      if (c.parteRecibo === 'cartao') out.cartao = id;
+    });
+    return out;
+  }
+
+  /* Gera os que faltarem. Nunca duplica: uma pessoa que já tenha a parte
+     'conta' só ganha a do cartão. Devolve uma promessa com os nomes criados. */
+  function gerarCompromissosPessoa(pessoaId, nome, semente){
+    var jaTem = compromissosDaPessoa(pessoaId);
+    var iniciais = iniciaisDe(nome);
+    var dia = semente.dia;
+    var criados = [];
+    var escritas = [];
+
+    var base = {
+      categoria: 'Pessoal',
+      periodicidade: 'mensal',
+      tipo: 'fixo',
+      dia: dia,
+      meses: [],
+      metodoPagamento: 'iban',
+      ativo: true,
+      pessoaId: pessoaId
+    };
+
+    if (!jaTem.conta){
+      var salario = Object.assign({}, base, {
+        nome: 'Salário — ' + iniciais,
+        parteRecibo: 'conta',
+        /* Semente do líquido: base menos os 11% de quotização. É uma
+           aproximação para o mês zero, não uma folha de cálculo — o primeiro
+           recibo substitui-a e nunca mais volta a contar. */
+        valor: semente.base > 0 ? Math.round(semente.base * (1 - REC_TAXA_SS) * 100) / 100 : 0,
+        notas: 'Gerado ao criar a pessoa. Valor derivado dos recibos; até ao primeiro recibo vale a semente.'
+      });
+      criados.push(salario.nome);
+      escritas.push(compromissosRef.push().set(salario));
+    }
+
+    if (!jaTem.cartao){
+      var cartao = Object.assign({}, base, {
+        nome: 'Cartão refeição — ' + iniciais,
+        parteRecibo: 'cartao',
+        valor: 0,
+        notas: 'Gerado ao criar a pessoa. Valor derivado dos recibos; até ao primeiro recibo vale o valor diário × dias úteis.'
+      });
+      /* 'valorDiario' só entra quando tem valor útil, como na tesouraria. */
+      if (semente.cartaoDiario > 0) cartao.valorDiario = semente.cartaoDiario;
+      criados.push(cartao.nome);
+      escritas.push(compromissosRef.push().set(cartao));
+    }
+
+    return Promise.all(escritas).then(function(){ return criados; });
+  }
+
+  /* Dias de segunda a sexta do mês — a mesma base da tesouraria para os
+     valores diários (subsídio de refeição). Não exclui feriados. */
+  function diasUteisDoMes(ano, mes){
+    var total = 0;
+    var nd = new Date(ano, mes, 0).getDate();
+    for (var d = 1; d <= nd; d++){
+      var dow = new Date(ano, mes - 1, d).getDay();
+      if (dow >= 1 && dow <= 5) total++;
+    }
+    return total;
+  }
+
+  /* Versão reduzida do detalheCompromisso() da tesouraria — ver o cabeçalho
+     deste bloco. Devolve { valor, estado }. */
+  function valorCompromissoDaPessoa(c, ano, mes){
+    var periodo = ano + '-' + (mes < 10 ? '0' + mes : String(mes));
+    var meses = (recibos[c.pessoaId] && Object.keys(recibos[c.pessoaId])) || [];
+    var parte = c.parteRecibo === 'cartao' ? 'cartao' : 'conta';
+
+    if (meses.length){
+      var doMes = recibos[c.pessoaId][periodo];
+      if (doMes) return { valor: recPartes(doMes)[parte], estado: 'confirmado' };
+
+      var ordenados = meses.slice().sort();
+      var anteriores = ordenados.filter(function(p){ return p < periodo; }).reverse();
+      var usar = (anteriores.length ? anteriores : ordenados).slice(0, 3);
+      var soma = 0;
+      usar.forEach(function(p){ soma += recPartes(recibos[c.pessoaId][p])[parte]; });
+      return { valor: recRound(soma / usar.length), estado: 'estimado' };
+    }
+
+    var diario = Number(c.valorDiario);
+    if (c.valorDiario !== undefined && c.valorDiario !== null && c.valorDiario !== '' && !isNaN(diario) && diario > 0){
+      return { valor: recRound(diasUteisDoMes(ano, mes) * diario), estado: 'semente' };
+    }
+    return { valor: recRound(Number(c.valor) || 0), estado: 'semente' };
+  }
+
+  /* Ocorrências por pagar dos compromissos de uma pessoa, deste mês e do
+     seguinte — é o que desaparece da tesouraria ao desativá-la. */
+  function pendentesDaPessoa(pessoaId){
+    var hoje = new Date();
+    var meses = [{ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 }];
+    meses.push(meses[0].mes === 12 ? { ano: meses[0].ano + 1, mes: 1 } : { ano: meses[0].ano, mes: meses[0].mes + 1 });
+
+    var out = [];
+    compromissosDaPessoa(pessoaId).todos.forEach(function(c){
+      if (!c.ativo) return;
+      meses.forEach(function(m){
+        var mesesAtivos = c.meses && !Array.isArray(c.meses) ? Object.keys(c.meses).map(function(k){ return c.meses[k]; }) : (c.meses || []);
+        if (mesesAtivos.length && mesesAtivos.map(Number).indexOf(m.mes) === -1) return;
+        if (c.dia === undefined || c.dia === null || c.dia === '') return;
+        /* A chave de pagamentosConcluidos é {id}_{ano}-{mes}, com o mês SEM
+           zero à esquerda — não confundir com o AAAA-MM dos recibos. */
+        if (pagamentosConcluidos[c.id + '_' + m.ano + '-' + m.mes]) return;
+        var v = valorCompromissoDaPessoa(c, m.ano, m.mes);
+        var nd = new Date(m.ano, m.mes, 0).getDate();
+        var dia = c.dia === 'ultimo' ? nd : Math.max(1, Math.min(parseInt(c.dia, 10) || 1, nd));
+        out.push({
+          nome: c.nome || c.id,
+          valor: v.valor,
+          estado: v.estado,
+          quando: (dia < 10 ? '0' + dia : dia) + '/' + (m.mes < 10 ? '0' + m.mes : m.mes) + '/' + m.ano
+        });
+      });
+    });
+    return out;
+  }
+
+  compromissosRef.on('value', function(snapshot){
+    compromissos = snapshot.val() || {};
+    atualizarBlocoCompromissos();
+  });
+
+  pagamentosConcluidosRef.on('value', function(snapshot){
+    pagamentosConcluidos = snapshot.val() || {};
+  });
+
   document.getElementById('btnDesativarPessoa').addEventListener('click', function(){
     if (!editingPessoaId) return;
-    if (!confirm('Desativar esta pessoa? Deixa de aparecer nos dropdowns, mas os registos antigos mantêm-se.')) return;
-    pessoasRef.child(editingPessoaId).update({ ativo: false }).then(closePessoaModal).catch(function(err){
+
+    /* Desativar a pessoa desativa também os compromissos dela, e isso tira
+       da tesouraria pagamentos que podem ainda não ter saído — o último
+       salário e o último carregamento do cartão. Dizer QUAIS, com nome e
+       valor, antes de perguntar. Nunca se apaga nada: só se desativa. */
+    var jaTem = compromissosDaPessoa(editingPessoaId);
+    var ativos = jaTem.todos.filter(function(c){ return c.ativo; });
+    var pendentes = pendentesDaPessoa(editingPessoaId);
+
+    var aviso = 'Desativar esta pessoa? Deixa de aparecer nos dropdowns, mas os registos antigos mantêm-se.';
+    if (ativos.length){
+      aviso += '\n\nVão ser desativados ' + ativos.length +
+        (ativos.length === 1 ? ' compromisso na tesouraria:' : ' compromissos na tesouraria:') +
+        '\n· ' + ativos.map(function(c){ return c.nome || c.id; }).join('\n· ');
+    }
+    if (pendentes.length){
+      aviso += '\n\nATENÇÃO — estes pagamentos ainda estão POR PAGAR e vão deixar de aparecer:\n· ' +
+        pendentes.map(function(p){
+          return p.quando + ' · ' + p.nome + ' · ' + recFmt(p.valor) +
+                 (p.estado === 'confirmado' ? '' : ' (estimado)');
+        }).join('\n· ') +
+        '\n\nSe algum destes ainda tem de ser pago, cancela, paga primeiro e só depois desativa.';
+    }
+    if (!confirm(aviso)) return;
+
+    pessoasRef.child(editingPessoaId).update({ ativo: false }).then(function(){
+      /* Desativar, nunca apagar: o histórico de pagamentos aponta para estes
+         ids e um compromisso apagado deixava as ocorrências pagas órfãs. */
+      return Promise.all(ativos.map(function(c){
+        return compromissosRef.child(c.id).update({ ativo: false });
+      }));
+    }).then(closePessoaModal).catch(function(err){
       alert('Erro ao desativar: ' + err.message);
     });
   });

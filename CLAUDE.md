@@ -36,7 +36,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
-| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
+| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `mrn-dashboard.html` | Dashboard privado: pagamentos, tarefas, Instagram, pedidos espelhados | Só Manel |
@@ -76,27 +76,34 @@ recibos               — recibos de vencimento importados: recibos/{pessoaId}/{
 compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): regra, não instância;
                          com valorDiario preenchido o montante é calculado por mês
                          (dias úteis seg-sex × valorDiario) e o campo valor é ignorado.
-                         Campo opcional pessoaId (push key de pessoas), só para a
-                         categoria 'Pessoal': ligado a uma pessoa, o montante deixa de
-                         vir de valor/valorDiario e passa a derivar dos recibos —
-                         líquido real no mês com recibo (confirmado), média dos últimos
-                         3 nos meses sem (estimado), corrigida pela diferença de
-                         vencimentoBase quando há aumento ainda sem recibo. Sem
-                         pessoaId, ou pessoa sem recibos, nada muda.
-                         Ligado aos recibos, o compromisso gera DUAS ocorrências por
-                         mês — transferência (pagamento.conta) e carregamento do cartão
-                         de refeição (pagamento.cartao) — cuja soma é sempre o líquido.
-                         A ocorrência do cartão tem id {compromissoId}~cartao (o '~' é
-                         chave válida no RTDB e não colide com o '_' do período) e dia
-                         próprio no campo opcional diaCartao, que por defeito é o dia da
-                         transferência. As médias são feitas por destino e o ajuste de
-                         vencimentoBase entra só na transferência.
-                         A Segurança Social (TSU) é um compromisso VIRTUAL de id 'tsu':
-                         não existe no nó, é derivado dos recibos (34,75% sobre a soma
-                         dos totais.sujeito do mês anterior, arredondado uma só vez no
-                         agregado) e vence no dia 20.
+                         Campo opcional pessoaId (push key de pessoas) + parteRecibo
+                         ('conta' = transferência | 'cartao' = carregamento do cartão
+                         refeição): ligado a uma pessoa, o montante deixa de vir de
+                         valor/valorDiario e passa a derivar dos recibos — valor real no
+                         mês com recibo (confirmado), média dos últimos 3 nos meses sem
+                         (estimado), corrigida pela diferença de vencimentoBase quando há
+                         aumento ainda sem recibo (só na parte 'conta'). Enquanto a pessoa
+                         não tiver recibo NENHUM valem as sementes (valor/valorDiario)
+                         deixadas ao criá-la, marcadas 'estimado · sem recibos'; a partir
+                         do primeiro recibo dessa pessoa nunca mais contam.
+                         Criar uma pessoa em equipa.html gera dois destes compromissos
+                         ('Salário — {iniciais}' e 'Cartão refeição — {iniciais}');
+                         desativar a pessoa desativa-os, depois de um aviso que lista os
+                         pagamentos pendentes. Nunca se apagam.
+                         Um compromisso com pessoaId mas SEM parteRecibo é do modelo
+                         anterior e gera as duas saídas de uma vez, a do cartão com id
+                         {compromissoId}~cartao ('~' é chave válida no RTDB e não colide
+                         com o '_' do período) e dia próprio em diaCartao.
+                         Campo opcional derivaDe:'tsu' — entrada ÚNICA da Segurança
+                         Social: ignora o campo valor e vale 34,75% sobre a soma dos
+                         totais.sujeito de TODOS os recibos do mês anterior, arredondado
+                         uma só vez no agregado (nunca somar valores já arredondados por
+                         pessoa). Dia, método, IBAN e notas são do utilizador. Não é
+                         gerada automaticamente nem existe uma TSU virtual.
                          ATENÇÃO: esta lógica está duplicada em tesouraria.html e em
-                         mrn-dashboard.html e tem de ser igual nos dois ficheiros
+                         mrn-dashboard.html e tem de ser igual nos dois ficheiros; a
+                         equipa.html tem uma versão REDUZIDA (valorCompromissoDaPessoa)
+                         só para o aviso de desativação
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 ```

@@ -575,6 +575,69 @@
     font-style:italic;
   }
 
+  /* Discriminação da TSU dentro do bloco de detalhe. Sem @media: a tabela
+     tem scroll horizontal próprio, como o resto do OS. */
+  .tsu-detalhe{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+    overflow-x:auto;
+  }
+
+  .tsu-detalhe-titulo{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .tsu-detalhe-estimado{
+    text-transform:none;
+    letter-spacing:0;
+    font-style:italic;
+  }
+
+  .tsu-tabela{
+    border-collapse:collapse;
+    font-size:12px;
+    min-width:520px;
+  }
+
+  .tsu-tabela th,
+  .tsu-tabela td{
+    padding:4px 10px 4px 0;
+    text-align:left;
+    white-space:nowrap;
+  }
+
+  .tsu-tabela th{
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  .tsu-tabela .tsu-num{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .tsu-tabela tr.tsu-total td{
+    font-weight:700;
+    border-top:1px solid var(--line);
+  }
+
+  .tsu-nota{
+    margin:6px 0 0;
+    font-size:11px;
+    color:var(--muted);
+    font-style:italic;
+    white-space:normal;
+  }
+
   /* Coluna à direita (Pagar em cima do Fechar), alinhada pelo fundo com
      a última linha da coluna de informação, para aproveitar o espaço
      vazio em vez de empilhar tudo por baixo. */
@@ -1704,10 +1767,30 @@
       <!-- Só para a categoria Pessoal: ligar o compromisso a uma pessoa faz o
            montante passar a vir dos recibos dela. Vazio = comportamento
            normal, com o valor escrito abaixo. -->
+      <!-- Entrada única da Segurança Social. Marcada como TSU, o valor deixa
+           de vir do campo «Valor» e passa a ser 34,75% sobre a base agregada
+           dos recibos do mês anterior. Dia, método, IBAN e notas continuam a
+           ser o que o utilizador configurar. -->
+      <div class="field" id="cfDerivaTsuField" style="display:none;">
+        <label class="ativo-toggle" style="margin:0;">
+          <input type="checkbox" id="cfDerivaTsu">
+          É a Segurança Social (TSU) — valor derivado dos recibos
+        </label>
+        <span class="field-hint">34,75% sobre a soma dos totais sujeitos de todos os recibos do mês anterior, arredondado uma só vez no agregado. Inclui os 11% já retidos ao trabalhador.</span>
+      </div>
       <div class="field" id="cfPessoaField" style="display:none;">
         <label class="field-label">Pessoa</label>
         <select id="cfPessoa"></select>
-        <span class="field-hint">Ligado a uma pessoa, o montante vem dos recibos: líquido real no mês com recibo, média dos últimos 3 nos meses sem. Vazio usa o valor abaixo.</span>
+        <span class="field-hint">Ligado a uma pessoa, o montante vem dos recibos: valor real no mês com recibo, média dos últimos 3 nos meses sem. Vazio usa o valor abaixo.</span>
+      </div>
+      <div class="field" id="cfParteReciboField" style="display:none;">
+        <label class="field-label">Parte do recibo</label>
+        <select id="cfParteRecibo">
+          <option value="">As duas (registo antigo)</option>
+          <option value="conta">Transferência para a conta</option>
+          <option value="cartao">Carregamento do cartão refeição</option>
+        </select>
+        <span class="field-hint">Os compromissos gerados ao criar a pessoa têm uma parte cada. «As duas» é o modelo antigo, que gera as duas saídas a partir deste registo.</span>
       </div>
       <div class="field">
         <label class="field-label">Valor (€)</label>
@@ -2333,6 +2416,7 @@ window.addEventListener('load', function () {
         montante: o.montante,
         estado: o.estado,
         nota: o.nota,
+        derivaDe: o.derivaDe,
         prazo: formatDateDDMMYYYY(d),
         prazoDate: d,
         dia: o.dia,
@@ -2419,6 +2503,44 @@ window.addEventListener('load', function () {
   // pagamentos.html. Campos vazios são omitidos em silêncio. 'pago' troca
   // as ações (Pagar/Marcar) pelo indicador ✓ Pago, sem ação — usada pelo
   // calendário de Tesouraria, onde pendentes e já pagos aparecem juntos.
+  // Discriminação da TSU por pessoa, para o bloco de detalhe da ocorrência.
+  // O que se paga é o agregado; as linhas por pessoa são para se perceber de
+  // onde vem, e a diferença de cêntimos tem de estar dita, não escondida.
+  // ATENÇÃO: duplicado em tesouraria.html e mrn-dashboard.html.
+  function blocoDiscriminacaoTSU(prazoDate){
+    var d = discriminacaoTSU(prazoDate.getFullYear(), prazoDate.getMonth() + 1);
+    if (!d) return '';
+
+    var h = '<div class="tsu-detalhe">';
+    h += '<div class="tsu-detalhe-titulo">Discriminação · recibos de ' + escapeHtml(labelPeriodoRecibo(d.periodo)) +
+         (d.estimado ? ' <span class="tsu-detalhe-estimado">(estimativa: o mês ainda não tem recibos)</span>' : '') + '</div>';
+    h += '<table class="tsu-tabela"><thead><tr>' +
+         '<th>Pessoa</th><th class="tsu-num">Base sujeita</th>' +
+         '<th class="tsu-num">Empresa 23,75%</th><th class="tsu-num">Trabalhador 11%</th>' +
+         '<th class="tsu-num">Total</th></tr></thead><tbody>';
+    d.pessoas.forEach(function(p){
+      h += '<tr><td>' + escapeHtml(p.nome) + '</td>' +
+           '<td class="tsu-num">' + formatEuro(arredCentimos(p.contribuicao.base)) + '</td>' +
+           '<td class="tsu-num">' + formatEuro(p.contribuicao.empresa) + '</td>' +
+           '<td class="tsu-num">' + formatEuro(p.contribuicao.trabalhador) + '</td>' +
+           '<td class="tsu-num">' + formatEuro(p.contribuicao.total) + '</td></tr>';
+    });
+    h += '<tr class="tsu-total"><td>A pagar (agregado)</td>' +
+         '<td class="tsu-num">' + formatEuro(d.agregado.base) + '</td>' +
+         '<td class="tsu-num">' + formatEuro(d.agregado.empresa) + '</td>' +
+         '<td class="tsu-num">' + formatEuro(d.agregado.trabalhador) + '</td>' +
+         '<td class="tsu-num">' + formatEuro(d.agregado.total) + '</td></tr>';
+    h += '</tbody></table>';
+    h += '<p class="tsu-nota">A quotização de 11% já foi retida ao trabalhador no recibo: a empresa só a entrega. Custo real da empresa é a coluna dos 23,75%.</p>';
+    if (d.difereDoAgregado){
+      h += '<p class="tsu-nota">Somar as linhas de cima dá ' + formatEuro(d.somaIndividual.total) +
+           ', porque a Segurança Social arredonda no agregado e não por pessoa. Paga-se sempre o agregado: ' +
+           formatEuro(d.agregado.total) + '.</p>';
+    }
+    h += '</div>';
+    return h;
+  }
+
   function blocoDetalhePagamento(l, incluirPedido, pago){
     var h = '<div class="pay-detalhe" data-chave="' + escapeHtml(chaveLinha(l)) + '">';
     h += '<div class="pay-detalhe-info">';
@@ -2455,6 +2577,11 @@ window.addEventListener('load', function () {
 
     if (incluirPedido && l.ticketNumero){
       h += '<div class="card-row"><span>Pedido: #' + escapeHtml(l.ticketNumero) + '</span></div>';
+    }
+
+    // A TSU é um valor agregado: aqui mostra-se de onde vem, pessoa a pessoa.
+    if (l.tipo === 'fixo' && l.derivaDe === 'tsu' && l.prazoDate){
+      h += blocoDiscriminacaoTSU(l.prazoDate);
     }
 
     h += '</div>'; // .pay-detalhe-info
@@ -2609,17 +2736,28 @@ window.addEventListener('load', function () {
   }
 
   /* ---------- Recibos → compromissos pessoais ----------
-     Um compromisso de categoria 'Pessoal' ligado a uma pessoa (pessoaId)
-     deixa de usar valor/valorDiario: o montante passa a vir dos recibos.
-     Mês COM recibo gravado usa o líquido real (confirmado); mês SEM recibo
-     usa a média dos últimos 3 recibos (estimado). Os valores nunca se
-     somam — a existência do recibo desliga a estimativa desse mês. Pessoa
-     sem recibos mantém exactamente o comportamento antigo.
+     Um compromisso ligado a uma pessoa (pessoaId) não usa valor/valorDiario
+     como verdade: o montante vem dos recibos. Mês COM recibo usa o valor
+     real (confirmado); mês SEM recibo usa a média dos últimos 3 (estimado).
+     Os valores nunca se somam — a existência do recibo desliga a estimativa
+     desse mês.
 
-     Um recibo paga-se por DUAS vias e por isso gera DUAS ocorrências no
-     mês: a transferência para a conta e o carregamento do cartão de
-     refeição. São saídas distintas, para destinos distintos, e a soma das
-     duas é sempre o líquido — garantido por construção em partes().
+     'parteRecibo' diz QUAL das duas saídas do recibo é que este compromisso
+     representa: 'conta' (transferência) ou 'cartao' (carregamento do cartão
+     de refeição). São dois compromissos separados, gerados ao criar a
+     pessoa, cada um com o seu dia e o seu método de pagamento.
+
+     Enquanto a pessoa não tiver recibo nenhum, valem as SEMENTES deixadas
+     ao criá-la (valor / valorDiario), marcadas «estimado · sem recibos».
+     A partir do primeiro recibo dessa pessoa as sementes nunca mais contam.
+
+     'derivaDe: "tsu"' marca a entrada única da Segurança Social: ignora o
+     campo valor e calcula 34,75% sobre a soma dos totais sujeitos de TODOS
+     os recibos do mês. Tudo o resto (dia, método, IBAN, notas) é do
+     utilizador.
+
+     Um compromisso com pessoaId mas SEM parteRecibo é do modelo anterior e
+     continua a gerar as duas saídas de uma vez — não se mexe no que existe.
 
      ATENÇÃO: este bloco está duplicado em tesouraria.html e em
      mrn-dashboard.html e tem de ser igual nos dois. */
@@ -2629,14 +2767,15 @@ window.addEventListener('load', function () {
   // só pagamento, por isso o compromisso de tesouraria é o total.
   var TSU_TAXA_TOTAL = 0.3475;
   var TSU_TAXA_PATRONAL = 0.2375;
-  var TSU_ID = 'tsu';
-  var TSU_DIA = 20; // vence no dia 20 do mês SEGUINTE ao dos recibos
+  var TSU_TAXA_TRABALHADOR = 0.11;
 
-  // Sufixo do id da ocorrência do cartão. A ocorrência da transferência fica
-  // com o id do compromisso tal como estava, para que os pagamentos já
-  // marcados como concluídos continuem a bater certo. '~' é caracter válido
-  // numa chave do RTDB ('.', '$', '#', '[', ']' e '/' não são) e não colide
-  // com o '_' que separa o período em pagamentosConcluidos.
+  // Sufixo do id da ocorrência do cartão nos compromissos do modelo antigo
+  // (pessoaId sem parteRecibo), que geram as duas saídas de uma vez. A
+  // ocorrência da transferência fica com o id do compromisso tal como
+  // estava, para que os pagamentos já marcados como concluídos continuem a
+  // bater certo. '~' é caracter válido numa chave do RTDB ('.', '$', '#',
+  // '[', ']' e '/' não são) e não colide com o '_' que separa o período em
+  // pagamentosConcluidos.
   var SUFIXO_CARTAO = '~cartao';
 
   // Nome longo de propósito: mrn-dashboard.html já tem um centimos() que
@@ -2675,18 +2814,27 @@ window.addEventListener('load', function () {
     return (m && m[periodoRecibo(ano, mes)]) || null;
   }
 
-  // Recibos da pessoa ANTERIORES ao mês pedido, do mais recente para o mais
-  // antigo. AAAA-MM ordena alfabeticamente na ordem cronológica.
-  function recibosAnteriores(pessoaId, ano, mes){
+  function normalizaRecibo(periodo, r){
+    r = r || {};
+    return { periodo: periodo, totais: r.totais || {}, pessoa: r.pessoa || {}, pagamento: r.pagamento || {} };
+  }
+
+  // Os recibos da pessoa que servem de base à estimativa de um mês sem
+  // recibo: os anteriores, do mais recente para o mais antigo. Se o mês
+  // pedido é anterior a todos (pessoa que só tem recibos mais recentes),
+  // usam-se os mais antigos que existem — assim que há UM recibo, é sempre
+  // um recibo a mandar, e a semente nunca mais volta a contar.
+  function recibosParaEstimar(pessoaId, ano, mes){
     var m = allRecibos[pessoaId] || {};
     var limite = periodoRecibo(ano, mes);
-    return Object.keys(m)
-      .filter(function(p){ return p < limite; })
-      .sort().reverse()
-      .map(function(p){
-        var r = m[p] || {};
-        return { periodo: p, totais: r.totais || {}, pessoa: r.pessoa || {}, pagamento: r.pagamento || {} };
-      });
+    var todos = Object.keys(m).sort();
+    var anteriores = todos.filter(function(p){ return p < limite; }).reverse();
+    var base = anteriores.length ? anteriores : todos;
+    return base.map(function(p){ return normalizaRecibo(p, m[p]); });
+  }
+
+  function pessoaTemRecibos(pessoaId){
+    return !!(allRecibos[pessoaId] && Object.keys(allRecibos[pessoaId]).length);
   }
 
   function liquidoDoRecibo(r){
@@ -2724,8 +2872,12 @@ window.addEventListener('load', function () {
   }
 
   function baseAtualDaPessoa(pessoaId){
+    return numOuNull(allPessoas[pessoaId] ? allPessoas[pessoaId].vencimentoBase : null);
+  }
+
+  function nomeDaPessoa(pessoaId){
     var p = allPessoas[pessoaId];
-    return numOuNull(p ? p.vencimentoBase : null);
+    return (p && p.nome) || null;
   }
 
   function temRecibos(){
@@ -2734,21 +2886,42 @@ window.addEventListener('load', function () {
     });
   }
 
+  /* ---------- Segurança Social (TSU) ---------- */
+
+  // Contribuição de UMA pessoa num mês, já separada nas duas componentes.
+  // Os valores por pessoa são informativos: o que se paga é o agregado,
+  // arredondado uma só vez (ver discriminacaoTSU).
+  function contribuicaoPessoa(base){
+    return {
+      base: base,
+      empresa: arredCentimos(base * TSU_TAXA_PATRONAL),
+      trabalhador: arredCentimos(base * TSU_TAXA_TRABALHADOR),
+      total: arredCentimos(base * TSU_TAXA_TOTAL)
+    };
+  }
+
   // Base agregada da Segurança Social de um mês de recibos: soma dos
   // 'totais.sujeito' de TODOS os recibos desse mês, sem arredondar pelo
   // caminho — a SS arredonda no agregado, e somar valores já arredondados
   // por pessoa dá um cêntimo a mais (julho 2026: 749,03 e não 749,04).
   function baseSSDoMes(ano, mes){
     var periodo = periodoRecibo(ano, mes);
-    var total = 0, n = 0;
+    var total = 0;
+    var pessoas = [];
     Object.keys(allRecibos).forEach(function(pessoaId){
       var r = allRecibos[pessoaId] && allRecibos[pessoaId][periodo];
       var s = numOuNull(r && r.totais ? r.totais.sujeito : null);
       if (s === null) return;
       total += s;
-      n++;
+      pessoas.push({
+        pessoaId: pessoaId,
+        nome: nomeDaPessoa(pessoaId) || (r.pessoa && r.pessoa.nome) || '(pessoa apagada)',
+        contribuicao: contribuicaoPessoa(s)
+      });
     });
-    return n ? { base: total, n: n, periodo: periodo } : null;
+    if (!pessoas.length) return null;
+    pessoas.sort(function(a, b){ return String(a.nome).localeCompare(String(b.nome), 'pt'); });
+    return { base: total, n: pessoas.length, periodo: periodo, pessoas: pessoas };
   }
 
   // Mês de recibos mais recente que existe, usado como base estimada quando
@@ -2768,58 +2941,75 @@ window.addEventListener('load', function () {
   }
 
   // A TSU que se paga no mês (ano, mes) refere-se aos recibos do mês
-  // ANTERIOR. Sem recibos desse mês, estima com a base mais recente.
-  function detalheTSU(ano, mes){
+  // ANTERIOR — a de julho entrega-se em agosto. Sem recibos desse mês,
+  // estima com a base mais recente que existir.
+  function agregadoTSU(ano, mes){
     var ref = mesAnterior(ano, mes);
     var agg = baseSSDoMes(ref.ano, ref.mes);
-    if (agg){
-      return {
-        valor: arredCentimos(agg.base * TSU_TAXA_TOTAL),
-        conta: null, cartao: null,
-        estado: 'confirmado',
-        nota: '34,75% sobre ' + formatEuro(arredCentimos(agg.base)) + ' · ' + agg.n +
-              (agg.n === 1 ? ' recibo de ' : ' recibos de ') + labelPeriodoRecibo(agg.periodo)
-      };
-    }
+    if (agg) return { agg: agg, estimado: false, refPeriodo: periodoRecibo(ref.ano, ref.mes) };
     var ultima = ultimaBaseSS();
-    if (ultima){
-      return {
-        valor: arredCentimos(ultima.base * TSU_TAXA_TOTAL),
-        conta: null, cartao: null,
-        estado: 'estimado',
-        nota: 'sem recibos de ' + labelPeriodoRecibo(periodoRecibo(ref.ano, ref.mes)) +
-              ' · base de ' + labelPeriodoRecibo(ultima.periodo) + ' (' + formatEuro(arredCentimos(ultima.base)) + ')'
-      };
-    }
-    return { valor: 0, conta: null, cartao: null, estado: null, nota: '' };
+    if (ultima) return { agg: ultima, estimado: true, refPeriodo: periodoRecibo(ref.ano, ref.mes) };
+    return null;
   }
 
-  // Compromisso virtual: a TSU não existe no nó compromissosFixos, é
-  // derivada inteiramente dos recibos. Só aparece quando há recibos.
-  function compromissoTSU(){
+  function detalheTSU(ano, mes){
+    var r = agregadoTSU(ano, mes);
+    if (!r) return { valor: 0, conta: null, cartao: null, estado: null, nota: 'sem recibos importados' };
+    var valor = arredCentimos(r.agg.base * TSU_TAXA_TOTAL);
+    if (!r.estimado){
+      return {
+        valor: valor, conta: null, cartao: null, estado: 'confirmado',
+        nota: '34,75% sobre ' + formatEuro(arredCentimos(r.agg.base)) + ' · ' + r.agg.n +
+              (r.agg.n === 1 ? ' recibo de ' : ' recibos de ') + labelPeriodoRecibo(r.agg.periodo)
+      };
+    }
     return {
-      id: TSU_ID,
-      derivado: 'tsu',
-      nome: 'Segurança Social (TSU)',
-      categoria: 'Estado',
-      tipo: 'fixo',
-      periodicidade: 'mensal',
-      dia: TSU_DIA,
-      meses: [],
-      ativo: true,
-      metodoPagamento: 'iban',
-      iban: '',
-      notas: '34,75% sobre o total sujeito dos recibos do mês anterior (23,75% da empresa + 11% retidos ao trabalhador).'
+      valor: valor, conta: null, cartao: null, estado: 'estimado',
+      nota: 'sem recibos de ' + labelPeriodoRecibo(r.refPeriodo) + ' · base de ' +
+            labelPeriodoRecibo(r.agg.periodo) + ' (' + formatEuro(arredCentimos(r.agg.base)) + ')'
     };
   }
 
-  function ehTSU(c){
-    return !!(c && (c.derivado === 'tsu' || c.id === TSU_ID));
+  // Discriminação por pessoa do mês pago em (ano, mes). A soma das partes
+  // individuais pode diferir do agregado em cêntimos — quem paga é o
+  // agregado, e é isso que se diz no ecrã.
+  function discriminacaoTSU(ano, mes){
+    var r = agregadoTSU(ano, mes);
+    if (!r) return null;
+    var somaEmpresa = 0, somaTrabalhador = 0, somaTotal = 0;
+    r.agg.pessoas.forEach(function(p){
+      somaEmpresa += p.contribuicao.empresa;
+      somaTrabalhador += p.contribuicao.trabalhador;
+      somaTotal += p.contribuicao.total;
+    });
+    var agregado = {
+      base: arredCentimos(r.agg.base),
+      empresa: arredCentimos(r.agg.base * TSU_TAXA_PATRONAL),
+      trabalhador: arredCentimos(r.agg.base * TSU_TAXA_TRABALHADOR),
+      total: arredCentimos(r.agg.base * TSU_TAXA_TOTAL)
+    };
+    return {
+      periodo: r.agg.periodo,
+      estimado: r.estimado,
+      pessoas: r.agg.pessoas,
+      agregado: agregado,
+      somaIndividual: { empresa: arredCentimos(somaEmpresa), trabalhador: arredCentimos(somaTrabalhador), total: arredCentimos(somaTotal) },
+      // Verdadeiro quando somar por pessoa dá diferente de arredondar no
+      // agregado. É o caso normal, não é um erro — mas tem de estar dito.
+      difereDoAgregado: arredCentimos(somaTotal) !== agregado.total
+    };
   }
 
+  function derivaTSU(c){
+    return !!(c && c.derivaDe === 'tsu');
+  }
+
+  /* ---------- Montante de um compromisso ---------- */
+
   // O id de uma ocorrência é o id do compromisso, mais o sufixo do cartão
-  // quando é a segunda saída. Tudo o que lê um compromisso a partir de uma
-  // ocorrência (ou de uma chave de pagamentosConcluidos) passa por aqui.
+  // quando é a segunda saída de um compromisso do modelo antigo. Tudo o que
+  // lê um compromisso a partir de uma ocorrência (ou de uma chave de
+  // pagamentosConcluidos) passa por aqui.
   function ehOcorrenciaCartao(id){
     return String(id).slice(-SUFIXO_CARTAO.length) === SUFIXO_CARTAO;
   }
@@ -2828,36 +3018,36 @@ window.addEventListener('load', function () {
     return ehOcorrenciaCartao(id) ? String(id).slice(0, -SUFIXO_CARTAO.length) : id;
   }
 
-  // allCompromissos vive no Firebase; a TSU é sintética. Toda a leitura de
-  // um compromisso por id passa por aqui para as duas coexistirem.
   function compromissoPorId(id){
-    var base = idBase(id);
-    if (base === TSU_ID) return compromissoTSU();
-    return allCompromissos[base];
+    return allCompromissos[idBase(id)];
   }
 
   function idsCompromissos(){
-    var ids = Object.keys(allCompromissos);
-    if (temRecibos()) ids.push(TSU_ID);
-    return ids;
+    return Object.keys(allCompromissos);
   }
 
   // Montante de um compromisso num mês concreto, com a origem do número:
-  //   'confirmado'     — recibo desse mês gravado, líquido real
-  //   'estimado'       — média dos últimos 3 recibos da pessoa
-  //   'estimado-base'  — média corrigida por um vencimento base novo que
-  //                      ainda não apareceu em nenhum recibo
-  //   null             — regra do próprio registo (valorDiario ou valor)
-  // 'conta' e 'cartao' são as duas saídas quando o montante vem dos recibos,
-  // e null quando não vem — nesse caso há uma só saída, como sempre houve.
+  //   'confirmado'        — recibo desse mês gravado, valor real
+  //   'estimado'          — média dos últimos 3 recibos da pessoa
+  //   'estimado-base'     — média corrigida por um vencimento base novo que
+  //                         ainda não apareceu em nenhum recibo
+  //   'estimado-semente'  — pessoa ainda sem recibos: vale a semente
+  //                         deixada ao criá-la
+  //   null                — regra do próprio registo (valorDiario ou valor)
+  // 'conta' e 'cartao' só vêm preenchidos nos compromissos do modelo antigo
+  // (pessoaId sem parteRecibo), que geram as duas saídas de uma vez.
   // Ponto ÚNICO de leitura do montante: alterar aqui, em mais lado nenhum.
   function detalheCompromisso(c, ano, mes){
     if (!c) return { valor: 0, conta: null, cartao: null, estado: null, nota: '' };
-    if (ehTSU(c)) return detalheTSU(ano, mes);
+    if (derivaTSU(c)) return detalheTSU(ano, mes);
 
-    if (c.pessoaId && allRecibos[c.pessoaId]){
-      // A soma das duas saídas É o montante: construído a partir delas, não
-      // verificado depois. Não há caminho em que se separem.
+    if (c.pessoaId && pessoaTemRecibos(c.pessoaId)){
+      var parte = c.parteRecibo === 'conta' || c.parteRecibo === 'cartao' ? c.parteRecibo : null;
+      var comValor = function(valor, estado, nota){
+        return { valor: arredCentimos(valor), conta: null, cartao: null, estado: estado, nota: nota };
+      };
+      // Modelo antigo: a soma das duas saídas É o montante, construída a
+      // partir delas e não verificada depois.
       var comPartes = function(conta, cartao, estado, nota){
         var pc = arredCentimos(conta), pk = arredCentimos(cartao);
         return { valor: arredCentimos(pc + pk), conta: pc, cartao: pk, estado: estado, nota: nota };
@@ -2865,16 +3055,18 @@ window.addEventListener('load', function () {
 
       var partesMes = partesDoRecibo(reciboDoMes(c.pessoaId, ano, mes));
       if (partesMes){
+        var doMes = 'recibo de ' + labelPeriodoRecibo(periodoRecibo(ano, mes));
+        if (parte === 'conta') return comValor(partesMes.conta, 'confirmado', 'transferência do ' + doMes);
+        if (parte === 'cartao') return comValor(partesMes.cartao, 'confirmado', 'cartão do ' + doMes);
         return comPartes(partesMes.conta, partesMes.cartao, 'confirmado',
-          'líquido do recibo de ' + labelPeriodoRecibo(periodoRecibo(ano, mes)) +
-          ' · conta ' + formatEuro(partesMes.conta) + ' + cartão ' + formatEuro(partesMes.cartao));
+          'líquido do ' + doMes + ' · conta ' + formatEuro(partesMes.conta) + ' + cartão ' + formatEuro(partesMes.cartao));
       }
 
-      var anteriores = recibosAnteriores(c.pessoaId, ano, mes).filter(function(r){
+      var candidatos = recibosParaEstimar(c.pessoaId, ano, mes).filter(function(r){
         return partesDoRecibo(r) !== null;
       });
-      if (anteriores.length){
-        var usados = anteriores.slice(0, 3);
+      if (candidatos.length){
+        var usados = candidatos.slice(0, 3);
         // A média é feita SEPARADAMENTE por destino: o cartão é um valor
         // com vida própria (dias de subsídio), não uma fatia do líquido.
         var somaConta = 0, somaCartao = 0;
@@ -2886,8 +3078,6 @@ window.addEventListener('load', function () {
         var mediaConta = somaConta / usados.length;
         var mediaCartao = somaCartao / usados.length;
         var quantos = usados.length + (usados.length === 1 ? ' recibo' : ' recibos');
-        var detalheMedia = 'conta ' + formatEuro(arredCentimos(mediaConta)) +
-                           ' + cartão ' + formatEuro(arredCentimos(mediaCartao));
 
         // Se o vencimento base ATUAL da pessoa já não é o do último recibo,
         // houve aumento (ou redução) ainda não refletido em recibo nenhum e
@@ -2896,39 +3086,59 @@ window.addEventListener('load', function () {
         // vencimento. As rubricas variáveis (KM, suplementar) continuam a
         // vir da média, que é o melhor que se consegue.
         var baseAtual = baseAtualDaPessoa(c.pessoaId);
-        var baseUltimo = baseDoRecibo(anteriores[0]);
-        if (baseAtual !== null && baseUltimo !== null && Math.abs(baseAtual - baseUltimo) >= 0.005){
-          return comPartes(mediaConta + (baseAtual - baseUltimo), mediaCartao, 'estimado-base',
-            'média de ' + quantos + ' (' + detalheMedia + ') · base ' +
-            formatEuro(arredCentimos(baseUltimo)) + ' → ' + formatEuro(arredCentimos(baseAtual)) +
-            ', ajuste só na transferência');
-        }
+        var baseUltimo = baseDoRecibo(usados[0]);
+        var ajuste = (baseAtual !== null && baseUltimo !== null && Math.abs(baseAtual - baseUltimo) >= 0.005)
+          ? baseAtual - baseUltimo : 0;
+        var notaBase = ajuste ? ' · base ' + formatEuro(arredCentimos(baseUltimo)) + ' → ' + formatEuro(arredCentimos(baseAtual)) : '';
+        var estado = ajuste ? 'estimado-base' : 'estimado';
 
-        return comPartes(mediaConta, mediaCartao, 'estimado',
-          'média dos últimos ' + quantos + ' · ' + detalheMedia);
+        if (parte === 'cartao'){
+          // O cartão nunca leva o ajuste de base.
+          return comValor(mediaCartao, 'estimado', 'média do cartão em ' + quantos);
+        }
+        if (parte === 'conta'){
+          return comValor(mediaConta + ajuste, estado, 'média da transferência em ' + quantos + notaBase);
+        }
+        return comPartes(mediaConta + ajuste, mediaCartao, estado,
+          'média de ' + quantos + ' (conta ' + formatEuro(arredCentimos(mediaConta)) +
+          ' + cartão ' + formatEuro(arredCentimos(mediaCartao)) + ')' + notaBase +
+          (ajuste ? ', ajuste só na transferência' : ''));
       }
     }
+
+    // Semente: a pessoa ainda não tem recibo nenhum e o valor do registo é a
+    // melhor aproximação que há. Marcado como estimativa para não se
+    // confundir com um valor vindo de um recibo — e a partir do primeiro
+    // recibo dessa pessoa esta linha deixa de ser alcançável.
+    var semente = c.pessoaId ? 'estimado-semente' : null;
 
     // Comportamento antigo, intacto: com 'valorDiario' preenchido o valor é
     // calculado (dias úteis × valor diário) e o campo 'valor' é ignorado;
     // sem ele, usa 'valor'.
     var diario = parseMontante(c.valorDiario);
     if (c.valorDiario !== undefined && c.valorDiario !== null && c.valorDiario !== '' && diario > 0){
-      return { valor: diasUteis(ano, mes) * diario, conta: null, cartao: null, estado: null, nota: '' };
+      return {
+        valor: diasUteis(ano, mes) * diario, conta: null, cartao: null, estado: semente,
+        nota: semente ? diasUteis(ano, mes) + ' dias úteis × ' + formatEuro(diario) + ' (semente)' : ''
+      };
     }
-    return { valor: parseMontante(c.valor), conta: null, cartao: null, estado: null, nota: '' };
+    return {
+      valor: parseMontante(c.valor), conta: null, cartao: null, estado: semente,
+      nota: semente ? 'valor semente, ainda sem recibos' : ''
+    };
   }
 
   function valorCompromisso(c, ano, mes){
     return detalheCompromisso(c, ano, mes).valor;
   }
 
-  // As saídas de um compromisso num mês: uma só (como sempre), ou duas
-  // quando o montante vem dos recibos — transferência e cartão.
+  // As saídas de um compromisso num mês: uma só (o caso normal, e o de todos
+  // os compromissos com parteRecibo), ou duas nos do modelo antigo, em que a
+  // transferência e o cartão vinham do mesmo registo.
   function saidasCompromisso(c, ano, mes){
     var det = detalheCompromisso(c, ano, mes);
     if (det.conta === null){
-      return [{ sufixo: '', destino: null, valor: det.valor, estado: det.estado, nota: det.nota }];
+      return [{ sufixo: '', destino: c.parteRecibo || null, valor: det.valor, estado: det.estado, nota: det.nota }];
     }
     var saidas = [{
       sufixo: '', destino: 'conta', valor: det.conta, estado: det.estado,
@@ -2956,6 +3166,7 @@ window.addEventListener('load', function () {
     var querCartao = ehOcorrenciaCartao(id);
     var saidas = saidasCompromisso(c, ano, mes);
     for (var i = 0; i < saidas.length; i++){
+      if (saidas.length === 1) return saidas[i].valor;
       if ((saidas[i].destino === 'cartao') === querCartao) return saidas[i].valor;
     }
     return 0;
@@ -2974,6 +3185,7 @@ window.addEventListener('load', function () {
     if (estado === 'confirmado') return 'confirmado';
     if (estado === 'estimado') return 'estimado';
     if (estado === 'estimado-base') return 'estimado · base atualizada';
+    if (estado === 'estimado-semente') return 'estimado · sem recibos';
     return '';
   }
 
@@ -2988,10 +3200,11 @@ window.addEventListener('load', function () {
     return Math.max(1, Math.min(dia, nd));
   }
 
-  // O carregamento do cartão pode ter vencimento próprio; sem 'diaCartao'
-  // preenchido sai no mesmo dia da transferência.
-  function diaDaSaida(c, destino){
-    if (destino === 'cartao' && c.diaCartao !== undefined && c.diaCartao !== null && c.diaCartao !== ''){
+  // Nos compromissos do modelo antigo o carregamento do cartão podia ter
+  // vencimento próprio; sem 'diaCartao' sai no mesmo dia da transferência.
+  // Nos novos o dia é o do próprio compromisso do cartão.
+  function diaDaSaida(c, sufixo){
+    if (sufixo === SUFIXO_CARTAO && c.diaCartao !== undefined && c.diaCartao !== null && c.diaCartao !== ''){
       return c.diaCartao;
     }
     return c.dia;
@@ -2999,9 +3212,7 @@ window.addEventListener('load', function () {
 
   // Gera as ocorrências dos compromissos fixos ativos que caem no mês
   // pedido. 'meses' vazio = todos os meses; 'dia' em falta = por confirmar,
-  // não gera ocorrência. Um compromisso pessoal ligado a recibos gera duas
-  // ocorrências (transferência e cartão). Inclui a TSU, que é derivada dos
-  // recibos e não existe no nó compromissosFixos.
+  // não gera ocorrência.
   function ocorrenciasCompromissos(ano, mes){
     var out = [];
     idsCompromissos().forEach(function(id){
@@ -3012,10 +3223,10 @@ window.addEventListener('load', function () {
       if (meses.length && meses.indexOf(mes) === -1) return;
 
       saidasCompromisso(c, ano, mes).forEach(function(s){
-        var dia = resolveDia(diaDaSaida(c, s.destino), ano, mes);
+        var dia = resolveDia(diaDaSaida(c, s.sufixo), ano, mes);
         if (dia === null) return;
         // A TSU sem base nenhuma não é um pagamento: não gera ocorrência.
-        if (ehTSU(c) && s.valor <= 0) return;
+        if (derivaTSU(c) && s.valor <= 0) return;
 
         out.push({
           tipo: 'fixo',
@@ -3029,6 +3240,7 @@ window.addEventListener('load', function () {
           estado: s.estado,
           nota: s.nota,
           destino: s.destino,
+          derivaDe: c.derivaDe || null,
           dia: dia
         });
       });
@@ -3732,13 +3944,12 @@ window.addEventListener('load', function () {
           return '<div class="tes-comp' + (c.ativo ? '' : ' inativo') + '">' +
             '<span class="tes-comp-nome">' + escapeHtml(c.nome || c.id) +
             (tipoDe(c) === 'variavel' ? '<span class="tes-comp-tipo-tag">variável</span>' : '') +
+            (derivaTSU(c) ? '<span class="tes-comp-tipo-tag">TSU</span>' : '') +
             (det.estado ? '<span class="tes-comp-estado tes-comp-estado-' + (det.estado === 'confirmado' ? 'ok' : 'est') + '">' + escapeHtml(rotuloEstado(det.estado)) + '</span>' : '') +
             (c.ativo ? '' : '<span class="tes-comp-inativo-tag">inativo</span>') + '</span>' +
             '<span class="tes-comp-meta">' + escapeHtml(descreveCompromisso(c)) + '</span>' +
             '<span class="tes-comp-valor">' + formatEuro(det.valor) + calc + '</span>' +
-            (ehTSU(c)
-              ? '<span class="tes-comp-derivado">derivado dos recibos</span>'
-              : '<button type="button" class="btn-small btn-editar-comp" data-id="' + escapeHtml(c.id) + '">✎ Editar</button>') +
+            '<button type="button" class="btn-small btn-editar-comp" data-id="' + escapeHtml(c.id) + '">✎ Editar</button>' +
             '</div>';
         }).join('') +
         '</div>';
@@ -3771,6 +3982,8 @@ window.addEventListener('load', function () {
     document.getElementById('cfNome').value = c.nome || '';
     document.getElementById('cfCategoria').value = c.categoria || 'Outros';
     preencherSelectPessoas(c.pessoaId || '');
+    document.getElementById('cfParteRecibo').value = c.parteRecibo || '';
+    document.getElementById('cfDerivaTsu').checked = derivaTSU(c);
     atualizarVisibilidadePessoaCompromisso();
     document.getElementById('cfValor').value = (c.valor === undefined || c.valor === null) ? '' : c.valor;
     document.getElementById('cfValorDiario').value = (c.valorDiario === undefined || c.valorDiario === null) ? '' : c.valorDiario;
@@ -3819,11 +4032,21 @@ window.addEventListener('load', function () {
 
   function atualizarVisibilidadePessoaCompromisso(){
     var cat = document.getElementById('cfCategoria').value;
-    document.getElementById('cfPessoaField').style.display = cat === 'Pessoal' ? '' : 'none';
-    document.getElementById('cfDiaCartaoField').style.display = cat === 'Pessoal' ? '' : 'none';
+    var pessoal = cat === 'Pessoal';
+    var tsuMarcada = document.getElementById('cfDerivaTsu').checked;
+    // A TSU não é de ninguém em particular: marcada, os campos da pessoa
+    // saem da frente.
+    document.getElementById('cfPessoaField').style.display = (pessoal && !tsuMarcada) ? '' : 'none';
+    document.getElementById('cfParteReciboField').style.display = (pessoal && !tsuMarcada) ? '' : 'none';
+    document.getElementById('cfDiaCartaoField').style.display =
+      (pessoal && !tsuMarcada && document.getElementById('cfParteRecibo').value === '') ? '' : 'none';
+    // A TSU é um encargo do Estado, mas há quem a arrume em Pessoal.
+    document.getElementById('cfDerivaTsuField').style.display = (pessoal || cat === 'Estado') ? '' : 'none';
   }
 
   document.getElementById('cfCategoria').addEventListener('change', atualizarVisibilidadePessoaCompromisso);
+  document.getElementById('cfDerivaTsu').addEventListener('change', atualizarVisibilidadePessoaCompromisso);
+  document.getElementById('cfParteRecibo').addEventListener('change', atualizarVisibilidadePessoaCompromisso);
 
   // O campo IBAN só faz sentido quando o método de pagamento é IBAN.
   function atualizarVisibilidadeIbanCompromisso(){
@@ -3905,8 +4128,16 @@ window.addEventListener('load', function () {
     // 'pessoaId' só existe quando a categoria é Pessoal E foi escolhida uma
     // pessoa. Fora disso não é gravado, e os compromissos sem ele mantêm
     // exactamente a forma e o comportamento que já tinham.
+    var derivaTsuSel = document.getElementById('cfDerivaTsu').checked;
     var pessoaIdSel = document.getElementById('cfPessoa').value;
-    if (registo.categoria === 'Pessoal' && pessoaIdSel) registo.pessoaId = pessoaIdSel;
+    var parteSel = document.getElementById('cfParteRecibo').value;
+    // A TSU é da empresa, não de uma pessoa: as duas coisas excluem-se.
+    if (derivaTsuSel){
+      registo.derivaDe = 'tsu';
+    } else if (registo.categoria === 'Pessoal' && pessoaIdSel){
+      registo.pessoaId = pessoaIdSel;
+      if (parteSel === 'conta' || parteSel === 'cartao') registo.parteRecibo = parteSel;
+    }
     // 'diaCartao' só se grava quando é mesmo diferente do dia da
     // transferência: vazio significa «no mesmo dia», e é o caso normal.
     if (registo.categoria === 'Pessoal' && diaCartao !== null && String(diaCartao) !== String(dia)){
