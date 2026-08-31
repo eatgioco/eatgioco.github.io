@@ -16,7 +16,9 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -1781,50 +1783,96 @@
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
 
-    <div class="notif-wrap">
-      <button type="button" class="notif-bell" id="notifBell" aria-label="Notificações">
-        🔔
-        <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
-      </button>
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel privado</span></div>
+    </div>
 
-      <div class="notif-panel" id="notifPanel">
-        <div class="notif-panel-header">
-          <span>Notificações</span>
-          <button type="button" class="notif-clear" id="notifClearAll">Limpar todas</button>
-        </div>
-        <div class="notif-filters" id="notifFilters">
-          <button type="button" class="notif-filter-chip active" data-filtro="todas">Todas</button>
-          <button type="button" class="notif-filter-chip" data-filtro="pagamentos">Pagamentos</button>
-          <button type="button" class="notif-filter-chip" data-filtro="loja">Loja</button>
-          <button type="button" class="notif-filter-chip" data-filtro="caixa">Caixa</button>
-          <button type="button" class="notif-filter-chip" data-filtro="equipa">Equipa</button>
-        </div>
-        <div class="notif-list" id="notifList"></div>
+    <!-- Página PRIVADA: link não partilhado. Esta lista é própria e nunca deve
+         listar mrn-dashboard.html. Se a nav subir ao gioco-shell.css/.js, esta
+         página fica de fora (allow-list, nunca deny-list). -->
+    <!-- A lista aqui NÃO é a das páginas públicas: aponta para o cluster que só
+         se alcança a partir daqui (tesouraria, tarefas, conta bancária). A
+         primeira entrada chama-se "Home" e não "Dashboard" de propósito —
+         nas páginas públicas há um "Dashboard → index.html" que convida a ser
+         "corrigido" para mrn-dashboard.html. É assim que o link privado sairia.
+         Máximo 7 entradas: as regras :nth-child do shell param na 7ª. -->
+    <nav>
+      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Home</span></a>
+      <a class="nav-row" href="tesouraria.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Tesouraria</span></a>
+      <a class="nav-row" href="tarefas.html"><svg class="icon" width="17" height="17"><use href="#i-pencil"/></svg> <span>Tarefas</span></a>
+      <!-- conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
+           é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. -->
+      <a class="nav-row" href="conta-bancaria.html?conta=abanca"><svg class="icon" width="17" height="17"><use href="#i-trending-up"/></svg> <span>Conta bancária</span></a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Manel</span><div class="dot"></div>
       </div>
     </div>
   </div>
-</header>
 
-<main>
-  <div class="page-title-row">
-    <div>
-      <h1 class="page-title">GIOCO · Dashboard</h1>
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-layout-dashboard"/></svg>GIOCO · <b>Dashboard</b></h1>
+        <div class="spacer"></div>
+
+        <!-- O .notif-wrap mantém o position:relative: é ele que ancora o
+             .notif-panel absoluto. O sino passou a .icon-btn do shell; o
+             indicador é o .notif-badge, que é o .ping do shell com o número
+             dentro (dois pontos vermelhos no mesmo botão seriam um erro
+             visual). O JS continua a mexer-lhe só pelo id. -->
+        <div class="notif-wrap">
+          <button type="button" class="icon-btn" id="notifBell" aria-label="Notificações">
+            <svg class="icon" width="18" height="18"><use href="#i-bell"/></svg>
+            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+          </button>
+
+          <div class="notif-panel" id="notifPanel">
+            <div class="notif-panel-header">
+              <span>Notificações</span>
+              <button type="button" class="notif-clear" id="notifClearAll">Limpar todas</button>
+            </div>
+            <div class="notif-filters" id="notifFilters">
+              <button type="button" class="notif-filter-chip active" data-filtro="todas">Todas</button>
+              <button type="button" class="notif-filter-chip" data-filtro="pagamentos">Pagamentos</button>
+              <button type="button" class="notif-filter-chip" data-filtro="loja">Loja</button>
+              <button type="button" class="notif-filter-chip" data-filtro="caixa">Caixa</button>
+              <button type="button" class="notif-filter-chip" data-filtro="equipa">Equipa</button>
+            </div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
       <p class="page-subtitle">Manel — Gestão</p>
-    </div>
 
-    <div class="quicklinks-row">
-      <a class="quicklink-pill" href="https://zsbmsv2.zonesoft.org/#!/rpt-vv-evolucao" target="_blank" rel="noopener">ZoneSoft</a>
-      <a class="quicklink-pill" href="https://jaconsultores.taxdome.com/app/documents" target="_blank" rel="noopener">TaxDome</a>
-      <a class="quicklink-pill" href="https://be.abanca.pt/BEPRJ001/" target="_blank" rel="noopener">ABanca</a>
-      <a class="quicklink-pill" href="https://business.revolut.com/transactions?ACCOUNTS=a320eb9c-1761-e252-0200-0ed8726ca0d9" target="_blank" rel="noopener">Revolut</a>
-    </div>
-  </div>
+      <div class="quicklinks-row">
+        <a class="quicklink-pill" href="https://zsbmsv2.zonesoft.org/#!/rpt-vv-evolucao" target="_blank" rel="noopener">ZoneSoft</a>
+        <a class="quicklink-pill" href="https://jaconsultores.taxdome.com/app/documents" target="_blank" rel="noopener">TaxDome</a>
+        <a class="quicklink-pill" href="https://be.abanca.pt/BEPRJ001/" target="_blank" rel="noopener">ABanca</a>
+        <a class="quicklink-pill" href="https://business.revolut.com/transactions?ACCOUNTS=a320eb9c-1761-e252-0200-0ed8726ca0d9" target="_blank" rel="noopener">Revolut</a>
+      </div>
 
   <h2 class="section-heading">Vista Rápida</h2>
   <div class="grid-quick">
@@ -2007,9 +2055,11 @@
 
     <p class="storage-note" id="storageNote">Valores aproximados, estimados a partir da contagem e tamanho médio dos registos — não são a leitura exata da consola Firebase.</p>
   </div>
-</main>
 
 <!-- ============ Depósitos Bancários (detalhe) ============ -->
+<!-- Dentro do .main/.page desde a Fase 2. Fora, era irmão do <main> e tinha
+     max-width/margin próprios; com o shell o .main é filho flex do .shell e a
+     secção aparecia por baixo da sidebar, em largura total. -->
 <section class="depositos-detalhe" id="depositosDetalhe">
   <div class="tes-header">
     <button type="button" class="btn" id="btnFecharDepositos">← Voltar</button>
@@ -2054,6 +2104,11 @@
     </div>
   </details>
 </section>
+
+    </div>
+  </div>
+
+</div>
 
 <!-- Modal Novo Pagamento -->
 <div class="modal-overlay" id="novoPagamentoModalOverlay">
