@@ -482,6 +482,7 @@
     border:1px solid var(--line);
     border-radius:12px;
     padding:12px;
+    flex-shrink:0;
   }
 
   .payment-line-detail{
@@ -868,10 +869,12 @@
   [data-theme="dark"] .pedido-badge-feito,
   [data-theme="dark"] .pedido-badge-naoavancar{ color:#141414; }
 
+  /* Mesmo caso do .pay-line-wrap: item de um flex column com max-height. */
   .pedido-ticket{
     border:1px solid var(--line);
     border-radius:12px;
     padding:12px;
+    flex-shrink:0;
   }
 
   .pedido-top{
@@ -1289,11 +1292,17 @@
     gap:6px;
   }
 
+  /* flex-shrink:0 e obrigatorio: o #payLines e um flex column com
+     max-height:300px, e o overflow:hidden (que o border-radius precisa para
+     cortar o fundo do :hover) poe o min-height automatico do item a 0. Sem
+     isto o flex esmaga as 20 linhas para caberem nos 300px — ficavam com 9px
+     de altura, com o conteudo cortado, em vez de a lista fazer scroll. */
   .pay-line-wrap{
     border:1px solid var(--line);
     border-left:3px solid var(--line);
     border-radius:10px;
     overflow:hidden;
+    flex-shrink:0;
   }
 
   .pay-line{
