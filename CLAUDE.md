@@ -17,12 +17,6 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   `main` com `padding:40px 24px 80px`, e `<meta name="viewport" content="width=1200">`.
   Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
-- **Excepção: `contagens.html`.** O uso principal é desktop (o Alfredo regista ao computador
-  enquanto o Bishnu conta), mas a contagem também se faz com o telemóvel na mão em frente à
-  arca. Usa `width=device-width` e, como a equipa.html, **zero `@media` de largura**: as linhas
-  são flex com wrap (`flex:1 1 240px` no nome), por isso a 1200px ficam numa linha densa e a
-  375px empilham sozinhas. As únicas `@media` são `(hover: hover)` — nada de essencial pode
-  depender de hover, e o realce do campo activo é `:focus`, nunca `:hover`.
 - **Excepção: `equipa.html`.** A grelha de turnos tem de ser usável ao telemóvel, por isso
   usa `<meta name="viewport" content="width=device-width, initial-scale=1">`. Adapta-se com
   `overflow-x:auto` + coluna sticky e grelhas `minmax(min(Xpx,100%),1fr)`, e tem os ÚNICOS
@@ -32,6 +26,9 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   de fixar a barra fechada — ao toque não há hover, e os itens do menu são `<a>`, por isso
   tocar neles navegava em vez de abrir. Isto vive só no `<style>` da equipa.html: o
   `gioco-shell.css`/`.js` não tem mobile, e esta página é o rascunho que mais tarde lá sobe.
+  A `contagens.html` segue esta mesma doutrina (bloco `(hover: none)` e JS do menu copiados
+  da equipa.html) — não é uma excepção nova, é a segunda página no padrão que vai subir ao
+  shell; se o bloco mudar numa, mudar na outra.
 
 ## Ficheiros do repositório
 
@@ -47,7 +44,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
-| `gioco-shell.js` | Sprite de 23 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
+| `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
 | `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU | Só Manel |
 | `tarefas.html` | Tarefas, prazos e fixados do dia | Só Manel |
@@ -179,7 +176,7 @@ que apagariam `precoUltimaCompra` e o resto da ficha.
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
 Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
-`equipa.html`, `mrn-dashboard.html`. Por migrar: `compras.html`, `caixa.html`,
+`equipa.html`, `mrn-dashboard.html`, `contagens.html`. Por migrar: `compras.html`, `caixa.html`,
 `loja-sao-bento.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`,
 `leitura-faturas.html`, `index.html`.
 
@@ -219,8 +216,9 @@ Sobre um selo cuja superfície não inverte, o texto é um literal fixo
   o conteúdo com `.card > *{ position:relative; z-index:1 }`.
 - O shell dá `table{width:100%}`, `th{}` e `td{}` a elementos nus. Uma tabela
   estreita da página precisa de `width:auto` explícito.
-- As regras `:nth-child` da sidebar param na **7ª** entrada: uma nav com mais
-  perde a animação escalonada nas seguintes.
+- As regras `:nth-child` da sidebar param na **8ª** entrada (alargadas quando as
+  Contagens entraram no menu): uma nav com mais perde a animação escalonada nas
+  seguintes.
 - O `<style>` da página vem **depois** do `<link>`: em empate de
   especificidade, o local ganha. Uma classe local com o nome de uma do shell
   (`.card`, `.num`) anula-a em silêncio.
@@ -228,7 +226,8 @@ Sobre um selo cuja superfície não inverte, o texto é um literal fixo
 **Regra da navegação.** A lista de links da sidebar é declarada **página a
 página**, no `<body>`. Não está no `gioco-shell.css` nem no `.js` — o shell só
 lhe dá estilo (`nav`, `.nav-row`). As páginas públicas partilham a mesma lista
-de 7 entradas, copiada à mão.
+de 8 entradas (com as Contagens, ícone `clipboard-check`, entre Vendas e
+Equipa), copiada à mão.
 
 O `mrn-dashboard.html` é a **excepção e tem de continuar a ser**: é privado, o
 link não é partilhado, e tem lista própria (Home, Tesouraria, Tarefas, Conta

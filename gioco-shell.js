@@ -15,7 +15,10 @@
 (function () {
   'use strict';
 
-  /* ---------- Sprite: filtro liquidDistort + 22 símbolos ----------
+  /* ---------- Sprite: filtro liquidDistort + 24 símbolos ----------
+     (Eram 23 — o comentário antigo dizia 22, contagem errada. O
+     clipboard-check foi acrescentado em Set/2026 para as Contagens, no
+     mesmo traço Feather dos restantes.)
      Cada <symbol> tem o seu próprio viewBox="0 0 24 24" — NÃO usar <g>,
      foi uma correção feita porque cortava os ícones. */
   var GIOCO_SPRITE = [
@@ -30,6 +33,7 @@
     '<symbol id="i-chef-hat" viewBox="0 0 24 24"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></symbol>',
     '<symbol id="i-chevron-down" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>',
     '<symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>',
+    '<symbol id="i-clipboard-check" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>',
     '<symbol id="i-layout-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>',
     '<symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>',
     '<symbol id="i-message-square" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>',
@@ -56,9 +60,10 @@
      tal como estão no sprite. Serve a grelha de ícones do estilo.html. */
   var GIOCO_ICON_NAMES = [
     'bar-chart-2', 'bell', 'chef-hat', 'chevron-down', 'chevron-right',
-    'layout-dashboard', 'log-out', 'message-square', 'moon', 'more-vertical',
-    'menu', 'panel-left', 'pencil', 'plus', 'receipt', 'search', 'settings',
-    'shopping-cart', 'sun', 'trash-2', 'trending-down', 'trending-up', 'users'
+    'clipboard-check', 'layout-dashboard', 'log-out', 'message-square', 'moon',
+    'more-vertical', 'menu', 'panel-left', 'pencil', 'plus', 'receipt',
+    'search', 'settings', 'shopping-cart', 'sun', 'trash-2', 'trending-down',
+    'trending-up', 'users'
   ];
 
   function injectSprite() {

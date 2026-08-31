@@ -11,215 +11,170 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#FFEDDA">
 <meta name="apple-mobile-web-app-title" content="GIOCO Contagens">
-<!-- 2a excepcao ao padrao desktop-only do OS (a 1a e a equipa.html): o uso principal
-     e desktop - o Alfredo regista ao computador enquanto o Bishnu conta - mas a
-     contagem tambem se faz com o telemovel na mao em frente a arca. Segue a doutrina
-     da equipa.html: width=device-width e ZERO media queries de largura. As linhas
-     adaptam-se sozinhas com flex-wrap + clamp(); a 1200px ficam numa linha densa, a
-     375px empilham. As unicas @media sao (hover:hover), nunca (max-width). -->
+<!-- Como a equipa.html: width=device-width e adaptação por (hover: none), nunca
+     por largura. O uso principal é desktop (o Alfredo regista ao computador
+     enquanto o Bishnu conta), mas a contagem também se faz com o telemóvel na
+     mão em frente à arca — a barra inferior e as linhas que empilham vêm da
+     doutrina da equipa.html, que é o rascunho do mobile do shell. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Contagens</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
+  /* ======================================================================
+     contagens.html — estilos próprios da página.
+     O layout, o vidro, a sidebar, o tema claro/escuro e a tipografia base
+     vêm do gioco-shell.css. Aqui fica só o que é das contagens: a lista de
+     contagens, a barra de progresso, as linhas por categoria, o campo de
+     quantidade e os modais (no padrão do pagamentos.html).
+     ====================================================================== */
+
+  /* Tokens próprios: realce da linha activa e erro de input. Par claro/escuro
+     obrigatório — são fundos atrás de texto que inverte com o tema. */
   :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-    --amber:#B8860B;
+    --ativa-bg:#FDF3F2;
+    --erro-bg:#FBE9E9;
+  }
+  [data-theme="dark"]{
+    --ativa-bg:rgba(255,125,136,0.08);
+    --erro-bg:rgba(255,125,136,0.14);
   }
 
-  *{box-sizing:border-box;}
+  body{ -webkit-font-smoothing:antialiased; }
 
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
+  /* O .btn-add do shell tem display:flex, que ganha ao atributo hidden —
+     os botões Fechar/Reabrir alternam por hidden no JS. */
+  [hidden]{ display:none !important; }
 
-  h1,h2,h3,.mono{
-    font-family:'Space Mono', monospace;
-  }
+  /* Os itens do menu são links reais (<a>), estilizados pelo .nav-row do shell. */
+  .nav-row{ text-decoration:none; }
 
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
-
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:40px 24px 80px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:clamp(22px, 5vw, 30px);
-    font-weight:700;
-    letter-spacing:-0.5px;
+  /* Rodapé da sidebar: utilizador fixo, sem sessões nem logout. */
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
   }
 
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:6px 0 0;
     font-size:12px;
-    color:var(--red);
-    letter-spacing:2px;
+    font-weight:600;
+    /* --red-ink, não --red: no shell o --red é cor de superfície e o --red-ink
+       é o vermelho de texto, que clareia no tema escuro. */
+    color:var(--red-ink);
+    letter-spacing:.14em;
     text-transform:uppercase;
   }
 
-  .section-title{
-    margin:0 0 12px;
-    font-size:13px;
-    font-family:'Space Mono', monospace;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    color:var(--muted);
-  }
+  /* O ::before do .glass-light pinta por cima do conteúdo estático (armadilha
+     conhecida do shell): empurrar o conteúdo dos cartões para cima. */
+  .card > *{ position:relative; z-index:1; }
 
-  .btn{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    border:2px solid var(--black);
-    background:var(--white);
-    color:var(--black);
-    padding:9px 14px;
-    min-height:40px;
-    cursor:pointer;
-    letter-spacing:0.3px;
-    white-space:nowrap;
-  }
-
-  .btn:disabled{
-    opacity:0.6;
-    cursor:default;
-  }
-
-  .btn-primary{
-    background:var(--red);
-    border-color:var(--red);
-    color:var(--white);
-  }
-
-  /* Unica excepcao ao "sem @media": o criterio e a existencia de hover, nunca a
-     largura. Ao toque nao ha hover, e nada de essencial pode depender dele. */
-  @media (hover: hover){
-    .home-link:hover{ background:var(--white); color:var(--red); }
-    .btn:not(:disabled):hover{ background:var(--black); color:var(--white); }
-    .btn-primary:not(:disabled):hover{ background:var(--black); border-color:var(--black); }
-    .cat-head:hover{ background:var(--red); border-color:var(--red); }
-    .contagem-card:hover{ border-color:var(--red); }
-    .btn-cfg:hover{ background:var(--black); color:var(--white); }
-  }
-
-  /* ---------- Erro de autenticacao ---------- */
-  #authErro{
-    display:none;
-    max-width:1200px;
-    margin:24px auto 0;
-    padding:0 24px;
-  }
-
+  /* ---------- Erro de autenticação ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
   #authErro.on{ display:block; }
 
   .auth-box{
-    background:var(--white);
-    border:3px solid var(--red);
-    padding:20px;
+    border-left:4px solid var(--red);
   }
 
   .auth-box h2{
     margin:0 0 8px;
-    font-size:16px;
-    color:var(--red);
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
   }
 
   .auth-box p{
     margin:0 0 16px;
-    font-size:14px;
+    font-size:13.5px;
     color:var(--muted);
-    line-height:1.5;
+    line-height:1.55;
   }
 
-  /* ---------- Ecra inicial: lista de contagens ---------- */
-  .nova-card{
+  /* ---------- FORMULÁRIO — padrão do OS (pagamentos.html, Fase 2) ---------- */
+  .field{ display:flex; flex-direction:column; gap:6px; }
+
+  .field-label{
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  input, select, textarea{
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
     background:var(--white);
-    border:2px solid var(--black);
-    padding:16px;
-    margin-top:28px;
+    color:var(--ink);
+    width:100%;
+    transition:border-color .15s ease;
+  }
+
+  input:focus, select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  input::placeholder, textarea::placeholder{ color:var(--muted); }
+
+  /* ---------- BOTÕES — primário é o .btn-add do shell; secundários na
+     mesma família de pílula (padrão do pagamentos.html) ---------- */
+  .btn{
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    background:var(--white);
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:9px 18px;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+
+  .btn:hover{ border-color:var(--red); }
+  .btn:active{ transform:scale(0.97); }
+
+  /* ---------- Ecrã inicial: nova contagem + lista ---------- */
+  .nova-card{
+    margin-top:22px;
     display:flex;
     flex-wrap:wrap;
     align-items:flex-end;
-    gap:12px;
+    gap:14px;
   }
 
-  .field-label{
-    display:block;
-    font-family:'Space Mono', monospace;
-    font-size:10px;
-    letter-spacing:1px;
+  .nova-card .campo{ flex:1 1 200px; max-width:280px; min-width:0; }
+
+  .lista-contagens{ margin-top:28px; }
+
+  .section-title{
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.08em;
     text-transform:uppercase;
     color:var(--muted);
-    margin-bottom:6px;
+    margin:0 0 12px;
   }
-
-  .nova-card .campo{ flex:1 1 200px; min-width:0; }
-
-  input[type="date"], input[type="text"], input[type="number"], select{
-    width:100%;
-    padding:10px 12px;
-    min-height:44px;
-    border:2px solid var(--line);
-    background:var(--bg);
-    font-family:'Inter', sans-serif;
-    font-size:14px;
-    color:var(--black);
-  }
-
-  input:focus, select:focus{ outline:none; border-color:var(--black); }
-
-  .lista-contagens{ margin-top:32px; }
 
   .contagem-card{
     display:flex;
@@ -228,69 +183,82 @@
     gap:10px 16px;
     width:100%;
     text-align:left;
+    font-family:'Inter', sans-serif;
     background:var(--white);
-    border:2px solid var(--line);
-    padding:14px 16px;
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 18px;
     margin-bottom:8px;
     cursor:pointer;
-    color:var(--black);
-    font-family:'Inter', sans-serif;
+    transition:border-color .15s ease, transform .1s ease;
   }
 
+  .contagem-card:hover{ border-color:var(--red); transform:translateY(-1px); }
+
   .contagem-data{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
+    font-size:14.5px;
     font-weight:700;
+    font-variant-numeric:tabular-nums;
     flex:0 0 auto;
   }
 
   .contagem-meta{
-    font-size:13px;
+    font-size:12.5px;
     color:var(--muted);
     flex:1 1 160px;
   }
 
+  /* Selo de estado: texto+fundo na família --green/--amber do shell (cores de
+     ESTADO, com par escuro), não os selos sólidos --lime/--mustard. */
   .selo{
-    font-family:'Space Mono', monospace;
-    font-size:10px;
+    font-size:10.5px;
     font-weight:700;
-    letter-spacing:1px;
+    letter-spacing:.06em;
     text-transform:uppercase;
-    padding:4px 8px;
-    border:2px solid currentColor;
+    padding:4px 10px;
+    border-radius:100px;
     flex:0 0 auto;
   }
 
-  .selo-rascunho{ color:var(--amber); }
-  .selo-fechada{ color:var(--green); }
+  .selo-rascunho{ background:var(--amber-bg); color:var(--amber); }
+  .selo-fechada{ background:var(--green-bg); color:var(--green); }
 
   .vazio{
-    font-size:14px;
+    font-size:13.5px;
     color:var(--muted);
-    padding:16px 0;
+    padding:14px 0;
     line-height:1.5;
   }
 
-  /* ---------- Ecra de contagem ---------- */
+  /* ---------- Ecrã de contagem ---------- */
   .conta-topo{
     display:flex;
     flex-wrap:wrap;
     align-items:center;
     gap:10px 14px;
-    margin-bottom:4px;
+    margin-top:22px;
   }
 
-  .conta-topo .page-title{ flex:0 0 auto; }
+  .conta-data{
+    margin:0;
+    font-family:'Inter', sans-serif;
+    font-size:20px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    flex:0 0 auto;
+  }
+
   .conta-acoes{ display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
 
   .barra{
     position:sticky;
     top:0;
     z-index:20;
-    background:var(--bg);
-    border-bottom:2px solid var(--black);
+    background:var(--dough);
+    border-bottom:1px solid var(--line);
     padding:12px 0;
-    margin:20px 0 4px;
+    margin:16px 0 4px;
   }
 
   .barra-linha{
@@ -300,76 +268,103 @@
     gap:10px 12px;
   }
 
-  .barra .busca{ flex:1 1 220px; min-width:0; }
+  .search-box.contagens-search{ flex:1 1 220px; max-width:340px; margin:0; min-width:0; }
+
+  .search-box.contagens-search input{
+    flex:1;
+    min-width:0;
+    background:none;
+    border:none;
+    outline:none;
+    padding:0;
+    border-radius:0;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--ink);
+  }
 
   .prog-texto{
-    font-family:'Space Mono', monospace;
     font-size:12px;
-    font-weight:700;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+    color:var(--muted);
     white-space:nowrap;
     flex:0 0 auto;
   }
 
   .prog-track{
-    height:10px;
+    height:8px;
     background:var(--line);
-    border:2px solid var(--black);
+    border-radius:100px;
     margin-top:10px;
+    overflow:hidden;
   }
 
   .prog-fill{
     height:100%;
     background:var(--red);
+    border-radius:100px;
     width:0;
+    transition:width .2s ease;
   }
 
+  /* ---------- Cabeçalhos de categoria ----------
+     Mesma linguagem do .cat-chip.active do shell: superfície --ink. É um
+     <button>: cor explícita obrigatória (armadilha conhecida do tema escuro). */
   .cat-head{
     display:flex;
     align-items:center;
     gap:10px;
     width:100%;
     min-height:44px;
-    background:var(--black);
-    color:var(--white);
-    border:2px solid var(--black);
-    font-family:'Space Mono', monospace;
+    background:var(--ink);
+    color:var(--dough);
+    border:1px solid var(--ink);
+    border-radius:12px;
+    font-family:'Inter', sans-serif;
     font-size:12px;
-    font-weight:700;
-    letter-spacing:1px;
+    font-weight:600;
+    letter-spacing:.06em;
     text-transform:uppercase;
-    padding:10px 12px;
-    margin:22px 0 8px;
+    padding:10px 14px;
+    margin:20px 0 8px;
     cursor:pointer;
     text-align:left;
+    transition:background .15s ease, border-color .15s ease;
   }
 
-  .cat-head .seta{ flex:0 0 auto; font-size:11px; width:12px; }
-  .cat-head .cat-label{ flex:1 1 auto; min-width:0; }
-  .cat-head .cat-cont{ flex:0 0 auto; font-weight:400; opacity:0.85; }
+  .cat-head:hover{ background:var(--red); border-color:var(--red); color:var(--on-red); }
 
+  .cat-head .seta{ flex:0 0 auto; display:inline-flex; width:14px; }
+  .cat-head .cat-label{ flex:1 1 auto; min-width:0; }
+  .cat-head .cat-cont{ flex:0 0 auto; font-weight:400; opacity:0.75; font-variant-numeric:tabular-nums; }
+
+  /* ---------- Linhas de ingrediente ---------- */
   .linha{
     display:flex;
     flex-wrap:wrap;
     align-items:center;
     gap:8px 12px;
     background:var(--white);
-    border:2px solid var(--line);
-    padding:8px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:9px 14px;
     margin-bottom:6px;
-    scroll-margin-top:150px;
+    scroll-margin-top:130px;
     scroll-margin-bottom:40px;
+    transition:border-color .15s ease, background .15s ease;
   }
 
-  .linha.ativa{ border-color:var(--red); background:#FFF7F7; }
-  .linha.contado{ box-shadow:inset 6px 0 0 var(--green); }
+  .linha.ativa{ border-color:var(--red); background:var(--ativa-bg); }
+  .linha.contado{ box-shadow:inset 4px 0 0 var(--green); }
 
   .linha-nome{ flex:1 1 240px; min-width:0; }
 
   .linha-nome b{
     display:block;
-    font-size:14px;
+    font-size:13.5px;
     font-weight:600;
-    line-height:1.3;
+    line-height:1.35;
   }
 
   .linha-alias{
@@ -379,14 +374,14 @@
 
   .aviso-unidade{
     display:inline-block;
-    font-family:'Space Mono', monospace;
-    font-size:10px;
+    font-size:9.5px;
     font-weight:700;
-    letter-spacing:0.5px;
+    letter-spacing:.05em;
     text-transform:uppercase;
     color:var(--amber);
-    border:1px solid var(--amber);
-    padding:2px 5px;
+    background:var(--amber-bg);
+    border-radius:100px;
+    padding:2px 8px;
     margin-top:4px;
   }
 
@@ -398,41 +393,36 @@
   }
 
   input.qtd{
-    width:clamp(88px, 20vw, 116px);
-    padding:8px 10px;
+    width:clamp(88px, 20vw, 112px);
     min-height:44px;
+    padding:8px 12px;
     text-align:right;
-    font-family:'Space Mono', monospace;
-    font-size:18px;
-    font-weight:700;
-    border:2px solid var(--line);
-    background:var(--bg);
-    color:var(--black);
+    font-size:15px;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
   }
 
   input.qtd:focus{
-    outline:none;
     border-color:var(--red);
-    box-shadow:0 0 0 3px rgba(217,17,36,0.25);
+    box-shadow:0 0 0 3px rgba(217,17,36,0.18);
   }
 
-  input.qtd:disabled{ background:var(--line); color:var(--muted); }
-  input.qtd.erro{ border-color:var(--red); background:#FFECEC; }
+  input.qtd:disabled{ background:var(--dough); color:var(--muted); }
+  input.qtd.erro{ border-color:var(--red); background:var(--erro-bg); }
 
   .uni{
-    font-family:'Space Mono', monospace;
     font-size:12px;
-    font-weight:700;
-    width:clamp(50px, 12vw, 72px);
+    font-weight:600;
+    width:clamp(50px, 12vw, 70px);
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
   }
 
   .base{
-    font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
+    font-variant-numeric:tabular-nums;
     width:clamp(70px, 16vw, 104px);
     overflow:hidden;
     text-overflow:ellipsis;
@@ -443,84 +433,105 @@
     flex:0 0 auto;
     width:36px;
     height:36px;
-    border:2px solid var(--line);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border:1.5px solid var(--line);
+    border-radius:100px;
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
-    font-size:14px;
-    line-height:1;
     padding:0;
+    transition:border-color .15s ease;
   }
 
-  /* ---------- Modais ---------- */
+  .btn-cfg:hover{ border-color:var(--red); }
+  .btn-cfg:disabled{ opacity:.45; cursor:not-allowed; }
+
+  /* ---------- MODAL — mesmos nomes do pagamentos.html ---------- */
   .modal-overlay{
     display:none;
     position:fixed;
     inset:0;
-    background:rgba(20,20,20,0.6);
-    z-index:100;
-    align-items:flex-start;
-    justify-content:center;
-    padding:40px 16px;
+    background:rgba(20,20,20,0.55);
+    z-index:80;
+    padding:40px 20px;
     overflow-y:auto;
   }
 
-  .modal-overlay.open{ display:flex; }
+  .modal-overlay.open{ display:block; }
 
   .modal{
-    background:var(--bg);
-    border:3px solid var(--black);
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:16px;
     max-width:480px;
-    width:100%;
-    padding:clamp(18px, 5vw, 28px);
-    cursor:default;
+    margin:0 auto;
+    padding:24px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.22);
   }
 
-  .modal-header{
+  .modal-head{
     display:flex;
-    justify-content:space-between;
     align-items:center;
+    justify-content:space-between;
     gap:12px;
-    margin-bottom:18px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:12px;
+    margin-bottom:16px;
   }
 
-  .modal-header h2{ margin:0; font-size:18px; min-width:0; }
+  .modal-title{
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    font-weight:700;
+    margin:0;
+    min-width:0;
+  }
 
   .modal-close{
     background:none;
-    border:none;
-    font-size:22px;
-    cursor:pointer;
-    font-family:'Space Mono', monospace;
+    border:1px solid var(--line);
+    border-radius:9px;
+    color:var(--ink);
+    font-size:18px;
     line-height:1;
-    color:var(--black);
-    min-width:36px;
-    min-height:36px;
+    padding:4px 9px;
+    cursor:pointer;
   }
 
   .modal .field{ margin-bottom:14px; }
 
   .modal-actions{
     display:flex;
-    justify-content:flex-end;
-    gap:10px;
-    margin-top:22px;
     flex-wrap:wrap;
+    justify-content:flex-end;
+    align-items:center;
+    margin-top:22px;
+    gap:10px;
   }
 
   .modal-nota{
     font-size:13px;
     color:var(--muted);
-    line-height:1.5;
+    line-height:1.55;
+    margin:0 0 14px;
+  }
+
+  .modal-erro{
+    font-size:13px;
+    color:var(--red-ink);
+    line-height:1.55;
     margin:0 0 14px;
   }
 
   .fator-preview{
-    font-family:'Space Mono', monospace;
     font-size:13px;
-    font-weight:700;
-    background:var(--white);
-    border:2px solid var(--line);
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+    background:var(--dough);
+    border:1px solid var(--line);
+    border-radius:10px;
     padding:10px 12px;
   }
 
@@ -528,12 +539,12 @@
     display:flex;
     justify-content:space-between;
     gap:12px;
-    font-size:14px;
+    font-size:13.5px;
     padding:8px 0;
     border-bottom:1px solid var(--line);
   }
 
-  .resumo-linha b{ font-family:'Space Mono', monospace; }
+  .resumo-linha b{ font-variant-numeric:tabular-nums; }
 
   .sr-only{
     position:absolute;
@@ -544,79 +555,231 @@
     white-space:nowrap;
     border:0;
   }
+
+  /* ======================================================================
+     MOBILE (hover: none) — a sidebar passa a barra fixa no fundo, com o
+     painel a abrir para cima. Copiado da equipa.html, que é o rascunho do
+     mobile do shell; nada disto toca no gioco-shell.css/.js. O critério é a
+     existência de hover, NUNCA a largura — regra do OS.
+     ====================================================================== */
+  .nav-overlay{ display:none; }
+
+  @media (hover: none){
+
+    .shell{ display:block; min-height:100vh; min-height:100dvh; }
+    .main{ padding:20px 16px 0; }
+    .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
+
+    /* Folga no fundo para a barra fixa não tapar as últimas linhas. */
+    .page{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+
+    /* --- Base: vale nos dois estados (barra e painel), mutuamente exclusivos
+       de propósito — ver a nota longa na equipa.html sobre regras de um
+       estado a sangrar para o outro. --- */
+    .sidebar,
+    .sidebar.collapsed,
+    .sidebar.hidden{
+      position:fixed;
+      top:auto; right:0; bottom:0; left:0;
+      width:auto; height:auto; min-height:0; margin:0;
+      align-items:stretch;
+      border:none; border-top:1px solid var(--sidebar-line); border-radius:0;
+      box-shadow:0 -10px 30px rgba(0,0,0,0.16);
+      opacity:1; pointer-events:auto;
+      /* NUNCA overflow:auto aqui — backdrop-filter + fixed + scroll próprio
+         deixa de repintar no iOS. Quem faz scroll é o <nav>. */
+      overflow:visible;
+      transition:none;
+      z-index:70;
+    }
+
+    .sidebar .brand,
+    .sidebar .sidebar-foot{ display:none; }
+
+    .sidebar nav{ display:flex; width:100%; }
+    .sidebar .nav-row{ border-radius:12px; }
+
+    /* --- Estado BARRA: ícones lado a lado --- */
+    .sidebar:not(.painel-aberto){
+      flex-direction:row;
+      padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    }
+
+    .sidebar:not(.painel-aberto) nav{ flex-direction:row; gap:2px; }
+
+    .sidebar:not(.painel-aberto) .nav-row{
+      flex:1 1 0; min-width:0;
+      justify-content:center;
+      padding:10px 4px;
+    }
+
+    .sidebar:not(.painel-aberto) .nav-row span{ display:none; }
+
+    /* --- Estado PAINEL: a mesma barra a abrir para cima --- */
+    .sidebar.painel-aberto{
+      flex-direction:column;
+      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+      max-height:80vh;
+      max-height:80dvh;
+      min-height:min(320px, 70vh);
+      min-height:min(320px, 70dvh);
+    }
+
+    .sidebar.painel-aberto .glass-bend{ display:none; }
+
+    .sidebar.painel-aberto nav{
+      flex-direction:column;
+      gap:4px;
+      flex:1 1 auto;
+      min-height:0;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    .sidebar.painel-aberto .nav-row{
+      flex:0 0 auto;
+      min-height:44px;
+      align-items:center;
+      justify-content:flex-start;
+      padding:12px 14px;
+    }
+
+    .sidebar.painel-aberto .nav-row span{
+      display:inline-block;
+      transform:none; opacity:1; max-width:none;
+    }
+
+    .sidebar-pin-btn{ position:relative; z-index:66; }
+
+    .nav-overlay.aberto{
+      display:block;
+      position:fixed;
+      inset:0;
+      background:rgba(20,20,20,0.45);
+      z-index:65;
+    }
+  }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
-  </div>
-</header>
+<div class="shell">
 
-<div id="authErro">
-  <div class="auth-box">
-    <h2>Sem ligação ao Firebase</h2>
-    <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
-    <button type="button" class="btn btn-primary" id="authRetryBtn">Tentar de novo</button>
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav>
+      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Dashboard</span></a>
+      <a class="nav-row" href="receitas.html"><svg class="icon" width="17" height="17"><use href="#i-chef-hat"/></svg> <span>Receitas</span></a>
+      <a class="nav-row" href="compras.html"><svg class="icon" width="17" height="17"><use href="#i-shopping-cart"/></svg> <span>Compras</span></a>
+      <a class="nav-row" href="pagamentos.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Pagamentos</span></a>
+      <a class="nav-row" href="vendas.html"><svg class="icon" width="17" height="17"><use href="#i-bar-chart-2"/></svg> <span>Vendas</span></a>
+      <a class="nav-row active" href="contagens.html"><svg class="icon" width="17" height="17"><use href="#i-clipboard-check"/></svg> <span>Contagens</span></a>
+      <a class="nav-row" href="equipa.html"><svg class="icon" width="17" height="17"><use href="#i-users"/></svg> <span>Equipa</span></a>
+      <!-- Definições ainda não tem página. Link morto de propósito: fica à vista
+           no menu, mas não navega para lado nenhum. -->
+      <a class="nav-row" href="#"><svg class="icon" width="17" height="17"><use href="#i-settings"/></svg> <span>Definições</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
   </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <!-- Um botão só, dois papéis (padrão da equipa.html): com rato faz o
+             pin do shell; ao toque abre/fecha o painel do menu. -->
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="contagensToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-clipboard-check"/></svg>GIOCO · <b>Contagens</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Stock físico</p>
+
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <main id="app" hidden>
+
+        <!-- ================= ECRÃ INICIAL ================= -->
+        <section id="vistaLista">
+          <div class="nova-card card glass-light">
+            <div class="campo field">
+              <label class="field-label" for="novaData">Data da contagem</label>
+              <input type="date" id="novaData">
+            </div>
+            <button type="button" class="btn-add" id="novaBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Nova contagem</button>
+          </div>
+
+          <div class="lista-contagens">
+            <p class="section-title">Contagens registadas</p>
+            <div id="listaContagens"><p class="vazio">A carregar…</p></div>
+          </div>
+        </section>
+
+        <!-- ================= ECRÃ DE CONTAGEM ================= -->
+        <section id="vistaContagem" hidden>
+          <div class="conta-topo">
+            <button type="button" class="btn" id="voltarBtn">← Contagens</button>
+            <h2 class="conta-data" id="contaData">—</h2>
+            <span class="selo" id="contaSelo">—</span>
+            <div class="conta-acoes">
+              <button type="button" class="btn-add" id="fecharBtn">Fechar contagem</button>
+              <button type="button" class="btn" id="reabrirBtn" hidden>Reabrir</button>
+            </div>
+          </div>
+
+          <div class="barra">
+            <div class="barra-linha">
+              <div class="search-box contagens-search">
+                <svg class="icon" width="14" height="14"><use href="#i-search"/></svg>
+                <label class="sr-only" for="busca">Pesquisar ingrediente</label>
+                <input type="text" id="busca" placeholder="Pesquisar por nome ou alias   (tecla /)" autocomplete="off">
+              </div>
+              <span class="prog-texto" id="progTexto">0 de 0 contados</span>
+            </div>
+            <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+          </div>
+
+          <div id="linhas"></div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
 </div>
 
-<main id="app" hidden>
-
-  <!-- ================= ECRÃ INICIAL ================= -->
-  <section id="vistaLista">
-    <h1 class="page-title">Contagens</h1>
-    <p class="page-subtitle">Stock físico</p>
-
-    <div class="nova-card">
-      <div class="campo">
-        <label class="field-label" for="novaData">Data da contagem</label>
-        <input type="date" id="novaData">
-      </div>
-      <button type="button" class="btn btn-primary" id="novaBtn">Nova contagem</button>
-    </div>
-
-    <div class="lista-contagens">
-      <p class="section-title">Contagens registadas</p>
-      <div id="listaContagens"><p class="vazio">A carregar…</p></div>
-    </div>
-  </section>
-
-  <!-- ================= ECRÃ DE CONTAGEM ================= -->
-  <section id="vistaContagem" hidden>
-    <div class="conta-topo">
-      <button type="button" class="btn" id="voltarBtn">← Contagens</button>
-      <h1 class="page-title" id="contaData">—</h1>
-      <span class="selo" id="contaSelo">—</span>
-      <div class="conta-acoes">
-        <button type="button" class="btn btn-primary" id="fecharBtn">Fechar contagem</button>
-        <button type="button" class="btn" id="reabrirBtn" hidden>Reabrir</button>
-      </div>
-    </div>
-
-    <div class="barra">
-      <div class="barra-linha">
-        <div class="busca">
-          <label class="sr-only" for="busca">Pesquisar ingrediente</label>
-          <input type="text" id="busca" placeholder="Pesquisar por nome ou alias   (tecla /)" autocomplete="off">
-        </div>
-        <span class="prog-texto" id="progTexto">0 de 0 contados</span>
-      </div>
-      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-    </div>
-
-    <div id="linhas"></div>
-  </section>
-
-</main>
+<div class="nav-overlay" id="navOverlay"></div>
 
 <!-- ================= MINI-MODAL: unidade de contagem + fator ================= -->
 <div class="modal-overlay" id="uniOverlay">
   <form class="modal" id="uniForm" autocomplete="off">
-    <div class="modal-header">
-      <h2 id="uniTitulo">Unidade de contagem</h2>
+    <div class="modal-head">
+      <h3 class="modal-title" id="uniTitulo">Unidade de contagem</h3>
       <button type="button" class="modal-close" id="uniFechar" aria-label="Cancelar">×</button>
     </div>
 
@@ -638,11 +801,11 @@
       <div class="fator-preview" id="uniPreview">1 unidade = ?</div>
     </div>
 
-    <p class="modal-nota" id="uniErro" style="color:var(--red);" hidden></p>
+    <p class="modal-erro" id="uniErro" hidden></p>
 
     <div class="modal-actions">
       <button type="button" class="btn" id="uniCancelar">Cancelar</button>
-      <button type="submit" class="btn btn-primary">Confirmar</button>
+      <button type="submit" class="btn-add">Confirmar</button>
     </div>
   </form>
 </div>
@@ -674,15 +837,15 @@
 <!-- ================= MODAL: fechar contagem ================= -->
 <div class="modal-overlay" id="fecharOverlay">
   <div class="modal">
-    <div class="modal-header">
-      <h2>Fechar contagem</h2>
+    <div class="modal-head">
+      <h3 class="modal-title">Fechar contagem</h3>
       <button type="button" class="modal-close" id="fecharFechar" aria-label="Cancelar">×</button>
     </div>
     <div id="fecharResumo"></div>
     <p class="modal-nota" style="margin-top:14px;">Depois de fechada a contagem abre em modo de leitura. Podes sempre reabri-la.</p>
     <div class="modal-actions">
       <button type="button" class="btn" id="fecharCancelar">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="fecharConfirmar">Fechar contagem</button>
+      <button type="button" class="btn-add" id="fecharConfirmar">Fechar contagem</button>
     </div>
   </div>
 </div>
@@ -690,17 +853,71 @@
 <!-- ================= MODAL: reabrir contagem ================= -->
 <div class="modal-overlay" id="reabrirOverlay">
   <div class="modal">
-    <div class="modal-header">
-      <h2>Reabrir contagem</h2>
+    <div class="modal-head">
+      <h3 class="modal-title">Reabrir contagem</h3>
       <button type="button" class="modal-close" id="reabrirFechar" aria-label="Cancelar">×</button>
     </div>
     <p class="modal-nota">A contagem volta a rascunho e fica outra vez editável. O registo de fecho é removido; os itens contados mantêm-se todos.</p>
     <div class="modal-actions">
       <button type="button" class="btn" id="reabrirCancelar">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="reabrirConfirmar">Reabrir</button>
+      <button type="button" class="btn-add" id="reabrirConfirmar">Reabrir</button>
     </div>
   </div>
 </div>
+
+<script>
+  /* ---------- Menu ao toque: barra inferior + painel para cima ----------
+     Mesmo padrão da equipa.html (que é o rascunho do mobile do shell): o
+     #sidebarPinBtn tem dois papéis — com rato chama o toggleSidebarPin() do
+     shell, sem desvios; ao toque abre/fecha o painel. Só chrome, zero lógica
+     de contagens aqui. */
+  (function () {
+    var mqToque = window.matchMedia ? window.matchMedia('(hover: none)') : null;
+
+    function ehToque(){ return !!(mqToque && mqToque.matches); }
+
+    function painelAberto(){
+      var sb = document.getElementById('sidebarEl');
+      return !!(sb && sb.classList.contains('painel-aberto'));
+    }
+
+    function mostrarPainel(abrir){
+      var sb = document.getElementById('sidebarEl');
+      var ov = document.getElementById('navOverlay');
+      if (sb) sb.classList.toggle('painel-aberto', !!abrir);
+      if (ov) ov.classList.toggle('aberto', !!abrir);
+      var btn = document.getElementById('sidebarPinBtn');
+      if (btn && ehToque()) btn.setAttribute('title', abrir ? 'Fechar o menu' : 'Abrir o menu');
+    }
+
+    window.contagensToggleMenu = function(){
+      if (!ehToque()){
+        if (typeof window.toggleSidebarPin === 'function') window.toggleSidebarPin();
+        return;
+      }
+      mostrarPainel(!painelAberto());
+    };
+
+    var navOverlay = document.getElementById('navOverlay');
+    if (navOverlay) navOverlay.addEventListener('click', function(){ mostrarPainel(false); });
+
+    document.querySelectorAll('#sidebarEl .nav-row').forEach(function(a){
+      a.addEventListener('click', function(){ mostrarPainel(false); });
+    });
+
+    window.addEventListener('pageshow', function(){ mostrarPainel(false); });
+
+    if (mqToque && mqToque.addEventListener){
+      mqToque.addEventListener('change', function(){
+        mostrarPainel(false);
+        var btn = document.getElementById('sidebarPinBtn');
+        if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
+      });
+    }
+
+    if (ehToque()) mostrarPainel(false);
+  })();
+</script>
 
 <script>
   var firebaseConfig = {
@@ -1021,7 +1238,7 @@
       '<span class="uni" title="' + escapeHtml(uni) + '">' + escapeHtml(uni) + '</span>' +
       '<span class="base">' + escapeHtml(textoBase(ing, item)) + '</span>' +
       '<button type="button" class="btn-cfg" data-cfg="' + escapeHtml(ing.id) + '" ' +
-      'title="' + titulo + '" aria-label="' + titulo + '"' + (ed ? '' : ' disabled') + '>⚙</button>' +
+      'title="' + titulo + '" aria-label="' + titulo + '"' + (ed ? '' : ' disabled') + '><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></button>' +
       '</span></div>';
   }
 
@@ -1041,7 +1258,7 @@
       var aberta = q ? true : !colapsadas[cat];
       var contados = ings.filter(function (i) { return itens[i.id] !== undefined; }).length;
       html += '<button type="button" class="cat-head" data-cat="' + escapeHtml(cat) + '" aria-expanded="' + aberta + '">' +
-        '<span class="seta">' + (aberta ? '▾' : '▸') + '</span>' +
+        '<span class="seta">' + (aberta ? '<svg class="icon" width="13" height="13"><use href="#i-chevron-down"/></svg>' : '<svg class="icon" width="13" height="13"><use href="#i-chevron-right"/></svg>') + '</span>' +
         '<span class="cat-label">' + escapeHtml(labelCat(cat)) + '</span>' +
         '<span class="cat-cont">' + contados + '/' + ings.length + '</span>' +
         '</button>';
