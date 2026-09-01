@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Contactos">
+<!-- Excepção ao padrão desktop-only do OS: um diretório de contactos serve
+     sobretudo para LIGAR, e liga-se do telemóvel. Como a equipa.html:
+     width=device-width, sem @media próprios, menu ao toque do shell. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Contactos</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<style>
+  /* ======================================================================
+     contactos.html — estilos próprios da página.
+     Layout, sidebar, vidro, tema, .card, .btn-add vêm do gioco-shell.css.
+     Aqui fica só o específico do diretório: grelha de cartões, linha de
+     ações, modais e formulário — nos padrões partilhados das outras páginas.
+     ====================================================================== */
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+
+  .nav-overlay{ display:none; }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-size:12px;
+    font-weight:600;
+    color:var(--red-ink);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+  }
+
+  /* Selo do modo gestão: só existe no DOM quando ?acesso=gestao. */
+  .tag-gestao{
+    display:inline-block;
+    margin-left:10px;
+    padding:2px 8px;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.14em;
+    border:1.5px solid var(--red-ink);
+    border-radius:100px;
+    color:var(--red-ink);
+    vertical-align:1px;
+  }
+
+  /* ---------- Pesquisa + separadores (padrões de compras/equipa) ---------- */
+  .controls{
+    margin:22px 0 0;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .search-input{
+    flex:1 1 260px;
+    padding:12px 16px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+  }
+
+  .search-input:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  .tab-btn{
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    background:var(--white);
+    color:var(--ink);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:9px 20px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, color .15s ease;
+  }
+
+  .tab-btn:hover{ border-color:var(--red); }
+
+  .tab-btn.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--dough);
+  }
+
+  .tab-count{
+    font-weight:400;
+    opacity:0.65;
+    margin-left:6px;
+  }
+
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin:22px 0 14px;
+    flex-wrap:wrap;
+  }
+
+  .panel-head p{
+    margin:0;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* ---------- Grelha de cartões ---------- */
+  .contact-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(280px,100%), 1fr));
+    gap:18px;
+    margin-top:18px;
+  }
+
+  .contact-card{ display:flex; flex-direction:column; gap:8px; }
+  /* O ::before do .glass-light pinta por cima do conteúdo estático. */
+  .contact-card > *{ position:relative; z-index:1; }
+  .contact-card.editavel{ cursor:pointer; }
+
+  /* Emergências: destaque com a barra vermelha (igual nos dois temas). */
+  .contact-card.card-emerg{ border-left:4px solid var(--red); }
+
+  .cc-top{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
+
+  .cc-avatar{
+    width:34px; height:34px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700;
+    color:#FFFFFF;
+    flex-shrink:0;
+  }
+
+  .cc-nome{
+    font-size:15.5px;
+    font-weight:700;
+    margin:0;
+    line-height:1.3;
+  }
+
+  .cc-cat{
+    font-size:12px;
+    color:var(--muted);
+    margin:2px 0 0;
+  }
+
+  .cc-fav{ color:var(--amber); margin-left:6px; }
+
+  .cc-row{
+    font-size:13px;
+    color:var(--muted);
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .cc-row strong{
+    color:var(--ink);
+    font-weight:600;
+  }
+
+  .cc-notas{
+    font-size:12.5px;
+    color:var(--muted);
+    border-top:1px solid var(--line);
+    padding-top:8px;
+    margin-top:4px;
+    white-space:pre-line;
+  }
+
+  .cc-gestao{
+    font-size:12px;
+    color:var(--muted);
+    border-top:1px dashed var(--line);
+    padding-top:8px;
+  }
+
+  .cc-acoes{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:auto;
+    padding-top:10px;
+  }
+
+  /* Botões-ação: alvo de toque >=40px de altura. São <a>, por isso a cor
+     tem de ser explícita (herança do browser, não do --ink). */
+  .acao-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:9px 14px;
+    min-height:40px;
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    background:var(--white);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    text-decoration:none;
+    cursor:pointer;
+    transition:border-color .15s ease;
+  }
+
+  .acao-btn:hover{ border-color:var(--red); }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+    font-family:'Inter', sans-serif;
+  }
+
+  /* ---------- Modal (padrão partilhado equipa/compras) ---------- */
+  .modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,0.6);
+    z-index:100;
+    align-items:flex-start;
+    justify-content:center;
+    padding:40px 16px;
+    overflow-y:auto;
+  }
+
+  .modal-overlay.open{ display:flex; }
+
+  .modal{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:16px;
+    max-width:480px;
+    width:100%;
+    padding:28px;
+    cursor:default;
+  }
+
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+  }
+
+  .modal-header h2{ margin:0; font-size:20px; }
+
+  .modal-close{
+    background:none;
+    border:none;
+    color:var(--ink);
+    font-size:22px;
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    line-height:1;
+  }
+
+  .field{ margin-bottom:14px; }
+
+  .field-label{
+    display:block;
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input,
+  .field textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--dough);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    box-sizing:border-box;
+  }
+
+  .field textarea{ min-height:70px; resize:vertical; }
+
+  .field input:focus,
+  .field textarea:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .field-checkbox{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    margin-bottom:18px;
+    color:var(--ink);
+  }
+
+  .field-checkbox input{ width:20px; height:20px; }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+    gap:14px;
+  }
+
+  .form-grid input{ min-width:0; }
+
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+    align-items:center;
+    margin-top:20px;
+    flex-wrap:wrap;
+  }
+
+  .btn-sec{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 18px;
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .btn-sec:hover{ border-color:var(--red); }
+
+  .modal-erro{
+    color:var(--red-ink);
+    font-size:12.5px;
+    margin:0 auto 0 0;
+    display:none;
+  }
+
+  .modal-erro.on{ display:block; }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+
+  .auth-box h2{
+    margin:0 0 8px;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
+  }
+
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.55;
+  }
+</style>
+</head>
+<body class="shell-mobile">
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('contactos.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-phone"/></svg>GIOCO · <b>Contactos</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle" id="pageSubtitle">Fornecedores, equipa e serviços</p>
+
+      <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+           falhar; ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input type="search" class="search-input" id="pesquisa" placeholder="Pesquisar por nome, categoria ou função…" autocomplete="off">
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="fornecedores">Fornecedores<span class="tab-count" id="countFornecedores"></span></button>
+        <button class="tab-btn" data-tab="equipa">Equipa<span class="tab-count" id="countEquipa"></span></button>
+        <button class="tab-btn" data-tab="servicos">Serviços<span class="tab-count" id="countServicos"></span></button>
+        <button class="tab-btn" data-tab="emergencias">Emergências<span class="tab-count" id="countEmergencias"></span></button>
+      </div>
+
+      <!-- ================= FORNECEDORES (read-only, nó suppliers) ================= -->
+      <div class="tab-panel active" id="painelFornecedores">
+        <div class="panel-head">
+          <p>Dados da base de fornecedores — editam-se em <a href="compras.html">Compras</a>.</p>
+        </div>
+        <div class="contact-grid" id="gridFornecedores"></div>
+        <div class="empty-state" id="vazioFornecedores" style="display:none">Sem fornecedores para mostrar.</div>
+      </div>
+
+      <!-- ================= EQUIPA (read-only, nó pessoas) ================= -->
+      <div class="tab-panel" id="painelEquipa">
+        <div class="panel-head">
+          <p>Pessoas ativas — editam-se em <a href="equipa.html">Equipa</a>.</p>
+        </div>
+        <div class="contact-grid" id="gridEquipa"></div>
+        <div class="empty-state" id="vazioEquipa" style="display:none">Sem pessoas para mostrar.</div>
+      </div>
+
+      <!-- ================= SERVIÇOS / TÉCNICOS (CRUD) ================= -->
+      <div class="tab-panel" id="painelServicos">
+        <div class="panel-head">
+          <p>Senhorio, contabilista, suporte, técnicos, seguros…</p>
+          <button type="button" class="btn-add" id="btnNovoServico">+ Serviço</button>
+        </div>
+        <div class="contact-grid" id="gridServicos"></div>
+        <div class="empty-state" id="vazioServicos" style="display:none">Sem serviços para mostrar.</div>
+      </div>
+
+      <!-- ================= EMERGÊNCIAS (CRUD) ================= -->
+      <div class="tab-panel" id="painelEmergencias">
+        <div class="panel-head">
+          <p>Números a ter à mão. Em emergência liga primeiro ao 112.</p>
+          <button type="button" class="btn-add" id="btnNovaEmergencia">+ Emergência</button>
+        </div>
+        <div class="contact-grid" id="gridEmergencias"></div>
+        <div class="empty-state" id="vazioEmergencias" style="display:none">Sem contactos de emergência.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="nav-overlay" id="navOverlay"></div>
+
+<!-- ================= Modal Serviço ================= -->
+<div class="modal-overlay" id="servicoOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="servicoModalTitulo">Novo serviço</h2>
+      <button type="button" class="modal-close" id="servicoFechar" aria-label="Fechar">✕</button>
+    </div>
+    <div class="field">
+      <label class="field-label" for="svNome">Nome *</label>
+      <input type="text" id="svNome" autocomplete="off">
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="svCategoria">Categoria</label>
+        <input type="text" id="svCategoria" list="categoriasServico" autocomplete="off">
+        <datalist id="categoriasServico">
+          <option value="Senhorio"></option>
+          <option value="Contabilidade"></option>
+          <option value="Suporte técnico"></option>
+          <option value="Seguros"></option>
+          <option value="Manutenção"></option>
+          <option value="Limpeza"></option>
+          <option value="Outro"></option>
+        </datalist>
+      </div>
+      <div class="field">
+        <label class="field-label" for="svContacto">Pessoa de contacto</label>
+        <input type="text" id="svContacto" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="svTelefone">Telefone</label>
+        <input type="tel" id="svTelefone" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label" for="svWhatsapp">WhatsApp</label>
+        <input type="tel" id="svWhatsapp" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" for="svEmail">Email</label>
+      <input type="email" id="svEmail" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="field-label" for="svNotas">Notas</label>
+      <textarea id="svNotas"></textarea>
+    </div>
+    <label class="field-checkbox"><input type="checkbox" id="svPrivado"> Privado (só gestão)</label>
+    <div class="modal-actions">
+      <p class="modal-erro" id="servicoErro">O nome é obrigatório.</p>
+      <button type="button" class="btn-sec" id="servicoArquivar" style="display:none">Arquivar</button>
+      <button type="button" class="btn-sec" id="servicoCancelar">Cancelar</button>
+      <button type="button" class="btn-add" id="servicoGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Modal Emergência ================= -->
+<div class="modal-overlay" id="emergOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="emergModalTitulo">Nova emergência</h2>
+      <button type="button" class="modal-close" id="emergFechar" aria-label="Fechar">✕</button>
+    </div>
+    <div class="field">
+      <label class="field-label" for="emNome">Nome *</label>
+      <input type="text" id="emNome" autocomplete="off">
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="emCategoria">Categoria</label>
+        <input type="text" id="emCategoria" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label" for="emTelefone">Telefone *</label>
+        <input type="tel" id="emTelefone" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" for="emOrdem">Ordem</label>
+      <input type="number" id="emOrdem" min="1" step="1">
+    </div>
+    <div class="field">
+      <label class="field-label" for="emNotas">Notas</label>
+      <textarea id="emNotas"></textarea>
+    </div>
+    <div class="modal-actions">
+      <p class="modal-erro" id="emergErro">Nome e telefone são obrigatórios.</p>
+      <button type="button" class="btn-sec" id="emergCancelar">Cancelar</button>
+      <button type="button" class="btn-add" id="emergGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  /* ---------- Modo gestão (?acesso=gestao) ----------
+     Mesmo padrão de leitura de parâmetro do conta-bancaria.html:
+     trim/lowercase + validação por regex antes de usar. Sem o parâmetro,
+     os registos privados e os campos de gestão NÃO são renderizados —
+     não existem no DOM, não é display:none. (Nota honesta: é filtro no
+     cliente; com o RTDB em modo de teste isto é organização, não segurança.) */
+  var acesso = (new URLSearchParams(window.location.search).get('acesso') || '').trim().toLowerCase();
+  if (acesso && !/^[a-z0-9_-]+$/.test(acesso)) acesso = '';
+  var MODO_GESTAO = (acesso === 'gestao');
+
+  if (MODO_GESTAO) {
+    var sub = document.getElementById('pageSubtitle');
+    var tag = document.createElement('span');
+    tag.className = 'tag-gestao';
+    tag.textContent = 'GESTÃO';
+    sub.appendChild(tag);
+  }
+
+  /* ---------- Separadores ----------
+     Mesmo padrão do receitas/equipa. Fica FORA do autenticarEContinuar de
+     propósito: alternar separadores é só DOM, e assim continua a funcionar
+     mesmo que a sessão anónima falhe e o resto da página não arranque. */
+  var TAB_PAINEL = {
+    fornecedores: 'painelFornecedores',
+    equipa: 'painelEquipa',
+    servicos: 'painelServicos',
+    emergencias: 'painelEmergencias'
+  };
+
+  Array.prototype.slice.call(document.querySelectorAll('.tab-btn')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var alvo = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (p) {
+        p.classList.toggle('active', p.id === TAB_PAINEL[alvo]);
+      });
+    });
+  });
+
+  /* ---------- Utilitários ---------- */
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* Pesquisa insensível a maiúsculas E a acentos (diacríticos por escape
+     Unicode, nunca caracteres combinantes literais no ficheiro). */
+  function normalizar(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  /* wa.me só aceita dígitos com indicativo: tira tudo o que não é dígito,
+     tira o 00 internacional, e a um número PT de 9 dígitos junta o 351. */
+  function numeroWhatsapp(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    if (d.indexOf('00') === 0) d = d.slice(2);
+    if (d.length === 9) d = '351' + d;
+    return d;
+  }
+
+  /* tel: aguenta o +, mas não os espaços. */
+  function numeroTel(v) {
+    return String(v || '').replace(/[^\d+]/g, '');
+  }
+
+  function botaoAcao(href, icone, rotulo) {
+    return '<a class="acao-btn" href="' + escapeHtml(href) + '"' +
+           (href.indexOf('http') === 0 ? ' target="_blank" rel="noopener"' : '') + '>' +
+           (icone ? giocoIcon(icone, { size: 14 }) : '') + escapeHtml(rotulo) + '</a>';
+  }
+
+  function acoesContacto(telefone, email, whatsapp) {
+    var html = '';
+    if (telefone) html += botaoAcao('tel:' + numeroTel(telefone), 'phone', 'Ligar');
+    if (email) html += botaoAcao('mailto:' + String(email).trim(), null, 'Email');
+    if (whatsapp) {
+      var w = String(whatsapp).trim();
+      /* Há campos com o LINK do grupo (chat.whatsapp.com) em vez de número:
+         um link usa-se tal como está, nunca se reduz a dígitos. */
+      if (w.indexOf('http') === 0) {
+        html += botaoAcao(w, 'message-square', 'WhatsApp');
+      } else {
+        var d = numeroWhatsapp(w);
+        if (d.length >= 10) html += botaoAcao('https://wa.me/' + d, 'message-square', 'WhatsApp');
+      }
+    }
+    return html ? '<div class="cc-acoes">' + html + '</div>' : '';
+  }
+
+  function linha(rotulo, valor) {
+    if (!valor) return '';
+    return '<div class="cc-row"><strong>' + escapeHtml(rotulo) + '</strong><span>' + escapeHtml(valor) + '</span></div>';
+  }
+
+  /* ---------- Pesquisa ----------
+     O filtro corre sobre todas as secções (cada uma re-renderiza); a caixa
+     é uma só e vale para a tab ativa. */
+  var termo = '';
+  var renderTudo = function () {}; /* substituída dentro do auth */
+
+  document.getElementById('pesquisa').addEventListener('input', function () {
+    termo = normalizar(this.value.trim());
+    renderTudo();
+  });
+
+  function corresponde(campos) {
+    if (!termo) return true;
+    for (var i = 0; i < campos.length; i++) {
+      if (normalizar(campos[i]).indexOf(termo) !== -1) return true;
+    }
+    return false;
+  }
+
+  function mostrarVazio(grid, vazio, temCartoes) {
+    document.getElementById(vazio).style.display = temCartoes ? 'none' : 'block';
+  }
+
+  /* ---------- Firebase ---------- */
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  autenticarEContinuar(function () {
+    var db = firebase.database();
+    /* suppliers e pessoas entram SÓ EM LEITURA: o seed, as migrações e as
+       edições são responsabilidade exclusiva de compras.html e equipa.html. */
+    var suppliersRef = db.ref('suppliers');
+    var pessoasRef = db.ref('pessoas');
+    var servicosRef = db.ref('contactos/servicos');
+    var emergenciasRef = db.ref('contactos/emergencias');
+
+    var fornecedores = {};
+    var pessoas = {};
+    var servicos = {};
+    var emergencias = {};
+
+    /* ================= FORNECEDORES (read-only) ================= */
+    function renderFornecedores() {
+      var lista = Object.keys(fornecedores).map(function (id) {
+        return Object.assign({ id: id }, fornecedores[id]);
+      });
+      /* Favoritos primeiro, depois alfabética. */
+      lista.sort(function (a, b) {
+        if (!!a.favorito !== !!b.favorito) return a.favorito ? -1 : 1;
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt');
+      });
+
+      var html = '';
+      var n = 0;
+      lista.forEach(function (s) {
+        var cats = Array.isArray(s.categoria) ? s.categoria.join(' · ') : (s.categoria || '');
+        if (!corresponde([s.nome, cats, s.contacto, s.produtos])) return;
+        n++;
+        /* NUNCA renderizar iban/banco — em nenhum modo. */
+        html += '<div class="contact-card card glass-light">';
+        html += '<div class="cc-top"><div><h3 class="cc-nome">' + escapeHtml(s.nome || '—') +
+                (s.favorito ? '<span class="cc-fav">★</span>' : '') + '</h3>' +
+                (cats ? '<p class="cc-cat">' + escapeHtml(cats) + '</p>' : '') + '</div></div>';
+        html += linha('Contacto', s.contacto);
+        html += linha('Telefone', s.telefone);
+        html += linha('Email', s.email);
+        if (s.emailord && s.emailord !== s.email) html += linha('Encomendas', s.emailord);
+        if (MODO_GESTAO) {
+          var g = '';
+          if (s.prazoEntrega) g += linha('Prazo', s.prazoEntrega);
+          if (s.valorMinimo) g += linha('Mínimo', s.valorMinimo);
+          if (s.condicoesPagamento) g += linha('Pagamento', s.condicoesPagamento);
+          if (s.plataformaEncomenda) {
+            g += '<div class="cc-row"><strong>Plataforma</strong><span>' + escapeHtml(s.plataformaEncomenda) + '</span></div>';
+          }
+          if (g) html += '<div class="cc-gestao">' + g + '</div>';
+        }
+        var notas = [s.produtos, s.notas].filter(Boolean).join('\n');
+        if (notas) html += '<div class="cc-notas">' + escapeHtml(notas) + '</div>';
+        html += acoesContacto(s.telefone, s.emailord || s.email, s.whatsappEncomenda);
+        html += '</div>';
+      });
+
+      document.getElementById('gridFornecedores').innerHTML = html;
+      document.getElementById('countFornecedores').textContent = n ? ' ' + n : '';
+      mostrarVazio('gridFornecedores', 'vazioFornecedores', n > 0);
+    }
+
+    /* ================= EQUIPA (read-only) =================
+       Só nome, função, telefone, email e cor. Nada de nif, salários,
+       vencimentos, contratos nem recibos — nem lidos, nem no DOM. */
+    function renderEquipa() {
+      var lista = Object.keys(pessoas).map(function (id) {
+        return Object.assign({ id: id }, pessoas[id]);
+      }).filter(function (p) { return p.ativo !== false; });
+      lista.sort(function (a, b) {
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt');
+      });
+
+      var html = '';
+      var n = 0;
+      lista.forEach(function (p) {
+        if (!corresponde([p.nome, p.funcao])) return;
+        n++;
+        var inicial = String(p.nome || '?').trim().charAt(0).toUpperCase();
+        html += '<div class="contact-card card glass-light">';
+        html += '<div class="cc-top">' +
+                '<div class="cc-avatar" style="background:' + escapeHtml(p.cor || '#D91124') + '">' + escapeHtml(inicial) + '</div>' +
+                '<div><h3 class="cc-nome">' + escapeHtml(p.nome || '—') + '</h3>' +
+                (p.funcao ? '<p class="cc-cat">' + escapeHtml(p.funcao) + '</p>' : '') + '</div></div>';
+        html += linha('Telefone', p.telefone);
+        html += linha('Email', p.email);
+        html += acoesContacto(p.telefone, p.email, null);
+        html += '</div>';
+      });
+
+      document.getElementById('gridEquipa').innerHTML = html;
+      document.getElementById('countEquipa').textContent = n ? ' ' + n : '';
+      mostrarVazio('gridEquipa', 'vazioEquipa', n > 0);
+    }
+
+    /* ================= SERVIÇOS (CRUD) ================= */
+    function renderServicos() {
+      var lista = Object.keys(servicos).map(function (id) {
+        return Object.assign({ id: id }, servicos[id]);
+      }).filter(function (s) {
+        if (s.arquivado) return false;              /* arquivados nunca se mostram */
+        if (s.privado && !MODO_GESTAO) return false; /* privados só em gestão */
+        return true;
+      });
+      lista.sort(function (a, b) {
+        return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt');
+      });
+
+      var html = '';
+      var n = 0;
+      lista.forEach(function (s) {
+        if (!corresponde([s.nome, s.categoria, s.contacto])) return;
+        n++;
+        html += '<div class="contact-card card glass-light editavel" data-id="' + escapeHtml(s.id) + '">';
+        html += '<div class="cc-top"><div><h3 class="cc-nome">' + escapeHtml(s.nome || '—') +
+                (s.privado ? '<span class="cc-fav" title="Privado">●</span>' : '') + '</h3>' +
+                (s.categoria ? '<p class="cc-cat">' + escapeHtml(s.categoria) + '</p>' : '') + '</div></div>';
+        html += linha('Contacto', s.contacto);
+        html += linha('Telefone', s.telefone);
+        html += linha('Email', s.email);
+        if (s.notas) html += '<div class="cc-notas">' + escapeHtml(s.notas) + '</div>';
+        html += acoesContacto(s.telefone, s.email, s.whatsapp);
+        html += '</div>';
+      });
+
+      document.getElementById('gridServicos').innerHTML = html;
+      document.getElementById('countServicos').textContent = n ? ' ' + n : '';
+      mostrarVazio('gridServicos', 'vazioServicos', n > 0);
+
+      Array.prototype.slice.call(document.querySelectorAll('#gridServicos .contact-card')).forEach(function (el) {
+        el.addEventListener('click', function (ev) {
+          if (ev.target.closest('a')) return; /* os botões de ação não abrem o modal */
+          abrirModalServico(el.getAttribute('data-id'));
+        });
+      });
+    }
+
+    /* ================= EMERGÊNCIAS (CRUD) ================= */
+    var emergSeedTentado = false;
+
+    function renderEmergencias() {
+      var lista = Object.keys(emergencias).map(function (id) {
+        return Object.assign({ id: id }, emergencias[id]);
+      });
+      lista.sort(function (a, b) { return (a.ordem || 999) - (b.ordem || 999); });
+
+      var html = '';
+      var n = 0;
+      lista.forEach(function (e) {
+        if (!corresponde([e.nome, e.categoria])) return;
+        n++;
+        html += '<div class="contact-card card glass-light card-emerg editavel" data-id="' + escapeHtml(e.id) + '">';
+        html += '<div class="cc-top"><div><h3 class="cc-nome">' + escapeHtml(e.nome || '—') + '</h3>' +
+                (e.categoria ? '<p class="cc-cat">' + escapeHtml(e.categoria) + '</p>' : '') + '</div></div>';
+        html += linha('Telefone', e.telefone);
+        if (e.notas) html += '<div class="cc-notas">' + escapeHtml(e.notas) + '</div>';
+        html += acoesContacto(e.telefone, null, null);
+        html += '</div>';
+      });
+
+      document.getElementById('gridEmergencias').innerHTML = html;
+      document.getElementById('countEmergencias').textContent = n ? ' ' + n : '';
+      mostrarVazio('gridEmergencias', 'vazioEmergencias', n > 0);
+
+      Array.prototype.slice.call(document.querySelectorAll('#gridEmergencias .contact-card')).forEach(function (el) {
+        el.addEventListener('click', function (ev) {
+          if (ev.target.closest('a')) return;
+          abrirModalEmergencia(el.getAttribute('data-id'));
+        });
+      });
+    }
+
+    renderTudo = function () {
+      renderFornecedores();
+      renderEquipa();
+      renderServicos();
+      renderEmergencias();
+    };
+
+    /* ---------- Listeners ---------- */
+    suppliersRef.on('value', function (snapshot) {
+      fornecedores = snapshot.val() || {};
+      renderFornecedores();
+    }, function (erro) { console.error('suppliers:', erro); });
+
+    pessoasRef.on('value', function (snapshot) {
+      pessoas = snapshot.val() || {};
+      renderEquipa();
+    }, function (erro) { console.error('pessoas:', erro); });
+
+    servicosRef.on('value', function (snapshot) {
+      servicos = snapshot.val() || {};
+      renderServicos();
+    }, function (erro) { console.error('contactos/servicos:', erro); });
+
+    emergenciasRef.on('value', function (snapshot) {
+      var val = snapshot.val();
+      /* Seed APENAS com o nó completamente vazio, uma única tentativa por
+         sessão — se houver o que quer que seja, não se escreve nada. */
+      if (!val) {
+        if (!emergSeedTentado) {
+          emergSeedTentado = true;
+          emergenciasRef.push().set({
+            nome: 'Emergência Nacional',
+            categoria: 'Emergência',
+            telefone: '112',
+            ordem: 1
+          });
+        }
+        emergencias = {};
+        renderEmergencias();
+        return;
+      }
+      emergencias = val;
+      renderEmergencias();
+    }, function (erro) { console.error('contactos/emergencias:', erro); });
+
+    /* ---------- Modal Serviço ---------- */
+    var servicoOverlay = document.getElementById('servicoOverlay');
+    var servicoEmEdicao = null;
+
+    function abrirModalServico(id) {
+      servicoEmEdicao = id || null;
+      var s = id ? (servicos[id] || {}) : {};
+      document.getElementById('servicoModalTitulo').textContent = id ? 'Editar serviço' : 'Novo serviço';
+      document.getElementById('svNome').value = s.nome || '';
+      document.getElementById('svCategoria').value = s.categoria || '';
+      document.getElementById('svContacto').value = s.contacto || '';
+      document.getElementById('svTelefone').value = s.telefone || '';
+      document.getElementById('svWhatsapp').value = s.whatsapp || '';
+      document.getElementById('svEmail').value = s.email || '';
+      document.getElementById('svNotas').value = s.notas || '';
+      document.getElementById('svPrivado').checked = !!s.privado;
+      document.getElementById('servicoErro').classList.remove('on');
+      /* Arquivar: só em modo gestão e só num registo existente. */
+      document.getElementById('servicoArquivar').style.display =
+        (MODO_GESTAO && id) ? 'inline-block' : 'none';
+      servicoOverlay.classList.add('open');
+    }
+
+    function fecharModalServico() {
+      servicoOverlay.classList.remove('open');
+      servicoEmEdicao = null;
+    }
+
+    document.getElementById('btnNovoServico').addEventListener('click', function () { abrirModalServico(null); });
+    document.getElementById('servicoFechar').addEventListener('click', fecharModalServico);
+    document.getElementById('servicoCancelar').addEventListener('click', fecharModalServico);
+    servicoOverlay.addEventListener('click', function (ev) { if (ev.target === servicoOverlay) fecharModalServico(); });
+
+    document.getElementById('servicoGuardar').addEventListener('click', function () {
+      var dados = {
+        nome: document.getElementById('svNome').value.trim(),
+        categoria: document.getElementById('svCategoria').value.trim(),
+        contacto: document.getElementById('svContacto').value.trim(),
+        telefone: document.getElementById('svTelefone').value.trim(),
+        whatsapp: document.getElementById('svWhatsapp').value.trim(),
+        email: document.getElementById('svEmail').value.trim(),
+        notas: document.getElementById('svNotas').value.trim(),
+        privado: document.getElementById('svPrivado').checked
+      };
+      if (!dados.nome) {
+        document.getElementById('servicoErro').classList.add('on');
+        return;
+      }
+      if (servicoEmEdicao) {
+        /* Regra do OS: em registos existentes escreve-se campo a campo, cada
+           um com set() no seu path — nunca update() multi-chave. */
+        var ref = servicosRef.child(servicoEmEdicao);
+        Object.keys(dados).forEach(function (campo) {
+          ref.child(campo).set(dados[campo] === '' ? null : dados[campo]);
+        });
+      } else {
+        dados.criadoEm = Date.now();
+        Object.keys(dados).forEach(function (campo) {
+          if (dados[campo] === '') delete dados[campo];
+        });
+        servicosRef.push().set(dados);
+      }
+      fecharModalServico();
+    });
+
+    document.getElementById('servicoArquivar').addEventListener('click', function () {
+      if (!servicoEmEdicao || !MODO_GESTAO) return;
+      /* Nunca remover dados: arquivar é uma flag, o registo fica no Firebase. */
+      servicosRef.child(servicoEmEdicao).child('arquivado').set(true);
+      fecharModalServico();
+    });
+
+    /* ---------- Modal Emergência ---------- */
+    var emergOverlay = document.getElementById('emergOverlay');
+    var emergEmEdicao = null;
+
+    function abrirModalEmergencia(id) {
+      emergEmEdicao = id || null;
+      var e = id ? (emergencias[id] || {}) : {};
+      document.getElementById('emergModalTitulo').textContent = id ? 'Editar emergência' : 'Nova emergência';
+      document.getElementById('emNome').value = e.nome || '';
+      document.getElementById('emCategoria').value = e.categoria || '';
+      document.getElementById('emTelefone').value = e.telefone || '';
+      var proxOrdem = Object.keys(emergencias).reduce(function (m, k) {
+        return Math.max(m, emergencias[k].ordem || 0);
+      }, 0) + 1;
+      document.getElementById('emOrdem').value = (e.ordem != null) ? e.ordem : proxOrdem;
+      document.getElementById('emNotas').value = e.notas || '';
+      document.getElementById('emergErro').classList.remove('on');
+      emergOverlay.classList.add('open');
+    }
+
+    function fecharModalEmergencia() {
+      emergOverlay.classList.remove('open');
+      emergEmEdicao = null;
+    }
+
+    document.getElementById('btnNovaEmergencia').addEventListener('click', function () { abrirModalEmergencia(null); });
+    document.getElementById('emergFechar').addEventListener('click', fecharModalEmergencia);
+    document.getElementById('emergCancelar').addEventListener('click', fecharModalEmergencia);
+    emergOverlay.addEventListener('click', function (ev) { if (ev.target === emergOverlay) fecharModalEmergencia(); });
+
+    document.getElementById('emergGuardar').addEventListener('click', function () {
+      var ordem = parseInt(document.getElementById('emOrdem').value, 10);
+      var dados = {
+        nome: document.getElementById('emNome').value.trim(),
+        categoria: document.getElementById('emCategoria').value.trim(),
+        telefone: document.getElementById('emTelefone').value.trim(),
+        ordem: isNaN(ordem) ? 999 : ordem,
+        notas: document.getElementById('emNotas').value.trim()
+      };
+      if (!dados.nome || !dados.telefone) {
+        document.getElementById('emergErro').classList.add('on');
+        return;
+      }
+      if (emergEmEdicao) {
+        var ref = emergenciasRef.child(emergEmEdicao);
+        Object.keys(dados).forEach(function (campo) {
+          ref.child(campo).set(dados[campo] === '' ? null : dados[campo]);
+        });
+      } else {
+        Object.keys(dados).forEach(function (campo) {
+          if (dados[campo] === '') delete dados[campo];
+        });
+        emergenciasRef.push().set(dados);
+      }
+      fecharModalEmergencia();
+    });
+
+  }); // fim de autenticarEContinuar
+});
+</script>
+</body>
+</html>

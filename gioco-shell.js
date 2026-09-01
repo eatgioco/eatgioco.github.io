@@ -15,7 +15,8 @@
 (function () {
   'use strict';
 
-  /* ---------- Sprite: filtro liquidDistort + 24 símbolos ----------
+  /* ---------- Sprite: filtro liquidDistort + 25 símbolos ----------
+     (O i-phone entrou em Set/2026 para os Contactos, traço Feather.)
      (Eram 23 — o comentário antigo dizia 22, contagem errada. O
      clipboard-check foi acrescentado em Set/2026 para as Contagens, no
      mesmo traço Feather dos restantes.)
@@ -42,6 +43,7 @@
     '<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></symbol>',
     '<symbol id="i-panel-left" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></symbol>',
     '<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>',
+    '<symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>',
     '<symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>',
     '<symbol id="i-receipt" viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></symbol>',
     '<symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 7V5a2 2 0 0 1 2-2h2"/><path d="M16 3h2a2 2 0 0 1 2 2v2"/><path d="M20 17v2a2 2 0 0 1-2 2h-2"/><path d="M8 21H6a2 2 0 0 1-2-2v-2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="8" y1="16" x2="14" y2="16"/></symbol>',
@@ -63,7 +65,7 @@
   var GIOCO_ICON_NAMES = [
     'bar-chart-2', 'bell', 'chef-hat', 'chevron-down', 'chevron-right',
     'clipboard-check', 'layout-dashboard', 'log-out', 'message-square', 'moon',
-    'more-vertical', 'menu', 'panel-left', 'pencil', 'plus', 'receipt',
+    'more-vertical', 'menu', 'panel-left', 'pencil', 'phone', 'plus', 'receipt',
     'scan', 'search', 'settings', 'shopping-cart', 'store', 'sun', 'trash-2', 'trending-down',
     'trending-up', 'users'
   ];
@@ -235,6 +237,7 @@
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
+      { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
          no menu, mas não navega para lado nenhum. Com os Resultados a lista
          passou a 10 entradas: é o link morto que fica na 10ª, a única sem
