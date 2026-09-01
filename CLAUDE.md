@@ -202,6 +202,53 @@ clássico deste modelo de dados.
 - Sem build step, sem package.json
 - Após editar, fazer `git add`, `git commit`, `git push` directamente
 
+### Definição de página shell completa
+
+A fonte de verdade é o `estilo.html` + `gioco-shell.css`/`.js`. Uma página só está
+"migrada" quando cumpre TUDO isto (o `scripts/verifica-shell.sh` verifica a parte
+mecânica e é obrigatório antes de qualquer push que toque em páginas):
+
+1. **Fontes.** Antonio 700 SÓ no h1/hero (`.greet-row h1`) e na marca da sidebar.
+   Inter em todo o resto — nav, botões, tabelas, labels e NÚMEROS (`.num` =
+   Inter + `tabular-nums`). **ZERO Space Mono** (decisão do Manel, 31 Ago/2026):
+   nem `font-family`, nem no URL do Google Fonts. Nada de imports de fontes
+   antigas. (O parágrafo antigo "Space Mono só se a página tiver números
+   monoespaçados" está revogado.)
+2. **Tokens.** Só os do shell (`--dough`, `--ink`, `--red`, `--white`…). Nenhum
+   hex da família antiga: `#F5F2EC`, `#E2DDD1`, `#E8E2D4` — nem como fallback
+   em JS (`tok('--line', '#E2DDD1')` conta como violação).
+3. **Estrutura.** `.shell` > `.sidebar glass collapsed` (com `.glass-bend`,
+   `.brand` com logo real, `<nav id="giocoNav">` + `giocoNav('pagina.html')`
+   síncrono, `.sidebar-foot`) + `.main` > `.greet-row` (pin btn, h1 com `<b>`,
+   toggle de tema) e conteúdo dentro de `.page`. **Nada do header vermelho
+   antigo `● GIOCO®` nem do botão `🏠 Home`.**
+4. **Cartões.** `.card`/`.panel`/`.kpi` sempre com `.glass-light` (ou `.glass`)
+   na mesma tag; o hover levanta e ganha a **sombra dura vermelha**
+   `4px 4px 0 var(--red)` — vem do shell, nunca duplicada por página.
+5. **Sidebar.** Via nav partilhada (`giocoNav`), entrada ativa correta,
+   allow-list (ver "Regra da navegação").
+6. **Mobile.** Páginas usadas ao telemóvel: viewport `device-width` + opt-in
+   `shell-mobile` (body class + `#navOverlay` + `giocoToggleMenu()` no pin).
+   As restantes: `width=1200`, sem media queries próprias (só `@media print`).
+7. **Tema.** Claro/escuro funcional via toggle do shell; qualquer cor local tem
+   par `[data-theme="dark"]` quando o token não resolve sozinho.
+8. **Ícones.** Sprite local do `gioco-shell.js` (`<use href="#i-…">`), zero CDN.
+   Zero emoji pictográfico (📋💶🏦…) como ícone de UI — exceções: os emblemas
+   de categoria dentro de `.cat-chip .circle` (conteúdo, não ícone) e o export
+   PNG de turnos da equipa.html (artwork de marca, não UI). Glifos geométricos
+   de texto (✓ ✕ ▸ ▾ ★ ⚠) são tolerados como affordance textual.
+9. **Auth.** Bloco padrão `autenticarEContinuar` (ver Restrição 5) em todas as
+   páginas com Firebase.
+10. **Home.** Toda a página pública tem cartão no `index.html`; páginas privadas
+    nunca são linkadas de páginas públicas.
+11. **Cascata.** O `<style>` local vem depois do `<link>`: nunca criar classe
+    local com nome de classe do shell.
+
+Fora do âmbito (lista de exceções do script): `abanca-callback.html`,
+`privacidade.html`, `termos.html` (páginas de suporte, design próprio),
+`_referencia-fase0.html` (arquivo histórico) e `estilo.html` (montra — nav à
+mão de propósito).
+
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
 Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
@@ -209,8 +256,8 @@ Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
 `abanca-callback`, `privacidade`, `termos`).
 
 Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
-(`Antonio` + `Inter`, mais `Space Mono` só se a página tiver números
-monoespaçados) e `<link rel="stylesheet" href="gioco-shell.css">`. A seguir a
+(`Antonio` + `Inter` — nunca Space Mono, ver checklist acima) e
+`<link rel="stylesheet" href="gioco-shell.css">`. A seguir a
 `<body>`, `<script src="gioco-shell.js"></script>` — antes de qualquer markup
 com `<use href="#i-...">`, para o sprite já estar no DOM.
 
