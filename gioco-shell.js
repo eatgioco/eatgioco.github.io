@@ -231,9 +231,12 @@
       { href: 'vendas.html',     icone: 'bar-chart-2',      label: 'Vendas' },
       { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
+      { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
-         no menu, mas não navega para lado nenhum. */
+         no menu, mas não navega para lado nenhum. Com os Resultados a lista
+         passou a 10 entradas: é o link morto que fica na 10ª, a única sem
+         animação escalonada (as :nth-child do shell param na 9ª). */
       { href: '#',               icone: 'settings',         label: 'Definições' }
     ],
     privada: [

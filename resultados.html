@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO P&L">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Resultados</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  /* ======================================================================
+     resultados.html — P&L mensal (v1). Página 100% de leitura: nenhuma
+     escrita no Firebase em circunstância alguma.
+     Layout, sidebar, vidro, tema, .card, .kpi e tabelas vêm do shell.
+     ====================================================================== */
+
+  body{
+    -webkit-font-smoothing:antialiased;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-size:12px;
+    font-weight:600;
+    color:var(--red);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+  }
+
+  .num{ text-align:right; white-space:nowrap; }
+
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ max-width:520px; padding:26px 28px; }
+  .auth-box h2{
+    margin:0 0 8px; font-family:'Antonio', sans-serif;
+    font-size:20px; color:var(--red); letter-spacing:.02em;
+  }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  .card{ margin-top:24px; }
+  .card > *, .kpi > *{ position:relative; z-index:1; }
+  .card-title{
+    margin:0 0 10px; font-size:10.5px; font-weight:600;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  }
+  .card-note{ margin:0 0 14px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+
+  /* ---------- Seletor de mês ---------- */
+  .mes-row{
+    display:flex; align-items:center; gap:12px; margin-top:22px;
+  }
+  .mes-btn{
+    width:34px; height:34px; border-radius:10px;
+    border:1px solid var(--line); background:var(--white); color:var(--ink);
+    font-size:15px; cursor:pointer; line-height:1;
+  }
+  .mes-btn:hover{ border-color:var(--red); color:var(--red); }
+  .mes-btn:disabled{ opacity:.35; cursor:default; }
+  .mes-label{
+    font-family:'Antonio', sans-serif; font-size:22px; color:var(--ink);
+    letter-spacing:.03em; min-width:190px; text-align:center;
+    text-transform:capitalize;
+  }
+  .mes-estado{ font-size:12.5px; color:var(--muted); }
+
+  /* ---------- KPIs ---------- */
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:22px; }
+  .kpi-titulo{
+    font-size:10.5px; font-weight:600; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 6px;
+  }
+  .kpi-valor{
+    font-family:'Antonio', sans-serif; font-size:26px; color:var(--ink);
+    letter-spacing:.02em;
+  }
+  .kpi-valor.pos{ color:var(--green); }
+  .kpi-valor.neg{ color:var(--red-ink); }
+  .kpi-sub{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+
+  /* ---------- Tabela do P&L ---------- */
+  .pnl-table{ width:100%; border-collapse:collapse; }
+  .pnl-table td, .pnl-table th{
+    padding:10px 10px; border-bottom:1px solid var(--line);
+    font-size:13.5px; vertical-align:top;
+  }
+  .pnl-table tr:last-child td{ border-bottom:none; }
+  .pnl-rubrica{ font-weight:600; }
+  .pnl-total td{
+    font-weight:700; border-top:2px solid var(--ink); border-bottom:none;
+  }
+  .pnl-sub{ font-size:12px; color:var(--muted); font-weight:400; margin-top:2px; }
+
+  .selo-estimativa{
+    display:inline-block; margin-left:8px; padding:2px 8px; border-radius:20px;
+    background:var(--mustard); color:#141414;
+    font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    vertical-align:1px;
+  }
+  .selo-pendente{
+    display:inline-block; margin-left:8px; padding:2px 8px; border-radius:20px;
+    background:var(--blush); color:#141414;
+    font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    vertical-align:1px;
+  }
+
+  /* ---------- Drill-downs ---------- */
+  details.drill{ margin-top:6px; }
+  details.drill > summary{
+    cursor:pointer; font-size:12px; color:var(--red-ink); font-weight:600;
+    list-style:none; user-select:none;
+  }
+  details.drill > summary::-webkit-details-marker{ display:none; }
+  details.drill > summary::before{ content:'▸ '; }
+  details.drill[open] > summary::before{ content:'▾ '; }
+  .drill-table{ width:100%; border-collapse:collapse; margin-top:8px; }
+  .drill-table td, .drill-table th{
+    padding:6px 8px; font-size:12.5px; border-bottom:1px solid var(--line);
+  }
+  .drill-table th{
+    text-align:left; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.06em; color:var(--muted); font-weight:600;
+  }
+  .drill-table td.num, .drill-table th.num{ text-align:right; }
+  .drill-table tr:last-child td{ border-bottom:none; }
+
+  .vazio{
+    padding:26px 10px; text-align:center; color:var(--muted); font-size:13.5px;
+  }
+
+  /* ---------- Reconciliação ---------- */
+  .rec-linhas{ display:flex; flex-wrap:wrap; gap:24px; margin:6px 0 4px; }
+  .rec-item .kpi-titulo{ margin-bottom:2px; }
+  .rec-item .kpi-valor{ font-size:21px; }
+  .rec-nc .kpi-valor{ color:var(--red-ink); }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+<!-- Regras partilhadas de compromissos (TSU patronal, pessoal). A rubrica
+     "Pessoal com recibo" NÃO calcula nada sozinha: usa exclusivamente esta
+     lib — se ela faltar, a rubrica fica pendente, nunca reimplementada. -->
+<script src="gioco-compromissos.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('resultados.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-up"/></svg>GIOCO · <b>Resultados</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Demonstração de resultados mensal · só leitura</p>
+
+      <!-- Sem sessão anónima a página não lê nada. Padrão único do OS. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <div class="mes-row">
+        <button type="button" class="mes-btn" id="mesAnterior" title="Mês anterior">‹</button>
+        <div class="mes-label" id="mesLabel">—</div>
+        <button type="button" class="mes-btn" id="mesSeguinte" title="Mês seguinte">›</button>
+        <span class="mes-estado" id="mesEstado"></span>
+      </div>
+
+      <div class="kpis" id="kpis" style="display:none;">
+        <div class="kpi glass-light">
+          <p class="kpi-titulo">Receita líquida</p>
+          <div class="kpi-valor" id="kpiReceita">—</div>
+          <div class="kpi-sub" id="kpiReceitaSub"></div>
+        </div>
+        <div class="kpi glass-light">
+          <p class="kpi-titulo">Custos</p>
+          <div class="kpi-valor" id="kpiCustos">—</div>
+          <div class="kpi-sub" id="kpiCustosSub"></div>
+        </div>
+        <div class="kpi glass-light">
+          <p class="kpi-titulo">Resultado</p>
+          <div class="kpi-valor" id="kpiResultado">—</div>
+          <div class="kpi-sub" id="kpiResultadoSub"></div>
+        </div>
+        <div class="kpi glass-light">
+          <p class="kpi-titulo">Margem</p>
+          <div class="kpi-valor" id="kpiMargem">—</div>
+          <div class="kpi-sub">resultado / receita líquida</div>
+        </div>
+      </div>
+
+      <div class="card glass-light">
+        <p class="card-title">Demonstração de resultados</p>
+        <p class="card-note">
+          Cada rubrica vem da sua fonte de verdade: vendas (líquido), pedidos de
+          pagamento concluídos + saídas bancárias de fornecedores, recibos + TSU
+          patronal, caixa, e compromissos fixos. Impostos ficam fora do P&amp;L v1
+          — aparecem só na reconciliação, em baixo.
+        </p>
+        <div id="pnlCorpo"><div class="vazio">A carregar…</div></div>
+      </div>
+
+      <div class="card glass-light">
+        <p class="card-title">Reconciliação bancária do mês</p>
+        <p class="card-note">
+          Saídas do ABANCA + Revolut (sem transferências internas) confrontadas,
+          movimento a movimento, com as rubricas do P&amp;L. O que não bate certo
+          fica em "Não classificado" — sempre visível.
+        </p>
+        <div id="recCorpo"><div class="vazio">A carregar…</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* =========================================================
+     Firebase — padrão único do OS (não alterar).
+     ========================================================= */
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco.
+  // Padrão único do OS: se mudar aqui, muda em todas.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  /* =========================================================
+     Utilitários
+     ========================================================= */
+  function escapeHtml(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function formatEuro(n){
+    if (n == null || isNaN(n)) return '—';
+    return n.toLocaleString('pt-PT', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  // Comparar em cêntimos inteiros — "valor igual" tem de ser mesmo igual.
+  function centimos(v){
+    var n = parseFloat(v);
+    return isNaN(n) ? null : Math.round(Math.abs(n) * 100);
+  }
+  function normalizar(s){
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  }
+  var MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho',
+                  'agosto','setembro','outubro','novembro','dezembro'];
+  function nomeMes(mes){ // 'YYYY-MM' -> 'agosto 2026'
+    var p = mes.split('-');
+    return MESES_PT[parseInt(p[1],10)-1] + ' ' + p[0];
+  }
+  function mesVizinho(mes, delta){
+    var p = mes.split('-');
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1 + delta, 1);
+    return d.getFullYear() + '-' + pad2(d.getMonth()+1);
+  }
+  function mesCorrente(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth()+1);
+  }
+
+  /* =========================================================
+     Arranque
+     ========================================================= */
+  autenticarEContinuar(function(){
+    var db = firebase.database();
+
+    // Nós que não dependem do mês: lidos UMA vez (página é só leitura,
+    // e o P&L não precisa de live updates — cada mudança de mês recalcula).
+    var base = null;      // { paymentRequests, recibos, compromissosFixos,
+                          //   caixaMovimentos, suppliers, contas:{abanca,revolut} }
+    var mesAtivo = null;
+
+    Promise.all([
+      db.ref('paymentRequests').once('value'),
+      db.ref('recibos').once('value'),
+      db.ref('compromissosFixos').once('value'),
+      db.ref('caixaMovimentos').once('value'),
+      db.ref('suppliers').once('value'),
+      db.ref('contasBancarias/abanca/movimentos').once('value'),
+      db.ref('contasBancarias/revolut/movimentos').once('value'),
+      db.ref('vendas').once('value')
+    ]).then(function(snaps){
+      base = {
+        paymentRequests: snaps[0].val() || {},
+        recibos: snaps[1].val() || {},
+        compromissosFixos: snaps[2].val() || {},
+        caixaMovimentos: snaps[3].val() || {},
+        suppliers: snaps[4].val() || {},
+        contas: { abanca: snaps[5].val() || {}, revolut: snaps[6].val() || {} },
+        vendas: snaps[7].val() || {}
+      };
+
+      // Mês por omissão: o corrente se já tiver vendas; senão o último mês
+      // com resumo de vendas; senão o corrente na mesma (estado vazio claro).
+      var corrente = mesCorrente();
+      var comVendas = Object.keys(base.vendas)
+        .filter(function(k){ return /^\d{4}-\d{2}$/.test(k) && base.vendas[k] && base.vendas[k].resumo; })
+        .sort();
+      mesAtivo = (base.vendas[corrente] && base.vendas[corrente].resumo)
+        ? corrente
+        : (comVendas.length ? comVendas[comVendas.length-1] : corrente);
+
+      ligarSeletor();
+      renderMes();
+    }).catch(function(err){
+      console.error('Falha a ler do Firebase:', err);
+      document.getElementById('pnlCorpo').innerHTML =
+        '<div class="vazio">Não foi possível ler do Firebase: ' +
+        escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
+      document.getElementById('recCorpo').innerHTML =
+        '<div class="vazio">Sem dados.</div>';
+    });
+
+    function ligarSeletor(){
+      document.getElementById('mesAnterior').addEventListener('click', function(){
+        mesAtivo = mesVizinho(mesAtivo, -1); renderMes();
+      });
+      document.getElementById('mesSeguinte').addEventListener('click', function(){
+        mesAtivo = mesVizinho(mesAtivo, +1); renderMes();
+      });
+    }
+
+    /* =========================================================
+       Cálculo das rubricas do mês
+       ========================================================= */
+
+    // Linhas de pedidos de pagamento concluídas no mês (concluidoEm cai no
+    // mês civil local). É a fonte de verdade da auditoria de 31 Ago.
+    function linhasPayReqDoMes(mes){
+      var out = [];
+      Object.keys(base.paymentRequests).forEach(function(id){
+        var req = base.paymentRequests[id];
+        var linhas = (req && req.lines) || [];
+        linhas.forEach(function(l, i){
+          if (!l || !l.concluidoEm) return;
+          var d = new Date(l.concluidoEm);
+          if (isNaN(d.getTime())) return;
+          var m = d.getFullYear() + '-' + pad2(d.getMonth()+1);
+          if (m !== mes) return;
+          var v = parseFloat(l.montante);
+          if (isNaN(v)) return;
+          out.push({ id: id + '/' + i, fornecedor: l.fornecedor || '—',
+                     valor: v, data: d, referencia: l.referencia || '' });
+        });
+      });
+      return out;
+    }
+
+    // Prestadores sem recibo: as linhas destes nomes saem do CMV e entram
+    // na rubrica "Pessoal sem recibo" (decisão da auditoria: Subash,
+    // prestadores, Mattia são pessoal, não compras).
+    var RE_PRESTADOR = /mattia|subash/i;
+
+    // Movimentos bancários de saída do mês (DBIT), sem transferências
+    // internas (ABANCA→Revolut aparece como "INTERNA" dos dois lados; os
+    // depósitos de caixa são créditos e nunca entram aqui).
+    function saidasBancariasDoMes(mes){
+      var out = [];
+      ['abanca','revolut'].forEach(function(slug){
+        var movs = base.contas[slug];
+        Object.keys(movs).forEach(function(ref){
+          var m = movs[ref];
+          if (!m || m.credit_debit_indicator !== 'DBIT') return;
+          if (!m.booking_date || m.booking_date.slice(0,7) !== mes) return;
+          var v = parseFloat(m.amount);
+          if (isNaN(v)) return;
+          var desc = (m.remittance_information || m.creditor_name || '—');
+          var interna = /INTERNA/i.test(m.remittance_information || '');
+          out.push({ conta: slug, ref: ref, data: m.booking_date,
+                     desc: desc, extra: m.creditor_name || '',
+                     valor: Math.abs(v), interna: interna });
+        });
+      });
+      out.sort(function(a,b){ return a.data < b.data ? -1 : (a.data > b.data ? 1 : 0); });
+      return out;
+    }
+
+    // Recibos do mês: [{pessoaId, nome, sujeito, naoSujeito, conta, cartao}]
+    function recibosDoMes(mes){
+      var out = [];
+      Object.keys(base.recibos).forEach(function(pid){
+        var r = base.recibos[pid] && base.recibos[pid][mes];
+        if (!r || !r.totais) return;
+        out.push({
+          pessoaId: pid,
+          nome: (r.pessoa && r.pessoa.nome) || pid,
+          sujeito: parseFloat(r.totais.sujeito) || 0,
+          naoSujeito: parseFloat(r.totais.naoSujeito) || 0,
+          conta: r.pagamento ? parseFloat(r.pagamento.conta) || 0 : 0,
+          cartao: r.pagamento ? parseFloat(r.pagamento.cartao) || 0 : 0
+        });
+      });
+      return out;
+    }
+
+    // Compromissos fixos que entram na rubrica "Fixos": ativos, sem pessoaId,
+    // sem parteRecibo, e que não sejam TSU. Os "Salário — X" / "Cartão
+    // Refeição — X" do modelo antigo (sem pessoaId) também ficam de fora:
+    // são pessoal, e contá-los aqui duplicava as rubricas de pessoal.
+    function fixosDoMes(mes){
+      var out = [];
+      Object.keys(base.compromissosFixos).forEach(function(id){
+        var c = base.compromissosFixos[id];
+        if (!c || c.ativo === false) return;
+        if (c.pessoaId || c.parteRecibo) return;
+        if (c.derivaDe === 'tsu' || id === 'tsu-001' || /^tsu$/i.test(c.nome || '')) return;
+        if (/^(sal[aá]rio|cart[aã]o refei[cç][aã]o)/i.test(c.nome || '')) return;
+        var valor;
+        if (c.valorDiario != null && c.valorDiario !== '') {
+          valor = diasUteis(mes) * (parseFloat(c.valorDiario) || 0);
+        } else {
+          valor = parseFloat(c.valor) || 0;
+        }
+        if (!valor) return; // 0 € não é custo do mês
+        out.push({ id: id, nome: c.nome || id, valor: valor });
+      });
+      out.sort(function(a,b){ return b.valor - a.valor; });
+      return out;
+    }
+    function diasUteis(mes){
+      var p = mes.split('-'), ano = parseInt(p[0],10), m = parseInt(p[1],10);
+      var n = 0, ultimo = new Date(ano, m, 0).getDate();
+      for (var d = 1; d <= ultimo; d++){
+        var dia = new Date(ano, m-1, d).getDay();
+        if (dia !== 0 && dia !== 6) n++;
+      }
+      return n;
+    }
+
+    // Pessoal sem recibo (ESTIMATIVA): saídas de caixa que são pagamentos a
+    // pessoas (Subash, adiantamentos, prestadores) + linhas de pedidos de
+    // pagamento a prestadores (Mattia). Nunca inclui depósitos bancários.
+    var RE_CAIXA_PESSOAL = /subash|mattia|adiantamento|prestador/i;
+    function pessoalSemReciboDoMes(mes, payReqLinhas){
+      var itens = [];
+      Object.keys(base.caixaMovimentos).forEach(function(id){
+        var m = base.caixaMovimentos[id];
+        if (!m || m.tipo !== 'saida') return;
+        if (!m.dataHora || m.dataHora.slice(0,7) !== mes) return;
+        if (!RE_CAIXA_PESSOAL.test(m.motivo || '')) return;
+        itens.push({ origem: 'caixa', desc: m.motivo, data: m.dataHora.slice(0,10),
+                     valor: parseFloat(m.valor) || 0 });
+      });
+      payReqLinhas.forEach(function(l){
+        if (!RE_PRESTADOR.test(l.fornecedor)) return;
+        itens.push({ origem: 'pagamentos', desc: l.fornecedor +
+                     (l.referencia ? ' · ' + l.referencia : ''),
+                     data: l.data.toISOString().slice(0,10), valor: l.valor });
+      });
+      return itens;
+    }
+
+    // CMV: linhas de pedidos de pagamento concluídas no mês (sem os
+    // prestadores) + saídas bancárias do mês categorizadas por fornecedor
+    // que não correspondam a nenhuma dessas linhas (mesmo valor exato, o
+    // mesmo movimento nunca serve duas linhas). faturasProcessadas NÃO
+    // entra no total — é detalhe por ingrediente, não fonte de total.
+    function nomesFornecedores(){
+      var nomes = [];
+      Object.keys(base.suppliers).forEach(function(id){
+        var s = base.suppliers[id];
+        var n = s && (s.nome || s.name);
+        if (n) nomes.push({ id: id, nome: n, norm: normalizar(n) });
+      });
+      return nomes;
+    }
+    function movimentoParecerFornecedor(mov, fornecedores){
+      var alvo = normalizar(mov.desc + ' ' + mov.extra);
+      for (var i = 0; i < fornecedores.length; i++){
+        var f = fornecedores[i];
+        // primeiro token "forte" do nome do fornecedor (≥5 letras) chega
+        // para apanhar "Recheio-Alfragide" → RECHEIO, "As Marias" → inteiro.
+        if (alvo.indexOf(f.norm) !== -1) return f.nome;
+        var tok = f.norm.split(/[^a-z0-9]+/).filter(function(t){ return t.length >= 5; });
+        for (var j = 0; j < tok.length; j++){
+          if (alvo.indexOf(tok[j]) !== -1) return f.nome;
+        }
+      }
+      return null;
+    }
+
+    /* =========================================================
+       Reconciliação: classifica cada saída bancária numa rubrica.
+       Cada alvo é consumido uma única vez (mapa de cêntimos → fila).
+       ========================================================= */
+    var RE_IMPOSTO = /PAG\.TSU|PAG\.DUC|IMP\.SELO|PAGAMENTO POR CONTA|\bIVA\b|\bIRC\b|\bIUC\b|AUTORIDADE TRIBUT/i;
+    var RE_PESSOAL_BANCO = /^SAL[ .]|SAL[AÁ]RIO|CART[AO]ES? REFEICAO|CART[AÃ]O REFEI[CÇ][AÃ]O/i;
+
+    function filaPorCentimos(itens, valorDe){
+      var mapa = {};
+      itens.forEach(function(it){
+        var c = centimos(valorDe(it));
+        if (c == null) return;
+        (mapa[c] = mapa[c] || []).push(it);
+      });
+      return {
+        consumir: function(valor){
+          var c = centimos(valor);
+          if (c == null || !mapa[c] || !mapa[c].length) return null;
+          return mapa[c].shift();
+        }
+      };
+    }
+
+    function reconciliar(mes, dados){
+      var movs = saidasBancariasDoMes(mes);
+      var fornecedores = nomesFornecedores();
+
+      var filaCmv = filaPorCentimos(dados.cmvPayReq, function(l){ return l.valor; });
+      var filaPrest = filaPorCentimos(dados.pessoalSemRecibo.filter(function(i){
+        return i.origem === 'pagamentos'; }), function(i){ return i.valor; });
+      var alvosRecibo = [];
+      dados.recibos.forEach(function(r){
+        if (r.conta) alvosRecibo.push({ valor: r.conta, nome: r.nome + ' (conta)' });
+        if (r.cartao) alvosRecibo.push({ valor: r.cartao, nome: r.nome + ' (cartão)' });
+      });
+      var filaRecibo = filaPorCentimos(alvosRecibo, function(a){ return a.valor; });
+      var filaFixos = filaPorCentimos(dados.fixos, function(f){ return f.valor; });
+
+      // Palavras-chave dos fixos (RENDA, NOS, EPAL…) para os débitos diretos
+      // cujo valor real difere do valor orçamentado do compromisso.
+      var fixosNorm = dados.fixos.map(function(f){
+        return { nome: f.nome, toks: normalizar(f.nome).split(/[^a-z0-9]+/)
+                 .filter(function(t){ return t.length >= 3 && t !== 'social' && t !== 'media'; }) };
+      });
+
+      var res = { total: 0, internas: 0, impostos: [], porRubrica: {
+                    cmv: 0, pessoalRecibo: 0, pessoalSemRecibo: 0, fixos: 0 },
+                  naoClassificado: [], explicado: 0 };
+
+      movs.forEach(function(mov){
+        if (mov.interna){ res.internas += mov.valor; return; }
+        res.total += mov.valor;
+
+        if (RE_IMPOSTO.test(mov.desc)){ res.impostos.push(mov); return; }
+
+        if (filaCmv.consumir(mov.valor)){ res.porRubrica.cmv += mov.valor; res.explicado += mov.valor; return; }
+        if (filaPrest.consumir(mov.valor) || /MATTIA|SUBASH/i.test(mov.desc)){
+          res.porRubrica.pessoalSemRecibo += mov.valor; res.explicado += mov.valor; return;
+        }
+        if (filaRecibo.consumir(mov.valor) || RE_PESSOAL_BANCO.test(mov.desc)){
+          res.porRubrica.pessoalRecibo += mov.valor; res.explicado += mov.valor; return;
+        }
+        if (filaFixos.consumir(mov.valor)){ res.porRubrica.fixos += mov.valor; res.explicado += mov.valor; return; }
+        var descNorm = normalizar(mov.desc + ' ' + mov.extra);
+        var fixoNome = null;
+        fixosNorm.forEach(function(f){
+          if (fixoNome) return;
+          f.toks.forEach(function(t){ if (descNorm.indexOf(t) !== -1) fixoNome = f.nome; });
+        });
+        // "IBELECTRA" é a Eletricidade — o débito direto não traz o nome do compromisso.
+        if (!fixoNome && /IBELECTRA/i.test(mov.desc)) fixoNome = 'Eletricidade';
+        if (fixoNome){ res.porRubrica.fixos += mov.valor; res.explicado += mov.valor; return; }
+
+        if (movimentoParecerFornecedor(mov, fornecedores)){
+          res.porRubrica.cmv += mov.valor; res.explicado += mov.valor; return;
+        }
+
+        res.naoClassificado.push(mov);
+      });
+
+      res.naoClassificadoTotal = res.naoClassificado.reduce(function(s,m){ return s + m.valor; }, 0);
+      res.impostosTotal = res.impostos.reduce(function(s,m){ return s + m.valor; }, 0);
+      return res;
+    }
+
+    /* =========================================================
+       Saídas bancárias extra para o CMV (fornecedor pago por cartão/
+       transferência sem pedido de pagamento).
+       ========================================================= */
+    function cmvBancario(mes, cmvPayReq, pessoalSemRecibo){
+      var fornecedores = nomesFornecedores();
+      var filaCmv = filaPorCentimos(cmvPayReq, function(l){ return l.valor; });
+      var filaPrest = filaPorCentimos(pessoalSemRecibo.filter(function(i){
+        return i.origem === 'pagamentos'; }), function(i){ return i.valor; });
+      var extra = [];
+      saidasBancariasDoMes(mes).forEach(function(mov){
+        if (mov.interna || RE_IMPOSTO.test(mov.desc)) return;
+        if (filaCmv.consumir(mov.valor)) return;       // já contado via pedido
+        if (filaPrest.consumir(mov.valor)) return;     // é pessoal, não CMV
+        if (/MATTIA|SUBASH/i.test(mov.desc)) return;
+        var nome = movimentoParecerFornecedor(mov, fornecedores);
+        if (!nome) return;
+        extra.push({ desc: mov.desc, fornecedor: nome, data: mov.data,
+                     conta: mov.conta, valor: mov.valor });
+      });
+      return extra;
+    }
+
+    /* =========================================================
+       Pessoal com recibo — EXCLUSIVAMENTE via gioco-compromissos.js.
+       A TSU patronal (23,75% sobre a soma dos sujeitos do mês, arredondada
+       uma única vez no agregado) vem da lib partilhada; esta página nunca
+       a recalcula por conta própria.
+       ========================================================= */
+    var CE = (typeof giocoCompromissosEngine === 'function')
+      ? giocoCompromissosEngine({
+          getCompromissos: function(){ return base.compromissosFixos; },
+          getRecibos:      function(){ return base.recibos; },
+          getPessoas:      function(){ return {}; }, // nomeDaPessoa cai no r.pessoa.nome
+          formatEuro: formatEuro,
+          parseMontante: function(v){ var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; },
+          MESES_PT: MESES_PT
+        })
+      : null;
+
+    function calcularPessoalComRecibo(recibosMes, mes){
+      if (!CE || !recibosMes.length) return null;
+      // Vista de competência do P&L: a TSU patronal do mês incide sobre os
+      // recibos DESSE mês (na tesouraria paga-se no mês seguinte, mas o
+      // custo pertence a este). Base agregada e arredondamento — uma única
+      // vez, no agregado — vêm do motor partilhado.
+      var p = mes.split('-');
+      var agg = CE.baseSSDoMes(parseInt(p[0],10), parseInt(p[1],10));
+      if (!agg) return null;
+      var tsu = CE.arredCentimos(agg.base * CE.TSU_TAXA_PATRONAL);
+      var bruto = recibosMes.reduce(function(s,r){ return s + r.sujeito + r.naoSujeito; }, 0);
+      return { tsu: tsu, bruto: bruto, total: bruto + tsu };
+    }
+
+    /* =========================================================
+       Render
+       ========================================================= */
+    function renderMes(){
+      var mes = mesAtivo;
+      document.getElementById('mesLabel').textContent = nomeMes(mes);
+      document.getElementById('mesSeguinte').disabled = (mes >= mesCorrente());
+
+      var resumo = base.vendas[mes] && base.vendas[mes].resumo;
+      var receita = resumo ? parseFloat(resumo.liquido) : null;
+
+      var payReq = linhasPayReqDoMes(mes);
+      var cmvPayReq = payReq.filter(function(l){ return !RE_PRESTADOR.test(l.fornecedor); });
+      var recibos = recibosDoMes(mes);
+      var fixos = fixosDoMes(mes);
+      var pessoalSemRecibo = pessoalSemReciboDoMes(mes, payReq);
+      var cmvExtra = cmvBancario(mes, cmvPayReq, pessoalSemRecibo);
+      var pessoalRecibo = calcularPessoalComRecibo(recibos, mes);
+
+      var temAlgumDado = !!resumo || payReq.length || recibos.length ||
+        pessoalSemRecibo.length || saidasBancariasDoMes(mes).length;
+
+      document.getElementById('mesEstado').textContent = temAlgumDado
+        ? (resumo ? (resumo.dias || '') && (resumo.dias + ' dias de vendas importados') : 'sem vendas importadas')
+        : 'sem dados neste mês';
+
+      var totCmvPayReq = cmvPayReq.reduce(function(s,l){ return s + l.valor; }, 0);
+      var totCmvExtra = cmvExtra.reduce(function(s,l){ return s + l.valor; }, 0);
+      var totCmv = totCmvPayReq + totCmvExtra;
+      var totPsr = pessoalSemRecibo.reduce(function(s,i){ return s + i.valor; }, 0);
+      var totFixos = fixos.reduce(function(s,f){ return s + f.valor; }, 0);
+      var totPessoalRecibo = pessoalRecibo ? pessoalRecibo.total : 0;
+
+      // Com recibos no mês mas sem a lib partilhada, o total de pessoal com
+      // recibo é incalculável — custos e resultado ficam pendentes em vez de
+      // fingir um lucro sem a maior rubrica de pessoal.
+      var pessoalPendente = recibos.length > 0 && !pessoalRecibo;
+      var custos = (pessoalPendente || !temAlgumDado)
+        ? null : totCmv + totPessoalRecibo + totPsr + totFixos;
+      var resultado = (receita != null && custos != null) ? receita - custos : null;
+
+      renderKpis(receita, custos, resultado, resumo, pessoalRecibo);
+      renderPnl({ mes: mes, receita: receita, resumo: resumo,
+                  cmvPayReq: cmvPayReq, cmvExtra: cmvExtra, totCmv: totCmv,
+                  recibos: recibos, pessoalRecibo: pessoalRecibo,
+                  pessoalSemRecibo: pessoalSemRecibo, totPsr: totPsr,
+                  fixos: fixos, totFixos: totFixos,
+                  custos: custos, resultado: resultado, temAlgumDado: temAlgumDado });
+
+      var rec = reconciliar(mes, { cmvPayReq: cmvPayReq, recibos: recibos,
+                                   fixos: fixos, pessoalSemRecibo: pessoalSemRecibo });
+      renderReconciliacao(rec);
+    }
+
+    function renderKpis(receita, custos, resultado, resumo, pessoalRecibo){
+      var kpis = document.getElementById('kpis');
+      kpis.style.display = 'grid';
+      document.getElementById('kpiReceita').textContent = formatEuro(receita);
+      document.getElementById('kpiReceitaSub').textContent = resumo
+        ? 'bruto ' + formatEuro(parseFloat(resumo.bruto)) : 'sem vendas importadas';
+      document.getElementById('kpiCustos').textContent = formatEuro(custos);
+      document.getElementById('kpiCustosSub').textContent =
+        (custos == null)
+          ? (resumo ? 'pendente de gioco-compromissos.js' : 'sem dados no mês')
+          : 'CMV + pessoal + fixos';
+      var el = document.getElementById('kpiResultado');
+      el.textContent = formatEuro(resultado);
+      el.className = 'kpi-valor' + (resultado == null ? '' : (resultado >= 0 ? ' pos' : ' neg'));
+      document.getElementById('kpiResultadoSub').textContent =
+        (resultado == null)
+          ? (custos == null && resumo ? 'pendente de gioco-compromissos.js' : 'precisa de vendas do mês')
+          : (resultado >= 0 ? 'lucro' : 'prejuízo');
+      document.getElementById('kpiMargem').textContent =
+        (resultado != null && receita) ? (100 * resultado / receita).toLocaleString('pt-PT',
+          { minimumFractionDigits:1, maximumFractionDigits:1 }) + ' %' : '—';
+    }
+
+    function drill(resumoTxt, headHtml, linhasHtml){
+      return '<details class="drill"><summary>' + escapeHtml(resumoTxt) + '</summary>' +
+        '<table class="drill-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+        linhasHtml + '</tbody></table></details>';
+    }
+
+    function renderPnl(d){
+      var corpo = document.getElementById('pnlCorpo');
+      if (!d.temAlgumDado){
+        corpo.innerHTML = '<div class="vazio">Sem dados em ' + escapeHtml(nomeMes(d.mes)) +
+          ': nenhumas vendas, pagamentos, recibos ou movimentos bancários. ' +
+          'Escolhe outro mês nas setas acima.</div>';
+        return;
+      }
+
+      var h = '<table class="pnl-table"><tbody>';
+
+      // Receita
+      h += '<tr><td class="pnl-rubrica">Receita líquida' +
+        '<div class="pnl-sub">vendas/' + escapeHtml(d.mes) + '/resumo.liquido — nunca o bruto</div></td>' +
+        '<td class="num">' + (d.receita != null ? formatEuro(d.receita)
+          : '<span class="pnl-sub">sem vendas importadas</span>') + '</td></tr>';
+
+      // CMV
+      var cmvDrill = '';
+      if (d.cmvPayReq.length || d.cmvExtra.length){
+        var linhas = d.cmvPayReq.map(function(l){
+          return '<tr><td>' + escapeHtml(l.data.toISOString().slice(0,10)) + '</td>' +
+            '<td>' + escapeHtml(l.fornecedor) + '</td><td>pedido de pagamento</td>' +
+            '<td class="num">' + formatEuro(l.valor) + '</td></tr>';
+        }).join('') + d.cmvExtra.map(function(l){
+          return '<tr><td>' + escapeHtml(l.data) + '</td>' +
+            '<td>' + escapeHtml(l.fornecedor) + '</td><td>banco (' + escapeHtml(l.conta) + ') · ' +
+            escapeHtml(l.desc) + '</td><td class="num">' + formatEuro(l.valor) + '</td></tr>';
+        }).join('');
+        cmvDrill = drill((d.cmvPayReq.length + d.cmvExtra.length) + ' compras',
+          '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th>', linhas);
+      }
+      h += '<tr><td class="pnl-rubrica">CMV / Compras' +
+        '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores</div>' +
+        cmvDrill + '</td><td class="num">' +
+        (d.cmvPayReq.length || d.cmvExtra.length ? formatEuro(d.totCmv)
+          : '<span class="pnl-sub">sem compras concluídas</span>') + '</td></tr>';
+
+      // Pessoal com recibo
+      var prCell, prDrill = '';
+      if (!d.recibos.length){
+        prCell = '<span class="pnl-sub">sem recibos importados neste mês</span>';
+      } else if (!d.pessoalRecibo){
+        prCell = '<span class="pnl-sub">gioco-compromissos.js em falta — rubrica pendente</span>';
+      } else {
+        prCell = formatEuro(d.pessoalRecibo.total);
+        var linhasR = d.recibos.map(function(r){
+          return '<tr><td>' + escapeHtml(r.nome) + '</td><td>recibo (sujeito + não sujeito)</td>' +
+            '<td class="num">' + formatEuro(r.sujeito + r.naoSujeito) + '</td></tr>';
+        }).join('') +
+        '<tr><td>TSU patronal</td><td>23,75% da soma dos sujeitos, arredondada uma vez (gioco-compromissos.js)</td>' +
+        '<td class="num">' + formatEuro(d.pessoalRecibo.tsu) + '</td></tr>';
+        prDrill = drill(d.recibos.length + ' recibos + TSU patronal',
+          '<th>Item</th><th>Fonte</th><th class="num">Valor</th>', linhasR);
+      }
+      h += '<tr><td class="pnl-rubrica">Pessoal com recibo' +
+        (d.recibos.length && !d.pessoalRecibo ? '<span class="selo-pendente">pendente</span>' : '') +
+        '<div class="pnl-sub">recibos do mês + TSU patronal derivada</div>' + prDrill +
+        '</td><td class="num">' + prCell + '</td></tr>';
+
+      // Pessoal sem recibo
+      var psrDrill = '';
+      if (d.pessoalSemRecibo.length){
+        var linhasP = d.pessoalSemRecibo.map(function(i){
+          return '<tr><td>' + escapeHtml(i.data) + '</td>' +
+            '<td>' + escapeHtml(i.desc) + '</td><td>' + escapeHtml(i.origem) + '</td>' +
+            '<td class="num">' + formatEuro(i.valor) + '</td></tr>';
+        }).join('');
+        psrDrill = drill(d.pessoalSemRecibo.length + ' pagamentos',
+          '<th>Data</th><th>Descrição</th><th>Origem</th><th class="num">Valor</th>', linhasP);
+      }
+      h += '<tr><td class="pnl-rubrica">Pessoal sem recibo' +
+        '<span class="selo-estimativa">estimativa</span>' +
+        '<div class="pnl-sub">caixa + pedidos de pagamento a prestadores (Subash, Mattia…)</div>' + psrDrill +
+        '</td><td class="num">' + (d.pessoalSemRecibo.length ? formatEuro(d.totPsr)
+          : '<span class="pnl-sub">sem pagamentos este mês</span>') + '</td></tr>';
+
+      // Fixos
+      var fxDrill = '';
+      if (d.fixos.length){
+        var linhasF = d.fixos.map(function(f){
+          return '<tr><td>' + escapeHtml(f.nome) + '</td>' +
+            '<td class="num">' + formatEuro(f.valor) + '</td></tr>';
+        }).join('');
+        fxDrill = drill(d.fixos.length + ' compromissos',
+          '<th>Compromisso</th><th class="num">Valor mensal</th>', linhasF);
+      }
+      h += '<tr><td class="pnl-rubrica">Fixos' +
+        '<div class="pnl-sub">compromissos fixos sem pessoal e sem TSU (evita dupla contagem)</div>' + fxDrill +
+        '</td><td class="num">' + (d.fixos.length ? formatEuro(d.totFixos) : '—') + '</td></tr>';
+
+      // Resultado
+      h += '<tr class="pnl-total"><td>Resultado do mês' +
+        '<div class="pnl-sub" style="font-weight:400;">impostos fora da v1 — ver reconciliação</div></td>' +
+        '<td class="num">' + formatEuro(d.resultado) + '</td></tr>';
+
+      h += '</tbody></table>';
+      corpo.innerHTML = h;
+    }
+
+    function renderReconciliacao(rec){
+      var corpo = document.getElementById('recCorpo');
+      if (!rec.total && !rec.internas){
+        corpo.innerHTML = '<div class="vazio">Sem saídas bancárias neste mês.</div>';
+        return;
+      }
+
+      var h = '<div class="rec-linhas">' +
+        '<div class="rec-item"><p class="kpi-titulo">Saídas do mês</p>' +
+          '<div class="kpi-valor">' + formatEuro(rec.total) + '</div>' +
+          '<div class="kpi-sub">sem ' + formatEuro(rec.internas) + ' de transferências internas</div></div>' +
+        '<div class="rec-item"><p class="kpi-titulo">Explicadas pelas rubricas</p>' +
+          '<div class="kpi-valor">' + formatEuro(rec.explicado) + '</div>' +
+          '<div class="kpi-sub">CMV ' + formatEuro(rec.porRubrica.cmv) +
+          ' · pessoal ' + formatEuro(rec.porRubrica.pessoalRecibo + rec.porRubrica.pessoalSemRecibo) +
+          ' · fixos ' + formatEuro(rec.porRubrica.fixos) + '</div></div>' +
+        '<div class="rec-item"><p class="kpi-titulo">Impostos (fora do P&L)</p>' +
+          '<div class="kpi-valor">' + formatEuro(rec.impostosTotal) + '</div>' +
+          '<div class="kpi-sub">TSU paga, DUC, pagamentos por conta</div></div>' +
+        '<div class="rec-item rec-nc"><p class="kpi-titulo">Não classificado</p>' +
+          '<div class="kpi-valor">' + formatEuro(rec.naoClassificadoTotal) + '</div>' +
+          '<div class="kpi-sub">' + rec.naoClassificado.length + ' movimentos por explicar</div></div>' +
+        '</div>';
+
+      function tabelaMovs(movs){
+        return movs.map(function(m){
+          return '<tr><td>' + escapeHtml(m.data) + '</td>' +
+            '<td>' + escapeHtml(m.conta) + '</td>' +
+            '<td>' + escapeHtml(m.desc) +
+              (m.extra && m.extra !== m.desc ? ' <span class="pnl-sub" style="display:inline">· ' +
+               escapeHtml(m.extra) + '</span>' : '') + '</td>' +
+            '<td class="num">' + formatEuro(m.valor) + '</td></tr>';
+        }).join('');
+      }
+
+      if (rec.naoClassificado.length){
+        h += drill('Ver os ' + rec.naoClassificado.length + ' movimentos não classificados (' +
+          formatEuro(rec.naoClassificadoTotal) + ')',
+          '<th>Data</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th>',
+          tabelaMovs(rec.naoClassificado));
+      }
+      if (rec.impostos.length){
+        h += drill('Ver os ' + rec.impostos.length + ' movimentos de impostos (' +
+          formatEuro(rec.impostosTotal) + ')',
+          '<th>Data</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th>',
+          tabelaMovs(rec.impostos));
+      }
+
+      corpo.innerHTML = h;
+    }
+
+  }); // fim de autenticarEContinuar
+})();
+</script>
+</body>
+</html>
