@@ -26,10 +26,11 @@
 
 <style>
   /* ======================================================================
-     resultados.html — P&L mensal (v1) + classificação de movimentos.
-     Escritas no Firebase SÓ nos nós classificacaoRegras/ e
-     classificacaoMovimentos/ (um set() por registo, nunca update()
-     multi-chave). Tudo o resto continua leitura pura.
+     resultados.html — P&L mensal em ótica de caixa (valores c/ IVA) +
+     classificação de movimentos. Escritas no Firebase SÓ em plAjustes/
+     (exclusões reversíveis), classificacaoRegras/ e classificacaoMovimentos/
+     — um set() por registo, nunca update() multi-chave. Tudo o resto é
+     leitura pura.
      Layout, sidebar, vidro, tema, .card, .kpi e tabelas vêm do shell.
      ====================================================================== */
 
@@ -156,25 +157,35 @@
     padding:26px 10px; text-align:center; color:var(--muted); font-size:13.5px;
   }
 
-  /* ---------- Remoção de linhas (só nesta vista, via localStorage) ---------- */
+  /* ---------- Exclusão reversível de linhas (plAjustes/) ---------- */
   .btn-remover{
     border:none; background:none; color:var(--muted); cursor:pointer;
     font-size:13px; line-height:1; padding:2px 6px; border-radius:6px;
   }
   .btn-remover:hover{ color:var(--red-ink); background:var(--line); }
-  .repor-row{ margin-top:10px; }
-  .btn-repor{
-    border:none; background:none; color:var(--red-ink); cursor:pointer;
-    font-size:12px; font-weight:600; padding:0;
+  .excl-form{ display:inline-flex; gap:6px; align-items:center; }
+  .excl-motivo{
+    width:170px; padding:4px 8px; font-size:12px; font-family:inherit;
+    border:1px solid var(--line); border-radius:8px;
+    background:var(--white); color:var(--ink);
   }
-  .btn-repor:hover{ text-decoration:underline; }
+  .excl-motivo:focus{ outline:none; border-color:var(--red); }
+  .excl-btn{
+    border:none; background:none; color:var(--red-ink); cursor:pointer;
+    font-size:12px; font-weight:600; padding:2px 4px; white-space:nowrap;
+  }
+  .excl-btn:hover{ text-decoration:underline; }
+  .excl-cancelar{ color:var(--muted); font-weight:400; }
+  .drill-secao td{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); font-weight:600; padding-top:12px;
+  }
 
   /* ---------- Reconciliação ---------- */
   .rec-linhas{ display:flex; flex-wrap:wrap; gap:24px; margin:6px 0 4px; }
   .rec-item .kpi-titulo{ margin-bottom:2px; }
   .rec-item .kpi-valor{ font-size:21px; }
   .rec-nc .kpi-valor{ color:var(--red-ink); }
-
   /* ---------- Classificação de movimentos ---------- */
   .selo-auto, .selo-manual{
     display:inline-block; margin-left:6px; padding:1px 7px; border-radius:20px;
@@ -205,9 +216,10 @@
 </head>
 <body>
 <script src="gioco-shell.js"></script>
-<!-- Regras partilhadas de compromissos (TSU patronal, pessoal). A rubrica
-     "Pessoal com recibo" NÃO calcula nada sozinha: usa exclusivamente esta
-     lib — se ela faltar, a rubrica fica pendente, nunca reimplementada. -->
+<!-- Regras partilhadas de compromissos (TSU patronal, pessoal). A parte
+     com recibo da rubrica Pessoal NÃO calcula nada sozinha: usa
+     exclusivamente esta lib — se ela faltar, fica pendente, nunca
+     reimplementada. -->
 <script src="gioco-compromissos.js"></script>
 
 <div class="shell">
@@ -244,7 +256,7 @@
         </div>
       </div>
 
-      <p class="page-subtitle">Demonstração de resultados mensal</p>
+      <p class="page-subtitle">Demonstração de resultados mensal · ótica de caixa (c/ IVA)</p>
 
       <!-- Sem sessão anónima a página não lê nada. Padrão único do OS. -->
       <div id="authErro">
@@ -264,7 +276,7 @@
 
       <div class="kpis" id="kpis" style="display:none;">
         <div class="kpi glass-light">
-          <p class="kpi-titulo">Receita líquida</p>
+          <p class="kpi-titulo">Receita (c/ IVA)</p>
           <div class="kpi-valor" id="kpiReceita">—</div>
           <div class="kpi-sub" id="kpiReceitaSub"></div>
         </div>
@@ -281,32 +293,34 @@
         <div class="kpi glass-light">
           <p class="kpi-titulo">Margem</p>
           <div class="kpi-valor" id="kpiMargem">—</div>
-          <div class="kpi-sub">resultado / receita líquida</div>
+          <div class="kpi-sub">resultado / receita c/ IVA</div>
         </div>
       </div>
 
       <div class="card glass-light">
         <p class="card-title">Demonstração de resultados</p>
         <p class="card-note">
-          Cada rubrica vem da sua fonte de verdade: vendas (líquido), pedidos de
-          pagamento concluídos + saídas bancárias de fornecedores, recibos + TSU
-          patronal, caixa, e compromissos fixos. Impostos ficam fora do P&amp;L v1
-          — aparecem só na reconciliação, em baixo.
+          Ótica de caixa: tudo em valores com IVA — dinheiro que entra vs. dinheiro
+          que sai, sem estimar nem deduzir IVA em lado nenhum. Cada rubrica vem da
+          sua fonte de verdade: vendas (bruto), pedidos de pagamento concluídos +
+          saídas bancárias de fornecedores, recibos + TSU patronal, caixa, e
+          compromissos fixos. As entregas de IVA e restantes impostos aparecem na
+          reconciliação, em baixo, quando saem do banco.
         </p>
         <div id="pnlCorpo"><div class="vazio">A carregar…</div></div>
       </div>
 
-      <div class="card glass-light">
+      <div class="card glass-light" id="recCard">
         <p class="card-title">Reconciliação bancária do mês</p>
         <p class="card-note">
           Saídas do ABANCA + Revolut (sem transferências internas) confrontadas,
           movimento a movimento, com as rubricas do P&amp;L. O que não bate certo
-          fica em "Não classificado" — sempre visível. Cada movimento por explicar
-          pode ser classificado numa rubrica; a classificação pode criar uma regra
-          pelo descritivo, que passa a classificar automaticamente movimentos
-          futuros (e de outros meses) — marcados "auto" e sempre corrigíveis.
+          fica em "Não classificado" — sempre visível. Itens excluídos do P&amp;L
+          com expressão bancária voltam a contar aqui como não classificados,
+          para a linha de reconciliação continuar exata.
         </p>
         <div id="recCorpo"><div class="vazio">A carregar…</div></div>
+        <div id="exclusoesPainel"></div>
       </div>
 
     </div>
@@ -429,43 +443,92 @@
   autenticarEContinuar(function(){
     var db = firebase.database();
 
-    // Nós que não dependem do mês: lidos UMA vez (página é só leitura,
-    // e o P&L não precisa de live updates — cada mudança de mês recalcula).
+    // Nós de dados: lidos UMA vez (o P&L não precisa de live updates —
+    // cada mudança de mês recalcula). Só o plAjustes/ fica em .on(), para
+    // as exclusões refletirem na hora.
     var base = null;      // { paymentRequests, recibos, compromissosFixos,
                           //   caixaMovimentos, suppliers, contas:{abanca,revolut} }
     var mesAtivo = null;
 
-    /* ---------- Linhas removidas à mão ----------
-       O utilizador pode tirar qualquer linha do P&L (✕ nos drill-downs).
-       Fica em localStorage, por mês — a página continua com ZERO escritas
-       no Firebase; noutro browser o P&L volta ao estado calculado. */
-    var EXCL_LS = 'pnlLinhasRemovidas';
-    var exclusoes = (function(){
-      try { return JSON.parse(localStorage.getItem(EXCL_LS)) || {}; }
-      catch(e){ return {}; }
-    })();
-    function gravarExclusoes(){
-      try { localStorage.setItem(EXCL_LS, JSON.stringify(exclusoes)); } catch(e){}
+    /* ---------- Exclusões reversíveis (plAjustes/) ----------
+       A ÚNICA escrita desta página: plAjustes/{mes}/exclusoes/{idEstavel} =
+       { origem, motivo?, excluidoEm }. Cada exclusão é um set() num path
+       próprio; repor é um remove() desse mesmo path. Nada mais é escrito e
+       nada dos dados de origem é alguma vez apagado. */
+    var ajustes = {};   // espelho live de plAjustes/ (recalcula ao gravar/repor)
+    db.ref('plAjustes').on('value', function(snap){
+      ajustes = snap.val() || {};
+      if (base && mesAtivo) renderMes();
+    }, function(err){
+      console.error('Falha a ler plAjustes:', err);
+    });
+
+    // Chave determinística do item, válida como chave do RTDB ('.', '#',
+    // '$', '[', ']' e '/' são proibidos — o '~' não colide com nada nosso).
+    function idEstavel(chave){
+      return String(chave).replace(/[.#$\[\]\/]/g, '~');
     }
-    function removido(chave){
-      var ex = exclusoes[mesAtivo];
-      return !!(ex && ex[chave]);
+    function exclusaoDe(chave){
+      var ex = ajustes[mesAtivo] && ajustes[mesAtivo].exclusoes;
+      return (ex && ex[idEstavel(chave)]) || null;
     }
-    function botaoRemover(chave){
-      return '<button type="button" class="btn-remover" data-remover="' +
-        escapeHtml(chave) + '" title="Remover esta linha do P&L (só nesta vista)">✕</button>';
+    function removido(chave){ return !!exclusaoDe(chave); }
+
+    function excluir(chave, origem, motivo){
+      var registo = { origem: origem || 'pnl', excluidoEm: new Date().toISOString() };
+      if (motivo) registo.motivo = motivo;
+      db.ref('plAjustes/' + mesAtivo + '/exclusoes/' + idEstavel(chave))
+        .set(registo)
+        .catch(function(err){ console.error('Falha a gravar exclusão:', err); });
     }
-    // Recibos vistos pelo motor de compromissos: sem os que foram removidos
-    // do mês ativo — assim a TSU recalcula pela mesma via de sempre (a lib),
+    function reporExclusao(id){
+      db.ref('plAjustes/' + mesAtivo + '/exclusoes/' + id).remove()
+        .catch(function(err){ console.error('Falha a repor exclusão:', err); });
+    }
+
+    function botaoExcluir(chave, origem){
+      return '<button type="button" class="btn-remover" data-excluir="' +
+        escapeHtml(chave) + '" data-origem="' + escapeHtml(origem) +
+        '" title="Excluir do P&L (reversível, com motivo opcional)">✕</button>';
+    }
+
+    // Formulário inline de motivo: aparece no lugar do ✕; confirmar grava
+    // em plAjustes e o listener re-renderiza tudo.
+    function abrirFormExclusao(btn){
+      fecharFormsExclusao();
+      var form = document.createElement('span');
+      form.className = 'excl-form';
+      form.innerHTML =
+        '<input type="text" class="excl-motivo" placeholder="motivo (opcional)" maxlength="120">' +
+        '<button type="button" class="excl-btn excl-confirmar">Excluir do P&L</button>' +
+        '<button type="button" class="excl-btn excl-cancelar">cancelar</button>';
+      btn.style.display = 'none';
+      btn.parentElement.appendChild(form);
+      form.querySelector('.excl-confirmar').addEventListener('click', function(){
+        excluir(btn.getAttribute('data-excluir'), btn.getAttribute('data-origem'),
+                form.querySelector('.excl-motivo').value.trim());
+      });
+      form.querySelector('.excl-cancelar').addEventListener('click', fecharFormsExclusao);
+      form.querySelector('.excl-motivo').focus();
+    }
+    function fecharFormsExclusao(){
+      Array.prototype.forEach.call(document.querySelectorAll('.excl-form'), function(f){
+        var b = f.parentElement.querySelector('[data-excluir]');
+        if (b) b.style.display = '';
+        f.remove();
+      });
+    }
+
+    // Recibos vistos pelo motor de compromissos: sem os excluídos do mês
+    // ativo — assim a TSU recalcula pela mesma via de sempre (a lib),
     // apenas com menos recibos à frente.
     function recibosFiltrados(){
-      var ex = exclusoes[mesAtivo] || {};
       var out = {};
       Object.keys(base.recibos).forEach(function(pid){
         var meses = base.recibos[pid] || {};
         var copia = {};
         Object.keys(meses).forEach(function(p){
-          if (p === mesAtivo && ex['recibo:' + pid]) return;
+          if (p === mesAtivo && removido('recibo:' + pid)) return;
           copia[p] = meses[p];
         });
         out[pid] = copia;
@@ -526,26 +589,16 @@
         mesAtivo = mesVizinho(mesAtivo, +1); renderMes();
       });
 
-      // Remover/repor linhas: delegação no corpo do P&L, porque as tabelas
-      // são reconstruídas a cada render.
-      document.getElementById('pnlCorpo').addEventListener('click', function(e){
-        var btn = e.target.closest('[data-remover]');
-        if (btn){
-          var ex = exclusoes[mesAtivo] = exclusoes[mesAtivo] || {};
-          ex[btn.getAttribute('data-remover')] = true;
-          gravarExclusoes();
-          renderMes();
-          return;
-        }
-        if (e.target.closest('#btnReporLinhas')){
-          delete exclusoes[mesAtivo];
-          gravarExclusoes();
-          renderMes();
-        }
-      });
-
-      // Classificar / corrigir movimentos: delegação no corpo da
-      // reconciliação, porque as tabelas são reconstruídas a cada render.
+      // Excluir/repor linhas: delegação, porque as tabelas são
+      // reconstruídas a cada render.
+      function aoClicar(e){
+        var btn = e.target.closest('[data-excluir]');
+        if (btn){ abrirFormExclusao(btn); return; }
+        var rep = e.target.closest('[data-repor]');
+        if (rep){ reporExclusao(rep.getAttribute('data-repor')); }
+      }
+      document.getElementById('pnlCorpo').addEventListener('click', aoClicar);
+      document.getElementById('recCard').addEventListener('click', aoClicar);
       document.getElementById('recCorpo').addEventListener('click', onRecClick);
       // Pré-visualização ao vivo da regra enquanto o padrão é editado.
       document.getElementById('recCorpo').addEventListener('input', function(e){
@@ -573,8 +626,8 @@
           if (m !== mes) return;
           var v = parseFloat(l.montante);
           if (isNaN(v)) return;
-          if (removido('payreq:' + id + '/' + i)) return;
-          out.push({ id: id + '/' + i, chave: 'payreq:' + id + '/' + i,
+          var chave = 'payreq:' + id + '/' + i;
+          out.push({ id: id + '/' + i, chave: chave, exc: removido(chave),
                      fornecedor: l.fornecedor || '—',
                      valor: v, data: d, referencia: l.referencia || '' });
         });
@@ -617,9 +670,9 @@
       Object.keys(base.recibos).forEach(function(pid){
         var r = base.recibos[pid] && base.recibos[pid][mes];
         if (!r || !r.totais) return;
-        if (removido('recibo:' + pid)) return;
         out.push({
           chave: 'recibo:' + pid,
+          exc: removido('recibo:' + pid),
           pessoaId: pid,
           nome: (r.pessoa && r.pessoa.nome) || pid,
           sujeito: parseFloat(r.totais.sujeito) || 0,
@@ -650,8 +703,8 @@
           valor = parseFloat(c.valor) || 0;
         }
         if (!valor) return; // 0 € não é custo do mês
-        if (removido('fixo:' + id)) return;
-        out.push({ id: id, chave: 'fixo:' + id, nome: c.nome || id, valor: valor });
+        out.push({ id: id, chave: 'fixo:' + id, exc: removido('fixo:' + id),
+                   nome: c.nome || id, valor: valor });
       });
       out.sort(function(a,b){ return b.valor - a.valor; });
       return out;
@@ -677,14 +730,14 @@
         if (!m || m.tipo !== 'saida') return;
         if (!m.dataHora || m.dataHora.slice(0,7) !== mes) return;
         if (!RE_CAIXA_PESSOAL.test(m.motivo || '')) return;
-        if (removido('caixa:' + id)) return;
-        itens.push({ origem: 'caixa', chave: 'caixa:' + id, desc: m.motivo,
+        itens.push({ origem: 'caixa', chave: 'caixa:' + id,
+                     exc: removido('caixa:' + id), desc: m.motivo,
                      data: m.dataHora.slice(0,10), valor: parseFloat(m.valor) || 0 });
       });
       payReqLinhas.forEach(function(l){
         if (!RE_PRESTADOR.test(l.fornecedor)) return;
-        itens.push({ origem: 'pagamentos', chave: l.chave, desc: l.fornecedor +
-                     (l.referencia ? ' · ' + l.referencia : ''),
+        itens.push({ origem: 'pagamentos', chave: l.chave, exc: l.exc,
+                     desc: l.fornecedor + (l.referencia ? ' · ' + l.referencia : ''),
                      data: l.data.toISOString().slice(0,10), valor: l.valor });
       });
       return itens;
@@ -886,23 +939,52 @@
       var movs = saidasBancariasDoMes(mes);
       var fornecedores = nomesFornecedores();
 
-      var filaCmv = filaPorCentimos(dados.cmvPayReq, function(l){ return l.valor; });
-      var filaPrest = filaPorCentimos(dados.pessoalSemRecibo.filter(function(i){
-        return i.origem === 'pagamentos'; }), function(i){ return i.valor; });
-      var alvosRecibo = [];
-      dados.recibos.forEach(function(r){
-        if (r.conta) alvosRecibo.push({ valor: r.conta, nome: r.nome + ' (conta)' });
-        if (r.cartao) alvosRecibo.push({ valor: r.cartao, nome: r.nome + ' (cartão)' });
-      });
-      var filaRecibo = filaPorCentimos(alvosRecibo, function(a){ return a.valor; });
-      var filaFixos = filaPorCentimos(dados.fixos, function(f){ return f.valor; });
+      function fila(itens){ return filaPorCentimos(itens, function(i){ return i.valor; }); }
+      function porExc(lista, exc){ return lista.filter(function(i){ return !!i.exc === exc; }); }
+
+      // Cada categoria tem duas filas: a dos itens ativos (explicam o
+      // movimento na rubrica) e a dos excluídos — um movimento que casa com
+      // um item EXCLUÍDO do P&L cai no "Não classificado", para a linha de
+      // reconciliação continuar exata.
+      var filaCmv     = fila(porExc(dados.cmvPayReq, false));
+      var filaCmvExc  = fila(porExc(dados.cmvPayReq, true));
+      var prest = dados.pessoalSemRecibo.filter(function(i){ return i.origem === 'pagamentos'; });
+      var filaPrest    = fila(porExc(prest, false));
+      var filaPrestExc = fila(porExc(prest, true));
+
+      function alvosRecibo(lista){
+        var alvos = [];
+        lista.forEach(function(r){
+          if (r.conta) alvos.push({ valor: r.conta });
+          if (r.cartao) alvos.push({ valor: r.cartao });
+        });
+        return alvos;
+      }
+      var filaRecibo    = filaPorCentimos(alvosRecibo(porExc(dados.recibos, false)), function(a){ return a.valor; });
+      var filaReciboExc = filaPorCentimos(alvosRecibo(porExc(dados.recibos, true)), function(a){ return a.valor; });
+
+      var fixosAtivos = porExc(dados.fixos, false), fixosExc = porExc(dados.fixos, true);
+      var filaFixos    = fila(fixosAtivos);
+      var filaFixosExc = fila(fixosExc);
 
       // Palavras-chave dos fixos (RENDA, NOS, EPAL…) para os débitos diretos
       // cujo valor real difere do valor orçamentado do compromisso.
-      var fixosNorm = dados.fixos.map(function(f){
-        return { nome: f.nome, toks: normalizar(f.nome).split(/[^a-z0-9]+/)
-                 .filter(function(t){ return t.length >= 3 && t !== 'social' && t !== 'media'; }) };
-      });
+      function toksDe(lista){
+        return lista.map(function(f){
+          return { nome: f.nome, toks: normalizar(f.nome).split(/[^a-z0-9]+/)
+                   .filter(function(t){ return t.length >= 3 && t !== 'social' && t !== 'media'; }) };
+        });
+      }
+      var fixosNorm = toksDe(fixosAtivos), fixosNormExc = toksDe(fixosExc);
+      function casaFixo(lista, descNorm){
+        var nome = null;
+        lista.forEach(function(f){
+          if (nome) return;
+          f.toks.forEach(function(t){ if (descNorm.indexOf(t) !== -1) nome = f.nome; });
+        });
+        return nome;
+      }
+      var eletricidadeExc = fixosExc.some(function(f){ return /eletricidade/i.test(f.nome); });
 
       var res = { total: 0, internas: 0, impostos: [], porRubrica: {
                     cmv: 0, pessoalRecibo: 0, pessoalSemRecibo: 0, fixos: 0, outros: 0 },
@@ -911,46 +993,57 @@
       recMovsPorId = {};
       recClassificaveis = [];
 
+      function nc(mov, excluido){
+        if (excluido) mov = Object.assign({}, mov, { excluido: true });
+        res.naoClassificado.push(mov);
+      }
+
       movs.forEach(function(mov){
         if (mov.interna){ res.internas += mov.valor; return; }
         res.total += mov.valor;
 
+        // O próprio movimento foi excluído do P&L → não classificado.
+        // Fica na mesma registado para o preview das regras e para o id.
+        if (removido('banco:' + mov.conta + '/' + mov.ref)){
+          recMovsPorId[idMovimento(mov)] = mov;
+          recClassificaveis.push(mov);
+          nc(mov, true); return;
+        }
+
         if (RE_IMPOSTO.test(mov.desc)){ res.impostos.push(mov); return; }
 
+        if (filaCmvExc.consumir(mov.valor)){ nc(mov, true); return; }
         if (filaCmv.consumir(mov.valor)){ res.porRubrica.cmv += mov.valor; res.explicado += mov.valor; return; }
+        if (filaPrestExc.consumir(mov.valor)){ nc(mov, true); return; }
         if (filaPrest.consumir(mov.valor) || /MATTIA|SUBASH/i.test(mov.desc)){
           res.porRubrica.pessoalSemRecibo += mov.valor; res.explicado += mov.valor; return;
         }
+        if (filaReciboExc.consumir(mov.valor)){ nc(mov, true); return; }
         if (filaRecibo.consumir(mov.valor) || RE_PESSOAL_BANCO.test(mov.desc)){
           res.porRubrica.pessoalRecibo += mov.valor; res.explicado += mov.valor; return;
         }
+        if (filaFixosExc.consumir(mov.valor)){ nc(mov, true); return; }
         if (filaFixos.consumir(mov.valor)){ res.porRubrica.fixos += mov.valor; res.explicado += mov.valor; return; }
+
         var descNorm = normalizar(mov.desc + ' ' + mov.extra);
-        var fixoNome = null;
-        fixosNorm.forEach(function(f){
-          if (fixoNome) return;
-          f.toks.forEach(function(t){ if (descNorm.indexOf(t) !== -1) fixoNome = f.nome; });
-        });
+        if (casaFixo(fixosNormExc, descNorm)){ nc(mov, true); return; }
+        var fixoNome = casaFixo(fixosNorm, descNorm);
         // "IBELECTRA" é a Eletricidade — o débito direto não traz o nome do compromisso.
-        if (!fixoNome && /IBELECTRA/i.test(mov.desc)) fixoNome = 'Eletricidade';
+        if (!fixoNome && /IBELECTRA/i.test(mov.desc)){
+          if (eletricidadeExc){ nc(mov, true); return; }
+          fixoNome = 'Eletricidade';
+        }
         if (fixoNome){ res.porRubrica.fixos += mov.valor; res.explicado += mov.valor; return; }
 
-        if (!removido('banco:' + mov.conta + '/' + mov.ref) &&
-            movimentoParecerFornecedor(mov, fornecedores)){
+        if (movimentoParecerFornecedor(mov, fornecedores)){
           res.porRubrica.cmv += mov.valor; res.explicado += mov.valor; return;
         }
 
         // A lógica de sempre não explicou o movimento: entra o classificador
-        // (override individual > regra com o padrão mais longo).
+        // (override individual > regra com o padrão mais longo). Uma exclusão
+        // em plAjustes vence sempre — já saiu lá em cima para o NC.
         recMovsPorId[idMovimento(mov)] = mov;
         recClassificaveis.push(mov);
-        // Um movimento excluído (✕) não é classificável: a exclusão vence
-        // e devolve-o ao tratamento das exclusões já implementado.
-        if (removido('banco:' + mov.conta + '/' + mov.ref)){
-          mov.excluido = true;
-          res.naoClassificado.push(mov);
-          return;
-        }
         var clf = classificarMovimento(mov);
         if (clf){
           if (clf.modo === 'auto' && clf.regraId)
@@ -970,7 +1063,7 @@
           return;
         }
 
-        res.naoClassificado.push(mov);
+        nc(mov, false);
       });
 
       res.naoClassificadoTotal = res.naoClassificado.reduce(function(s,m){ return s + m.valor; }, 0);
@@ -996,9 +1089,9 @@
         if (/MATTIA|SUBASH/i.test(mov.desc)) return;
         var nome = movimentoParecerFornecedor(mov, fornecedores);
         if (!nome) return;
-        if (removido('banco:' + mov.conta + '/' + mov.ref)) return;
+        var chave = 'banco:' + mov.conta + '/' + mov.ref;
         extra.push({ desc: mov.desc, fornecedor: nome, data: mov.data,
-                     chave: 'banco:' + mov.conta + '/' + mov.ref,
+                     chave: chave, exc: removido(chave),
                      conta: mov.conta, valor: mov.valor });
       });
       return extra;
@@ -1029,10 +1122,12 @@
       // vez, no agregado — vêm do motor partilhado.
       var p = mes.split('-');
       var agg = CE.baseSSDoMes(parseInt(p[0],10), parseInt(p[1],10));
-      var tsu = (agg && !removido('tsu'))
-        ? CE.arredCentimos(agg.base * CE.TSU_TAXA_PATRONAL) : 0;
+      var tsuCalc = agg ? CE.arredCentimos(agg.base * CE.TSU_TAXA_PATRONAL) : 0;
+      var tsuExc = removido('tsu');
+      var tsu = tsuExc ? 0 : tsuCalc;
       var bruto = recibosMes.reduce(function(s,r){ return s + r.sujeito + r.naoSujeito; }, 0);
-      return { tsu: tsu, bruto: bruto, total: bruto + tsu };
+      return { tsu: tsu, tsuExcluida: tsuExc ? tsuCalc : 0,
+               bruto: bruto, total: bruto + tsu };
     }
 
     /* =========================================================
@@ -1044,18 +1139,32 @@
       document.getElementById('mesSeguinte').disabled = (mes >= mesCorrente());
 
       var resumo = base.vendas[mes] && base.vendas[mes].resumo;
-      var receita = resumo ? parseFloat(resumo.liquido) : null;
+      // Ótica de caixa (decisão de 02/09/2026): o P&L é integralmente em
+      // valores COM IVA — dinheiro que entra vs. dinheiro que sai. A receita
+      // é o bruto; o líquido fica visível como informação no drill-down.
+      var receita = resumo ? parseFloat(resumo.bruto) : null;
+      var receitaLiquida = resumo ? parseFloat(resumo.liquido) : null;
 
-      var payReq = linhasPayReqDoMes(mes);
-      var cmvPayReq = payReq.filter(function(l){ return !RE_PRESTADOR.test(l.fornecedor); });
-      var recibos = recibosDoMes(mes);
-      var fixos = fixosDoMes(mes);
-      var pessoalSemRecibo = pessoalSemReciboDoMes(mes, payReq);
-      var cmvExtra = cmvBancario(mes, cmvPayReq, pessoalSemRecibo);
+      // "Todos" inclui os excluídos (exc:true) — os ativos entram nos
+      // totais, os excluídos vão para a reconciliação e para o painel.
+      var payReqTodos = linhasPayReqDoMes(mes);
+      var cmvPayReqTodos = payReqTodos.filter(function(l){ return !RE_PRESTADOR.test(l.fornecedor); });
+      var recibosTodos = recibosDoMes(mes);
+      var fixosTodos = fixosDoMes(mes);
+      var pessoalSemReciboTodos = pessoalSemReciboDoMes(mes, payReqTodos);
+      var cmvExtraTodos = cmvBancario(mes, cmvPayReqTodos, pessoalSemReciboTodos);
+
+      function ativos(l){ return l.filter(function(i){ return !i.exc; }); }
+      var cmvPayReq = ativos(cmvPayReqTodos);
+      var recibos = ativos(recibosTodos);
+      var fixos = ativos(fixosTodos);
+      var pessoalSemRecibo = ativos(pessoalSemReciboTodos);
+      var cmvExtra = ativos(cmvExtraTodos);
+
       var pessoalRecibo = calcularPessoalComRecibo(recibos, mes);
 
-      var temAlgumDado = !!resumo || payReq.length || recibos.length ||
-        pessoalSemRecibo.length || saidasBancariasDoMes(mes).length;
+      var temAlgumDado = !!resumo || payReqTodos.length || recibosTodos.length ||
+        pessoalSemReciboTodos.length || saidasBancariasDoMes(mes).length;
 
       document.getElementById('mesEstado').textContent = temAlgumDado
         ? (resumo ? (resumo.dias || '') && (resumo.dias + ' dias de vendas importados') : 'sem vendas importadas')
@@ -1063,8 +1172,11 @@
 
       // A reconciliação corre ANTES dos totais: os movimentos classificados
       // (por regra ou à mão) são custos reais e entram nas rubricas do P&L.
-      var rec = reconciliar(mes, { cmvPayReq: cmvPayReq, recibos: recibos,
-                                   fixos: fixos, pessoalSemRecibo: pessoalSemRecibo });
+      // Recebe TODOS os itens (ativos + excluídos): os excluídos com
+      // expressão bancária caem no não classificado.
+      var rec = reconciliar(mes, { cmvPayReq: cmvPayReqTodos, recibos: recibosTodos,
+                                   fixos: fixosTodos,
+                                   pessoalSemRecibo: pessoalSemReciboTodos });
       function clfDe(rubrica){
         return rec.classificados.filter(function(c){ return c.rubrica === rubrica; });
       }
@@ -1093,8 +1205,9 @@
         ? null : totCmv + totPessoal + totFixos + totOutros;
       var resultado = (receita != null && custos != null) ? receita - custos : null;
 
-      renderKpis(receita, custos, resultado, resumo, pessoalRecibo);
-      renderPnl({ mes: mes, receita: receita, resumo: resumo,
+      renderKpis(receita, receitaLiquida, custos, resultado, resumo);
+      renderPnl({ mes: mes, receita: receita, receitaLiquida: receitaLiquida,
+                  resumo: resumo,
                   cmvPayReq: cmvPayReq, cmvExtra: cmvExtra, totCmv: totCmv,
                   recibos: recibos, pessoalRecibo: pessoalRecibo,
                   pessoalSemRecibo: pessoalSemRecibo, totPessoal: totPessoal,
@@ -1105,14 +1218,20 @@
                   custos: custos, resultado: resultado, temAlgumDado: temAlgumDado });
 
       renderReconciliacao(rec);
+
+      renderExclusoes(mes, {
+        cmvPayReq: cmvPayReqTodos, cmvExtra: cmvExtraTodos,
+        recibos: recibosTodos, pessoalSemRecibo: pessoalSemReciboTodos,
+        fixos: fixosTodos, pessoalRecibo: pessoalRecibo
+      });
     }
 
-    function renderKpis(receita, custos, resultado, resumo, pessoalRecibo){
+    function renderKpis(receita, receitaLiquida, custos, resultado, resumo){
       var kpis = document.getElementById('kpis');
       kpis.style.display = 'grid';
       document.getElementById('kpiReceita').textContent = formatEuro(receita);
       document.getElementById('kpiReceitaSub').textContent = resumo
-        ? 'bruto ' + formatEuro(parseFloat(resumo.bruto)) : 'sem vendas importadas';
+        ? 'líquido s/ IVA ' + formatEuro(receitaLiquida) : 'sem vendas importadas';
       document.getElementById('kpiCustos').textContent = formatEuro(custos);
       document.getElementById('kpiCustosSub').textContent =
         (custos == null)
@@ -1161,9 +1280,19 @@
 
       var h = '<table class="pnl-table"><tbody>';
 
-      // Receita
-      h += '<tr><td class="pnl-rubrica">Receita líquida' +
-        '<div class="pnl-sub">vendas/' + escapeHtml(d.mes) + '/resumo.liquido — nunca o bruto</div></td>' +
+      // Receita — bruto (c/ IVA), ótica de caixa; o líquido fica no drill.
+      var recDrill = '';
+      if (d.receita != null){
+        recDrill = drill('detalhe',
+          '<th>Item</th><th class="num">Valor</th>',
+          '<tr><td>Receita bruta (c/ IVA) — entra no P&L</td>' +
+            '<td class="num">' + formatEuro(d.receita) + '</td></tr>' +
+          '<tr><td>Receita líquida (s/ IVA) — informativo</td>' +
+            '<td class="num">' + formatEuro(d.receitaLiquida) + '</td></tr>');
+      }
+      h += '<tr><td class="pnl-rubrica">Receita (c/ IVA)' +
+        '<div class="pnl-sub">vendas/' + escapeHtml(d.mes) + '/resumo.bruto — ótica de caixa: dinheiro que entra</div>' +
+        recDrill + '</td>' +
         '<td class="num">' + (d.receita != null ? formatEuro(d.receita)
           : '<span class="pnl-sub">sem vendas importadas</span>') + '</td></tr>';
 
@@ -1174,49 +1303,58 @@
           return '<tr><td>' + escapeHtml(l.data.toISOString().slice(0,10)) + '</td>' +
             '<td>' + escapeHtml(l.fornecedor) + '</td><td>pedido de pagamento</td>' +
             '<td class="num">' + formatEuro(l.valor) + '</td>' +
-            '<td class="num">' + botaoRemover(l.chave) + '</td></tr>';
+            '<td class="num">' + botaoExcluir(l.chave, 'cmv') + '</td></tr>';
         }).join('') + d.cmvExtra.map(function(l){
           return '<tr><td>' + escapeHtml(l.data) + '</td>' +
             '<td>' + escapeHtml(l.fornecedor) + '</td><td>banco (' + escapeHtml(l.conta) + ') · ' +
             escapeHtml(l.desc) + '</td><td class="num">' + formatEuro(l.valor) + '</td>' +
-            '<td class="num">' + botaoRemover(l.chave) + '</td></tr>';
+            '<td class="num">' + botaoExcluir(l.chave, 'cmv') + '</td></tr>';
         }).join('') + d.clfCmv.map(function(c){ return linhaClfPnl(c, 5); }).join('');
         cmvDrill = drill((d.cmvPayReq.length + d.cmvExtra.length + d.clfCmv.length) + ' compras',
           '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th><th></th>', linhas);
       }
       h += '<tr><td class="pnl-rubrica">CMV / Compras' +
-        '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores</div>' +
+        '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores (valores c/ IVA)</div>' +
         cmvDrill + '</td><td class="num">' +
         (d.cmvPayReq.length || d.cmvExtra.length || d.clfCmv.length ? formatEuro(d.totCmv)
           : '<span class="pnl-sub">sem compras concluídas</span>') + '</td></tr>';
 
-      // Pessoal - rubrica ÚNICA: recibos + TSU + pagamentos sem recibo.
+      // Pessoal — rubrica ÚNICA; o drill separa "com recibo" de "sem
+      // recibo", e o selo de estimativa fica só na parte sem recibo.
       var pesCell, pesDrill = '';
-      var nItens = d.recibos.length + (d.pessoalRecibo && d.pessoalRecibo.tsu ? 1 : 0) +
-                   d.pessoalSemRecibo.length + d.clfPessoal.length;
+      var nComRecibo = d.recibos.length + (d.pessoalRecibo && d.pessoalRecibo.tsu ? 1 : 0);
+      var nSemRecibo = d.pessoalSemRecibo.length + d.clfPessoal.length;
+      var nItens = nComRecibo + nSemRecibo;
       if (d.pessoalPendente){
         pesCell = '<span class="pnl-sub">gioco-compromissos.js em falta — rubrica pendente</span>';
       } else if (!nItens){
         pesCell = '<span class="pnl-sub">sem custos de pessoal este mês</span>';
       } else {
         pesCell = formatEuro(d.totPessoal);
-        var linhasPes = d.recibos.map(function(r){
+        var linhasPes = '';
+        if (nComRecibo){
+          linhasPes += '<tr class="drill-secao"><td colspan="4">Com recibo</td></tr>';
+        }
+        linhasPes += d.recibos.map(function(r){
           return '<tr><td>' + escapeHtml(r.nome) + '</td><td>recibo (sujeito + não sujeito)</td>' +
             '<td class="num">' + formatEuro(r.sujeito + r.naoSujeito) + '</td>' +
-            '<td class="num">' + botaoRemover(r.chave) + '</td></tr>';
+            '<td class="num">' + botaoExcluir(r.chave, 'pessoal') + '</td></tr>';
         }).join('');
         if (d.pessoalRecibo && d.pessoalRecibo.tsu){
           linhasPes += '<tr><td>TSU patronal</td>' +
             '<td>23,75% da soma dos sujeitos, arredondada uma vez (gioco-compromissos.js)</td>' +
             '<td class="num">' + formatEuro(d.pessoalRecibo.tsu) + '</td>' +
-            '<td class="num">' + botaoRemover('tsu') + '</td></tr>';
+            '<td class="num">' + botaoExcluir('tsu', 'pessoal') + '</td></tr>';
+        }
+        if (nSemRecibo){
+          linhasPes += '<tr class="drill-secao"><td colspan="4">Sem recibo ' +
+            '<span class="selo-estimativa">estimativa</span></td></tr>';
         }
         linhasPes += d.pessoalSemRecibo.map(function(i){
           return '<tr><td>' + escapeHtml(i.desc) + '</td>' +
-            '<td>sem recibo · ' + escapeHtml(i.origem) + ' · ' + escapeHtml(i.data) +
-            ' <span class="selo-estimativa">estimativa</span></td>' +
+            '<td>' + escapeHtml(i.origem) + ' · ' + escapeHtml(i.data) + '</td>' +
             '<td class="num">' + formatEuro(i.valor) + '</td>' +
-            '<td class="num">' + botaoRemover(i.chave) + '</td></tr>';
+            '<td class="num">' + botaoExcluir(i.chave, 'pessoal') + '</td></tr>';
         }).join('');
         linhasPes += d.clfPessoal.map(function(c){
           return '<tr><td>' + escapeHtml(c.mov.desc) + '</td>' +
@@ -1229,8 +1367,8 @@
       }
       h += '<tr><td class="pnl-rubrica">Pessoal' +
         (d.pessoalPendente ? '<span class="selo-pendente">pendente</span>' : '') +
-        (!d.pessoalPendente && d.pessoalSemRecibo.length
-          ? '<span class="selo-estimativa">inclui estimativas</span>' : '') +
+        (!d.pessoalPendente && (d.pessoalSemRecibo.length || d.clfPessoal.length)
+          ? '<span class="selo-estimativa" title="A parte sem recibo (caixa e prestadores) é estimada: não há recibo de vencimento a confirmar estes valores.">contém estimativas</span>' : '') +
         '<div class="pnl-sub">recibos do mês + TSU patronal derivada + pagamentos sem recibo (caixa e prestadores)</div>' +
         pesDrill + '</td><td class="num">' + pesCell + '</td></tr>';
 
@@ -1240,7 +1378,7 @@
         var linhasF = d.fixos.map(function(f){
           return '<tr><td>' + escapeHtml(f.nome) + '</td>' +
             '<td class="num">' + formatEuro(f.valor) + '</td>' +
-            '<td class="num">' + botaoRemover(f.chave) + '</td></tr>';
+            '<td class="num">' + botaoExcluir(f.chave, 'fixos') + '</td></tr>';
         }).join('') + d.clfFixos.map(function(c){
           return '<tr><td>' + escapeHtml(c.mov.desc) +
             ' <span class="pnl-sub" style="display:inline">banco (' + escapeHtml(c.mov.conta) +
@@ -1252,7 +1390,7 @@
       }
       h += '<tr><td class="pnl-rubrica">Fixos' +
         '<div class="pnl-sub">compromissos fixos sem pessoal e sem TSU (evita dupla contagem)</div>' + fxDrill +
-        '</td><td class="num">' + (d.fixos.length || d.clfFixos.length ? formatEuro(d.totFixos) : '—') + '</td></tr>';
+        '</td><td class="num">' + (d.fixos.length || d.clfFixos.length ? formatEuro(d.totFixos) : '\u2014') + '</td></tr>';
 
       // Outros custos — só movimentos bancários classificados nesta rubrica
       if (d.clfOutros.length){
@@ -1271,20 +1409,53 @@
 
       // Resultado
       h += '<tr class="pnl-total"><td>Resultado do mês' +
-        '<div class="pnl-sub" style="font-weight:400;">impostos fora da v1 — ver reconciliação</div></td>' +
+        '<div class="pnl-sub" style="font-weight:400;">ótica de caixa, valores c/ IVA · entregas de impostos aparecem na reconciliação</div></td>' +
         '<td class="num">' + formatEuro(d.resultado) + '</td></tr>';
 
       h += '</tbody></table>';
+      corpo.innerHTML = h;
+    }
 
-      // Linhas removidas à mão neste mês: sempre reversível, sempre à vista.
-      var nRemovidas = Object.keys(exclusoes[d.mes] || {}).length;
-      if (nRemovidas){
-        h += '<div class="repor-row"><button type="button" class="btn-repor" id="btnReporLinhas">' +
-          'Repor ' + nRemovidas + (nRemovidas === 1 ? ' linha removida' : ' linhas removidas') +
-          ' deste mês</button></div>';
+    /* ---------- Painel "Exclusões deste mês" ----------
+       Lista tudo o que está excluído em plAjustes/{mes}, com motivo e botão
+       Repor (um remove() por exclusão). Entradas órfãs (o item já não é
+       encontrado nos dados) também aparecem, para poderem ser repostas. */
+    function renderExclusoes(mes, todos){
+      var el = document.getElementById('exclusoesPainel');
+      var reg = (ajustes[mes] && ajustes[mes].exclusoes) || {};
+      var ids = Object.keys(reg);
+      if (!ids.length){ el.innerHTML = ''; return; }
+
+      // id estável → detalhe calculado do item
+      var porId = {};
+      function fixa(item, rubrica, descr, valor){
+        porId[idEstavel(item.chave)] = { rubrica: rubrica, desc: descr, valor: valor };
+      }
+      todos.cmvPayReq.forEach(function(l){ if (l.exc) fixa(l, 'CMV', l.fornecedor, l.valor); });
+      todos.cmvExtra.forEach(function(l){ if (l.exc) fixa(l, 'CMV', l.fornecedor + ' · ' + l.desc, l.valor); });
+      todos.recibos.forEach(function(r){ if (r.exc) fixa(r, 'Pessoal', 'Recibo — ' + r.nome, r.sujeito + r.naoSujeito); });
+      todos.pessoalSemRecibo.forEach(function(i){ if (i.exc) fixa(i, 'Pessoal', i.desc, i.valor); });
+      todos.fixos.forEach(function(f){ if (f.exc) fixa(f, 'Fixos', f.nome, f.valor); });
+      if (todos.pessoalRecibo && todos.pessoalRecibo.tsuExcluida){
+        porId['tsu'] = { rubrica: 'Pessoal', desc: 'TSU patronal',
+                         valor: todos.pessoalRecibo.tsuExcluida };
       }
 
-      corpo.innerHTML = h;
+      var linhas = ids.map(function(id){
+        var meta = reg[id] || {};
+        var det = porId[id] || { rubrica: meta.origem || '\u2014',
+                                 desc: '(item não encontrado nos dados do mês)', valor: null };
+        return '<tr><td>' + escapeHtml(det.rubrica) + '</td>' +
+          '<td>' + escapeHtml(det.desc) + '</td>' +
+          '<td class="num">' + (det.valor != null ? formatEuro(det.valor) : '\u2014') + '</td>' +
+          '<td>' + escapeHtml(meta.motivo || '\u2014') + '</td>' +
+          '<td class="num"><button type="button" class="excl-btn" data-repor="' +
+            escapeHtml(id) + '">Repor</button></td></tr>';
+      }).join('');
+
+      el.innerHTML = drill('Exclusões deste mês (' + ids.length + ')',
+        '<th>Rubrica</th><th>Item</th><th class="num">Valor</th><th>Motivo</th><th></th>',
+        linhas);
     }
 
     function renderReconciliacao(rec){
@@ -1334,11 +1505,9 @@
           rec.naoClassificado.map(function(m){
             return '<tr><td>' + escapeHtml(m.data) + '</td>' +
               '<td>' + escapeHtml(m.conta) + '</td>' + celulaDesc(m) +
-              '<td class="num">' + formatEuro(m.valor) + '</td>' +
-              '<td class="num">' + (m.excluido
-                ? '<span class="pnl-sub">excluído</span>'
-                : '<button type="button" class="btn-classificar" data-clf="' +
-                  escapeHtml(idMovimento(m)) + '">Classificar</button>') + '</td></tr>';
+              (m.excluido ? '<td><span class="selo-estimativa" title="Este item foi excluído do P&L; volta a contar aqui para a reconciliação continuar exata. Para o classificar, repõe primeiro a exclusão.">excluído do P&L</span></td>'
+                          : '<td class="num"><button type="button" class="btn-classificar" data-clf="' +
+                            escapeHtml(idMovimento(m)) + '">Classificar</button></td>') + '</tr>';
           }).join(''));
       }
       if (rec.classificados.length){
@@ -1357,7 +1526,8 @@
               (c.modo === 'auto' && c.regraId
                 ? ' <button type="button" class="btn-classificar" data-apagar-regra="' +
                   escapeHtml(c.regraId) + '">Apagar regra</button>' : '') +
-              ' ' + botaoRemover('banco:' + c.mov.conta + '/' + c.mov.ref) + '</td></tr>';
+              ' ' + botaoExcluir('banco:' + c.mov.conta + '/' + c.mov.ref, 'reconciliação') +
+              '</td></tr>';
           }).join(''));
       }
       var regrasIds = Object.keys(base.classificacaoRegras);
@@ -1448,18 +1618,8 @@
       atualizarPreviewRegra(tr);
     }
 
-    function onRecClick(e){
-      // ✕ num movimento classificado: a exclusão vence a classificação e
-      // devolve-o ao tratamento das exclusões (mesma mecânica do P&L).
-      var rem = e.target.closest('[data-remover]');
-      if (rem){
-        var ex = exclusoes[mesAtivo] = exclusoes[mesAtivo] || {};
-        ex[rem.getAttribute('data-remover')] = true;
-        gravarExclusoes();
-        renderMes();
-        return;
-      }
 
+    function onRecClick(e){
       var btn = e.target.closest('.btn-classificar');
       if (!btn) return;
 

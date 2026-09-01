@@ -49,6 +49,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `foodcost.html` | Variância de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas | Equipa |
+| `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós) | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
@@ -147,12 +148,25 @@ classificacaoMovimentos — override individual por movimento bancário:
                          {conta}~{ref} = { rubrica, manual:true, regraId?,
                          criadoEm }. Vence sempre sobre qualquer regra.
                          PRIORIDADE de classificação na resultados.html:
-                         (1) lógica de reconciliação existente (salários, renda,
-                         paymentRequests, internas) — o classificador nunca atua
-                         sobre estes; (2) este override; (3) regra de
-                         classificacaoRegras; (4) fica "Não classificado".
-                         São os DOIS ÚNICOS nós onde a resultados.html escreve,
-                         sempre um set() por registo (nunca update multi-chave)
+                         (1) exclusão em plAjustes (o item sai do P&L e vai
+                         para "Não classificado"); (2) lógica de reconciliação
+                         existente (salários, renda, paymentRequests, internas)
+                         — o classificador nunca atua sobre estes; (3) este
+                         override; (4) regra de classificacaoRegras; (5) fica
+                         "Não classificado". Com plAjustes, são os TRÊS únicos
+                         nós onde a resultados.html escreve, sempre um set()
+                         por registo (nunca update multi-chave)
+plAjustes             — ajustes manuais do P&L (resultados.html, o ÚNICO que
+                         escreve aqui): plAjustes/{AAAA-MM}/exclusoes/{idEstavel}
+                         = { origem, motivo?, excluidoEm }. idEstavel identifica
+                         o item de forma determinística ('/' e afins trocados
+                         por '~'): payreq:{id}~{linha}, banco:{conta}~{ref},
+                         caixa:{id}, recibo:{pessoaId}, fixo:{id}, tsu.
+                         Exclusões são POR MÊS, sempre reversíveis (repor =
+                         remove() desse path); um set() por exclusão, nunca
+                         escritas multi-chave. Excluir nunca apaga dados de
+                         origem — um item excluído com expressão bancária volta
+                         a contar no "Não classificado" da reconciliação
 contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
                          { estado: 'rascunho'|'fechada', criadaEm, fechadaEm,
                            itens: { {ingredienteId}: { qtdContada, unidadeContagem,
