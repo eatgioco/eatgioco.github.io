@@ -358,7 +358,17 @@ Sobre um selo cuja superfície não inverte, o texto é um literal fixo
   seguintes.
 - O `<style>` da página vem **depois** do `<link>`: em empate de
   especificidade, o local ganha. Uma classe local com o nome de uma do shell
-  (`.card`, `.num`) anula-a em silêncio.
+  (`.card`, `.num`) anula-a em silêncio. **Já acontece na `compras.html`**, que
+  tem um `.card` próprio (o cartão de fornecedor: `display:flex`,
+  `flex-direction:column`, `cursor:pointer`, `height:100%`). Secções novas
+  dessa página usam `.panel glass-light`, não `.card` — senão herdam a coluna
+  e o cursor de mão sem se perceber porquê.
+- O `body` não inverte a **sua própria** `color`/`background` no tema escuro:
+  os tokens mudam (o `--ink` do `body` fica claro) mas o `color` computado do
+  `body` fica no valor claro. Os descendentes com `color:var(--ink)` explícita
+  ficam bem; quem só **herda** fica a preto sobre fundo escuro. Numa tabela ou
+  bloco de texto novo, declarar `color:var(--ink)` em vez de contar com a
+  herança.
 
 **Regra da navegação.** A lista de links da sidebar vive no `gioco-shell.js`
 (`GIOCO_NAV_CONJUNTOS`), numa única definição. Cada página só declara a entrada
