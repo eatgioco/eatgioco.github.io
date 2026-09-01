@@ -19,11 +19,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="../gioco-shell.css">
 
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="fake-firebase.js"></script>
+<script src="fixture.js"></script>
 
 <style>
   /* ======================================================================
@@ -308,7 +307,7 @@
 </style>
 </head>
 <body>
-<script src="gioco-shell.js"></script>
+<script src="../gioco-shell.js"></script>
 
 <div class="shell">
 
@@ -316,7 +315,7 @@
     <div class="glass-bend"></div>
     <div class="brand">
       <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
-      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <img src="../Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
       <div class="word">GIOCO OS<span>painel interno</span></div>
     </div>
     <nav id="giocoNav"></nav>
@@ -1348,5 +1347,21 @@
   } // fim de arrancar
 </script>
 
+
+<script>
+window.ZZT_CAPTURAR = function () {
+  var sel = document.getElementById('periodoSel');
+  var out = { periodos: [], escritas: window.ZZT_ESCRITAS || [] };
+  if (!sel) { out.erro = 'sem #periodo'; return out; }
+  var opts = Array.prototype.map.call(sel.options, function (o) { return o.value; });
+  out.opcoes = opts;
+  opts.forEach(function (v) {
+    sel.value = v;
+    sel.dispatchEvent(new Event('change'));
+    out.periodos.push({ valor: v, texto: document.getElementById('app').innerText });
+  });
+  return out;
+};
+</script>
 </body>
 </html>

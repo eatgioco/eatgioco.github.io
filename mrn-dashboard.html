@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-PT">
 <head>
+<meta name="robots" content="noindex, nofollow">
 <meta charset="UTF-8">
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
 <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
@@ -4488,8 +4489,14 @@ window.addEventListener('load', function () {
 
     // shallow=true devolve apenas as chaves — conta os registos sem
     // descarregar os dados (nomeadamente as fotos em base64).
+    // REST não herda a sessão do SDK: com regras auth != null estes
+    // pedidos precisam do ID token da sessão anónima em ?auth=.
+    var utilizador = firebase.auth().currentUser;
+    var tokenP = utilizador ? utilizador.getIdToken() : Promise.resolve('');
     var pedidos = refs.map(function(ref){
-      return fetch(DB_URL + '/' + ref + '.json?shallow=true')
+      return tokenP.then(function(token){
+        return fetch(DB_URL + '/' + ref + '.json?shallow=true' + (token ? '&auth=' + token : ''));
+      })
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(val){
           var n = val && typeof val === 'object' ? Object.keys(val).length : 0;
