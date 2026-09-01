@@ -272,11 +272,69 @@
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
+  /* ---------- MENU AO TOQUE ----------
+     Companheiro do bloco @media (hover: none) do gioco-shell.css, e igualmente
+     OPT-IN: só faz alguma coisa nas páginas com <body class="shell-mobile">.
+     Vinha duplicado no <style>/<script> da equipa.html e da contagens.html.
+
+     O #sidebarPinBtn tem dois papéis: com rato chama o toggleSidebarPin() de
+     sempre, sem desvios; ao toque abre/fecha o painel. Ao toque não há hover,
+     e os itens do menu são <a> — tocar neles navegava em vez de abrir. */
+  function ehToque(){
+    if (!document.body || !document.body.classList.contains('shell-mobile')) return false;
+    return !!(window.matchMedia && window.matchMedia('(hover: none)').matches);
+  }
+
+  function painelAberto(){
+    var sb = document.getElementById('sidebarEl');
+    return !!(sb && sb.classList.contains('painel-aberto'));
+  }
+
+  function mostrarPainel(abrir){
+    try {
+      var sb = document.getElementById('sidebarEl');
+      var ov = document.getElementById('navOverlay');
+      if (sb) sb.classList.toggle('painel-aberto', !!abrir);
+      if (ov) ov.classList.toggle('aberto', !!abrir);
+      var btn = document.getElementById('sidebarPinBtn');
+      if (btn && ehToque()) btn.setAttribute('title', abrir ? 'Fechar o menu' : 'Abrir o menu');
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+
+  /* O que o onclick do #sidebarPinBtn deve chamar nas páginas shell-mobile. */
+  function giocoToggleMenu(){
+    if (!ehToque()){ toggleSidebarPin(); return; }
+    mostrarPainel(!painelAberto());
+  }
+
+  function initMenuToque(){
+    try {
+      if (!document.body || !document.body.classList.contains('shell-mobile')) return;
+      var ov = document.getElementById('navOverlay');
+      if (ov) ov.addEventListener('click', function(){ mostrarPainel(false); });
+      var linhas = document.querySelectorAll('#sidebarEl .nav-row');
+      for (var i = 0; i < linhas.length; i++){
+        linhas[i].addEventListener('click', function(){ mostrarPainel(false); });
+      }
+      window.addEventListener('pageshow', function(){ mostrarPainel(false); });
+      var mq = window.matchMedia && window.matchMedia('(hover: none)');
+      if (mq && mq.addEventListener){
+        mq.addEventListener('change', function(){
+          mostrarPainel(false);
+          var btn = document.getElementById('sidebarPinBtn');
+          if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
+        });
+      }
+      mostrarPainel(false);
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+
   /* ---------- ARRANQUE ---------- */
   function giocoShellInit() {
     injectSprite();
     initSidebar();
     initTheme();
+    initMenuToque();
   }
 
   injectSprite(); // o mais cedo possível, para os <use> do markup resolverem
@@ -290,6 +348,7 @@
   /* API global (mantém os nomes usados pelos onclick inline da referência) */
   window.giocoIcon = giocoIcon;
   window.giocoNav = giocoNav;
+  window.giocoToggleMenu = giocoToggleMenu;
   window.GIOCO_NAV_CONJUNTOS = GIOCO_NAV_CONJUNTOS;
   window.GIOCO_ICON_NAMES = GIOCO_ICON_NAMES;
   window.giocoShellInit = giocoShellInit;

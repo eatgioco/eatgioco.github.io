@@ -562,104 +562,12 @@
      ====================================================================== */
   .nav-overlay{ display:none; }
 
-  @media (hover: none){
+  /* O menu ao toque (barra inferior + painel) vive no gioco-shell.css/.js,
+     ligado pela classe shell-mobile no elemento <body>. */
 
-    .shell{ display:block; min-height:100vh; min-height:100dvh; }
-    .main{ padding:20px 16px 0; }
-    .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
-
-    /* Folga no fundo para a barra fixa não tapar as últimas linhas. */
-    .page{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
-
-    /* --- Base: vale nos dois estados (barra e painel), mutuamente exclusivos
-       de propósito — ver a nota longa na equipa.html sobre regras de um
-       estado a sangrar para o outro. --- */
-    .sidebar,
-    .sidebar.collapsed,
-    .sidebar.hidden{
-      position:fixed;
-      top:auto; right:0; bottom:0; left:0;
-      width:auto; height:auto; min-height:0; margin:0;
-      align-items:stretch;
-      border:none; border-top:1px solid var(--sidebar-line); border-radius:0;
-      box-shadow:0 -10px 30px rgba(0,0,0,0.16);
-      opacity:1; pointer-events:auto;
-      /* NUNCA overflow:auto aqui — backdrop-filter + fixed + scroll próprio
-         deixa de repintar no iOS. Quem faz scroll é o <nav>. */
-      overflow:visible;
-      transition:none;
-      z-index:70;
-    }
-
-    .sidebar .brand,
-    .sidebar .sidebar-foot{ display:none; }
-
-    .sidebar nav{ display:flex; width:100%; }
-    .sidebar .nav-row{ border-radius:12px; }
-
-    /* --- Estado BARRA: ícones lado a lado --- */
-    .sidebar:not(.painel-aberto){
-      flex-direction:row;
-      padding:6px 6px calc(6px + env(safe-area-inset-bottom));
-    }
-
-    .sidebar:not(.painel-aberto) nav{ flex-direction:row; gap:2px; }
-
-    .sidebar:not(.painel-aberto) .nav-row{
-      flex:1 1 0; min-width:0;
-      justify-content:center;
-      padding:10px 4px;
-    }
-
-    .sidebar:not(.painel-aberto) .nav-row span{ display:none; }
-
-    /* --- Estado PAINEL: a mesma barra a abrir para cima --- */
-    .sidebar.painel-aberto{
-      flex-direction:column;
-      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-      max-height:80vh;
-      max-height:80dvh;
-      min-height:min(320px, 70vh);
-      min-height:min(320px, 70dvh);
-    }
-
-    .sidebar.painel-aberto .glass-bend{ display:none; }
-
-    .sidebar.painel-aberto nav{
-      flex-direction:column;
-      gap:4px;
-      flex:1 1 auto;
-      min-height:0;
-      overflow-y:auto;
-      -webkit-overflow-scrolling:touch;
-    }
-
-    .sidebar.painel-aberto .nav-row{
-      flex:0 0 auto;
-      min-height:44px;
-      align-items:center;
-      justify-content:flex-start;
-      padding:12px 14px;
-    }
-
-    .sidebar.painel-aberto .nav-row span{
-      display:inline-block;
-      transform:none; opacity:1; max-width:none;
-    }
-
-    .sidebar-pin-btn{ position:relative; z-index:66; }
-
-    .nav-overlay.aberto{
-      display:block;
-      position:fixed;
-      inset:0;
-      background:rgba(20,20,20,0.45);
-      z-index:65;
-    }
-  }
 </style>
 </head>
-<body>
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 
 <div class="shell">
@@ -688,7 +596,7 @@
       <div class="greet-row">
         <!-- Um botão só, dois papéis (padrão da equipa.html): com rato faz o
              pin do shell; ao toque abre/fecha o painel do menu. -->
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="contagensToggleMenu()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-clipboard-check"/></svg>GIOCO · <b>Contagens</b></h1>
@@ -853,59 +761,6 @@
   </div>
 </div>
 
-<script>
-  /* ---------- Menu ao toque: barra inferior + painel para cima ----------
-     Mesmo padrão da equipa.html (que é o rascunho do mobile do shell): o
-     #sidebarPinBtn tem dois papéis — com rato chama o toggleSidebarPin() do
-     shell, sem desvios; ao toque abre/fecha o painel. Só chrome, zero lógica
-     de contagens aqui. */
-  (function () {
-    var mqToque = window.matchMedia ? window.matchMedia('(hover: none)') : null;
-
-    function ehToque(){ return !!(mqToque && mqToque.matches); }
-
-    function painelAberto(){
-      var sb = document.getElementById('sidebarEl');
-      return !!(sb && sb.classList.contains('painel-aberto'));
-    }
-
-    function mostrarPainel(abrir){
-      var sb = document.getElementById('sidebarEl');
-      var ov = document.getElementById('navOverlay');
-      if (sb) sb.classList.toggle('painel-aberto', !!abrir);
-      if (ov) ov.classList.toggle('aberto', !!abrir);
-      var btn = document.getElementById('sidebarPinBtn');
-      if (btn && ehToque()) btn.setAttribute('title', abrir ? 'Fechar o menu' : 'Abrir o menu');
-    }
-
-    window.contagensToggleMenu = function(){
-      if (!ehToque()){
-        if (typeof window.toggleSidebarPin === 'function') window.toggleSidebarPin();
-        return;
-      }
-      mostrarPainel(!painelAberto());
-    };
-
-    var navOverlay = document.getElementById('navOverlay');
-    if (navOverlay) navOverlay.addEventListener('click', function(){ mostrarPainel(false); });
-
-    document.querySelectorAll('#sidebarEl .nav-row').forEach(function(a){
-      a.addEventListener('click', function(){ mostrarPainel(false); });
-    });
-
-    window.addEventListener('pageshow', function(){ mostrarPainel(false); });
-
-    if (mqToque && mqToque.addEventListener){
-      mqToque.addEventListener('change', function(){
-        mostrarPainel(false);
-        var btn = document.getElementById('sidebarPinBtn');
-        if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
-      });
-    }
-
-    if (ehToque()) mostrarPainel(false);
-  })();
-</script>
 
 <script>
   var firebaseConfig = {

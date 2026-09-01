@@ -100,149 +100,9 @@
   /* Overlay do painel do menu ao toque. Escondido por omissão em todo o lado. */
   .nav-overlay{ display:none; }
 
-  @media (hover: none){
+  /* O menu ao toque (barra inferior + painel) vive no gioco-shell.css/.js,
+     ligado pela classe shell-mobile no elemento <body>. */
 
-    /* A barra sai do fluxo (position:fixed), por isso o .main fica com a
-       largura toda — são os ~71px que a barra lateral roubava à grelha. */
-    .shell{ display:block; min-height:100vh; min-height:100dvh; }
-    .main{ padding:20px 16px 0; }
-    .greet-row h1{ font-size:clamp(21px, 5.4vw, 28px); }
-
-    /* Folga no fundo para a barra: sem isto os botões de ação da escala
-       (Editar / Confirmar / Exportar) ficavam tapados por ela. */
-    .page{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
-
-    /* ---------- A sidebar passa a barra horizontal fixa no fundo ----------
-
-       ESTRUTURA: o que é comum aos dois estados fica na regra de base; o que
-       é do estado escreve-se em `:not(.painel-aberto)` (barra) ou em
-       `.painel-aberto` (painel). Os dois estados são mutuamente exclusivos de
-       propósito.
-
-       Isto não é estilo, é uma correcção. Duas versões desta página partiram-se
-       exactamente da mesma maneira — uma regra de um estado a sangrar para o
-       outro. Primeiro o `width` da sidebar, que anulava o `.hidden` do shell e
-       partia o pin em desktop; depois o `flex:1 1 0` das linhas, escrito para
-       distribuir os ícones na horizontal, que ficava a valer no eixo vertical
-       do painel e esmagava as linhas de 41px para 24px (a zero em motores que
-       resolvem `flex-basis:0` de outra forma — que é o que se suspeita no
-       iPhone). Com os estados exclusivos deixa de depender de eu me lembrar de
-       anular cada propriedade, uma a uma. */
-
-    /* --- Base: vale nos dois estados --- */
-    .sidebar,
-    .sidebar.collapsed,
-    .sidebar.hidden{
-      position:fixed;
-      top:auto; right:0; bottom:0; left:0;
-      width:auto; height:auto; min-height:0; margin:0;
-      align-items:stretch;
-      border:none; border-top:1px solid var(--sidebar-line); border-radius:0;
-      box-shadow:0 -10px 30px rgba(0,0,0,0.16);
-      opacity:1; pointer-events:auto;
-      /* NUNCA overflow:auto aqui. Este elemento tem backdrop-filter (.glass do
-         shell) e é position:fixed: no iOS é precisamente essa combinação com
-         scroll próprio que deixa de repintar. Quem faz scroll é o <nav>. */
-      overflow:visible;
-      transition:none;
-      z-index:70;
-    }
-
-    /* Marca e rodapé não cabem numa barra de 52px. */
-    .sidebar .brand,
-    .sidebar .sidebar-foot{ display:none; }
-
-    /* flex-direction explícito: o shell tem `nav{ flex-direction:column }`. */
-    .sidebar nav{ display:flex; width:100%; }
-
-    .sidebar .nav-row{ border-radius:12px; }
-
-    /* --- Estado BARRA: ícones lado a lado, distribuídos por igual --- */
-    .sidebar:not(.painel-aberto){
-      flex-direction:row;
-      padding:6px 6px calc(6px + env(safe-area-inset-bottom));
-    }
-
-    .sidebar:not(.painel-aberto) nav{ flex-direction:row; gap:2px; }
-
-    .sidebar:not(.painel-aberto) .nav-row{
-      flex:1 1 0; min-width:0;
-      justify-content:center;
-      padding:10px 4px;
-    }
-
-    /* Na barra só ícones. display:none em vez do max-width:0 do shell, para
-       não herdar a animação de deslize, que aqui não faz sentido. */
-    .sidebar:not(.painel-aberto) .nav-row span{ display:none; }
-
-    /* ---------- Estado PAINEL: a mesma barra a abrir para cima ----------
-       É o mesmo <nav>, empilhado e com os nomes por extenso. Como a barra é
-       position:fixed com bottom:0, crescer significa crescer para cima: passa
-       por cima do .main sem lhe mexer no layout — a grelha não faz reflow. */
-    .sidebar.painel-aberto{
-      flex-direction:column;
-      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-      /* vh primeiro: sem dvh o motor descarta a segunda linha e fica na
-         primeira, em vez de ficar sem limite de altura nenhum. */
-      max-height:80vh;
-      max-height:80dvh;
-      /* Rede de segurança. As linhas já têm min-height própria, mas se algum
-         motor resolver o flex de maneira que não previ, o painel continua a
-         abrir com altura utilizável em vez de colapsar na barra. Fica abaixo
-         da altura natural (~352px), por isso nunca acrescenta espaço vazio no
-         caso saudável — só serve de chão. */
-      min-height:min(320px, 70vh);
-      min-height:min(320px, 70dvh);
-    }
-
-    /* A camada de distorção é decorativa e tem filter:url(#liquidDistort).
-       Repintá-la de 52px para ~352px num fixed com backdrop-filter é o risco
-       de composição em iOS que não consigo testar aqui; o vidro do .glass no
-       próprio elemento mantém-se e o painel continua com o mesmo aspecto. */
-    .sidebar.painel-aberto .glass-bend{ display:none; }
-
-    /* O scroll vive aqui, não no elemento com backdrop-filter.
-       flex-basis:auto (não 0) e min-height:0 para poder encolher e deslizar
-       quando o conteúdo passa o max-height do painel. */
-    .sidebar.painel-aberto nav{
-      flex-direction:column;
-      gap:4px;
-      flex:1 1 auto;
-      min-height:0;
-      overflow-y:auto;
-      -webkit-overflow-scrolling:touch;
-    }
-
-    /* flex:0 0 auto é a correcção: cada linha volta à sua altura natural em vez
-       de dividir o espaço do contentor. min-height é o chão que garante que a
-       linha existe mesmo que um motor resolva o flex a zero — e 44px é também
-       o alvo de toque mínimo recomendado em iOS. */
-    .sidebar.painel-aberto .nav-row{
-      flex:0 0 auto;
-      min-height:44px;
-      align-items:center;
-      justify-content:flex-start;
-      padding:12px 14px;
-    }
-
-    .sidebar.painel-aberto .nav-row span{
-      display:inline-block;
-      transform:none; opacity:1; max-width:none;
-    }
-
-    /* O botão fica acima do overlay: é ele que fecha o painel, e sem isto o
-       overlay apanhava o toque e o segundo toque não fazia nada. */
-    .sidebar-pin-btn{ position:relative; z-index:66; }
-
-    /* Tocar fora fecha. Fica por baixo da barra e do botão, por cima do resto. */
-    .nav-overlay.aberto{
-      display:block;
-      position:fixed;
-      inset:0;
-      background:rgba(20,20,20,0.45);
-      z-index:65;
-    }
-  }
 
   .page-subtitle{
     margin:6px 0 0;
@@ -1965,7 +1825,7 @@
   }
 </style>
 </head>
-<body>
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 
 <div class="shell">
@@ -1994,7 +1854,7 @@
       <div class="greet-row">
         <!-- Um botão só, dois papéis: com rato faz o pin do shell (inalterado);
              ao toque abre/fecha o painel do menu a partir da barra inferior. -->
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="equipaToggleMenu()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-users"/></svg>GIOCO · <b>Equipa</b></h1>
@@ -2531,64 +2391,8 @@
 <script>
 window.addEventListener('load', function () {
 
-  /* ---------- Menu ao toque: barra inferior + painel para cima ----------
-     O gioco-shell.js expande a sidebar no mouseenter e o #sidebarPinBtn
-     fixa-a fechada. Nada disso existe ao toque: não há hover, e a tentativa
-     anterior (:focus-within no CSS) só disparava ao tocar num item do menu —
-     que é um <a> e navegava. Aqui o mesmo botão passa a ter dois papéis, e o
-     shell fica intacto: com rato continua a chamar toggleSidebarPin(). */
-  var mqToque = window.matchMedia ? window.matchMedia('(hover: none)') : null;
-
-  function ehToque(){ return !!(mqToque && mqToque.matches); }
-
-  function painelAberto(){
-    var sb = document.getElementById('sidebarEl');
-    return !!(sb && sb.classList.contains('painel-aberto'));
-  }
-
-  function mostrarPainel(abrir){
-    var sb = document.getElementById('sidebarEl');
-    var ov = document.getElementById('navOverlay');
-    if (sb) sb.classList.toggle('painel-aberto', !!abrir);
-    if (ov) ov.classList.toggle('aberto', !!abrir);
-    var btn = document.getElementById('sidebarPinBtn');
-    if (btn && ehToque()) btn.setAttribute('title', abrir ? 'Fechar o menu' : 'Abrir o menu');
-  }
-
-  window.equipaToggleMenu = function(){
-    if (!ehToque()){
-      /* Com rato: comportamento do shell, sem desvios. */
-      if (typeof window.toggleSidebarPin === 'function') window.toggleSidebarPin();
-      return;
-    }
-    mostrarPainel(!painelAberto());
-  };
-
-  var navOverlay = document.getElementById('navOverlay');
-  if (navOverlay) navOverlay.addEventListener('click', function(){ mostrarPainel(false); });
-
-  /* O link "Definições" é href="#": sem isto o painel ficava aberto por cima
-     do conteúdo depois de o tocar. Os outros navegam e a página recarrega. */
-  document.querySelectorAll('#sidebarEl .nav-row').forEach(function(a){
-    a.addEventListener('click', function(){ mostrarPainel(false); });
-  });
-
-  /* Voltar atrás pode restaurar a página do bfcache com o painel como estava.
-     O estado vive só numa classe, nunca é gravado — aqui só se garante que uma
-     página restaurada aparece sempre com o menu fechado. */
-  window.addEventListener('pageshow', function(){ mostrarPainel(false); });
-
-  /* Ligar um rato (ou rodar para um contexto com hover) não pode deixar o
-     painel preso: fecha-se e devolve-se o título de origem ao botão. */
-  if (mqToque && mqToque.addEventListener){
-    mqToque.addEventListener('change', function(){
-      mostrarPainel(false);
-      var btn = document.getElementById('sidebarPinBtn');
-      if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
-    });
-  }
-
-  if (ehToque()) mostrarPainel(false);
+  /* O menu ao toque (barra inferior + painel) vive no gioco-shell.js.
+     O #sidebarPinBtn chama giocoToggleMenu(). */
 
   /* ---------- Separadores Escala / Pessoas / Recibos ----------
      Mesmo padrão do receitas.html. Fica FORA do autenticarEContinuar de
