@@ -18,7 +18,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   Sem `@media (max-width: …)` — a única excepção permitida é `@media print`.
   No telemóvel a página aparece reduzida (zoom out), não reorganizada.
 - **Excepção ao desktop-only: as páginas de `device-width`.** `equipa.html` (grelha de
-  turnos), `contagens.html`, `tesouraria.html` e `loja-sao-bento.html` usam
+  turnos), `contagens.html` e `tesouraria.html` usam
   `<meta name="viewport" content="width=device-width, initial-scale=1">` porque são usadas
   ao telemóvel. Adaptam-se sem `@media` próprios: `overflow-x:auto` + coluna sticky e
   grelhas `minmax(min(Xpx,100%),1fr)`.
@@ -179,7 +179,8 @@ que apagariam `precoUltimaCompra` e o resto da ficha.
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
 Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
-`equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`, `leitura-faturas.html`, `caixa.html`. Por migrar: `loja-sao-bento.html`, `index.html`.
+`equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`, `leitura-faturas.html`, `caixa.html`, `loja-sao-bento.html`. Por migrar: `index.html` (e as de suporte:
+`abanca-callback`, `privacidade`, `termos`).
 
 Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
 (`Antonio` + `Inter`, mais `Space Mono` só se a página tiver números
