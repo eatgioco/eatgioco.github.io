@@ -135,6 +135,24 @@ mapaProdutosReceitas  — ligação {codigoZoneSoft} -> { receitaId } ou { ignor
                          não estar mapeado, que aparece no balde "Sem mapa"
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
+classificacaoRegras   — regras de classificação de movimentos bancários da
+                         resultados.html: {idPush} = { padrao, rubrica, criadoEm,
+                         origemExemplo }. padrao = substring do descritivo,
+                         normalizada (maiúsculas, sem acentos, espaços
+                         colapsados); rubrica ∈ cmv | pessoal | fixos | outros |
+                         impostos | interno. Se várias regras casarem, ganha o
+                         padrão mais longo. Apagar uma regra é permitido (é
+                         configuração, não dados), sempre com confirmação na UI
+classificacaoMovimentos — override individual por movimento bancário:
+                         {conta}~{ref} = { rubrica, manual:true, regraId?,
+                         criadoEm }. Vence sempre sobre qualquer regra.
+                         PRIORIDADE de classificação na resultados.html:
+                         (1) lógica de reconciliação existente (salários, renda,
+                         paymentRequests, internas) — o classificador nunca atua
+                         sobre estes; (2) este override; (3) regra de
+                         classificacaoRegras; (4) fica "Não classificado".
+                         São os DOIS ÚNICOS nós onde a resultados.html escreve,
+                         sempre um set() por registo (nunca update multi-chave)
 contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
                          { estado: 'rascunho'|'fechada', criadaEm, fechadaEm,
                            itens: { {ingredienteId}: { qtdContada, unidadeContagem,

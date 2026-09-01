@@ -547,6 +547,11 @@
       // Classificar / corrigir movimentos: delegação no corpo da
       // reconciliação, porque as tabelas são reconstruídas a cada render.
       document.getElementById('recCorpo').addEventListener('click', onRecClick);
+      // Pré-visualização ao vivo da regra enquanto o padrão é editado.
+      document.getElementById('recCorpo').addEventListener('input', function(e){
+        var form = e.target.closest('.clf-form');
+        if (form) atualizarPreviewRegra(form);
+      });
     }
 
     /* =========================================================
@@ -806,9 +811,53 @@
       }
     }
 
-    // Movimentos indexados por id no último render — o formulário de
-    // classificação precisa deles para sugerir o padrão.
+    // Estado do último render da reconciliação: movimentos por id (para o
+    // formulário sugerir o padrão), a lista dos que chegaram ao classificador
+    // (para a pré-visualização das regras) e o uso de cada regra no mês.
     var recMovsPorId = {};
+    var recClassificaveis = [];
+    var recRegrasUso = {};
+
+    // Movimentos do mês ativo cujo descritivo contém o padrão — a
+    // pré-visualização que evita padrões demasiado largos (ex.: "TRF").
+    function movimentosQueCasam(padrao){
+      var p = normalizarPadrao(padrao);
+      if (!p) return [];
+      return recClassificaveis.filter(function(m){
+        return normalizarPadrao(m.desc + ' ' + (m.extra || '')).indexOf(p) !== -1;
+      });
+    }
+    function atualizarPreviewRegra(form){
+      var alvo = form.querySelector('.clf-preview');
+      if (!alvo) return;
+      var criar = form.querySelector('[data-campo="criarRegra"]');
+      if (criar && !criar.checked){ alvo.innerHTML = ''; return; }
+      var padrao = form.querySelector('[data-campo="padrao"]').value;
+      if (!normalizarPadrao(padrao)){ alvo.textContent = 'Padrão vazio — a regra não apanharia nada.'; return; }
+      var m = movimentosQueCasam(padrao);
+      var lista = m.slice(0, 8).map(function(x){
+        return escapeHtml(x.data + ' · ' + x.desc + ' · ' + formatEuro(x.valor));
+      }).join('<br>');
+      alvo.innerHTML = 'O padrão apanha <b>' + m.length + '</b> movimento' +
+        (m.length === 1 ? '' : 's') + ' de ' + escapeHtml(nomeMes(mesAtivo)) +
+        (m.length ? ':<br>' + lista +
+          (m.length > 8 ? '<br>… e mais ' + (m.length - 8) : '') : '.');
+    }
+
+    function apagarRegra(rid){
+      var r = base.classificacaoRegras[rid];
+      if (!r) return;
+      var n = recRegrasUso[rid] || 0;
+      // Apagar uma regra é permitido — é configuração, não dados — mas
+      // nunca em silêncio.
+      if (!confirm('Apagar a regra "' + r.padrao + '" → ' + nomeRubrica(r.rubrica) + '?\n' +
+        'Deixa de classificar ' + n + (n === 1 ? ' movimento' : ' movimentos') +
+        ' de ' + nomeMes(mesAtivo) + ' (voltam a "Não classificado").')) return;
+      firebase.database().ref('classificacaoRegras/' + rid).remove().then(function(){
+        delete base.classificacaoRegras[rid];
+        renderMes();
+      }).catch(erroEscrita);
+    }
 
     /* =========================================================
        Reconciliação: classifica cada saída bancária numa rubrica.
@@ -857,8 +906,10 @@
 
       var res = { total: 0, internas: 0, impostos: [], porRubrica: {
                     cmv: 0, pessoalRecibo: 0, pessoalSemRecibo: 0, fixos: 0, outros: 0 },
-                  naoClassificado: [], classificados: [], explicado: 0 };
+                  naoClassificado: [], classificados: [], explicado: 0,
+                  regrasUso: {} };
       recMovsPorId = {};
+      recClassificaveis = [];
 
       movs.forEach(function(mov){
         if (mov.interna){ res.internas += mov.valor; return; }
@@ -892,8 +943,18 @@
         // A lógica de sempre não explicou o movimento: entra o classificador
         // (override individual > regra com o padrão mais longo).
         recMovsPorId[idMovimento(mov)] = mov;
+        recClassificaveis.push(mov);
+        // Um movimento excluído (✕) não é classificável: a exclusão vence
+        // e devolve-o ao tratamento das exclusões já implementado.
+        if (removido('banco:' + mov.conta + '/' + mov.ref)){
+          mov.excluido = true;
+          res.naoClassificado.push(mov);
+          return;
+        }
         var clf = classificarMovimento(mov);
         if (clf){
+          if (clf.modo === 'auto' && clf.regraId)
+            res.regrasUso[clf.regraId] = (res.regrasUso[clf.regraId] || 0) + 1;
           res.classificados.push({ mov: mov, id: clf.id, rubrica: clf.rubrica,
                                    modo: clf.modo, regraId: clf.regraId });
           if (clf.rubrica === 'interno'){
@@ -914,6 +975,7 @@
 
       res.naoClassificadoTotal = res.naoClassificado.reduce(function(s,m){ return s + m.valor; }, 0);
       res.impostosTotal = res.impostos.reduce(function(s,m){ return s + m.valor; }, 0);
+      recRegrasUso = res.regrasUso;
       return res;
     }
 
@@ -1273,8 +1335,10 @@
             return '<tr><td>' + escapeHtml(m.data) + '</td>' +
               '<td>' + escapeHtml(m.conta) + '</td>' + celulaDesc(m) +
               '<td class="num">' + formatEuro(m.valor) + '</td>' +
-              '<td class="num"><button type="button" class="btn-classificar" data-clf="' +
-              escapeHtml(idMovimento(m)) + '">Classificar</button></td></tr>';
+              '<td class="num">' + (m.excluido
+                ? '<span class="pnl-sub">excluído</span>'
+                : '<button type="button" class="btn-classificar" data-clf="' +
+                  escapeHtml(idMovimento(m)) + '">Classificar</button>') + '</td></tr>';
           }).join(''));
       }
       if (rec.classificados.length){
@@ -1289,7 +1353,26 @@
               '<td class="num">' + formatEuro(c.mov.valor) + '</td>' +
               '<td class="num"><button type="button" class="btn-classificar" data-clf="' +
               escapeHtml(c.id) + '" data-regra="' + escapeHtml(c.regraId || '') +
-              '" data-corrigir="1">Corrigir</button></td></tr>';
+              '" data-corrigir="1">Corrigir</button>' +
+              (c.modo === 'auto' && c.regraId
+                ? ' <button type="button" class="btn-classificar" data-apagar-regra="' +
+                  escapeHtml(c.regraId) + '">Apagar regra</button>' : '') +
+              ' ' + botaoRemover('banco:' + c.mov.conta + '/' + c.mov.ref) + '</td></tr>';
+          }).join(''));
+      }
+      var regrasIds = Object.keys(base.classificacaoRegras);
+      if (regrasIds.length){
+        h += drill('Regras de classificação (' + regrasIds.length + ')',
+          '<th>Padrão</th><th>Rubrica</th><th class="num">Apanha este mês</th><th></th>',
+          regrasIds.map(function(rid){
+            var r = base.classificacaoRegras[rid] || {};
+            return '<tr><td>' + escapeHtml(r.padrao || '') + '</td>' +
+              '<td>' + escapeHtml(nomeRubrica(r.rubrica)) + '</td>' +
+              '<td class="num">' + (rec.regrasUso[rid] || 0) + '</td>' +
+              '<td class="num"><button type="button" class="btn-classificar" data-editar-regra="' +
+              escapeHtml(rid) + '">Editar</button> ' +
+              '<button type="button" class="btn-classificar" data-apagar-regra="' +
+              escapeHtml(rid) + '">Apagar</button></td></tr>';
           }).join(''));
       }
       if (rec.impostos.length){
@@ -1332,15 +1415,63 @@
         '<span class="clf-hint">' + (corrigir
           ? 'A correção grava um override individual (manual), que vence sempre sobre as regras.'
           : 'Com regra, todos os movimentos — passados e futuros — cujo descritivo contenha o padrão ficam nesta rubrica, marcados "auto". Sem regra, fica só este movimento.') +
-        '</span></div></td>';
+        '</span><span class="clf-preview clf-hint"></span></div></td>';
       tr.setAttribute('data-clf-id', id);
       if (regraAtual) tr.setAttribute('data-clf-regra', regraAtual);
       linha.parentNode.insertBefore(tr, linha.nextSibling);
+      atualizarPreviewRegra(tr);
+    }
+
+    function abrirFormEdicaoRegra(btn){
+      var aberta = document.querySelector('.clf-form');
+      if (aberta) aberta.parentNode.removeChild(aberta);
+
+      var rid = btn.getAttribute('data-editar-regra');
+      var r = base.classificacaoRegras[rid];
+      var linha = btn.closest('tr');
+      if (!r || !linha) return;
+
+      var opts = RUBRICAS.map(function(x){
+        return '<option value="' + x.key + '"' + (x.key === r.rubrica ? ' selected' : '') +
+          '>' + escapeHtml(x.nome) + '</option>';
+      }).join('');
+      var tr = document.createElement('tr');
+      tr.className = 'clf-form';
+      tr.innerHTML = '<td colspan="' + linha.children.length + '"><div class="clf-form-inner">' +
+        '<label>Rubrica <select data-campo="rubrica">' + opts + '</select></label>' +
+        '<label>Padrão <input type="text" data-campo="padrao" value="' + escapeHtml(r.padrao || '') + '"></label>' +
+        '<button type="button" class="btn-classificar" data-acao="guardar-regra">Guardar</button>' +
+        '<button type="button" class="btn-classificar" data-acao="cancelar">Cancelar</button>' +
+        '<span class="clf-preview clf-hint"></span></div></td>';
+      tr.setAttribute('data-regra-id', rid);
+      linha.parentNode.insertBefore(tr, linha.nextSibling);
+      atualizarPreviewRegra(tr);
     }
 
     function onRecClick(e){
+      // ✕ num movimento classificado: a exclusão vence a classificação e
+      // devolve-o ao tratamento das exclusões (mesma mecânica do P&L).
+      var rem = e.target.closest('[data-remover]');
+      if (rem){
+        var ex = exclusoes[mesAtivo] = exclusoes[mesAtivo] || {};
+        ex[rem.getAttribute('data-remover')] = true;
+        gravarExclusoes();
+        renderMes();
+        return;
+      }
+
       var btn = e.target.closest('.btn-classificar');
       if (!btn) return;
+
+      if (btn.hasAttribute('data-apagar-regra')){
+        apagarRegra(btn.getAttribute('data-apagar-regra'));
+        return;
+      }
+      if (btn.hasAttribute('data-editar-regra')){
+        abrirFormEdicaoRegra(btn);
+        return;
+      }
+
       var acao = btn.getAttribute('data-acao');
       if (!acao){ abrirFormClassificacao(btn); return; }
 
@@ -1348,10 +1479,28 @@
       if (!form) return;
       if (acao === 'cancelar'){ form.parentNode.removeChild(form); return; }
 
-      var id = form.getAttribute('data-clf-id');
       var rubrica = form.querySelector('[data-campo="rubrica"]').value;
-      var criarRegra = form.querySelector('[data-campo="criarRegra"]').checked;
       var padrao = normalizarPadrao(form.querySelector('[data-campo="padrao"]').value);
+
+      if (acao === 'guardar-regra'){
+        var rid = form.getAttribute('data-regra-id');
+        var r = base.classificacaoRegras[rid];
+        if (!r) return;
+        if (!padrao){ alert('O padrão da regra está vazio.'); return; }
+        // set() do registo completo no seu próprio path — nunca update()
+        // multi-chave. criadoEm e origemExemplo preservam-se.
+        var novo = { padrao: padrao, rubrica: rubrica,
+                     criadoEm: r.criadoEm || new Date().toISOString(),
+                     origemExemplo: r.origemExemplo || '' };
+        firebase.database().ref('classificacaoRegras/' + rid).set(novo).then(function(){
+          base.classificacaoRegras[rid] = novo;
+          renderMes();
+        }).catch(erroEscrita);
+        return;
+      }
+
+      var id = form.getAttribute('data-clf-id');
+      var criarRegra = form.querySelector('[data-campo="criarRegra"]').checked;
       if (criarRegra && !padrao){
         alert('O padrão da regra está vazio — escreve um padrão ou desliga "criar regra".');
         return;
