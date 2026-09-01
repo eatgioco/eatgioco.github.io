@@ -176,7 +176,7 @@ que apagariam `precoUltimaCompra` e o resto da ficha.
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
 Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
-`equipa.html`, `mrn-dashboard.html`, `contagens.html`. Por migrar: `compras.html`, `caixa.html`,
+`equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`. Por migrar: `caixa.html`,
 `loja-sao-bento.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`,
 `leitura-faturas.html`, `index.html`.
 

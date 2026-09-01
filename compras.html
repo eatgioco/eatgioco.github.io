@@ -16,83 +16,35 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-  }
+  body{ -webkit-font-smoothing:antialiased; }
 
-  *{box-sizing:border-box;}
-
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-
-  h1,h2,h3,.mono,button,.card-title,.tag,.field-label{
+  /* O h1 (Antonio) vem do .greet-row do shell. Aqui o Space Mono fica só
+     onde é etiqueta ou número — o texto corrido é Inter, como no resto do OS. */
+  .mono,.card-title,.tag,.field-label{
     font-family:'Space Mono', monospace;
   }
 
-  header{
-    padding:32px 24px 16px;
-    border-bottom:3px solid var(--black);
-    background:var(--bg);
-    position:sticky;
-    top:0;
-    z-index:10;
-  }
 
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-end;
-    flex-wrap:wrap;
-    gap:16px;
-  }
 
-  .brand{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
 
-  .brand .tag{
-    color:var(--red);
-    font-size:12px;
-    letter-spacing:2px;
-    text-transform:uppercase;
-  }
 
-  h1{
-    margin:0;
-    font-size:28px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
 
   .btn{
     font-family:'Space Mono', monospace;
     font-size:13px;
     font-weight:700;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     padding:12px 20px;
     cursor:pointer;
     transition:all .15s ease;
@@ -100,7 +52,7 @@
   }
 
   .btn:hover{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
@@ -111,8 +63,8 @@
   }
 
   .btn-primary:hover{
-    background:var(--black);
-    border-color:var(--black);
+    background:var(--ink);
+    border-color:var(--ink);
   }
 
   .btn-danger{
@@ -127,9 +79,7 @@
   }
 
   .controls{
-    max-width:1200px;
-    margin:20px auto 0;
-    padding:0 24px;
+    margin:20px 0 0;
     display:flex;
     gap:12px;
     flex-wrap:wrap;
@@ -139,11 +89,11 @@
   .search-input{
     flex:1 1 260px;
     padding:12px 16px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     font-family:'Inter', sans-serif;
     font-size:14px;
-    color:var(--black);
+    color:var(--ink);
   }
 
   .search-input:focus{
@@ -161,23 +111,22 @@
     font-family:'Space Mono', monospace;
     font-size:12px;
     padding:10px 14px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
     text-transform:uppercase;
     letter-spacing:0.5px;
   }
 
   .filter-btn.active{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
   main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:24px;
+    display:block;
+    padding:24px 0;
   }
 
   .grid{
@@ -188,7 +137,7 @@
 
   .card{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:20px;
     cursor:pointer;
     display:flex;
@@ -237,14 +186,14 @@
   }
 
   .card-row strong{
-    color:var(--black);
+    color:var(--ink);
     font-weight:600;
     min-width:60px;
   }
 
   .card-products{
     font-size:13px;
-    color:var(--black);
+    color:var(--ink);
     border-top:1px solid var(--line);
     padding-top:10px;
     margin-top:2px;
@@ -275,8 +224,8 @@
   }
 
   .modal{
-    background:var(--bg);
-    border:3px solid var(--black);
+    background:var(--dough);
+    border:1px solid var(--line);
     max-width:560px;
     width:100%;
     padding:28px;
@@ -330,9 +279,9 @@
     font-family:'Inter', sans-serif;
     font-size:14px;
     padding:10px 12px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     width:100%;
   }
 
@@ -364,9 +313,7 @@
   }
 
   .status-msg{
-    max-width:1200px;
-    margin:0 auto;
-    padding:0 24px;
+    margin:0;
     font-family:'Space Mono', monospace;
     font-size:12px;
     color:var(--muted);
@@ -400,7 +347,7 @@
   }
 
   .order-email-link:hover{
-    color:var(--black);
+    color:var(--ink);
   }
 
   .btn-small{
@@ -408,15 +355,15 @@
     font-size:11px;
     font-weight:700;
     padding:8px 10px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
     letter-spacing:0.3px;
   }
 
   .btn-small:hover{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
@@ -455,7 +402,7 @@
     max-height:min(78vh, calc(100vh - 312px));
     min-height:280px;
     overflow-y:auto;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
   }
 
   .order-table{
@@ -466,7 +413,7 @@
   .order-table thead th{
     position:sticky;
     top:0;
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -488,14 +435,14 @@
   .order-table .order-qty{
     width:100%;
     padding:6px 8px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     font-family:'Space Mono', monospace;
   }
 
   .order-table .order-tipo{
     width:100%;
     padding:6px 8px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     font-family:'Inter', sans-serif;
     font-size:13px;
@@ -513,11 +460,11 @@
   }
 
   .order-new-line{
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .order-new-line td{
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
     padding-bottom:10px;
   }
 
@@ -528,7 +475,7 @@
   .order-new-nome{
     width:100%;
     padding:6px 8px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     font-family:'Inter', sans-serif;
     font-size:14px;
   }
@@ -541,7 +488,7 @@
     top:100%;
     margin-top:2px;
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     max-height:180px;
     overflow-y:auto;
     z-index:20;
@@ -564,7 +511,7 @@
 
   .order-suggest-item:hover,
   .order-suggest-item.active{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
@@ -620,7 +567,7 @@
 
   .order-preview{
     margin-top:18px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     padding:14px;
   }
@@ -642,7 +589,7 @@
 
   .card-conditions{
     font-size:13px;
-    color:var(--black);
+    color:var(--ink);
     border-top:1px solid var(--line);
     padding-top:10px;
     margin-top:2px;
@@ -657,28 +604,8 @@
     gap:10px;
   }
 
-  .header-left{
-    display:flex;
-    align-items:center;
-    gap:16px;
-    flex-wrap:wrap;
-  }
 
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--black);
-    text-decoration:none;
-    border:2px solid var(--black);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
 
-  .home-link:hover{
-    background:var(--black);
-    color:var(--white);
-  }
 
   .checkbox-group{
     display:flex;
@@ -714,7 +641,7 @@
   }
 
   .ingredient-accordion{
-    border-top:2px solid var(--black);
+    border-top:1px solid var(--line);
     margin-top:4px;
   }
 
@@ -801,8 +728,8 @@
     height:26px;
     padding:0;
     background:var(--white);
-    border:2px solid var(--black);
-    color:var(--black);
+    border:1px solid var(--line);
+    color:var(--ink);
     font-family:'Space Mono', monospace;
     font-size:13px;
     font-weight:700;
@@ -811,17 +738,15 @@
   }
 
   .card-info-btn:hover{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
   .tabs-bar{
-    max-width:1200px;
-    margin:16px auto 0;
-    padding:0 24px;
+    margin:16px 0 0;
     display:flex;
     gap:0;
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
   }
 
   .tab-btn{
@@ -839,11 +764,11 @@
   }
 
   .tab-btn:hover{
-    color:var(--black);
+    color:var(--ink);
   }
 
   .tab-btn.active{
-    color:var(--black);
+    color:var(--ink);
     border-bottom-color:var(--red);
   }
 
@@ -851,14 +776,12 @@
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
     gap:14px;
-    max-width:1200px;
-    margin:20px auto 0;
-    padding:0 24px;
+    margin:20px 0 0;
   }
 
   .ing-stat-card{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:14px 16px;
   }
 
@@ -880,9 +803,7 @@
   }
 
   .ing-chips{
-    max-width:1200px;
-    margin:16px auto 0;
-    padding:0 24px;
+    margin:16px 0 0;
     display:flex;
     gap:8px;
     flex-wrap:wrap;
@@ -893,16 +814,16 @@
     font-size:11.5px;
     font-weight:700;
     padding:7px 13px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
     letter-spacing:0.3px;
     white-space:nowrap;
   }
 
   .ing-chip.active{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
@@ -922,15 +843,15 @@
     font-weight:700;
     letter-spacing:0.5px;
     text-transform:uppercase;
-    color:var(--black);
+    color:var(--ink);
     padding-bottom:8px;
     margin-bottom:14px;
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
   }
 
   .ing-card{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     cursor:pointer;
     display:flex;
     flex-direction:column;
@@ -944,13 +865,13 @@
 
   .ing-card-image{
     aspect-ratio:1/1;
-    border-bottom:2px solid var(--black);
-    background-image:repeating-linear-gradient(45deg, var(--bg), var(--bg) 10px, #EAE4D6 10px, #EAE4D6 20px);
+    border-bottom:1px solid var(--line);
+    background-image:repeating-linear-gradient(45deg, var(--dough), var(--dough) 10px, var(--line) 10px, var(--line) 20px);
     display:flex;
     align-items:center;
     justify-content:center;
     font-size:30px;
-    color:#b0a99a;
+    color:var(--muted);
   }
 
   .ing-card-body{
@@ -970,7 +891,7 @@
     letter-spacing:0.4px;
     padding:3px 7px;
     background:var(--red);
-    color:var(--bg);
+    color:var(--dough);
   }
 
   .ing-card-cat.none{
@@ -983,7 +904,7 @@
     font-size:14px;
     font-weight:700;
     line-height:1.3;
-    color:var(--black);
+    color:var(--ink);
   }
 
   .ing-card-footer{
@@ -999,7 +920,7 @@
     font-family:'Inter', sans-serif;
     font-size:11px;
     color:var(--muted);
-    border:1px solid #b0a99a;
+    border:1px solid var(--muted);
     padding:3px 8px;
     white-space:nowrap;
     overflow:hidden;
@@ -1022,13 +943,13 @@
   .sheet-image{
     width:120px;
     aspect-ratio:1/1;
-    border:2px solid var(--black);
-    background-image:repeating-linear-gradient(45deg, var(--bg), var(--bg) 10px, #EAE4D6 10px, #EAE4D6 20px);
+    border:1px solid var(--line);
+    background-image:repeating-linear-gradient(45deg, var(--dough), var(--dough) 10px, var(--line) 10px, var(--line) 20px);
     display:flex;
     align-items:center;
     justify-content:center;
     font-size:36px;
-    color:#b0a99a;
+    color:var(--muted);
     margin:0 auto 18px;
   }
 
@@ -1074,9 +995,9 @@
     font-size:10.5px;
     font-weight:700;
     padding:5px 10px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     white-space:nowrap;
   }
 
@@ -1124,9 +1045,9 @@
     font-size:10.5px;
     font-weight:700;
     padding:5px 6px 5px 10px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
   }
 
   .alias-chip button{
@@ -1173,7 +1094,7 @@
 
   .cat-manage-row input[type="text"]{
     flex:1;
-    border:2px solid transparent;
+    border:1px solid transparent;
     padding:6px 8px;
     background:transparent;
   }
@@ -1213,10 +1134,10 @@
     z-index:900;
     width:60px;
     height:60px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     border-radius:0;
     background:var(--red);
-    color:var(--bg);
+    color:var(--dough);
     font-size:24px;
     line-height:1;
     cursor:pointer;
@@ -1237,8 +1158,8 @@
     min-width:24px;
     height:24px;
     padding:0 5px;
-    background:var(--black);
-    color:var(--bg);
+    background:var(--ink);
+    color:var(--dough);
     font-family:'Space Mono', monospace;
     font-size:12px;
     font-weight:700;
@@ -1256,9 +1177,9 @@
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     font-family:'Space Mono', monospace;
     font-size:16px;
     font-weight:700;
@@ -1268,7 +1189,7 @@
 
   .ing-cart-add:hover{
     background:var(--red);
-    color:var(--bg);
+    color:var(--dough);
   }
 
   .ing-cart-stepper{
@@ -1276,9 +1197,9 @@
     display:inline-flex;
     align-items:stretch;
     height:36px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--red);
-    color:var(--bg);
+    color:var(--dough);
   }
 
   .ing-cart-stepper button{
@@ -1288,7 +1209,7 @@
     padding:0;
     border:none;
     background:transparent;
-    color:var(--bg);
+    color:var(--dough);
     font-family:'Space Mono', monospace;
     font-size:15px;
     font-weight:700;
@@ -1297,7 +1218,7 @@
   }
 
   .ing-cart-stepper button:hover{
-    background:var(--black);
+    background:var(--ink);
   }
 
   .stp-qtd{
@@ -1340,8 +1261,8 @@
 
   .btn:disabled:hover{
     background:var(--white);
-    color:var(--black);
-    border-color:var(--black);
+    color:var(--ink);
+    border-color:var(--ink);
   }
 
   /* ===== Modais largos (carrinho / checkout) ===== */
@@ -1351,7 +1272,7 @@
 
   /* ===== Modal do carrinho ===== */
   .cart-group{
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     margin-bottom:14px;
   }
@@ -1366,7 +1287,7 @@
     justify-content:space-between;
     gap:10px;
     padding:10px 12px;
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
     font-family:'Space Mono', monospace;
     font-size:13px;
     font-weight:700;
@@ -1481,8 +1402,8 @@
     z-index:2;
     margin-top:18px;
     padding:12px 0;
-    background:var(--bg);
-    border-top:2px solid var(--black);
+    background:var(--dough);
+    border-top:1px solid var(--line);
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -1506,7 +1427,7 @@
 
   /* ===== Checkout ===== */
   .ck-block{
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     padding:12px;
     margin-bottom:14px;
@@ -1594,7 +1515,7 @@
   .ck-minimo{
     margin-top:10px;
     padding:8px 10px;
-    border:2px solid var(--red);
+    border:1.5px solid var(--red);
     color:var(--red);
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -1606,7 +1527,7 @@
 
   .ck-progress{
     height:10px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
   }
 
@@ -1635,7 +1556,7 @@
 
   .ck-preview{
     margin-top:12px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     padding:12px;
   }
@@ -1695,7 +1616,7 @@
   .ck-nota-topo{
     margin-bottom:14px;
     padding:10px 12px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
     font-family:'Space Mono', monospace;
     font-size:12px;
@@ -1707,8 +1628,8 @@
     z-index:2;
     margin-top:18px;
     padding:12px 0;
-    background:var(--bg);
-    border-top:2px solid var(--black);
+    background:var(--dough);
+    border-top:1px solid var(--line);
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -1716,24 +1637,98 @@
     gap:12px;
   }
 
+
+  /* ======================================================================
+     Fase 3 — camada do design system
+     ======================================================================
+     Só aparência: o .page do shell já centra e dá a largura, os tokens já
+     invertem com o tema. Fica aqui o que o shell não tem (subtítulo da
+     página) e o arredondamento — a Fase 0 desta página era toda de cantos
+     rectos e traço preto de 2px, que já passou a 1px em var(--line).
+     Este bloco vem no fim de propósito: em empate de especificidade ganha
+     a última regra, e é assim que arredonda o que está escrito acima. */
+
+  .page-subtitle{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .header-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin:20px 0 4px;
+  }
+
+  .btn, .btn-small, .filter-btn, .search-input,
+  .ing-chip, .sheet-chip, .sheet-chip-small, .alias-chip{
+    border-radius:100px;
+  }
+
+  input, select, textarea,
+  .card, .ing-card, .ing-stat-card, .badge, .modal,
+  .ck-block, .cart-group, .order-suggest-box, .sheet-image{
+    border-radius:12px;
+  }
+
+  .modal{ border-radius:16px; }
+
+  /* URLs longos (grupos de WhatsApp) transbordavam o cartão e punham a página
+     a fazer scroll na horizontal. Já acontecia antes do shell. */
+  .card-row, .card-row span{ overflow-wrap:anywhere; }
+
+  /* O hover da Fase 0 era uma sombra dura deslocada. Fica a mesma ideia, mas
+     no vocabulário do shell: sobe, não salta. */
+  .card:hover, .ing-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 24px rgba(0,0,0,0.10);
+  }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <div class="header-left">
-      <a href="index.html" class="home-link">🏠 Home</a>
-      <div class="brand">
-        <span class="tag">GIOCO · Focaccia · Lisboa</span>
-        <h1>Base de Fornecedores</h1>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('compras.html');</script>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
       </div>
     </div>
-    <div class="header-actions">
-      <button class="btn btn-primary" id="btnNovo">+ Novo</button>
-    </div>
   </div>
-</header>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-shopping-cart"/></svg>GIOCO · <b>Compras</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Fornecedores, ingredientes e encomendas</p>
+
+      <div class="header-actions">
+        <button class="btn-add" id="btnNovo"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Novo fornecedor</button>
+      </div>
 
 <div class="tabs-bar">
   <button type="button" class="tab-btn active" id="tabFornecedor">Por fornecedor</button>
@@ -1778,6 +1773,9 @@
   </main>
 </div>
 
+    </div>
+  </div>
+</div>
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
