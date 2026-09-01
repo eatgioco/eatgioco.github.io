@@ -32,9 +32,9 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   O critério é a existência de hover, **nunca a largura** — e é por isso que tem de ser
   opt-in: sem a classe, uma página desktop-only (`width=1200`) aberta no telemóvel ficava
   com uma barra de 52px desenhada a 1200px e reduzida a zoom out, inutilizável.
-  Aderem hoje: `equipa.html`, `contagens.html` e `tesouraria.html`. A
-  `loja-sao-bento.html` **não** adere: apesar de ser do staff, corre no computador da loja
-  e continua com `viewport width=1200`.
+  Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html` e
+  `loja-sao-bento.html` (desde 1 Set/2026: no computador da loja, que tem rato,
+  nada muda — o critério é o hover).
 
 ## Ficheiros do repositório
 
