@@ -203,18 +203,14 @@ body{
   transform: translateX(-16px); opacity:0; max-width:0; transition-delay:0s;
 }
 .sidebar.collapsed .nav-row span{ transform: translateX(-16px); opacity:0; max-width:0; transition-delay:0s; }
-.nav-row:nth-child(1) span{ transition-delay:.03s; } .sidebar.collapsed .nav-row:nth-child(1) span{ transition-delay:0s; }
-.nav-row:nth-child(2) span{ transition-delay:.06s; } .sidebar.collapsed .nav-row:nth-child(2) span{ transition-delay:0s; }
-.nav-row:nth-child(3) span{ transition-delay:.09s; } .sidebar.collapsed .nav-row:nth-child(3) span{ transition-delay:0s; }
-.nav-row:nth-child(4) span{ transition-delay:.12s; } .sidebar.collapsed .nav-row:nth-child(4) span{ transition-delay:0s; }
-.nav-row:nth-child(5) span{ transition-delay:.15s; } .sidebar.collapsed .nav-row:nth-child(5) span{ transition-delay:0s; }
-.nav-row:nth-child(6) span{ transition-delay:.18s; } .sidebar.collapsed .nav-row:nth-child(6) span{ transition-delay:0s; }
-.nav-row:nth-child(7) span{ transition-delay:.21s; } .sidebar.collapsed .nav-row:nth-child(7) span{ transition-delay:0s; }
-/* 8ª entrada: a nav partilhada passou de 7 para 8 quando as Contagens
-   entraram no menu (Ago/2026). Sem esta regra, a última linha perdia a
-   animação escalonada. Se a lista voltar a crescer, acrescentar aqui. */
-.nav-row:nth-child(8) span{ transition-delay:.24s; } .sidebar.collapsed .nav-row:nth-child(8) span{ transition-delay:0s; }
-.nav-row:nth-child(9) span{ transition-delay:.27s; } .sidebar.collapsed .nav-row:nth-child(9) span{ transition-delay:0s; }
+/* Stagger da nav: o delay é .03s × posição, atribuído pelo giocoNav() no
+   momento da geração via --nav-d inline no <span> — assim funciona para
+   qualquer número de entradas (as antigas regras :nth-child paravam na 9ª
+   e a 10ª entrava sem stagger). O fallback .06s é o delay-base dos labels
+   (marca, rodapé, navs escritas à mão sem --nav-d). A regra
+   `.sidebar.collapsed .nav-row span` acima ganha por especificidade e
+   mantém o colapso instantâneo (0s). */
+.nav-row span{ transition-delay: var(--nav-d, .06s); }
 .sidebar.collapsed .foot-user .dot{ opacity:0; transition: opacity .15s ease; }
 .brand, .nav-row, .foot-user, .foot-logout{ overflow:hidden; }
 .brand{ display:flex; align-items:center; gap:10px; margin-bottom:32px; padding:0 4px; }

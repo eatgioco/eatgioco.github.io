@@ -270,9 +270,12 @@
       var html = '';
       for (var i = 0; i < lista.length; i++) {
         var e = lista[i];
+        /* --nav-d: stagger da animação dos labels (.03s × posição), lido
+           pelo gioco-shell.css — vale para qualquer número de entradas,
+           ao contrário das antigas regras :nth-child que paravam na 9ª. */
         html += '<a class="nav-row' + (e.href === ativo ? ' active' : '') +
                 '" href="' + e.href + '">' + giocoIcon(e.icone, { size: 17 }) +
-                ' <span>' + e.label + '</span></a>';
+                ' <span style="--nav-d:' + (0.03 * (i + 1)).toFixed(2) + 's">' + e.label + '</span></a>';
       }
       nav.innerHTML = html;
     } catch (e) { /* nunca travar o resto do script */ }
