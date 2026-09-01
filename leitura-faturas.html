@@ -365,6 +365,26 @@
     color:var(--white);
   }
 
+  /* Mini-modal do formato de compra */
+  .compra-nota{
+    font-size:12.5px;
+    color:var(--muted);
+    margin:0 0 14px;
+    line-height:1.5;
+  }
+  .compra-preview{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .compra-erro{
+    color:var(--red-ink);
+    font-size:12.5px;
+    font-weight:600;
+    margin:10px 0 0;
+  }
+
   .ing-select-vazio{
     padding:14px 12px;
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
@@ -793,6 +813,54 @@
   </div>
 </div>
 
+<!-- Mini-modal: formato de compra (unidade da fatura + fator), espelho do
+     mini-modal de unidade de contagem da contagens.html. Escreve SÓ em
+     ingredientes/{id}/compra — nunca um set/update no ingrediente inteiro. -->
+<div class="modal-overlay" id="compraOverlay">
+  <form class="modal" id="compraForm" autocomplete="off">
+    <div class="modal-header">
+      <h2 id="compraTitulo">Formato de compra</h2>
+      <button type="button" class="modal-close" id="compraFechar" aria-label="Cancelar">×</button>
+    </div>
+
+    <p class="compra-nota" id="compraNota"></p>
+
+    <div class="field">
+      <label class="field-label" for="compraUnidade">Unidade da fatura</label>
+      <input type="text" id="compraUnidade" list="unidadesCompra" placeholder="caixa">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="compraFator">Fator de conversão</label>
+      <input type="text" id="compraFator" inputmode="decimal" placeholder="0.25">
+      <div class="compra-preview" id="compraPreview">1 unidade = ?</div>
+    </div>
+
+    <p class="compra-erro" id="compraErro" hidden></p>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" id="compraCancelar">Agora não</button>
+      <div class="modal-actions-right">
+        <button type="submit" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<datalist id="unidadesCompra">
+  <option value="kg"></option>
+  <option value="lt"></option>
+  <option value="un"></option>
+  <option value="caixa"></option>
+  <option value="saco"></option>
+  <option value="pacote"></option>
+  <option value="garrafa"></option>
+  <option value="lata"></option>
+  <option value="balde"></option>
+  <option value="grade"></option>
+  <option value="barril"></option>
+</datalist>
+
 <script>
 window.addEventListener('load', function () {
 
@@ -1121,6 +1189,10 @@ window.addEventListener('load', function () {
     if (!linha || !ingredienteId) return;
     faturasRef.child(fatura.id).child('linhas').child(String(index)).child('ingredienteId').set(ingredienteId);
     atualizarIngredienteComLinha(ingredienteId, linha, fatura.data || null);
+    // Sem formato de compra definido, o foodcost só pode somar a quantidade
+    // da fatura tal e qual. Pede-se aqui, no momento da associação.
+    var ing = allIngredientes[ingredienteId];
+    if (!ing || !temFormatoCompra(ing)) abrirModalCompra(ingredienteId, (ing && ing.nome) || (linha.descricao || ''));
   }
 
   function criarIngredienteDaLinha(fatura, index) {
@@ -1141,7 +1213,100 @@ window.addEventListener('load', function () {
       aliases: []
     });
     faturasRef.child(fatura.id).child('linhas').child(String(index)).child('ingredienteId').set(novoRef.key);
+    // Ingrediente acabado de criar: nunca tem formato de compra.
+    abrirModalCompra(novoRef.key, nome);
   }
+
+  /* ---------- Formato de compra (ingredientes/{id}/compra) ----------
+     { unidade, fator }: o fator converte 1 unidade de fatura em unidades
+     base (ex.: «caixa 250g» com base kg → fator 0.25). Espelho do formato
+     `contagem` escrito pela contagens.html. Escrita num path único —
+     NUNCA um set em ingredientes/{id} inteiro nem update() multi-chave,
+     que apagariam precoUltimaCompra e o resto da ficha. */
+
+  function temFormatoCompra(ing) {
+    var c = ing && ing.compra;
+    return !!(c && c.unidade && typeof c.fator === 'number' && isFinite(c.fator));
+  }
+
+  var compraOverlay = document.getElementById('compraOverlay');
+  var compraForm = document.getElementById('compraForm');
+  var compraUnidade = document.getElementById('compraUnidade');
+  var compraFator = document.getElementById('compraFator');
+  var compraPreview = document.getElementById('compraPreview');
+  var compraErro = document.getElementById('compraErro');
+  var compraAlvo = null;
+  var compraNomeAlvo = '';
+
+  function parseFator(v) {
+    var n = parseFloat(String(v == null ? '' : v).replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+
+  function baseDoAlvo() {
+    var ing = allIngredientes[compraAlvo];
+    return (ing && ing.unidade) || '';
+  }
+
+  function atualizarPreviewCompra() {
+    var u = compraUnidade.value.trim() || '?';
+    var f = parseFator(compraFator.value);
+    var b = baseDoAlvo() || 'unidade base';
+    compraPreview.textContent = '1 ' + u + ' = ' + (f === null ? '?' : f) + ' ' + b;
+  }
+
+  // Unidade da fatura igual à base: fator 1 por definição.
+  function autoFatorCompra() {
+    var b = baseDoAlvo().toLowerCase();
+    var u = compraUnidade.value.trim().toLowerCase();
+    if (b && u && b === u && compraFator.value.trim() === '') compraFator.value = '1';
+  }
+
+  function abrirModalCompra(ingId, nome) {
+    compraAlvo = ingId;
+    compraNomeAlvo = nome || '';
+    var ing = allIngredientes[ingId];
+    document.getElementById('compraTitulo').textContent = (ing && ing.nome) || nome || 'Formato de compra';
+    document.getElementById('compraNota').textContent =
+      'Em que unidade vem este ingrediente na fatura, e quanto vale 1 dessas unidades na unidade base' +
+      (baseDoAlvo() ? ' («' + baseDoAlvo() + '»)' : '') + '? Ex.: caixa de 250 g com base kg → fator 0.25.';
+    compraUnidade.value = (ing && ing.compra && ing.compra.unidade) || '';
+    compraFator.value = (ing && ing.compra && typeof ing.compra.fator === 'number') ? String(ing.compra.fator) : '';
+    compraErro.hidden = true;
+    atualizarPreviewCompra();
+    compraOverlay.classList.add('open');
+    setTimeout(function () { compraUnidade.focus(); }, 0);
+  }
+
+  function fecharModalCompra() {
+    compraOverlay.classList.remove('open');
+    compraAlvo = null;
+  }
+
+  compraUnidade.addEventListener('input', function () { autoFatorCompra(); atualizarPreviewCompra(); });
+  compraFator.addEventListener('input', atualizarPreviewCompra);
+
+  compraForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ingId = compraAlvo;
+    if (!ingId) { fecharModalCompra(); return; }
+    var u = compraUnidade.value.trim();
+    autoFatorCompra();
+    var f = parseFator(compraFator.value);
+    function erro(msg) { compraErro.textContent = msg; compraErro.hidden = false; }
+    if (!u) { erro('Falta a unidade da fatura.'); compraUnidade.focus(); return; }
+    if (f === null || f <= 0) { erro('O fator tem de ser um número maior do que zero.'); compraFator.focus(); return; }
+    ingredientesRef.child(ingId).child('compra').set({ unidade: u, fator: f });
+    if (allIngredientes[ingId]) allIngredientes[ingId].compra = { unidade: u, fator: f };
+    fecharModalCompra();
+  });
+
+  document.getElementById('compraCancelar').addEventListener('click', fecharModalCompra);
+  document.getElementById('compraFechar').addEventListener('click', fecharModalCompra);
+  compraOverlay.addEventListener('click', function (e) { if (e.target === compraOverlay) fecharModalCompra(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && compraOverlay.classList.contains('open')) { e.preventDefault(); fecharModalCompra(); }
+  });
 
   // ===== paymentRequests (numeração + criação, igual a pagamentos.html) =====
   paymentRequestsRef.on('value', function (snapshot) {

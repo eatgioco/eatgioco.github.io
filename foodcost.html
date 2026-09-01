@@ -180,6 +180,45 @@
     margin-left:8px;
   }
 
+  /* ---------- Formato de compra: ⚙ + mini-modal ---------- */
+  .btn-compra-edit{
+    background:none; border:none; cursor:pointer;
+    color:var(--muted); font-size:13px; padding:0 0 0 8px;
+    vertical-align:middle;
+  }
+  .btn-compra-edit:hover{ color:var(--red-ink); }
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0;
+    background:rgba(20,20,20,0.55); z-index:80;
+    padding:40px 20px; overflow-y:auto;
+  }
+  .modal-overlay.open{ display:block; }
+  .modal{
+    background:var(--white); border:1px solid var(--line); border-radius:16px;
+    max-width:480px; margin:0 auto; padding:24px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.22);
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:16px;
+  }
+  .modal-title{ font-family:'Inter',sans-serif; font-size:16px; font-weight:700; margin:0; min-width:0; }
+  .modal-close{
+    background:none; border:1px solid var(--line); border-radius:9px;
+    color:var(--ink); font-size:18px; line-height:1; padding:4px 9px; cursor:pointer;
+  }
+  .modal .campo{ margin-bottom:14px; }
+  .modal-nota{ font-size:12.5px; color:var(--muted); margin:0 0 14px; line-height:1.5; }
+  .modal-erro{ color:var(--red-ink); font-size:12.5px; font-weight:600; margin:10px 0 0; }
+  .compra-preview{ margin-top:6px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
+  .modal-actions .btn-sec{
+    background:var(--dough); border:1px solid var(--line); border-radius:10px;
+    color:var(--ink); font-family:'Inter',sans-serif; font-size:13px; font-weight:600;
+    padding:10px 16px; cursor:pointer;
+  }
+
   /* ---------- Baldes (nunca escondidos) ---------- */
   .balde{
     background:var(--white);
@@ -425,6 +464,51 @@
     </div>
   </div>
 </div>
+
+<!-- Mini-modal: formato de compra (unidade da fatura + fator). Espelho do
+     mini-modal da leitura-faturas; escreve SÓ em ingredientes/{id}/compra. -->
+<div class="modal-overlay" id="compraOverlay">
+  <form class="modal" id="compraForm" autocomplete="off">
+    <div class="modal-head">
+      <h3 class="modal-title" id="compraTitulo">Formato de compra</h3>
+      <button type="button" class="modal-close" id="compraFechar" aria-label="Cancelar">×</button>
+    </div>
+
+    <p class="modal-nota" id="compraNota"></p>
+
+    <div class="campo">
+      <label class="campo-label" for="compraUnidade">Unidade da fatura</label>
+      <input type="text" id="compraUnidade" list="unidadesCompra" placeholder="caixa">
+    </div>
+
+    <div class="campo">
+      <label class="campo-label" for="compraFator">Fator de conversão</label>
+      <input type="text" id="compraFator" inputmode="decimal" placeholder="0.25">
+      <div class="compra-preview" id="compraPreview">1 unidade = ?</div>
+    </div>
+
+    <p class="modal-erro" id="compraErro" hidden></p>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-sec" id="compraCancelar">Cancelar</button>
+      <button type="submit" class="btn-add">Confirmar</button>
+    </div>
+  </form>
+</div>
+
+<datalist id="unidadesCompra">
+  <option value="kg"></option>
+  <option value="lt"></option>
+  <option value="un"></option>
+  <option value="caixa"></option>
+  <option value="saco"></option>
+  <option value="pacote"></option>
+  <option value="garrafa"></option>
+  <option value="lata"></option>
+  <option value="balde"></option>
+  <option value="grade"></option>
+  <option value="barril"></option>
+</datalist>
 
 <script>
   var firebaseConfig = {
@@ -767,9 +851,9 @@
     var itensDe = (allContagens[de] && allContagens[de].itens) || {};
     var itensPara = (allContagens[para] && allContagens[para].itens) || {};
 
-    var compras = {};          // ingredienteId -> { qtd, euro }
+    var compras = {};          // ingredienteId -> { qtd, euro } (qtd em unidade base quando há formato)
     var naoMapeado = { euro: 0, linhas: [] };
-    var comprasComQtd = {};    // ingredientes cuja qtd veio de faturas
+    var comprasSemFormato = {}; // qtd veio da fatura SEM formato de compra definido
 
     Object.keys(allFaturas).forEach(function (fid) {
       var f = allFaturas[fid];
@@ -783,9 +867,16 @@
           return;
         }
         if (!compras[l.ingredienteId]) compras[l.ingredienteId] = { qtd: 0, euro: 0 };
-        compras[l.ingredienteId].qtd += num(l.quantidade);
+        // Com formato de compra (ingredientes/{id}/compra, escrito pela
+        // leitura-faturas), a quantidade da fatura converte-se para a
+        // unidade base: qtd × fator. Sem formato, soma-se tal e qual e o
+        // ingrediente fica marcado com o selo «qtd da fatura».
+        var ingC = allIngredientes[l.ingredienteId];
+        var fmt = ingC && ingC.compra;
+        var temFormato = !!(fmt && fmt.unidade && typeof fmt.fator === 'number' && isFinite(fmt.fator) && fmt.fator > 0);
+        compras[l.ingredienteId].qtd += num(l.quantidade) * (temFormato ? fmt.fator : 1);
         compras[l.ingredienteId].euro += num(l.montante);
-        comprasComQtd[l.ingredienteId] = true;
+        if (!temFormato) comprasSemFormato[l.ingredienteId] = true;
       });
     });
 
@@ -833,7 +924,7 @@
         teoQtd: teoQtd, teoEuro: teoEuro,
         realQtd: realQtd, realEuro: realEuro,
         temReal: temReal,
-        qtdDeFatura: !!comprasComQtd[id],
+        qtdDeFatura: !!comprasSemFormato[id],
         desvioEuro: temReal ? arred(realEuro - teoEuro) : null,
         desvioPct: (temReal && teoEuro > 0) ? arred(((realEuro - teoEuro) / teoEuro) * 100) : null
       });
@@ -862,7 +953,7 @@
       vendidos: vendidos,
       temContagemDe: Object.keys(itensDe).length,
       temContagemPara: Object.keys(itensPara).length,
-      qtdDeFaturaUsada: Object.keys(comprasComQtd).length
+      qtdDeFaturaUsada: Object.keys(comprasSemFormato).length
     };
   }
 
@@ -911,11 +1002,10 @@
     var avisos = [];
 
     if (r.qtdDeFaturaUsada) {
-      avisos.push('A quantidade das linhas de fatura entra no consumo real <b>tal como vem na fatura</b>. ' +
-                  'Não há, hoje, o formato de compra por ingrediente (uma caixa de 24×250 g conta como 24), ' +
-                  'por isso a coluna <b>Real (qtd)</b> de ' + r.qtdDeFaturaUsada +
-                  (r.qtdDeFaturaUsada === 1 ? ' ingrediente' : ' ingredientes') + ' com compras no período ' +
-                  'só é de confiar quando a fatura vem na unidade base.');
+      avisos.push('Há ' + r.qtdDeFaturaUsada +
+                  (r.qtdDeFaturaUsada === 1 ? ' ingrediente' : ' ingredientes') + ' com compras no período mas <b>sem formato de compra definido</b>: ' +
+                  'a quantidade entra no consumo real tal como vem na fatura. ' +
+                  'Define unidade e fator no ⚙ da linha (ou ao associar a linha na leitura de faturas).');
     }
     var estim = Object.keys(r.estimativas);
     if (estim.length) {
@@ -995,7 +1085,8 @@
       return '<tr>' +
         '<td>' + esc(l.nome) +
           (l.semPreco ? '<span class="selo-est" title="Sem precoUltimaCompra: os euros deste ingrediente são zero">sem preço</span>' : '') +
-          (l.qtdDeFatura ? '<span class="selo-est" title="A quantidade comprada veio da fatura, na unidade da fatura">qtd da fatura</span>' : '') +
+          (l.qtdDeFatura ? '<span class="selo-est" title="A quantidade comprada veio da fatura, na unidade da fatura — sem formato de compra definido">qtd da fatura</span>' : '') +
+          '<button type="button" class="btn-compra-edit" data-id="' + esc(l.id) + '" title="Formato de compra (unidade da fatura + fator)">⚙</button>' +
         '</td>' +
         '<td>' + esc(nomeCategoria(l.categoria)) + '</td>' +
         '<td class="num">' + qtd(l.teoQtd, l.unidade) + '</td>' +
@@ -1173,6 +1264,85 @@
   db.ref('faturasProcessadas').on('value', function (s) { allFaturas = s.val() || {}; if (prontos >= PARA_CARREGAR) montar(); else chegou(); });
   db.ref('vendasDiario').on('value', function (s) { allVendasDiario = s.val() || {}; if (prontos >= PARA_CARREGAR) montar(); else chegou(); });
   mapaRef.on('value', function (s) { allMapa = s.val() || {}; if (prontos >= PARA_CARREGAR) montar(); else chegou(); });
+
+  // ---------- Formato de compra: ⚙ da linha + mini-modal ----------
+  // Escrita num path único (ingredientes/{id}/compra) — nunca um set no
+  // ingrediente inteiro nem update() multi-chave (apagaria a ficha).
+  var compraOverlay = document.getElementById('compraOverlay');
+  var compraUnidade = document.getElementById('compraUnidade');
+  var compraFator = document.getElementById('compraFator');
+  var compraErro = document.getElementById('compraErro');
+  var compraAlvo = null;
+
+  function parseFator(v) {
+    var n = parseFloat(String(v == null ? '' : v).replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+
+  function atualizarPreviewCompra() {
+    var ing = allIngredientes[compraAlvo];
+    var b = (ing && ing.unidade) || 'unidade base';
+    var u = compraUnidade.value.trim() || '?';
+    var f = parseFator(compraFator.value);
+    document.getElementById('compraPreview').textContent = '1 ' + u + ' = ' + (f === null ? '?' : f) + ' ' + b;
+  }
+
+  function abrirModalCompra(ingId) {
+    var ing = allIngredientes[ingId];
+    if (!ing) return;
+    compraAlvo = ingId;
+    document.getElementById('compraTitulo').textContent = ing.nome || 'Formato de compra';
+    document.getElementById('compraNota').textContent =
+      'Em que unidade vem este ingrediente na fatura, e quanto vale 1 dessas unidades na unidade base' +
+      (ing.unidade ? ' («' + ing.unidade + '»)' : '') + '? Ex.: caixa de 250 g com base kg → fator 0.25.';
+    compraUnidade.value = (ing.compra && ing.compra.unidade) || '';
+    compraFator.value = (ing.compra && typeof ing.compra.fator === 'number') ? String(ing.compra.fator) : '';
+    compraErro.hidden = true;
+    atualizarPreviewCompra();
+    compraOverlay.classList.add('open');
+    setTimeout(function () { compraUnidade.focus(); }, 0);
+  }
+
+  function fecharModalCompra() {
+    compraOverlay.classList.remove('open');
+    compraAlvo = null;
+  }
+
+  compraUnidade.addEventListener('input', function () {
+    var ing = allIngredientes[compraAlvo];
+    var b = ((ing && ing.unidade) || '').toLowerCase();
+    var u = compraUnidade.value.trim().toLowerCase();
+    if (b && u && b === u && compraFator.value.trim() === '') compraFator.value = '1';
+    atualizarPreviewCompra();
+  });
+  compraFator.addEventListener('input', atualizarPreviewCompra);
+
+  document.getElementById('compraForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ingId = compraAlvo;
+    if (!ingId) { fecharModalCompra(); return; }
+    var u = compraUnidade.value.trim();
+    var f = parseFator(compraFator.value);
+    function erroC(msg) { compraErro.textContent = msg; compraErro.hidden = false; }
+    if (!u) { erroC('Falta a unidade da fatura.'); compraUnidade.focus(); return; }
+    if (f === null || f <= 0) { erroC('O fator tem de ser um número maior do que zero.'); compraFator.focus(); return; }
+    // O on('value') de ingredientes/ volta a montar() e refaz a tabela com o
+    // fator novo — não é preciso recalcular aqui.
+    db.ref('ingredientes').child(ingId).child('compra').set({ unidade: u, fator: f });
+    fecharModalCompra();
+  });
+
+  document.getElementById('compraCancelar').addEventListener('click', fecharModalCompra);
+  document.getElementById('compraFechar').addEventListener('click', fecharModalCompra);
+  compraOverlay.addEventListener('click', function (e) { if (e.target === compraOverlay) fecharModalCompra(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && compraOverlay.classList.contains('open')) { e.preventDefault(); fecharModalCompra(); }
+  });
+
+  document.getElementById('tabelaIng').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.btn-compra-edit') : null;
+    if (btn) abrirModalCompra(btn.getAttribute('data-id'));
+  });
 
   } // fim de arrancar
 </script>

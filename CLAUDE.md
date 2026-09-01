@@ -157,6 +157,14 @@ O `contagens.html` também escreve **`ingredientes/{id}/contagem`** = `{ unidade
 próprios — nunca um `set` em `ingredientes/{id}` inteiro nem um `update()` multi-chave,
 que apagariam `precoUltimaCompra` e o resto da ficha.
 
+A `leitura-faturas.html` (mini-modal ao associar linha→ingrediente) e a
+`foodcost.html` (⚙ na linha) escrevem **`ingredientes/{id}/compra`** =
+`{ unidade, fator }` — o fator converte 1 unidade de FATURA em unidades base
+(ex.: «caixa 250g» com base kg → fator 0.25), espelho do formato `contagem`.
+No foodcost, a quantidade de fatura é convertida (qtd × fator); o selo
+«qtd da fatura» fica só nos ingredientes ainda sem `compra` definido.
+Mesma regra de escrita: um `set()` só nesse path.
+
 ### Formatos de chave por período (três, e não são o mesmo)
 
 | Nó | Formato | Exemplo |
