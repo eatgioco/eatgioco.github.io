@@ -48,7 +48,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
-| `foodcost.html` | Variância de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas | Equipa |
+| `foodcost.html` | Duas secções independentes: (1) **mapa de produtos ZoneSoft → fichas técnicas**, sempre visível, alimentado pelos produtos distintos de `vendasDiario` nas últimas 4 semanas completas — a MESMA janela do painel "Encomenda sugerida" da `compras.html`, de que o mapa é pré-requisito — com sugestão automática, escolha manual, "Ignorar" e progresso "X de Y produtos tratados"; (2) **variância** de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas. Só (2) depende das contagens: o estado vazio "ainda não há um período para comparar" está confinado a ela, e (1) continua utilizável com zero ou uma contagem | Equipa |
 | `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós). Classificação de movimentos em DUAS dimensões: a rubrica do P&L e a despesa concreta ("Meta Ads", "EDP"), ambas aprendidas pelas mesmas regras; a despesa é metadado e nunca mexe em valores | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
@@ -134,7 +134,13 @@ mapaProdutosReceitas  — ligação {codigoZoneSoft} -> { receitaId } ou { ignor
                          escrita SÓ pela foodcost.html. O código é o das chaves de
                          vendasDiario/{AAAA-MM}/{dia}/produtos. 'ignorado' é para o que
                          não consome ingredientes (sacos, taxas, portes) — é diferente de
-                         não estar mapeado, que aparece no balde "Sem mapa"
+                         não estar mapeado, que aparece no balde "Sem mapa".
+                         A UI de mapeamento é independente das contagens e lista os
+                         produtos das últimas 4 SEMANAS COMPLETAS (segunda a domingo,
+                         a semana em curso fora): janelaMapa/MAPA_SEMANAS na
+                         foodcost.html tem de continuar igual a
+                         encJanelaSemanas/ENC_SEMANAS na compras.html — conjuntos
+                         diferentes nas duas páginas seriam pior do que nenhum
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 classificacaoRegras   — regras de classificação de movimentos bancários da

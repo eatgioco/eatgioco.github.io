@@ -283,6 +283,18 @@
 
   .mapa-vazio{ font-size:13px; color:var(--muted); padding:6px 0; }
 
+  /* Progresso do mapeamento: mapeados + ignorados sobre o total vendido na
+     janela. É o número que diz se ainda falta trabalho aqui. */
+  .mapa-progresso{
+    margin:14px 0 2px;
+    font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums;
+    font-size:14px; font-weight:700;
+    color:var(--ink);
+  }
+
+  .mapa-nota{ margin:0 0 6px; }
+  .mapa-nota a{ color:var(--red-ink); }
+
   .ignorados{ margin-top:16px; font-size:12.5px; color:var(--muted); }
 
   .ignorados .chip{
@@ -346,7 +358,7 @@
         </div>
       </div>
 
-      <p class="page-subtitle">Consumo teórico vs. real entre duas contagens fechadas</p>
+      <p class="page-subtitle">Mapa de produtos → fichas técnicas e variância de consumo teórico vs. real</p>
 
       <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
            falhar; ver autenticarEContinuar() mais abaixo. -->
@@ -359,6 +371,34 @@
       </div>
 
       <main id="app" hidden>
+
+        <!-- ================================================================
+             1. Mapa de produtos ZoneSoft → fichas técnicas.
+             Renderiza SEMPRE, independentemente do estado das contagens: o
+             mapa não depende delas e é pré-requisito das encomendas sugeridas
+             da compras.html. Ficava escondido atrás do estado vazio da
+             variância — com menos de duas contagens fechadas não havia forma
+             nenhuma de mapear um produto.
+             A janela é a MESMA do painel “Encomenda sugerida” (últimas 4
+             semanas completas): ver conjuntos de produtos diferentes nas duas
+             páginas seria pior do que não ver nenhum.
+             ================================================================ -->
+        <p class="section-title">Mapa de produtos ZoneSoft → fichas técnicas</p>
+        <div class="tabela-wrap" style="padding:6px 20px 16px;">
+          <p class="mapa-progresso" id="mapaProgresso">—</p>
+          <p class="kpi-sub mapa-nota" id="mapaNota">—</p>
+          <div id="mapaLista"></div>
+          <div class="ignorados" id="ignoradosBox" style="display:none;">
+            <b>Ignorados de propósito</b> (sacos, taxas, portes — nunca consomem ingredientes):
+            <div id="ignoradosChips"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             2. Variância. Só esta parte precisa de duas contagens fechadas —
+             o estado vazio abaixo está confinado a ela.
+             ================================================================ -->
+        <p class="section-title">Variância entre duas contagens fechadas</p>
 
         <!-- Estado vazio: sem dois fechos consecutivos não há período nenhum
              para comparar. Diz exactamente o que falta, não "sem dados". -->
@@ -444,20 +484,6 @@
               </thead>
               <tbody id="tabelaCat"></tbody>
             </table>
-          </div>
-
-          <p class="section-title">Mapa de produtos ZoneSoft → fichas técnicas</p>
-          <div class="tabela-wrap" style="padding:6px 20px 16px;">
-            <p class="kpi-sub" style="margin:12px 0 6px;">
-              Produtos vendidos neste período que ainda não estão ligados a uma ficha
-              técnica. Sem a ligação, as vendas desse produto não entram no consumo
-              teórico — por isso ficam no balde “Sem mapa”, à vista.
-            </p>
-            <div id="mapaLista"></div>
-            <div class="ignorados" id="ignoradosBox" style="display:none;">
-              <b>Ignorados de propósito</b> (sacos, taxas, portes — nunca consomem ingredientes):
-              <div id="ignoradosChips"></div>
-            </div>
           </div>
 
         </div>
@@ -729,6 +755,45 @@
   }
 
   // ==================================================================
+  // Janela do mapa: últimas MAPA_SEMANAS semanas COMPLETAS (segunda a
+  // domingo) já terminadas. A semana em curso fica de fora de propósito.
+  //
+  // É a MESMA janela do painel "Encomenda sugerida" da compras.html — o mapa
+  // é pré-requisito dele, e ver conjuntos de produtos diferentes nas duas
+  // páginas seria pior do que não ver nenhum. Se mudar aqui, muda lá
+  // (encJanelaSemanas / ENC_SEMANAS).
+  //
+  // Não se reaproveita o diasDoPeriodo() do motor: esse é (de, para] — exclui
+  // o primeiro dia de propósito, porque a contagem inicial mede o fecho desse
+  // dia. Aqui a janela é fechada nos dois extremos.
+  // ==================================================================
+  var MAPA_SEMANAS = 4;
+
+  function isoDe(d) {
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+  }
+
+  function janelaMapa() {
+    var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    var desdeSegunda = (hoje.getDay() + 6) % 7;
+    var fim = new Date(hoje);
+    fim.setDate(hoje.getDate() - desdeSegunda - 1);              // domingo passado
+    var inicio = new Date(fim);
+    inicio.setDate(fim.getDate() - (MAPA_SEMANAS * 7 - 1));
+    return { de: isoDe(inicio), ate: isoDe(fim) };
+  }
+
+  function diasDaJanela(j) {
+    var out = [];
+    var d = new Date(j.de + 'T00:00:00');
+    var fim = new Date(j.ate + 'T00:00:00');
+    while (d <= fim) { out.push(isoDe(d)); d.setDate(d.getDate() + 1); }
+    return out;
+  }
+
+  // ==================================================================
   // Cálculo
   // ==================================================================
   function calcular(de, para) {
@@ -892,7 +957,8 @@
     renderBaldes(r);
     renderTabelaIngredientes(r);
     renderTabelaCategorias(r);
-    renderMapa(r);
+    // O mapa NÃO se renderiza aqui: não depende do período nem das contagens.
+    // Vive na sua própria secção e é montado pelo montar().
   }
 
   function renderAviso(r) {
@@ -952,7 +1018,7 @@
         '<p>' + r.semMapa.length + ' produtos vendidos no período, <span class="valor">' + euro(totalSemMapa) + '</span> ' +
         'de vendas, não estão ligados a nenhuma ficha técnica. O consumo teórico deles é zero, ' +
         'por isso o food cost teórico está <b>subestimado</b> enquanto isto não for resolvido. ' +
-        'Liga-os (ou marca-os como ignorados) na secção do mapa, mais abaixo.</p>' +
+        'Liga-os (ou marca-os como ignorados) na secção do mapa, no topo da página.</p>' +
         '<ul>' + r.semMapa.slice().sort(function (a, b) { return b.v.valor - a.v.valor; }).slice(0, 8).map(function (x) {
           return '<li>' + esc(x.v.desc) + ' — ' + x.v.qtd + ' un, ' + euro(x.v.valor) + '</li>';
         }).join('') +
@@ -1025,12 +1091,41 @@
   }
 
   // ---------- UI de mapeamento ----------
-  function renderMapa(r) {
+  // Independente das contagens de propósito: o mapa não depende delas, e
+  // enquanto estava dentro do #conteudo ficava inacessível sempre que não
+  // havia período de variância. Fonte: os produtos distintos de vendasDiario
+  // na janela das 4 semanas completas (a mesma das encomendas sugeridas).
+  //
+  // A classificação (mapeado / ignorado / sem mapa) vem do MESMO
+  // consumoDeVendidos do motor que a variância usa — nunca duplicada aqui,
+  // senão as duas secções podiam discordar sobre o mesmo produto.
+  function renderMapa() {
+    var j = janelaMapa();
+    var v = CONS.vendasDosDias(diasDaJanela(j));
+    var vendidos = v.vendidos;
+    var semMapa = CONS.consumoDeVendidos(vendidos).semMapa;
+
+    var total = Object.keys(vendidos).length;
+    var tratados = total - semMapa.length;
+
+    document.getElementById('mapaProgresso').textContent =
+      tratados + ' de ' + total + (total === 1 ? ' produto tratado' : ' produtos tratados');
+
+    document.getElementById('mapaNota').innerHTML =
+      'Produtos vendidos nas últimas ' + MAPA_SEMANAS + ' semanas completas (' +
+      esc(j.de) + ' a ' + esc(j.ate) + '), a mesma janela do painel “Encomenda sugerida” ' +
+      'das <a href="compras.html">Compras</a>. Sem ligação a uma ficha técnica, as vendas ' +
+      'do produto não entram no consumo teórico nem geram encomenda sugerida — ' +
+      '“tratado” é estar ligado <b>ou</b> marcado como ignorado.';
+
     var box = document.getElementById('mapaLista');
-    if (!r.semMapa.length) {
-      box.innerHTML = '<p class="mapa-vazio">Todos os produtos vendidos neste período estão ligados a uma ficha técnica ou marcados como ignorados.</p>';
+    if (!total) {
+      box.innerHTML = '<p class="mapa-vazio">Não há vendas importadas entre ' + esc(j.de) +
+        ' e ' + esc(j.ate) + ' — sem vendas não há produtos para mapear.</p>';
+    } else if (!semMapa.length) {
+      box.innerHTML = '<p class="mapa-vazio">Os ' + total + ' produtos vendidos nesta janela estão todos ligados a uma ficha técnica ou marcados como ignorados.</p>';
     } else {
-      var ordenados = r.semMapa.slice().sort(function (a, b) { return b.v.valor - a.v.valor; });
+      var ordenados = semMapa.slice().sort(function (a, b) { return b.v.valor - a.v.valor; });
       box.innerHTML = ordenados.map(function (x) {
         var sug = sugerirReceita(x.v.desc);
         var opcoes = '<option value="">— escolher ficha técnica —</option>' +
@@ -1060,7 +1155,7 @@
     else {
       caixa.style.display = 'block';
       document.getElementById('ignoradosChips').innerHTML = ign.sort().map(function (c) {
-        var nome = (r.vendidos[c] && r.vendidos[c].desc) || (allMapa[c] && allMapa[c].desc) || c;
+        var nome = (vendidos[c] && vendidos[c].desc) || (allMapa[c] && allMapa[c].desc) || c;
         return '<span class="chip">' + esc(nome) + ' <span style="opacity:.6">' + esc(c) + '</span>' +
                '<button type="button" data-cod="' + esc(c) + '" title="Deixar de ignorar">×</button></span>';
       }).join('');
@@ -1113,6 +1208,10 @@
   document.getElementById('periodoSel').addEventListener('change', recalcular);
 
   function montar() {
+    // Primeiro o mapa: renderiza SEMPRE, mesmo quando não há período nenhum
+    // de variância (o early return abaixo).
+    renderMapa();
+
     var pares = paresDePeriodos();
     var fechadas = contagensFechadas();
     var todas = Object.keys(allContagens).sort();
