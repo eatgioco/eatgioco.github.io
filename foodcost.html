@@ -309,6 +309,7 @@
 </head>
 <body>
 <script src="gioco-shell.js"></script>
+<script src="gioco-consumo.js"></script>
 
 <div class="shell">
 
@@ -613,6 +614,22 @@
   var prontos = 0;
   var PARA_CARREGAR = 8;
 
+  // Motor partilhado de explosao da ficha tecnica e de consumo teorico
+  // (gioco-consumo.js). Os nomes sao destruturados para os call sites
+  // continuarem iguais.
+  var CONS = giocoConsumoEngine({
+    getReceitas:     function () { return allReceitas; },
+    getPreparacoes:  function () { return allPreparacoes; },
+    getVendasDiario: function () { return allVendasDiario; },
+    getMapa:         function () { return allMapa; }
+  });
+  var num                = CONS.num;
+  var arred              = CONS.arred;
+  var mesDaData          = CONS.mesDaData;
+  var explodirPreparacao = CONS.explodirPreparacao;
+  var explodirReceita    = CONS.explodirReceita;
+  var diasDoPeriodo      = CONS.diasDoPeriodo;
+
   // ==================================================================
   // Formatos de chave — três, e não são o mesmo. Confundi-los é o erro
   // clássico deste nó de dados:
@@ -642,20 +659,6 @@
            (unidade ? ' ' + unidade : '');
   }
 
-  function arred(v) {
-    var n = Number(v);
-    return isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
-  }
-
-  function num(v) {
-    var n = Number(v);
-    return isFinite(n) ? n : 0;
-  }
-
-  function mesDaData(iso) {           // 2026-08-15 -> 2026-08
-    return String(iso || '').slice(0, 7);
-  }
-
   function nomeCategoria(cod) {
     if (!cod) return 'Sem categoria';
     var c = allCategorias[cod];
@@ -666,64 +669,6 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
-  }
-
-  // ==================================================================
-  // Explosão da ficha técnica
-  // ==================================================================
-  // Uma receita dá {ingredienteId: qtd} em unidade base, mais o custo em €
-  // das preparações que NÃO têm breakdown (custoManual: entram só em €).
-  //
-  // As preparações explodem recursivamente. `visitadas` corta ciclos: uma
-  // preparação que se contenha a si própria (directa ou indirectamente)
-  // pendurava o browser em vez de dar um erro.
-  function explodirPreparacao(prepId, fator, acc, visitadas) {
-    var prep = allPreparacoes[prepId];
-    if (!prep) { acc.semFicha += 1; return; }
-
-    // Custo fixo €/kg: não há breakdown, por isso não entra em quantidade de
-    // ingrediente nenhum — entra só em euros, e fica marcado como estimativa.
-    if (prep.custoManual) {
-      acc.euroSemBreakdown += fator * num(prep.custoManualPorUnidade);
-      acc.estimativas[prepId] = prep.nome || prepId;
-      return;
-    }
-
-    if (visitadas[prepId]) { acc.ciclos[prepId] = prep.nome || prepId; return; }
-    visitadas[prepId] = true;
-
-    var rend = (prep.rendimento && num(prep.rendimento.qtd)) || 0;
-    if (rend <= 0) { acc.euroSemBreakdown += 0; acc.semRendimento[prepId] = prep.nome || prepId; visitadas[prepId] = false; return; }
-
-    var lista = prep.ingredientes || [];
-    for (var i = 0; i < lista.length; i++) {
-      var c = lista[i];
-      // A quantidade da preparação é para o rendimento inteiro: para 1 unidade
-      // (kg) da preparação usa-se a fatia proporcional.
-      var q = fator * num(c.qtd) / rend;
-      if (c.ingredienteId) {
-        acc.ingredientes[c.ingredienteId] = (acc.ingredientes[c.ingredienteId] || 0) + q;
-      } else if (c.prepId) {
-        explodirPreparacao(c.prepId, q, acc, visitadas);
-      }
-    }
-    visitadas[prepId] = false;
-  }
-
-  function explodirReceita(receitaId, unidades, acc) {
-    var r = allReceitas[receitaId];
-    if (!r) return false;
-    var comps = r.componentes || [];
-    for (var i = 0; i < comps.length; i++) {
-      var c = comps[i];
-      var q = unidades * num(c.qtd);
-      if (c.tipo === 'preparacao' || c.prepId) {
-        explodirPreparacao(c.prepId, q, acc, {});
-      } else if (c.ingredienteId) {
-        acc.ingredientes[c.ingredienteId] = (acc.ingredientes[c.ingredienteId] || 0) + q;
-      }
-    }
-    return true;
   }
 
   // ==================================================================
@@ -740,23 +685,6 @@
     var out = [];
     for (var i = 0; i + 1 < f.length; i++) out.push({ de: f[i], para: f[i + 1] });
     return out.reverse();   // o mais recente primeiro
-  }
-
-  // Dias de venda do período: (de, para] — a contagem de `de` mede o stock ao
-  // fecho desse dia, por isso o consumo começa no dia seguinte e acaba no dia
-  // da contagem final, inclusive.
-  function diasDoPeriodo(de, para) {
-    var out = [];
-    var d = new Date(de + 'T00:00:00');
-    var fim = new Date(para + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    while (d <= fim) {
-      out.push(d.getFullYear() + '-' +
-               String(d.getMonth() + 1).padStart(2, '0') + '-' +
-               String(d.getDate()).padStart(2, '0'));
-      d.setDate(d.getDate() + 1);
-    }
-    return out;
   }
 
   // ==================================================================
@@ -806,47 +734,16 @@
   function calcular(de, para) {
     var dias = diasDoPeriodo(de, para);
 
-    // ---------- 1. Vendas do período, por código ZoneSoft ----------
-    var vendidos = {};       // codigo -> { qtd, valor, desc }
-    var receitaTotal = 0;
-    var diasComVendas = 0;
-
-    dias.forEach(function (dia) {
-      var mes = allVendasDiario[mesDaData(dia)];
-      var d = mes && mes[dia];
-      if (!d || !d.produtos) return;
-      diasComVendas++;
-      Object.keys(d.produtos).forEach(function (cod) {
-        var p = d.produtos[cod];
-        if (!vendidos[cod]) vendidos[cod] = { qtd: 0, valor: 0, desc: p.desc || cod, categoria: p.categoria || '' };
-        vendidos[cod].qtd += num(p.qtd);
-        vendidos[cod].valor += num(p.valor);
-        receitaTotal += num(p.valor);
-      });
-    });
-
-    // ---------- 2. Teórico: explodir cada produto vendido ----------
-    var acc = {
-      ingredientes: {},        // ingredienteId -> qtd base
-      euroSemBreakdown: 0,     // preparações de custo fixo
-      estimativas: {},
-      semFicha: 0,
-      semRendimento: {},
-      ciclos: {}
-    };
-
-    var semMapa = [];          // produtos vendidos sem receita e não ignorados
-    var ignoradosVendidos = [];
-
-    Object.keys(vendidos).forEach(function (cod) {
-      var m = allMapa[cod];
-      if (m && m.ignorado) { ignoradosVendidos.push({ cod: cod, v: vendidos[cod] }); return; }
-      if (!m || !m.receitaId || !allReceitas[m.receitaId]) {
-        semMapa.push({ cod: cod, v: vendidos[cod] });
-        return;
-      }
-      explodirReceita(m.receitaId, vendidos[cod].qtd, acc);
-    });
+    // ---------- 1+2. Vendas do periodo e consumo teorico ----------
+    // Ambos vem do gioco-consumo.js: vendas por codigo ZoneSoft e a explosao
+    // de cada produto vendido pela ficha tecnica.
+    var cons = CONS.consumoDosDias(dias);
+    var vendidos = cons.vendidos;
+    var receitaTotal = cons.receitaTotal;
+    var diasComVendas = cons.diasComVendas;
+    var acc = cons.acc;
+    var semMapa = cons.semMapa;
+    var ignoradosVendidos = cons.ignoradosVendidos;
 
     // ---------- 3. Real: stock inicial + compras − stock final ----------
     var itensDe = (allContagens[de] && allContagens[de].itens) || {};
