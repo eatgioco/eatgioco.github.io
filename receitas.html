@@ -572,6 +572,32 @@
     font-size:13px;
     line-height:1.6;
   }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+
+  .auth-box h2{
+    margin:0 0 8px;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
+  }
+
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.55;
+  }
 </style>
 </head>
 <body>
@@ -613,6 +639,16 @@
       </div>
 
       <p class="page-subtitle">Fichas técnicas e custo</p>
+
+      <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+           falhar; ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
 
       <p class="nota-iva card glass-light">Food cost calculado sobre o PVP <strong>sem IVA</strong> (13%, taxa da restauração): custo ÷ (PVP ÷ 1,13). Os valores de PVP mostrados nos cards são os de venda ao público, com IVA incluído.</p>
 
@@ -665,15 +701,66 @@ window.addEventListener('load', function () {
 
   // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
   // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
   function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
     firebase.auth().signInAnonymously()
-      .then(() => callback())
-      .catch((erro) => {
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
         console.error('Falha na autenticação anónima:', erro);
         // Não continuar sem sessão — evita escritas/leituras que vão
         // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
       });
   }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
 
   autenticarEContinuar(function () {
   var db = firebase.database();

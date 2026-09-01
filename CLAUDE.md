@@ -150,16 +150,21 @@ que apagariam `precoUltimaCompra` e o resto da ficha.
 2. **Firebase Storage não activado** (exige plano Blaze/cartão) — fotos ficam em base64 no RTDB.
 3. **mailto: falha no POS** — o computador da loja não tem cliente de email. Não usar mailto para fluxos críticos do staff.
 4. **Microsoft 365 write tools indisponíveis** — só leitura. Sem automações cloud que dependam de M365.
-5. **Firebase Auth adiado** — não implementar auth sem instrução explícita.
-   **PENDENTE: retrofit do padrão de auth às restantes 12 páginas.** O
-   `autenticarEContinuar()` que 12 páginas partilham só faz `console.error()` no `catch`
-   e não tem timeout — sem rede, o `signInAnonymously` fica pendurado para sempre e a
-   página fica em branco e muda, sem dizer nada a quem está ao balcão. O
-   `contagens.html` (Ago/2026) é o único com a versão boa: timeout de 8 s, caixa
-   `#authErro` visível e botão "Tentar de novo" que volta a tentar sem recarregar (com
-   guarda `authArrancou` para o retry não montar a página duas vezes). Copiar de lá para
-   `compras`, `pagamentos`, `caixa`, `loja-sao-bento`, `receitas`, `vendas`, `equipa`,
-   `tarefas`, `tesouraria`, `conta-bancaria`, `leitura-faturas` e `mrn-dashboard`.
+5. **Firebase Auth adiado** — não implementar auth sem instrução explícita. O que existe é
+   só a **sessão anónima**, obrigatória antes de qualquer leitura/escrita.
+   O padrão é **um só, igual nas 13 páginas com Firebase** (retrofit feito em Set/2026):
+   `autenticarEContinuar(callback)` com timeout de 8 s, caixa `#authErro` visível e botão
+   "Tentar de novo" que volta a tentar sem recarregar.
+   - O timeout não é zelo: sem rede o `signInAnonymously` fica **pendurado para sempre e
+     nunca rejeita**. Sem ele a página ficava em branco e muda para quem está ao balcão.
+   - `authArrancou` impede que um retry bem sucedido depois de um timeout monte a página
+     uma segunda vez por cima da primeira.
+   - `authCallback` guarda o callback à primeira chamada, para o botão de retry o repetir
+     sem obrigar cada página a dar-lhe um nome (todas passam uma função anónima).
+   - O markup (`#authErro` + `#authErroDetalhe` + `#authRetryBtn`) fica a seguir ao
+     `.page-subtitle`, e o CSS (`#authErro`, `.auth-box`) no `<style>` da página.
+   Se este bloco mudar numa página, tem de mudar em todas.
+
 6. **Notificações push adiadas** — sem service worker e sem Web Push. Não implementar sem instrução explícita.
    O que já está feito é o **ícone de ecrã principal (iOS)**: `icons/` com os PNG 120→1024, e o bloco de tags
    (`apple-touch-icon` 180/167/152, `icon` 192/512, `theme-color`, `apple-mobile-web-app-*`) no `<head>` das
