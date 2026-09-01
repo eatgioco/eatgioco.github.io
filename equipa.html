@@ -1853,6 +1853,7 @@
 </head>
 <body class="shell-mobile">
 <script src="gioco-shell.js"></script>
+<script src="gioco-compromissos.js"></script>
 
 <div class="shell">
 
@@ -3089,13 +3090,25 @@ window.addEventListener('load', function () {
      A TSU NÃO é gerada por pessoa: é uma entrada única da empresa, criada
      na tesouraria e marcada com derivaDe:'tsu'.
 
-     O cálculo do montante vive na tesouraria (detalheCompromisso, duplicado
-     em tesouraria.html e mrn-dashboard.html). Aqui só se precisa dele para
-     dizer, no aviso de desativação, o que fica por pagar — por isso há uma
-     versão reduzida, valorCompromissoDaPessoa(), com a mesma precedência:
-     recibo do mês → média dos últimos 3 → semente. Se a precedência mudar
-     lá, muda aqui.
+     O cálculo do montante vive no gioco-compromissos.js — o MESMO motor da
+     tesouraria e do dashboard. A antiga versão reduzida
+     (valorCompromissoDaPessoa) foi abandonada em Set/2026: as divergências
+     dela (sem partes conta/cartão do modelo antigo, sem ajuste de base, sem
+     filtro de recibos vazios, arredondamento próprio) eram defeitos, não
+     comportamento desejado.
      ====================================================================== */
+
+  var CE = giocoCompromissosEngine({
+    getCompromissos: function(){ return compromissos; },
+    getRecibos:      function(){ return recibos; },
+    getPessoas:      function(){ return pessoas; },
+    formatEuro: function(n){ return recFmt(n); },
+    parseMontante: function(m){
+      var n = parseFloat(String(m == null ? '' : m).replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    },
+    MESES_PT: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+  });
 
   /* "Alfredo Giangaspero" → "AG"; um nome só → as duas primeiras letras. */
   function iniciaisDe(nome){
@@ -3168,46 +3181,11 @@ window.addEventListener('load', function () {
     return Promise.all(escritas).then(function(){ return criados; });
   }
 
-  /* Dias de segunda a sexta do mês — a mesma base da tesouraria para os
-     valores diários (subsídio de refeição). Não exclui feriados. */
-  function diasUteisDoMes(ano, mes){
-    var total = 0;
-    var nd = new Date(ano, mes, 0).getDate();
-    for (var d = 1; d <= nd; d++){
-      var dow = new Date(ano, mes - 1, d).getDay();
-      if (dow >= 1 && dow <= 5) total++;
-    }
-    return total;
-  }
-
-  /* Versão reduzida do detalheCompromisso() da tesouraria — ver o cabeçalho
-     deste bloco. Devolve { valor, estado }. */
-  function valorCompromissoDaPessoa(c, ano, mes){
-    var periodo = ano + '-' + (mes < 10 ? '0' + mes : String(mes));
-    var meses = (recibos[c.pessoaId] && Object.keys(recibos[c.pessoaId])) || [];
-    var parte = c.parteRecibo === 'cartao' ? 'cartao' : 'conta';
-
-    if (meses.length){
-      var doMes = recibos[c.pessoaId][periodo];
-      if (doMes) return { valor: recPartes(doMes)[parte], estado: 'confirmado' };
-
-      var ordenados = meses.slice().sort();
-      var anteriores = ordenados.filter(function(p){ return p < periodo; }).reverse();
-      var usar = (anteriores.length ? anteriores : ordenados).slice(0, 3);
-      var soma = 0;
-      usar.forEach(function(p){ soma += recPartes(recibos[c.pessoaId][p])[parte]; });
-      return { valor: recRound(soma / usar.length), estado: 'estimado' };
-    }
-
-    var diario = Number(c.valorDiario);
-    if (c.valorDiario !== undefined && c.valorDiario !== null && c.valorDiario !== '' && !isNaN(diario) && diario > 0){
-      return { valor: recRound(diasUteisDoMes(ano, mes) * diario), estado: 'semente' };
-    }
-    return { valor: recRound(Number(c.valor) || 0), estado: 'semente' };
-  }
-
   /* Ocorrências por pagar dos compromissos de uma pessoa, deste mês e do
-     seguinte — é o que desaparece da tesouraria ao desativá-la. */
+     seguinte — é o que desaparece da tesouraria ao desativá-la. Usa o motor
+     partilhado: um compromisso do modelo antigo (pessoaId sem parteRecibo)
+     gera DUAS saídas (transferência + cartão), exatamente como na
+     tesouraria. */
   function pendentesDaPessoa(pessoaId){
     var hoje = new Date();
     var meses = [{ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 }];
@@ -3217,20 +3195,21 @@ window.addEventListener('load', function () {
     compromissosDaPessoa(pessoaId).todos.forEach(function(c){
       if (!c.ativo) return;
       meses.forEach(function(m){
-        var mesesAtivos = c.meses && !Array.isArray(c.meses) ? Object.keys(c.meses).map(function(k){ return c.meses[k]; }) : (c.meses || []);
-        if (mesesAtivos.length && mesesAtivos.map(Number).indexOf(m.mes) === -1) return;
-        if (c.dia === undefined || c.dia === null || c.dia === '') return;
-        /* A chave de pagamentosConcluidos é {id}_{ano}-{mes}, com o mês SEM
-           zero à esquerda — não confundir com o AAAA-MM dos recibos. */
-        if (pagamentosConcluidos[c.id + '_' + m.ano + '-' + m.mes]) return;
-        var v = valorCompromissoDaPessoa(c, m.ano, m.mes);
-        var nd = new Date(m.ano, m.mes, 0).getDate();
-        var dia = c.dia === 'ultimo' ? nd : Math.max(1, Math.min(parseInt(c.dia, 10) || 1, nd));
-        out.push({
-          nome: c.nome || c.id,
-          valor: v.valor,
-          estado: v.estado,
-          quando: (dia < 10 ? '0' + dia : dia) + '/' + (m.mes < 10 ? '0' + m.mes : m.mes) + '/' + m.ano
+        var mesesAtivos = CE.mesesArray(c.meses);
+        if (mesesAtivos.length && mesesAtivos.indexOf(m.mes) === -1) return;
+        CE.saidasCompromisso(c, m.ano, m.mes).forEach(function(s){
+          var dia = CE.resolveDia(CE.diaDaSaida(c, s.sufixo), m.ano, m.mes);
+          if (dia === null) return;
+          /* A chave de pagamentosConcluidos é {id+sufixo}_{ano}-{mes}, com o
+             mês SEM zero à esquerda — não confundir com o AAAA-MM dos
+             recibos. A ocorrência do cartão do modelo antigo leva '~cartao'. */
+          if (pagamentosConcluidos[c.id + s.sufixo + '_' + m.ano + '-' + m.mes]) return;
+          out.push({
+            nome: CE.nomeOcorrencia(c.id + s.sufixo, c.nome || c.id),
+            valor: s.valor,
+            estado: s.estado,
+            quando: (dia < 10 ? '0' + dia : dia) + '/' + (m.mes < 10 ? '0' + m.mes : m.mes) + '/' + m.ano
+          });
         });
       });
     });
