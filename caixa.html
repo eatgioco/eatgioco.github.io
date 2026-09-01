@@ -16,67 +16,26 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-    --amber:#B8860B;
-  }
 
-  *{box-sizing:border-box;}
 
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
+  body{ -webkit-font-smoothing:antialiased; }
 
   h1,h2,h3,.mono{
     font-family:'Space Mono', monospace;
   }
 
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
 
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
 
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
 
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
 
   .brand-mark{
     font-family:'Space Mono', monospace;
@@ -86,26 +45,12 @@
   }
 
   main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:40px 24px 80px;
-  }
-
-  .page-title{
+    display:block;
     margin:0;
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
+    padding:8px 0 40px;
   }
 
-  .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    color:var(--red);
-    letter-spacing:2px;
-    text-transform:uppercase;
-  }
+
 
   /* ---------- Layout ---------- */
   .work-grid{
@@ -126,7 +71,7 @@
   .summary-card{
     flex:0 0 260px;
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:18px;
   }
 
@@ -163,7 +108,7 @@
   /* ---------- Form ---------- */
   .form-card{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:20px;
   }
 
@@ -187,14 +132,14 @@
     font-size:14px;
     font-weight:700;
     padding:11px 8px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
   }
 
   .tipo-btn:hover{
-    background:var(--bg);
+    background:var(--dough);
   }
 
   .tipo-btn.saida.active{
@@ -229,10 +174,10 @@
     width:100%;
     padding:10px 12px;
     border:2px solid var(--line);
-    background:var(--bg);
+    background:var(--dough);
     font-family:'Inter', sans-serif;
     font-size:14px;
-    color:var(--black);
+    color:var(--ink);
   }
 
   .field input[type="number"]{
@@ -244,7 +189,7 @@
   .field input:focus,
   .field select:focus{
     outline:none;
-    border-color:var(--black);
+    border-color:var(--ink);
   }
 
   .btn-registar{
@@ -255,9 +200,9 @@
     font-weight:700;
     letter-spacing:1px;
     text-transform:uppercase;
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     cursor:pointer;
   }
 
@@ -288,14 +233,14 @@
     font-size:12px;
     font-weight:700;
     padding:9px 18px;
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     background:var(--white);
-    color:var(--black);
+    color:var(--ink);
     cursor:pointer;
   }
 
   .filter-tab.active{
-    background:var(--black);
+    background:var(--ink);
     color:var(--white);
   }
 
@@ -310,10 +255,10 @@
   .filter-extra select{
     padding:9px 12px;
     border:2px solid var(--line);
-    background:var(--bg);
+    background:var(--dough);
     font-family:'Inter', sans-serif;
     font-size:13px;
-    color:var(--black);
+    color:var(--ink);
   }
 
   .filter-summary{
@@ -446,8 +391,8 @@
     font-size:12px;
     font-weight:700;
     padding:9px 20px;
-    border:2px solid var(--black);
-    background:var(--black);
+    border:1px solid var(--line);
+    background:var(--ink);
     color:var(--white);
     cursor:pointer;
   }
@@ -470,7 +415,7 @@
   }
 
   .gasto-real strong{
-    color:var(--black);
+    color:var(--ink);
   }
 
   .notas-txt{
@@ -486,21 +431,77 @@
     color:var(--muted);
     font-size:13px;
   }
+
+  /* ======================================================================
+     Fase 3 — camada do design system
+     ======================================================================
+     Só aparência. O .page do shell centra e dá a largura; os tokens já
+     invertem com o tema. Fica aqui o que o shell não tem (subtítulo, folga
+     de acções) e o arredondamento — a Fase 0 desta página era de cantos
+     rectos e traço preto de 2px, que passou a 1px em var(--line).
+     Vem no fim de propósito: em empate de especificidade ganha a última
+     regra, e é assim que arredonda o que está escrito acima. */
+
+  .page-subtitle{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .header-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin:20px 0 4px;
+  }
+
+  .btn, .tipo-btn, .btn-small, .badge{ border-radius:100px; }
+  input, select, textarea,
+  .summary-card, .form-card, .modal, .mov-row{ border-radius:12px; }
+  .modal{ border-radius:16px; }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('caixa.html');</script>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
   </div>
-</header>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-down"/></svg>GIOCO · <b>Caixa</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Movimentos de dinheiro físico</p>
 
 <main>
-  <h1 class="page-title">GIOCO · Caixa</h1>
-  <p class="page-subtitle">Movimentos de dinheiro</p>
-
   <div class="summary-row">
     <div class="summary-card">
       <p class="summary-label">Saldo hoje</p>
@@ -580,6 +581,9 @@
   </div>
 </main>
 
+    </div>
+  </div>
+</div>
 <script>
   var firebaseConfig = {
     apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
