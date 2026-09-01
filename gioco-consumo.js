@@ -184,11 +184,21 @@ function giocoConsumoEngine(deps) {
     Object.keys(vendidos).forEach(function (cod) {
       var m = allMapa[cod];
       if (m && m.ignorado) { ignoradosVendidos.push({ cod: cod, v: vendidos[cod] }); return; }
-      if (!m || !m.receitaId || !allReceitas[m.receitaId]) {
-        semMapa.push({ cod: cod, v: vendidos[cod] });
+      if (m && m.receitaId && allReceitas[m.receitaId]) {
+        explodirReceita(m.receitaId, vendidos[cod].qtd, acc);
         return;
       }
-      explodirReceita(m.receitaId, vendidos[cod].qtd, acc);
+      if (m && m.ingredienteId) {
+        var qDireto = vendidos[cod].qtd * num(m.qtdBase);
+        acc.ingredientes[m.ingredienteId] = (acc.ingredientes[m.ingredienteId] || 0) + qDireto;
+        return;
+      }
+      if (m && m.preparacaoId) {
+        var qDose = vendidos[cod].qtd * num(m.qtdBase);
+        explodirPreparacao(m.preparacaoId, qDose, acc, {});
+        return;
+      }
+      semMapa.push({ cod: cod, v: vendidos[cod] });
     });
 
     return { acc: acc, semMapa: semMapa, ignoradosVendidos: ignoradosVendidos };

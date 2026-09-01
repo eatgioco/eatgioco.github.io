@@ -130,11 +130,27 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          mrn-dashboard.html e tem de ser igual nos dois ficheiros; a
                          equipa.html tem uma versão REDUZIDA (valorCompromissoDaPessoa)
                          só para o aviso de desativação
-mapaProdutosReceitas  — ligação {codigoZoneSoft} -> { receitaId } ou { ignorado:true },
+mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          escrita SÓ pela foodcost.html. O código é o das chaves de
-                         vendasDiario/{AAAA-MM}/{dia}/produtos. 'ignorado' é para o que
-                         não consome ingredientes (sacos, taxas, portes) — é diferente de
-                         não estar mapeado, que aparece no balde "Sem mapa".
+                         vendasDiario/{AAAA-MM}/{dia}/produtos.
+                           { receitaId }               — ficha técnica (forma original);
+                             cada unidade vendida explode a receita normalmente.
+                           { ignorado:true }            — para o que não consome
+                             ingredientes (sacos, taxas, portes) — é diferente de não
+                             estar mapeado, que aparece no balde "Sem mapa".
+                           { ingredienteId, qtdBase }   — consumo direto: cada unidade
+                             vendida consome qtdBase unidades (na unidade base do
+                             ingrediente) desse ingrediente, sem passar por receita
+                             nenhuma. Uso típico: bebidas de revenda (lata, garrafa).
+                           { preparacaoId, qtdBase }    — dose de preparação: cada
+                             unidade vendida consome qtdBase (unidade base da
+                             preparação, normalmente kg) dessa preparação, que explode
+                             recursivamente como quando uma receita a usa. Uso típico:
+                             extras avulsos (ex. "Extra Pesto").
+                         Todas as quatro formas são somadas pelo mesmo motor
+                         (gioco-consumo.js, consumoDeVendidos) — foodcost.html
+                         (variância) e compras.html (encomenda sugerida) não têm
+                         lógica própria que as filtre, delegam sempre no motor.
                          A UI de mapeamento é independente das contagens e lista os
                          produtos das últimas 4 SEMANAS COMPLETAS (segunda a domingo,
                          a semana em curso fora): janelaMapa/MAPA_SEMANAS na

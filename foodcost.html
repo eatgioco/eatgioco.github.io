@@ -754,6 +754,32 @@
     return melhorScore >= 0.45 ? { id: melhor, score: melhorScore } : null;
   }
 
+  // Sugestão automática nos TRÊS alvos possíveis (receita / ingrediente /
+  // preparação) — devolve o melhor de todos, com 'tipo' a dizer qual nó.
+  // Usada só para pré-selecionar; a escolha final é sempre manual.
+  function sugerirMapeamento(descProduto) {
+    var melhor = null, melhorScore = 0, melhorTipo = null;
+    Object.keys(allReceitas).forEach(function (id) {
+      var s = semelhanca(descProduto, allReceitas[id].nome);
+      if (s > melhorScore) { melhorScore = s; melhor = id; melhorTipo = 'receita'; }
+    });
+    Object.keys(allIngredientes).forEach(function (id) {
+      var s = semelhanca(descProduto, allIngredientes[id].nome);
+      if (s > melhorScore) { melhorScore = s; melhor = id; melhorTipo = 'ingrediente'; }
+    });
+    Object.keys(allPreparacoes).forEach(function (id) {
+      var s = semelhanca(descProduto, allPreparacoes[id].nome);
+      if (s > melhorScore) { melhorScore = s; melhor = id; melhorTipo = 'preparacao'; }
+    });
+    return melhorScore >= 0.45 ? { tipo: melhorTipo, id: melhor, score: melhorScore } : null;
+  }
+
+  function unidadeBaseDe(tipo, id) {
+    if (tipo === 'ingrediente') return (allIngredientes[id] && allIngredientes[id].unidade) || 'un';
+    if (tipo === 'preparacao') return (allPreparacoes[id] && allPreparacoes[id].rendimento && allPreparacoes[id].rendimento.unidade) || 'kg';
+    return '';
+  }
+
   // ==================================================================
   // Janela do mapa: últimas MAPA_SEMANAS semanas COMPLETAS (segunda a
   // domingo) já terminadas. A semana em curso fica de fora de propósito.
@@ -1126,27 +1152,70 @@
       box.innerHTML = '<p class="mapa-vazio">Os ' + total + ' produtos vendidos nesta janela estão todos ligados a uma ficha técnica ou marcados como ignorados.</p>';
     } else {
       var ordenados = semMapa.slice().sort(function (a, b) { return b.v.valor - a.v.valor; });
+      var nomeTipo = { receita: 'ficha técnica', ingrediente: 'ingrediente', preparacao: 'preparação' };
       box.innerHTML = ordenados.map(function (x) {
-        var sug = sugerirReceita(x.v.desc);
-        var opcoes = '<option value="">— escolher ficha técnica —</option>' +
-          Object.keys(allReceitas).sort(function (a, b) {
-            return String(allReceitas[a].nome).localeCompare(String(allReceitas[b].nome), 'pt');
-          }).map(function (id) {
-            return '<option value="' + esc(id) + '"' + (sug && sug.id === id ? ' selected' : '') + '>' +
-                   esc(allReceitas[id].nome) + '</option>';
-          }).join('');
+        var sug = sugerirMapeamento(x.v.desc);
+        var sugNome = sug && (sug.tipo === 'receita' ? allReceitas[sug.id].nome :
+                       sug.tipo === 'ingrediente' ? allIngredientes[sug.id].nome :
+                       allPreparacoes[sug.id].nome);
+        function opcoesDe(mapa, tipo) {
+          return '<option value="">— escolher ' + nomeTipo[tipo] + ' —</option>' +
+            Object.keys(mapa).sort(function (a, b) {
+              return String(mapa[a].nome).localeCompare(String(mapa[b].nome), 'pt');
+            }).map(function (id) {
+              return '<option value="' + esc(id) + '"' + (sug && sug.tipo === tipo && sug.id === id ? ' selected' : '') + '>' +
+                     esc(mapa[id].nome) + '</option>';
+            }).join('');
+        }
+        var tipoInicial = (sug && sug.tipo) || 'receita';
         return '<div class="mapa-linha" data-cod="' + esc(x.cod) + '">' +
           '<div class="mapa-produto">' +
             '<b>' + esc(x.v.desc) + '</b>' +
             '<span>' + esc(x.cod) + ' · ' + x.v.qtd + ' un · ' + euro(x.v.valor) + '</span>' +
-            (sug ? '<div class="mapa-sugestao">sugestão: <b>' + esc(allReceitas[sug.id].nome) + '</b> (' +
+            (sug ? '<div class="mapa-sugestao">sugestão (' + nomeTipo[sug.tipo] + '): <b>' + esc(sugNome) + '</b> (' +
                    Math.round(sug.score * 100) + '% de semelhança)</div>' : '') +
           '</div>' +
-          '<select class="mapa-sel">' + opcoes + '</select>' +
+          '<select class="mapa-tipo">' +
+            '<option value="receita"' + (tipoInicial === 'receita' ? ' selected' : '') + '>Ficha técnica</option>' +
+            '<option value="ingrediente"' + (tipoInicial === 'ingrediente' ? ' selected' : '') + '>Ingrediente (direto)</option>' +
+            '<option value="preparacao"' + (tipoInicial === 'preparacao' ? ' selected' : '') + '>Preparação (dose)</option>' +
+          '</select>' +
+          '<select class="mapa-sel mapa-sel-receita" style="display:' + (tipoInicial === 'receita' ? '' : 'none') + '">' + opcoesDe(allReceitas, 'receita') + '</select>' +
+          '<select class="mapa-sel mapa-sel-ingrediente" style="display:' + (tipoInicial === 'ingrediente' ? '' : 'none') + '">' + opcoesDe(allIngredientes, 'ingrediente') + '</select>' +
+          '<select class="mapa-sel mapa-sel-preparacao" style="display:' + (tipoInicial === 'preparacao' ? '' : 'none') + '">' + opcoesDe(allPreparacoes, 'preparacao') + '</select>' +
+          '<span class="mapa-qtd-box" style="display:' + (tipoInicial === 'receita' ? 'none' : 'inline-flex') + ';align-items:center;gap:4px;">' +
+            '<input type="text" class="mapa-qtd" placeholder="qtd base" style="width:70px;">' +
+            '<span class="mapa-unidade" style="font-size:12px;color:var(--muted);min-width:20px;"></span>' +
+          '</span>' +
           '<button type="button" class="btn btn-ok mapa-confirmar">Ligar</button>' +
           '<button type="button" class="btn mapa-ignorar">Ignorar</button>' +
         '</div>';
       }).join('');
+
+      // Atualiza select visível + unidade quando o tipo muda.
+      box.querySelectorAll('.mapa-linha').forEach(function (linha) {
+        var tipoSel = linha.querySelector('.mapa-tipo');
+        var qtdBox = linha.querySelector('.mapa-qtd-box');
+        var unidadeSpan = linha.querySelector('.mapa-unidade');
+        function atualizarLinha() {
+          var t = tipoSel.value;
+          linha.querySelector('.mapa-sel-receita').style.display = t === 'receita' ? '' : 'none';
+          linha.querySelector('.mapa-sel-ingrediente').style.display = t === 'ingrediente' ? '' : 'none';
+          linha.querySelector('.mapa-sel-preparacao').style.display = t === 'preparacao' ? '' : 'none';
+          qtdBox.style.display = t === 'receita' ? 'none' : 'inline-flex';
+          atualizarUnidade();
+        }
+        function atualizarUnidade() {
+          var t = tipoSel.value;
+          if (t === 'receita') { unidadeSpan.textContent = ''; return; }
+          var sel = linha.querySelector('.mapa-sel-' + t);
+          unidadeSpan.textContent = sel.value ? unidadeBaseDe(t, sel.value) : '';
+        }
+        tipoSel.addEventListener('change', atualizarLinha);
+        linha.querySelector('.mapa-sel-ingrediente').addEventListener('change', atualizarUnidade);
+        linha.querySelector('.mapa-sel-preparacao').addEventListener('change', atualizarUnidade);
+        atualizarUnidade();
+      });
     }
 
     var ign = Object.keys(allMapa).filter(function (c) { return allMapa[c] && allMapa[c].ignorado; });
@@ -1174,11 +1243,25 @@
     var cod = linha.getAttribute('data-cod');
 
     if (e.target.classList.contains('mapa-confirmar')) {
-      var sel = linha.querySelector('.mapa-sel');
-      if (!sel.value) { sel.focus(); return; }
-      e.target.disabled = true;
+      var tipo = linha.querySelector('.mapa-tipo').value;
       var desc = linha.querySelector('.mapa-produto b').textContent;
-      gravarMapa(cod, { receitaId: sel.value, desc: desc, ligadoEm: new Date().toISOString() });
+      if (tipo === 'receita') {
+        var selR = linha.querySelector('.mapa-sel-receita');
+        if (!selR.value) { selR.focus(); return; }
+        e.target.disabled = true;
+        gravarMapa(cod, { receitaId: selR.value, desc: desc, ligadoEm: new Date().toISOString() });
+        return;
+      }
+      var selAlvo = linha.querySelector('.mapa-sel-' + tipo);
+      if (!selAlvo.value) { selAlvo.focus(); return; }
+      var qtdInput = linha.querySelector('.mapa-qtd');
+      var qtdBase = parseFloat(String(qtdInput.value || '').replace(',', '.'));
+      if (!isFinite(qtdBase) || qtdBase <= 0) { qtdInput.focus(); return; }
+      e.target.disabled = true;
+      var payload = { qtdBase: qtdBase, desc: desc, ligadoEm: new Date().toISOString() };
+      if (tipo === 'ingrediente') payload.ingredienteId = selAlvo.value;
+      else payload.preparacaoId = selAlvo.value;
+      gravarMapa(cod, payload);
       return;
     }
 
