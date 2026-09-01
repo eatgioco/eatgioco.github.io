@@ -111,6 +111,13 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          anterior e gera as duas saídas de uma vez, a do cartão com id
                          {compromissoId}~cartao ('~' é chave válida no RTDB e não colide
                          com o '_' do período) e dia próprio em diaCartao.
+                         Desde 1 Set/2026 já não há registos do modelo antigo: sal-AG e
+                         sal-BC foram migrados (parteRecibo:'conta' + novos sal-AG-cartao
+                         / sal-BC-cartao); o motor mantém o suporte por causa do
+                         histórico de pagamentosConcluidos ({id}~cartao_...).
+                         A semente valor:1700 do sal-AG fica INTENCIONALMENTE: nunca é
+                         usada (a pessoa tem recibos, e a partir do primeiro recibo as
+                         sementes nunca mais contam) — não corrigir nem remover.
                          Campo opcional derivaDe:'tsu' — entrada ÚNICA da Segurança
                          Social: ignora o campo valor e vale 34,75% sobre a soma dos
                          totais.sujeito de TODOS os recibos do mês anterior, arredondado
