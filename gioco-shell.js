@@ -220,8 +220,8 @@
      "Dashboard → index.html" que convida a ser "corrigido" para
      mrn-dashboard.html, e era assim que o link privado sairia.
 
-     Máximo 8 entradas por conjunto: as regras :nth-child do gioco-shell.css
-     param na 8ª e a partir daí perde-se a animação escalonada. */
+     Máximo 9 entradas por conjunto: as regras :nth-child do gioco-shell.css
+     param na 9ª e a partir daí perde-se a animação escalonada. */
   var GIOCO_NAV_CONJUNTOS = {
     publica: [
       { href: 'index.html',      icone: 'layout-dashboard', label: 'Dashboard' },
@@ -230,6 +230,7 @@
       { href: 'pagamentos.html', icone: 'receipt',          label: 'Pagamentos' },
       { href: 'vendas.html',     icone: 'bar-chart-2',      label: 'Vendas' },
       { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
+      { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
          no menu, mas não navega para lado nenhum. */

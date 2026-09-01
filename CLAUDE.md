@@ -48,6 +48,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
+| `foodcost.html` | Variância de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
@@ -120,6 +121,11 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          mrn-dashboard.html e tem de ser igual nos dois ficheiros; a
                          equipa.html tem uma versão REDUZIDA (valorCompromissoDaPessoa)
                          só para o aviso de desativação
+mapaProdutosReceitas  — ligação {codigoZoneSoft} -> { receitaId } ou { ignorado:true },
+                         escrita SÓ pela foodcost.html. O código é o das chaves de
+                         vendasDiario/{AAAA-MM}/{dia}/produtos. 'ignorado' é para o que
+                         não consome ingredientes (sacos, taxas, portes) — é diferente de
+                         não estar mapeado, que aparece no balde "Sem mapa"
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
@@ -143,6 +149,18 @@ O `contagens.html` também escreve **`ingredientes/{id}/contagem`** = `{ unidade
 **só quando está vazio**, `ingredientes/{id}/unidade`. São dois `set()` em dois paths
 próprios — nunca um `set` em `ingredientes/{id}` inteiro nem um `update()` multi-chave,
 que apagariam `precoUltimaCompra` e o resto da ficha.
+
+### Formatos de chave por período (três, e não são o mesmo)
+
+| Nó | Formato | Exemplo |
+|---|---|---|
+| `vendas` / `vendasDiario` | `AAAA-MM` **com** zero (e os dias em `AAAA-MM-DD`) | `2026-08` |
+| `recibos` | `AAAA-MM` **com** zero | `2026-08` |
+| `contagens` | `AAAA-MM-DD` | `2026-08-31` |
+| `pagamentosConcluidos` | `{id}_AAAA-M` **sem** zero no mês | `-Ox..._2026-8` |
+
+O único sem zero à esquerda é o período do `pagamentosConcluidos`. Confundi-los é o erro
+clássico deste modelo de dados.
 
 ## Restrições críticas (não ignorar)
 
@@ -187,7 +205,7 @@ que apagariam `precoUltimaCompra` e o resto da ficha.
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
 Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
-`equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`, `leitura-faturas.html`, `caixa.html`, `loja-sao-bento.html`. Por migrar: `index.html` (e as de suporte:
+`equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`, `leitura-faturas.html`, `caixa.html`, `loja-sao-bento.html`, `foodcost.html` (nova, já no shell). Por migrar: `index.html` (e as de suporte:
 `abanca-callback`, `privacidade`, `termos`).
 
 Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
