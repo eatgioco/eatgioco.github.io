@@ -16,114 +16,65 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gioco-shell.css">
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-  }
-
-  *{box-sizing:border-box;}
-
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-
-  h1,h2,h3,.mono{
-    font-family:'Space Mono', monospace;
-  }
-
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
-
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
-
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:48px 24px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:34px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
-
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:-14px 0 0;
     font-size:12px;
+    font-weight:600;
     color:var(--red);
-    letter-spacing:2px;
+    letter-spacing:.18em;
     text-transform:uppercase;
   }
-
-  .placeholder-text{
-    margin-top:40px;
-    font-family:'Space Mono', monospace;
-    font-size:14px;
-    color:var(--muted);
-  }
+  .placeholder-card{ margin-top:28px; }
+  .placeholder-card > *{ position:relative; z-index:1; }
+  .placeholder-card p{ margin:0; font-size:13px; color:var(--muted); }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('contabilidade.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user"><div style="width:26px;height:26px;border-radius:50%;background:var(--mustard);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#141414;flex-shrink:0">G</div> <span>GIOCO</span><div class="dot"></div></div>
+    </div>
   </div>
-</header>
 
-<main>
-  <h1 class="page-title">GIOCO · Contabilidade</h1>
-  <p class="page-subtitle">Documentos e Finanças</p>
+  <div class="main">
+    <div class="page">
 
-  <p class="placeholder-text">Em construção — a caminho.</p>
-</main>
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1>Contabili<b>dade</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+      <p class="page-subtitle">Documentos e Finanças</p>
+
+      <div class="card glass-light placeholder-card">
+        <p>Em construção — a caminho.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
