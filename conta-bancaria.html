@@ -16,66 +16,26 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-    --green:#1E7A46;
-  }
 
-  *{box-sizing:border-box;}
 
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
+  body{ -webkit-font-smoothing:antialiased; }
 
   h1,h2,h3,.mono{
     font-family:'Space Mono', monospace;
   }
 
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
 
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:16px;
-  }
 
-  .home-link{
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--white);
-    text-decoration:none;
-    border:2px solid var(--white);
-    padding:6px 10px;
-    white-space:nowrap;
-  }
 
-  .home-link:hover{
-    background:var(--white);
-    color:var(--red);
-  }
 
   .brand-mark{
     font-family:'Space Mono', monospace;
@@ -85,48 +45,18 @@
   }
 
   main{
-    max-width:1200px;
-    margin:0 auto;
+    margin:0 0;
     padding:40px 24px 80px;
   }
 
-  .page-title{
-    margin:0;
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
 
-  .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    color:var(--red);
-    letter-spacing:2px;
-    text-transform:uppercase;
-  }
 
-  .back-link{
-    display:inline-block;
-    margin-bottom:20px;
-    font-family:'Space Mono', monospace;
-    font-size:12px;
-    font-weight:700;
-    color:var(--black);
-    text-decoration:none;
-    border:2px solid var(--black);
-    padding:6px 10px;
-  }
 
-  .back-link:hover{
-    background:var(--black);
-    color:var(--white);
-  }
 
   /* ---------- Saldo ---------- */
   .saldo-card{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:24px;
     margin-top:24px;
   }
@@ -173,8 +103,8 @@
     font-size:14px;
     padding:10px 12px;
     background:var(--white);
-    color:var(--black);
-    border:2px solid var(--black);
+    color:var(--ink);
+    border:1px solid var(--line);
   }
 
   .filtro-input:focus{
@@ -192,7 +122,7 @@
   /* ---------- Tabela de movimentos ---------- */
   .movs-wrap{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     margin-top:16px;
     /* ~200 movimentos numa tabela larga: o scroll é da tabela, não do body. */
     overflow-x:auto;
@@ -213,7 +143,7 @@
     color:var(--muted);
     text-align:left;
     padding:12px 14px;
-    border-bottom:2px solid var(--black);
+    border-bottom:1px solid var(--line);
     white-space:nowrap;
   }
 
@@ -241,7 +171,7 @@
 
   /* Entrada e saída: seta + cor, para não depender só do sinal do número. */
   .mov-in .num{ color:var(--green); }
-  .mov-out .num{ color:var(--black); }
+  .mov-out .num{ color:var(--ink); }
 
   .mov-seta{
     font-family:'Space Mono', monospace;
@@ -280,7 +210,7 @@
 
   .estado{
     background:var(--white);
-    border:2px solid var(--black);
+    border:1px solid var(--line);
     padding:40px 24px;
     margin-top:24px;
     text-align:center;
@@ -300,22 +230,91 @@
     color:var(--muted);
     font-size:14px;
   }
+
+  /* ======================================================================
+     Fase 3 — camada do design system
+     ======================================================================
+     Só aparência. O .page do shell centra e dá a largura; os tokens já
+     invertem com o tema. Fica aqui o que o shell não tem (subtítulo, folga
+     de acções) e o arredondamento — a Fase 0 desta página era de cantos
+     rectos e traço preto de 2px, que passou a 1px em var(--line).
+     Vem no fim de propósito: em empate de especificidade ganha a última
+     regra, e é assim que arredonda o que está escrito acima. */
+
+  .page-subtitle{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .header-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin:20px 0 4px;
+  }
+
+  /* Volta ao dashboard privado. Pílula neutra, no vocabulário do shell. */
+  .back-link{
+    display:inline-block;
+    margin-bottom:18px;
+    padding:7px 14px;
+    border:1px solid var(--line);
+    border-radius:100px;
+    background:var(--white);
+    color:var(--ink);
+    font-size:12.5px;
+    font-weight:600;
+    text-decoration:none;
+    transition:border-color .15s ease;
+  }
+
+  .back-link:hover{ border-color:var(--red); }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="home-link">🏠 Home</a>
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel privado</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('conta-bancaria.html?conta=abanca', 'privada');</script>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Manel</span><div class="dot"></div>
+      </div>
+    </div>
   </div>
-</header>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-up"/></svg>GIOCO · <b id="tituloConta">Conta bancária</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle" id="subtituloConta">A carregar…</p>
 
 <main>
+  <!-- Único caminho de volta ao dashboard privado (não está na nav pública). -->
   <a class="back-link" href="mrn-dashboard.html">← Dashboard</a>
-
-  <h1 class="page-title" id="tituloConta">Conta Bancária</h1>
-  <p class="page-subtitle" id="subtituloConta">A carregar…</p>
 
   <!-- Estado de erro/vazio; substitui todo o conteúdo abaixo quando aparece. -->
   <div class="estado estado-erro" id="estadoErro" style="display:none;">
@@ -353,6 +352,9 @@
   </div>
 </main>
 
+    </div>
+  </div>
+</div>
 <script>
 window.addEventListener('load', function () {
 
@@ -420,8 +422,10 @@ window.addEventListener('load', function () {
   // ---------- parâmetro da URL ----------
   var slug = (new URLSearchParams(window.location.search).get('conta') || '').trim().toLowerCase();
 
+  /* Só o nome da conta: o 'GIOCO · ' passou para o markup do greet-row do
+     shell, a preto, com o nome a vermelho ao lado — como nas outras páginas. */
   document.getElementById('tituloConta').textContent =
-    'GIOCO · ' + (slug ? nomeConta(slug) : 'Conta Bancária');
+    slug ? nomeConta(slug) : 'Conta bancária';
 
   if (!slug){
     mostrarErro('Nenhuma conta indicada',
