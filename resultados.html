@@ -239,8 +239,19 @@
   .clf-sugestoes button:hover, .clf-sugestoes button:focus{
     background:var(--dough); outline:none;
   }
-  .desp-resumo{ margin-top:8px; font-size:12px; color:var(--muted); line-height:1.7; }
-  .desp-resumo b{ color:var(--ink); font-weight:600; }
+  /* Linha agregada por despesa nos drill-downs das rubricas. A seta e a
+     contagem dizem que abre; os movimentos originais ficam recuados e sobre
+     outra superficie, para a hierarquia grupo -> movimentos ser obvia. */
+  .dg-grupo{ cursor:pointer; }
+  /* color explicita: so a herdar, a linha ficava preta no tema escuro. */
+  .dg-grupo > td{ font-weight:600; color:var(--ink); }
+  /* --line e nao --dough: no escuro o --dough e a superficie dos itens, e o
+     hover do grupo ficava igual a uma linha de movimento. */
+  .dg-grupo:hover > td{ background:var(--line); }
+  .dg-seta::before{ content:'▸ '; color:var(--red-ink); font-weight:700; }
+  .dg-grupo.aberto .dg-seta::before{ content:'▾ '; }
+  .dg-item > td{ background:var(--dough); color:var(--ink); }
+  .dg-item > td:first-child{ padding-left:24px; }
 </style>
 </head>
 <body>
@@ -626,7 +637,17 @@
         var btn = e.target.closest('[data-excluir]');
         if (btn){ abrirFormExclusao(btn); return; }
         var rep = e.target.closest('[data-repor]');
-        if (rep){ reporExclusao(rep.getAttribute('data-repor')); }
+        if (rep){ reporExclusao(rep.getAttribute('data-repor')); return; }
+        // Abrir/fechar um grupo de despesa: so exibicao, nada e gravado.
+        var grupo = e.target.closest('.dg-grupo');
+        if (grupo){
+          var gid = grupo.getAttribute('data-dgrupo');
+          var abrir = !grupo.classList.contains('aberto');
+          grupo.classList.toggle('aberto', abrir);
+          var itens = grupo.closest('tbody')
+            .querySelectorAll('[data-dgrupo-de="' + gid + '"]');
+          for (var i = 0; i < itens.length; i++) itens[i].hidden = !abrir;
+        }
       }
       document.getElementById('pnlCorpo').addEventListener('click', aoClicar);
       document.getElementById('recCard').addEventListener('click', aoClicar);
@@ -1374,46 +1395,68 @@
     }
     // Linha de drill do P&L para um movimento classificado. A correção
     // faz-se no drill da reconciliação, por isso aqui não há ✕.
-    function linhaClfPnl(c, nCols){
-      return '<tr><td>' + escapeHtml(c.mov.data) + '</td>' +
-        '<td>' + escapeHtml(c.mov.desc) + seloDespesa(c.despesa) + '</td>' +
+    // attrs entra no <tr> quando a linha e um item dentro de um grupo.
+    function linhaClfPnl(c, nCols, attrs){
+      return '<tr' + (attrs || '') + '><td>' + escapeHtml(c.mov.data) + '</td>' +
+        '<td>' + escapeHtml(c.mov.desc) + '</td>' +
         '<td>banco (' + escapeHtml(c.mov.conta) + ') · classificado' + seloClf(c.modo) + '</td>' +
         '<td class="num">' + formatEuro(c.mov.valor) + '</td>' +
         (nCols > 4 ? '<td></td>' : '') + '</tr>';
     }
 
-    // Total por despesa dentro de uma rubrica do P&L, por valor descendente.
-    // "Sem despesa" fecha a soma com o total da rubrica: alem dos movimentos
-    // classificados sem despesa, apanha tudo o que vem das outras fontes
-    // (recibos, pedidos de pagamento, compromissos fixos).
-    function resumoDespesas(total, lista){
-      var porNome = {}, comDespesa = 0, algum = false;
+    /* ---------------------------------------------------------
+       Agrupamento por despesa nos drill-downs das rubricas.
+       So exibicao: nao toca em valores, nem no que esta gravado.
+       Movimentos SEM despesa ficam como sempre estiveram — a
+       lista de soltos volta ao chamador tal e qual.
+       --------------------------------------------------------- */
+    function agruparPorDespesa(lista){
+      var porNome = {}, ordem = [], soltos = [];
       (lista || []).forEach(function(c){
-        if (!c.despesa) return;
-        algum = true;
-        porNome[c.despesa] = (porNome[c.despesa] || 0) + c.mov.valor;
-        comDespesa += c.mov.valor;
+        if (!c.despesa){ soltos.push(c); return; }
+        if (!porNome[c.despesa]){
+          porNome[c.despesa] = { nome: c.despesa, total: 0, itens: [] };
+          ordem.push(c.despesa);
+        }
+        porNome[c.despesa].total += c.mov.valor;
+        porNome[c.despesa].itens.push(c);
       });
-      if (!algum) return '';
-      var partes = Object.keys(porNome).map(function(nome){
-        return { nome: nome, valor: porNome[nome] };
-      }).sort(function(a, b){ return b.valor - a.valor; });
-      var resto = (total || 0) - comDespesa;
-      if (Math.abs(resto) >= 0.005) partes.push({ nome: 'Sem despesa', valor: resto });
-      return '<div class="desp-resumo">Por despesa: ' + partes.map(function(x){
-        return escapeHtml(x.nome) + ' <b>' + formatEuro(x.valor) + '</b>';
-      }).join(' · ') + '</div>';
+      return {
+        grupos: ordem.map(function(nome){ return porNome[nome]; })
+                     .sort(function(a, b){ return b.total - a.total; }),
+        soltos: soltos
+      };
     }
 
-    function drill(resumoTxt, headHtml, linhasHtml, topoHtml){
+    // Contador de grupos do render atual: da a cada grupo um id unico para o
+    // clique saber que linhas abrir. Reposto no inicio de cada renderPnl.
+    var dgSeq = 0;
+    // Linha-resumo de um grupo + os movimentos originais escondidos por baixo.
+    // colsAntes = colunas antes da do valor; colsDepois = as que vem a seguir.
+    function linhasGrupoDespesa(g, colsAntes, colsDepois, linhaItem){
+      var gid = 'dg' + (++dgSeq);
+      var vazias = '';
+      for (var i = 0; i < colsDepois; i++) vazias += '<td></td>';
+      return '<tr class="dg-grupo" data-dgrupo="' + gid + '">' +
+        '<td colspan="' + colsAntes + '"><span class="dg-seta"></span>' +
+          escapeHtml(g.nome) + ' <span class="pnl-sub" style="display:inline">· ' +
+          g.itens.length + (g.itens.length === 1 ? ' movimento' : ' movimentos') +
+          '</span></td>' +
+        '<td class="num">' + formatEuro(g.total) + '</td>' + vazias + '</tr>' +
+        g.itens.map(function(c){
+          return linhaItem(c, ' class="dg-item" hidden data-dgrupo-de="' + gid + '"');
+        }).join('');
+    }
+
+    function drill(resumoTxt, headHtml, linhasHtml){
       return '<details class="drill"><summary>' + escapeHtml(resumoTxt) + '</summary>' +
-        (topoHtml || '') +
         '<table class="drill-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
         linhasHtml + '</tbody></table></details>';
     }
 
     function renderPnl(d){
       var corpo = document.getElementById('pnlCorpo');
+      dgSeq = 0;
       if (!d.temAlgumDado){
         corpo.innerHTML = '<div class="vazio">Sem dados em ' + escapeHtml(nomeMes(d.mes)) +
           ': nenhumas vendas, pagamentos, recibos ou movimentos bancários. ' +
@@ -1452,10 +1495,18 @@
             '<td>' + escapeHtml(l.fornecedor) + '</td><td>banco (' + escapeHtml(l.conta) + ') · ' +
             escapeHtml(l.desc) + '</td><td class="num">' + formatEuro(l.valor) + '</td>' +
             '<td class="num">' + botaoExcluir(l.chave, 'cmv') + '</td></tr>';
-        }).join('') + d.clfCmv.map(function(c){ return linhaClfPnl(c, 5); }).join('');
+        }).join('');
+        var agCmv = agruparPorDespesa(d.clfCmv);
+        // Agregados por despesa primeiro (valor desc.), individuais depois.
+        linhas = agCmv.grupos.map(function(g){
+          return linhasGrupoDespesa(g, 3, 1, function(c, attrs){
+            return linhaClfPnl(c, 5, attrs);
+          });
+        }).join('') + linhas +
+          agCmv.soltos.map(function(c){ return linhaClfPnl(c, 5); }).join('');
         cmvDrill = drill((d.cmvPayReq.length + d.cmvExtra.length + d.clfCmv.length) + ' compras',
           '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th><th></th>',
-          linhas, resumoDespesas(d.totCmv, d.clfCmv));
+          linhas);
       }
       h += '<tr><td class="pnl-rubrica">CMV / Compras' +
         '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores (valores c/ IVA)</div>' +
@@ -1494,21 +1545,29 @@
           linhasPes += '<tr class="drill-secao"><td colspan="4">Sem recibo ' +
             '<span class="selo-estimativa">estimativa</span></td></tr>';
         }
-        linhasPes += d.pessoalSemRecibo.map(function(i){
+        var linhasPesSoltos = d.pessoalSemRecibo.map(function(i){
           return '<tr><td>' + escapeHtml(i.desc) + '</td>' +
             '<td>' + escapeHtml(i.origem) + ' · ' + escapeHtml(i.data) + '</td>' +
             '<td class="num">' + formatEuro(i.valor) + '</td>' +
             '<td class="num">' + botaoExcluir(i.chave, 'pessoal') + '</td></tr>';
         }).join('');
-        linhasPes += d.clfPessoal.map(function(c){
-          return '<tr><td>' + escapeHtml(c.mov.desc) + seloDespesa(c.despesa) + '</td>' +
+        function linhaPessoalClf(c, attrs){
+          return '<tr' + (attrs || '') + '><td>' + escapeHtml(c.mov.desc) + '</td>' +
             '<td>banco (' + escapeHtml(c.mov.conta) + ') · ' + escapeHtml(c.mov.data) +
             ' · classificado' + seloClf(c.modo) + '</td>' +
             '<td class="num">' + formatEuro(c.mov.valor) + '</td><td></td></tr>';
+        }
+        // Os agregados ficam no topo da seccao "Sem recibo", que e onde estes
+        // movimentos vivem — acima do cabecalho "Com recibo" davam a entender
+        // que tinham recibo, e a estimativa e so desta metade.
+        var agPes = agruparPorDespesa(d.clfPessoal);
+        linhasPes += agPes.grupos.map(function(g){
+          return linhasGrupoDespesa(g, 2, 1, linhaPessoalClf);
         }).join('');
+        linhasPesSoltos += agPes.soltos.map(function(c){ return linhaPessoalClf(c); }).join('');
         pesDrill = drill(nItens + (nItens === 1 ? ' item' : ' itens'),
-          '<th>Item</th><th>Fonte</th><th class="num">Valor</th><th></th>', linhasPes,
-          resumoDespesas(d.totPessoal, d.clfPessoal));
+          '<th>Item</th><th>Fonte</th><th class="num">Valor</th><th></th>',
+          linhasPes + linhasPesSoltos);
       }
       h += '<tr><td class="pnl-rubrica">Pessoal' +
         (d.pessoalPendente ? '<span class="selo-pendente">pendente</span>' : '') +
@@ -1524,16 +1583,20 @@
           return '<tr><td>' + escapeHtml(f.nome) + '</td>' +
             '<td class="num">' + formatEuro(f.valor) + '</td>' +
             '<td class="num">' + botaoExcluir(f.chave, 'fixos') + '</td></tr>';
-        }).join('') + d.clfFixos.map(function(c){
-          return '<tr><td>' + escapeHtml(c.mov.desc) +
-            ' <span class="pnl-sub" style="display:inline">banco (' + escapeHtml(c.mov.conta) +
-            ') · ' + escapeHtml(c.mov.data) + '</span>' + seloClf(c.modo) +
-            seloDespesa(c.despesa) + '</td>' +
-            '<td class="num">' + formatEuro(c.mov.valor) + '</td><td></td></tr>';
         }).join('');
+        function linhaFixosClf(c, attrs){
+          return '<tr' + (attrs || '') + '><td>' + escapeHtml(c.mov.desc) +
+            ' <span class="pnl-sub" style="display:inline">banco (' + escapeHtml(c.mov.conta) +
+            ') · ' + escapeHtml(c.mov.data) + '</span>' + seloClf(c.modo) + '</td>' +
+            '<td class="num">' + formatEuro(c.mov.valor) + '</td><td></td></tr>';
+        }
+        var agFix = agruparPorDespesa(d.clfFixos);
+        linhasF = agFix.grupos.map(function(g){
+          return linhasGrupoDespesa(g, 1, 1, linhaFixosClf);
+        }).join('') + linhasF +
+          agFix.soltos.map(function(c){ return linhaFixosClf(c); }).join('');
         fxDrill = drill((d.fixos.length + d.clfFixos.length) + ' compromissos',
-          '<th>Compromisso</th><th class="num">Valor mensal</th><th></th>', linhasF,
-          resumoDespesas(d.totFixos, d.clfFixos));
+          '<th>Compromisso</th><th class="num">Valor mensal</th><th></th>', linhasF);
       }
       h += '<tr><td class="pnl-rubrica">Fixos' +
         '<div class="pnl-sub">compromissos fixos sem pessoal e sem TSU (evita dupla contagem)</div>' + fxDrill +
@@ -1541,17 +1604,20 @@
 
       // Outros custos — só movimentos bancários classificados nesta rubrica
       if (d.clfOutros.length){
-        var linhasO = d.clfOutros.map(function(c){
-          return '<tr><td>' + escapeHtml(c.mov.data) + '</td>' +
-            '<td>' + escapeHtml(c.mov.desc) + seloClf(c.modo) + seloDespesa(c.despesa) + '</td>' +
+        function linhaOutrosClf(c, attrs){
+          return '<tr' + (attrs || '') + '><td>' + escapeHtml(c.mov.data) + '</td>' +
+            '<td>' + escapeHtml(c.mov.desc) + seloClf(c.modo) + '</td>' +
             '<td>' + escapeHtml(c.mov.conta) + '</td>' +
             '<td class="num">' + formatEuro(c.mov.valor) + '</td></tr>';
-        }).join('');
+        }
+        var agOut = agruparPorDespesa(d.clfOutros);
+        var linhasO = agOut.grupos.map(function(g){
+          return linhasGrupoDespesa(g, 3, 0, linhaOutrosClf);
+        }).join('') + agOut.soltos.map(function(c){ return linhaOutrosClf(c); }).join('');
         h += '<tr><td class="pnl-rubrica">Outros custos' +
           '<div class="pnl-sub">movimentos bancários classificados fora das rubricas acima</div>' +
           drill(d.clfOutros.length + (d.clfOutros.length === 1 ? ' movimento' : ' movimentos'),
-            '<th>Data</th><th>Descrição</th><th>Conta</th><th class="num">Valor</th>', linhasO,
-            resumoDespesas(d.totOutros, d.clfOutros)) +
+            '<th>Data</th><th>Descrição</th><th>Conta</th><th class="num">Valor</th>', linhasO) +
           '</td><td class="num">' + formatEuro(d.totOutros) + '</td></tr>';
       }
 
