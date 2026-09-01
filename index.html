@@ -16,210 +16,149 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gioco-shell.css">
 
 <style>
-  :root{
-    --bg:#F5F2EC;
-    --red:#D91124;
-    --black:#141414;
-    --white:#FFFFFF;
-    --line:#E2DDD1;
-    --muted:#6b6660;
-  }
-
-  *{box-sizing:border-box;}
-
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--black);
-    font-family:'Inter', sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-
-  h1,h2,h3,.mono,.card-title,.tag,.field-label{
-    font-family:'Space Mono', monospace;
-  }
-
-  header{
-    background:var(--red);
-    color:var(--white);
-    padding:20px 24px;
-  }
-
-  .header-inner{
-    max-width:1200px;
-    margin:0 auto;
-    display:flex;
-    align-items:center;
-    gap:8px;
-  }
-
-  .brand-mark{
-    font-family:'Space Mono', monospace;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
-  main{
-    max-width:1200px;
-    margin:0 auto;
-    padding:48px 24px;
-  }
-
-  .page-title{
-    margin:0;
-    font-size:34px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-  }
-
   .page-subtitle{
-    margin:8px 0 0;
-    font-family:'Space Mono', monospace;
+    margin:-14px 0 0;
     font-size:12px;
+    font-weight:600;
     color:var(--red);
-    letter-spacing:2px;
+    letter-spacing:.18em;
     text-transform:uppercase;
   }
-
-  .grid{
+  .home-grid{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
     gap:18px;
-    margin-top:40px;
+    margin-top:28px;
   }
-
-  .card{
+  .home-card{
     display:block;
-    background:var(--white);
-    border:2px solid var(--black);
-    padding:24px;
     text-decoration:none;
-    color:var(--black);
-    cursor:pointer;
-    transition:transform .12s ease, box-shadow .12s ease;
+    color:var(--ink);
   }
-
-  .card:hover{
-    transform:translate(-2px,-2px);
-    box-shadow:4px 4px 0 var(--red);
-  }
-
-  .card-icon{
-    font-size:28px;
-    line-height:1;
-  }
-
-  .card-title{
+  .home-card > *{ position:relative; z-index:1; }
+  .home-card .card-icon{ color:var(--red); }
+  .home-card .card-title{
     margin:14px 0 4px;
-    font-size:16px;
+    font-size:15px;
     font-weight:700;
   }
-
-  .card-subtitle{
+  .home-card .card-subtitle{
     margin:0;
-    font-family:'Inter', sans-serif;
-    font-size:13px;
+    font-size:12.5px;
     color:var(--muted);
-  }
-
-  .card-disabled{
-    cursor:default;
-    opacity:0.5;
-    position:relative;
-  }
-
-  .card-disabled:hover{
-    transform:none;
-    box-shadow:none;
-  }
-
-  .card-standby-badge{
-    position:absolute;
-    top:24px;
-    right:24px;
-    font-family:'Space Mono', monospace;
-    font-size:9px;
-    font-weight:700;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
-    color:var(--muted);
-    border:1px solid var(--muted);
-    padding:3px 6px;
   }
 </style>
 </head>
 <body>
+<script src="gioco-shell.js"></script>
 
-<header>
-  <div class="header-inner">
-    <span class="brand-mark"><span style="color:var(--black);">●</span> GIOCO®</span>
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('index.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user"><div style="width:26px;height:26px;border-radius:50%;background:var(--mustard);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#141414;flex-shrink:0">G</div> <span>GIOCO</span><div class="dot"></div></div>
+    </div>
   </div>
-</header>
 
-<main>
-  <h1 class="page-title">GIOCO OS</h1>
-  <p class="page-subtitle">Directório Operacional</p>
+  <div class="main">
+    <div class="page">
 
-  <div class="grid">
-    <a class="card" href="compras.html">
-      <div class="card-icon">📋</div>
-      <h3 class="card-title">Compras</h3>
-      <p class="card-subtitle">Fornecedores e encomendas</p>
-    </a>
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1>GIOCO <b>OS</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+      <p class="page-subtitle">Directório Operacional</p>
 
-    <a class="card" href="pagamentos.html">
-      <div class="card-icon">💳</div>
-      <h3 class="card-title">Pagamentos</h3>
-      <p class="card-subtitle">Pedidos e histórico</p>
-    </a>
+      <div class="home-grid">
+        <a class="home-card card glass-light" href="receitas.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-chef-hat"/></svg></div>
+          <h3 class="card-title">Receitas</h3>
+          <p class="card-subtitle">Fichas técnicas e food cost</p>
+        </a>
 
-    <a class="card" href="contabilidade.html">
-      <div class="card-icon">🧾</div>
-      <h3 class="card-title">Contabilidade</h3>
-      <p class="card-subtitle">Documentos e finanças</p>
-    </a>
+        <a class="home-card card glass-light" href="compras.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-shopping-cart"/></svg></div>
+          <h3 class="card-title">Compras</h3>
+          <p class="card-subtitle">Fornecedores e encomendas</p>
+        </a>
 
-    <a class="card" href="leitura-faturas.html">
-      <div class="card-icon">📸</div>
-      <h3 class="card-title">Leitura de Faturas</h3>
-      <p class="card-subtitle">Carregar e extrair dados de faturas</p>
-    </a>
+        <a class="home-card card glass-light" href="pagamentos.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-receipt"/></svg></div>
+          <h3 class="card-title">Pagamentos</h3>
+          <p class="card-subtitle">Pedidos e histórico</p>
+        </a>
 
-    <a class="card" href="caixa.html">
-      <div class="card-icon">💶</div>
-      <h3 class="card-title">Caixa</h3>
-      <p class="card-subtitle">Movimentos de dinheiro</p>
-    </a>
+        <a class="home-card card glass-light" href="vendas.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-bar-chart-2"/></svg></div>
+          <h3 class="card-title">Vendas</h3>
+          <p class="card-subtitle">Importação e análise de vendas</p>
+        </a>
 
-    <a class="card" href="loja-sao-bento.html">
-      <div class="card-icon">🏪</div>
-      <h3 class="card-title">São Bento 154</h3>
-      <p class="card-subtitle">Checklists e temperaturas</p>
-    </a>
+        <a class="home-card card glass-light" href="contagens.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-clipboard-check"/></svg></div>
+          <h3 class="card-title">Contagens</h3>
+          <p class="card-subtitle">Registo de stock físico</p>
+        </a>
 
-    <a class="card" href="contagens.html">
-      <div class="card-icon">📦</div>
-      <h3 class="card-title">Contagens</h3>
-      <p class="card-subtitle">Registo de stock físico</p>
-    </a>
+        <a class="home-card card glass-light" href="foodcost.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-trending-down"/></svg></div>
+          <h3 class="card-title">Food cost</h3>
+          <p class="card-subtitle">Consumo teórico vs. real</p>
+        </a>
 
-    <a class="card" href="receitas.html">
-      <div class="card-icon">📖</div>
-      <h3 class="card-title">Receitas</h3>
-      <p class="card-subtitle">Fichas técnicas e food cost</p>
-    </a>
+        <a class="home-card card glass-light" href="equipa.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-users"/></svg></div>
+          <h3 class="card-title">Equipa</h3>
+          <p class="card-subtitle">Turnos, pessoas e recibos</p>
+        </a>
 
-    <a class="card" href="equipa.html">
-      <div class="card-icon">👥</div>
-      <h3 class="card-title">Equipa</h3>
-      <p class="card-subtitle">Turnos e pessoas</p>
-    </a>
+        <a class="home-card card glass-light" href="leitura-faturas.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-receipt"/></svg></div>
+          <h3 class="card-title">Leitura de Faturas</h3>
+          <p class="card-subtitle">Carregar e extrair dados de faturas</p>
+        </a>
+
+        <a class="home-card card glass-light" href="caixa.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-receipt"/></svg></div>
+          <h3 class="card-title">Caixa</h3>
+          <p class="card-subtitle">Movimentos de dinheiro</p>
+        </a>
+
+        <a class="home-card card glass-light" href="loja-sao-bento.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-message-square"/></svg></div>
+          <h3 class="card-title">São Bento 154</h3>
+          <p class="card-subtitle">Checklists e temperaturas</p>
+        </a>
+
+        <a class="home-card card glass-light" href="contabilidade.html">
+          <div class="card-icon"><svg class="icon" width="26" height="26"><use href="#i-pencil"/></svg></div>
+          <h3 class="card-title">Contabilidade</h3>
+          <p class="card-subtitle">Documentos e finanças</p>
+        </a>
+      </div>
+
+    </div>
   </div>
-</main>
+</div>
 
 </body>
 </html>
