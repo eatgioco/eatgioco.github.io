@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Centro">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Centro de controlo</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  /* ======================================================================
+     centro-de-controlo.html — estilos próprios da página.
+
+     O vidro, a sidebar, os .card, os .status e os botões vêm todos do
+     gioco-shell.css. Aqui fica só o que é específico deste painel: a grelha
+     de três colunas, o mostrador do ar condicionado, o bloco de vídeo e os
+     esqueletos dos cartões que ainda não têm fonte de dados.
+
+     Página desktop-only (viewport width=1200): sem @media queries.
+     ====================================================================== */
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-size:12px;
+    font-weight:600;
+    color:var(--red);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+  }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+  .auth-box h2{
+    margin:0 0 8px;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
+  }
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.55;
+  }
+
+  /* ======================================================================
+     GRELHA — controlos à esquerda, câmara ao centro, mensagens à direita.
+     ====================================================================== */
+  .cc-grid{
+    display:grid;
+    /* A coluna do meio tem um minimo: com `minmax(0,1fr)` uma janela estreita
+       (abaixo dos 1200px para que a pagina foi desenhada) esmagava-a ate 36px
+       e a camara desaparecia. Com o minimo, a pagina passa a ter scroll
+       horizontal nessas larguras — que e o que as outras paginas desktop-only
+       do OS ja fazem, e infinitamente melhor do que a coluna colapsada. */
+    grid-template-columns:280px minmax(380px,1fr) 320px;
+    gap:16px;
+    /* stretch (e não start) para o painel de mensagens acompanhar a altura da
+       coluna mais alta — é um painel de altura completa, não um cartão. */
+    align-items:stretch;
+    margin-top:18px;
+  }
+  .cc-col{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+
+  /* O ::before do vidro pinta por cima do conteúdo estático (armadilha
+     conhecida do shell): empurrar tudo para z-index 1. */
+  .cc-card{ position:relative; }
+  .cc-card > *{ position:relative; z-index:1; }
+
+  /* Cabeçalho comum a todos os cartões: título à esquerda, selo à direita. */
+  .cc-head{
+    display:flex; align-items:center; gap:8px;
+    flex-wrap:wrap;
+    margin:0 0 14px;
+  }
+  /* Nem o título nem o selo se partem a meio ("AR / CONDICIONADO",
+     "Em / breve"): quando não cabem lado a lado, é o selo que passa para uma
+     linha própria por baixo do título. É o que acontece nos cartões estreitos
+     da fila central. */
+  .cc-head h3{
+    font-family:'Inter',sans-serif;
+    font-weight:700; font-size:11px;
+    letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted);
+    margin:0;
+    white-space:nowrap;
+  }
+  .cc-head .status{ white-space:nowrap; }
+
+  /* Linha só para o selo, alinhada à direita. No cartão do ar condicionado o
+     canto superior direito é do interruptor (é onde ele tem de estar), e
+     título + selo + interruptor não cabem nos 240px da coluna. */
+  .cc-selo-linha{ display:flex; justify-content:flex-end; margin:-6px 0 10px; }
+  .cc-head .icon{ color:var(--muted); flex-shrink:0; }
+  .cc-head .sp{ flex:1; }
+
+  /* Nota de rodapé de cada placeholder: diz de onde virão os dados. */
+  .cc-nota{
+    margin:14px 0 0;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+    font-size:11.5px;
+    line-height:1.5;
+    color:var(--muted);
+  }
+
+  /* Barras de esqueleto: ocupam o lugar de um dado que ainda não existe.
+     Sem animação — não é um carregamento, é uma ausência. */
+  .cc-skel{
+    display:inline-block;
+    height:9px; border-radius:100px;
+    background:var(--line);
+    vertical-align:middle;
+  }
+  [data-theme="dark"] .cc-skel{ background:rgba(255,255,255,0.10); }
+
+  /* Valor em falta. Nunca um número inventado. */
+  .cc-vazio{ color:var(--muted); font-weight:600; }
+
+  /* ======================================================================
+     1. AR CONDICIONADO — o cartão de destaque da coluna esquerda.
+     ====================================================================== */
+  .ac-dial{
+    width:168px; height:168px;
+    margin:4px auto 0;
+    position:relative;
+  }
+  .ac-dial svg{ width:100%; height:100%; transform:rotate(135deg); }
+  .ac-dial .trilho{ fill:none; stroke:var(--line); stroke-width:10; stroke-linecap:round; }
+  [data-theme="dark"] .ac-dial .trilho{ stroke:rgba(255,255,255,0.10); }
+
+  .ac-centro{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:2px;
+  }
+  .ac-temp{
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    font-size:38px; font-weight:700;
+    line-height:1;
+    color:var(--muted);
+  }
+  .ac-temp sup{ font-size:16px; font-weight:600; top:-.7em; }
+  .ac-estado{
+    font-size:10.5px; font-weight:700;
+    letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .ac-passos{
+    display:flex; align-items:center; justify-content:center;
+    gap:12px; margin-top:14px;
+  }
+  .ac-passo{
+    width:40px; height:40px; border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--white);
+    /* <button> sem color explícita herda o preto do browser e fica ilegível
+       no tema escuro — armadilha conhecida do shell. */
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:19px; font-weight:600; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:not-allowed;
+  }
+  .ac-passo:disabled{ opacity:.5; }
+
+  .ac-modos{
+    display:flex; gap:6px; margin-top:16px;
+  }
+  .ac-modo{
+    flex:1;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    border-radius:100px;
+    padding:8px 4px;
+    font-family:'Inter',sans-serif;
+    font-size:11px; font-weight:600;
+    cursor:not-allowed;
+    opacity:.55;
+  }
+
+  /* Interruptor decorativo do canto superior direito. Desligado e inerte. */
+  .cc-switch{
+    width:38px; height:21px; border-radius:100px;
+    background:var(--line);
+    border:none; padding:0;
+    position:relative; flex-shrink:0;
+    cursor:not-allowed; opacity:.7;
+  }
+  [data-theme="dark"] .cc-switch{ background:rgba(255,255,255,0.12); }
+  .cc-switch::after{
+    content:''; position:absolute;
+    top:3px; left:3px; width:15px; height:15px;
+    border-radius:50%; background:var(--white);
+    box-shadow:0 1px 3px rgba(0,0,0,0.25);
+  }
+
+  /* ======================================================================
+     2. TEMPERATURAS HACCP
+     ====================================================================== */
+  .haccp-linha{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .haccp-linha:last-of-type{ border-bottom:none; }
+  .haccp-ponto{ flex:1; min-width:0; }
+  .haccp-valor{
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+  }
+  .haccp-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--line);
+    flex-shrink:0;
+  }
+  [data-theme="dark"] .haccp-dot{ background:rgba(255,255,255,0.18); }
+
+  /* ======================================================================
+     3. EQUIPA EM TURNO
+     ====================================================================== */
+  .eq-avatares{ display:flex; align-items:center; }
+  .eq-av{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--line);
+    border:2px solid var(--white);
+    margin-left:-9px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Inter',sans-serif;
+    font-size:12px; font-weight:700;
+    color:var(--muted);
+  }
+  [data-theme="dark"] .eq-av{ background:rgba(255,255,255,0.10); }
+  .eq-av:first-child{ margin-left:0; }
+  .eq-registo{
+    margin:12px 0 0;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .eq-registo strong{ font-variant-numeric:tabular-nums; }
+
+  /* ======================================================================
+     CÂMARA — bloco de vídeo, selos e separadores sobrepostos.
+
+     A superfície do vídeo é escura nos DOIS temas de propósito: é a moldura
+     de uma imagem de câmara, não uma superfície do tema. Por isso as cores
+     aqui dentro são literais fixos, e não tokens que invertem.
+     ====================================================================== */
+  .cam{
+    position:relative;
+    border-radius:14px;
+    overflow:hidden;
+    background:#141414;
+    aspect-ratio:16/9;
+    outline:1px solid var(--line);
+    outline-offset:-1px;
+  }
+  .cam iframe{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    border:none; display:block;
+  }
+
+  .cam-topo{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; align-items:flex-start; gap:10px;
+    padding:14px 16px;
+    z-index:3;
+    background:linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+    pointer-events:none;
+  }
+  .cam-live{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--red); color:var(--on-red);
+    border-radius:100px;
+    padding:5px 11px;
+    font-size:10.5px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;
+    flex-shrink:0;
+  }
+  .cam-live i{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--on-red);
+    display:inline-block;
+  }
+  /* Sem stream montado o selo não pode dizer "live" a sério: fica apagado. */
+  .cam-live.off{ background:rgba(255,255,255,0.16); color:#FFFFFF; }
+
+  .cam-pills{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .cam-pill{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.14);
+    color:#FFFFFF;
+    border-radius:100px;
+    padding:5px 11px;
+    font-size:11px; font-weight:600;
+    font-variant-numeric:tabular-nums;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .cam-pill span{ color:rgba(255,255,255,0.62); font-weight:500; }
+
+  .cam-tabs{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; gap:8px;
+    padding:14px 16px;
+    z-index:3;
+    background:linear-gradient(0deg, rgba(0,0,0,0.6), transparent);
+  }
+  .cam-tab{
+    border:1px solid rgba(255,255,255,0.22);
+    background:rgba(255,255,255,0.12);
+    color:#FFFFFF;
+    border-radius:100px;
+    padding:7px 16px;
+    font-family:'Inter',sans-serif;
+    font-size:12px; font-weight:600;
+    cursor:pointer;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    transition:transform .1s ease;
+  }
+  .cam-tab:hover{ transform:translateY(-1px); }
+  .cam-tab.active{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+  }
+
+  /* Estado de indisponível: ocupa o lugar do vídeo. */
+  .cam-msg{
+    position:absolute; inset:0; z-index:2;
+    display:none;
+    flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:8px;
+    padding:0 40px;
+    text-align:center;
+    color:#FFFFFF;
+  }
+  .cam.sem-sinal .cam-msg{ display:flex; }
+  .cam.sem-sinal .cam-tabs{ display:none; }
+  .cam-msg .icon{ color:rgba(255,255,255,0.45); }
+  .cam-msg b{ font-size:14px; font-weight:700; }
+  .cam-msg small{ font-size:12px; color:rgba(255,255,255,0.6); line-height:1.5; }
+
+  /* Enquanto a sonda não responde não há nem imagem nem mensagem: só a
+     moldura preta com um aviso discreto ao centro. */
+  .cam-espera{
+    position:absolute; inset:0; z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:rgba(255,255,255,0.45);
+  }
+  .cam.sem-sinal .cam-espera{ display:none; }
+
+  /* ======================================================================
+     FILA DE CARTÕES por baixo da câmara.
+     ====================================================================== */
+  .cc-fila{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:14px;
+    align-items:stretch;
+  }
+  /* A coluna central e a mais estreita das tres depois da camara: com os 20px
+     do .card do shell sobravam ~120px de conteudo por cartao. */
+  .cc-fila .cc-card{ padding:16px; display:flex; flex-direction:column; }
+  .cc-fila .cc-nota{ margin-top:auto; }
+  .cc-numero{
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    font-size:28px; font-weight:700;
+    line-height:1.1;
+    color:var(--muted);
+  }
+  .cc-legenda{
+    margin:6px 0 0;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .fp-linha{
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; padding:7px 0 0;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .fp-linha .v{
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    color:var(--muted);
+  }
+
+  /* Seletor Mensal/Anual do consumo. */
+  .cc-seg-linha{ display:flex; justify-content:flex-end; margin-top:2px; }
+  .cc-seg{
+    display:flex; gap:4px;
+    background:var(--dough);
+    border-radius:100px;
+    padding:3px;
+    flex-shrink:0;
+  }
+  .cc-seg button{
+    border:none; background:transparent;
+    color:var(--muted);
+    border-radius:100px;
+    padding:4px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:10.5px; font-weight:600;
+    cursor:pointer;
+  }
+  .cc-seg button.active{
+    background:var(--white);
+    color:var(--ink);
+    box-shadow:0 1px 3px rgba(0,0,0,0.10);
+  }
+
+  /* Barras fantasma: todas iguais de propósito — a forma do gráfico sem
+     inventar uma leitura mensal que não temos. */
+  .cc-barras{
+    display:flex; align-items:flex-end; gap:5px;
+    height:78px; margin-top:6px;
+  }
+  .cc-barras i{
+    flex:1;
+    height:34%;
+    border-radius:4px 4px 2px 2px;
+    background:var(--line);
+  }
+  [data-theme="dark"] .cc-barras i{ background:rgba(255,255,255,0.10); }
+  .cc-eixo{
+    display:flex; justify-content:space-between;
+    margin-top:8px;
+    font-size:10px; color:var(--muted);
+  }
+
+  /* ======================================================================
+     COLUNA DIREITA — chat de equipa.
+     ====================================================================== */
+  .chat{
+    display:flex; flex-direction:column;
+    flex:1;
+    min-height:520px;
+  }
+  .chat-lista{
+    flex:1; overflow:hidden;
+    margin:0 -4px;
+  }
+  .chat-item{
+    display:flex; gap:10px;
+    padding:11px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  .chat-item:last-child{ border-bottom:none; }
+  .chat-av{
+    width:32px; height:32px; border-radius:50%;
+    background:var(--line);
+    flex-shrink:0;
+  }
+  [data-theme="dark"] .chat-av{ background:rgba(255,255,255,0.10); }
+  .chat-corpo{ flex:1; min-width:0; }
+  .chat-topo{ display:flex; align-items:baseline; gap:8px; }
+  .chat-nome{ font-size:12.5px; font-weight:700; color:var(--ink); }
+  .chat-data{ margin-left:auto; font-size:10.5px; color:var(--muted); flex-shrink:0; }
+  .chat-texto{
+    margin:4px 0 0;
+    font-size:12px; color:var(--muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .chat-escrita{
+    display:flex; align-items:center; gap:8px;
+    margin-top:14px; padding-top:14px;
+    border-top:1px solid var(--line);
+  }
+  .chat-escrita input{
+    flex:1; min-width:0;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    border-radius:100px;
+    padding:10px 14px;
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    cursor:not-allowed;
+  }
+  .chat-escrita .btn-add{ padding:10px 14px; cursor:not-allowed; }
+
+  /* ======================================================================
+     RODAPÉ — separadores de loja.
+     ====================================================================== */
+  .cc-rodape{
+    display:flex; align-items:center; justify-content:center;
+    gap:12px;
+    margin:22px 0 0;
+    padding:10px;
+  }
+  .loja-tab{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+    border-radius:100px;
+    padding:9px 18px;
+    font-family:'Inter',sans-serif;
+    font-size:12.5px; font-weight:600;
+  }
+  .loja-tab.active{
+    background:var(--ink);
+    color:var(--dough);
+    border-color:var(--ink);
+  }
+  .loja-vazio{
+    font-size:11.5px;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('centro-de-controlo.html');</script>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-scan"/></svg>GIOCO · <b>Centro de controlo</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle" id="pageSubtitle">A carregar a loja…</p>
+
+      <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+           falhar; ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <div class="cc-grid">
+
+        <!-- ============================================================
+             COLUNA ESQUERDA — cartões de controlo
+             ============================================================ -->
+        <div class="cc-col">
+
+          <!-- 1. AR CONDICIONADO -->
+          <div class="cc-card card glass-light">
+            <div class="cc-head">
+              <h3>Ar condicionado</h3>
+              <div class="sp"></div>
+              <button class="cc-switch" type="button" disabled title="Ligar (indisponível)" aria-label="Ligar (indisponível)"></button>
+            </div>
+            <div class="cc-selo-linha"><span class="status warn">Em breve</span></div>
+
+            <div class="ac-dial">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <!-- Arco aberto em baixo: r=42, perímetro 263.9; 3/4 disso
+                     (197.9) é o trilho, rodado 135° para abrir para baixo. -->
+                <circle class="trilho" cx="50" cy="50" r="42" stroke-dasharray="197.9 263.9"></circle>
+              </svg>
+              <div class="ac-centro">
+                <div class="ac-temp">—<sup>°C</sup></div>
+                <div class="ac-estado">Sem ligação</div>
+              </div>
+            </div>
+
+            <div class="ac-passos">
+              <button class="ac-passo" type="button" disabled aria-label="Baixar temperatura">−</button>
+              <button class="ac-passo" type="button" disabled aria-label="Subir temperatura">+</button>
+            </div>
+
+            <div class="ac-modos">
+              <button class="ac-modo" type="button" disabled>Frio</button>
+              <button class="ac-modo" type="button" disabled>Ventilação</button>
+              <button class="ac-modo" type="button" disabled>Calor</button>
+            </div>
+
+            <p class="cc-nota">Integração NetHome Plus (Midea) por confirmar.</p>
+          </div>
+
+          <!-- 2. TEMPERATURAS HACCP -->
+          <div class="cc-card card glass-light">
+            <div class="cc-head">
+              <svg class="icon" width="15" height="15"><use href="#i-clipboard-check"/></svg>
+              <h3>Temperaturas HACCP</h3>
+              <div class="sp"></div>
+              <span class="status warn">Em breve</span>
+            </div>
+
+            <div class="haccp-linha">
+              <span class="haccp-dot"></span>
+              <span class="haccp-ponto"><span class="cc-skel" style="width:92px"></span></span>
+              <span class="haccp-valor cc-vazio">—</span>
+            </div>
+            <div class="haccp-linha">
+              <span class="haccp-dot"></span>
+              <span class="haccp-ponto"><span class="cc-skel" style="width:72px"></span></span>
+              <span class="haccp-valor cc-vazio">—</span>
+            </div>
+            <div class="haccp-linha">
+              <span class="haccp-dot"></span>
+              <span class="haccp-ponto"><span class="cc-skel" style="width:104px"></span></span>
+              <span class="haccp-valor cc-vazio">—</span>
+            </div>
+            <div class="haccp-linha">
+              <span class="haccp-dot"></span>
+              <span class="haccp-ponto"><span class="cc-skel" style="width:60px"></span></span>
+              <span class="haccp-valor cc-vazio">—</span>
+            </div>
+
+            <p class="cc-nota">A ligar aos registos de loja-sao-bento.</p>
+          </div>
+
+          <!-- 3. EQUIPA EM TURNO -->
+          <div class="cc-card card glass-light">
+            <div class="cc-head">
+              <svg class="icon" width="15" height="15"><use href="#i-users"/></svg>
+              <h3>Equipa em turno</h3>
+              <div class="sp"></div>
+              <span class="status warn">Em breve</span>
+            </div>
+
+            <div class="eq-avatares">
+              <div class="eq-av"></div>
+              <div class="eq-av"></div>
+              <div class="eq-av"></div>
+              <div class="eq-av">—</div>
+            </div>
+
+            <p class="eq-registo">Último registo às <strong class="cc-vazio">--:--</strong></p>
+
+            <p class="cc-nota">A ligar a equipa.html.</p>
+          </div>
+
+        </div>
+
+        <!-- ============================================================
+             COLUNA CENTRAL — câmara + fila de cartões
+             ============================================================ -->
+        <div class="cc-col">
+
+          <!-- CÂMARA -->
+          <div class="cam" id="cam">
+            <div class="cam-espera" id="camEspera">A procurar as câmaras da loja…</div>
+
+            <div class="cam-topo">
+              <span class="cam-live off" id="camLive"><i></i><span id="camLiveTexto">Sem sinal</span></span>
+              <div class="cam-pills">
+                <span class="cam-pill">Sala <span>— °C</span></span>
+                <span class="cam-pill">Consumo <span>— kW</span></span>
+              </div>
+            </div>
+
+            <div class="cam-msg" id="camMsg">
+              <svg class="icon" width="28" height="28"><use href="#i-scan"/></svg>
+              <b id="camMsgTitulo">Câmaras indisponíveis</b>
+              <small id="camMsgDetalhe">É preciso estar ligado à rede Tailscale da loja.</small>
+            </div>
+
+            <div class="cam-tabs" id="camTabs"></div>
+          </div>
+
+          <!-- FILA DE CARTÕES -->
+          <div class="cc-fila">
+
+            <!-- 4. VENDAS HOJE -->
+            <div class="cc-card card glass-light">
+              <div class="cc-head">
+                <svg class="icon" width="15" height="15"><use href="#i-trending-up"/></svg>
+                <h3>Vendas hoje</h3>
+                <div class="sp"></div>
+                <span class="status warn">Em breve</span>
+              </div>
+              <div class="cc-numero">— €</div>
+              <p class="cc-legenda">— vs. mesmo dia da semana anterior</p>
+              <p class="cc-nota">A ligar a vendasDiario.</p>
+            </div>
+
+            <!-- 5. FOOTFALL -->
+            <div class="cc-card card glass-light">
+              <div class="cc-head">
+                <svg class="icon" width="15" height="15"><use href="#i-users"/></svg>
+                <h3>Footfall</h3>
+                <div class="sp"></div>
+                <span class="status warn">Em breve</span>
+              </div>
+              <div class="cc-numero">—</div>
+              <p class="cc-legenda">entradas contadas</p>
+              <div class="fp-linha">
+                <span>Taxa de conversão</span>
+                <span class="v">— %</span>
+              </div>
+              <p class="cc-nota">Requer Frigate + Raspberry Pi.</p>
+            </div>
+
+            <!-- 6. CONSUMO ELÉTRICO -->
+            <div class="cc-card card glass-light">
+              <div class="cc-head">
+                <svg class="icon" width="15" height="15"><use href="#i-bar-chart-2"/></svg>
+                <h3>Consumo</h3>
+                <div class="sp"></div>
+                <span class="status warn">Em breve</span>
+              </div>
+              <div class="cc-seg-linha">
+                <div class="cc-seg" id="consumoSeg">
+                  <button type="button" class="active" data-escala="mensal">Mensal</button>
+                  <button type="button" data-escala="anual">Anual</button>
+                </div>
+              </div>
+              <div class="cc-barras" id="consumoBarras"></div>
+              <div class="cc-eixo"><span>—</span><span>—</span></div>
+              <p class="cc-nota">Fonte: faturas EDP via OCR — dados mensais, não tempo real.</p>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ============================================================
+             COLUNA DIREITA — chat de equipa
+             ============================================================ -->
+        <div class="cc-col">
+          <div class="cc-card chat card glass-light">
+            <div class="cc-head">
+              <svg class="icon" width="15" height="15"><use href="#i-message-square"/></svg>
+              <h3>Mensagens da equipa</h3>
+              <div class="sp"></div>
+              <span class="status warn">Em breve</span>
+            </div>
+
+            <div class="chat-lista" id="chatLista"></div>
+
+            <div class="chat-escrita">
+              <input type="text" placeholder="Escrever mensagem…" disabled>
+              <button class="btn-add" type="button" disabled title="Enviar" aria-label="Enviar">
+                <svg class="icon" width="14" height="14"><use href="#i-chevron-right"/></svg>
+              </button>
+            </div>
+
+            <p class="cc-nota">Ligação ao Firebase pendente.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ============================================================
+           RODAPÉ — separadores de loja
+           ============================================================ -->
+      <div class="cc-rodape" id="lojaTabs"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  function escapar(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ===================================================================
+  // PLACEHOLDERS — desenhados em JS só para não repetir markup. Nenhum
+  // destes blocos inventa valores: é a FORMA do cartão à espera de fonte
+  // de dados. Não dependem do Firebase, por isso correm já.
+  // ===================================================================
+  (function desenharPlaceholders() {
+    var barras = document.getElementById('consumoBarras');
+
+    function barrasIguais(n) {
+      var s = '';
+      for (var i = 0; i < n; i++) s += '<i></i>';
+      barras.innerHTML = s;
+    }
+
+    if (barras) {
+      barrasIguais(12);
+
+      // O seletor Mensal/Anual troca o número de barras e mais nada: é a
+      // forma do controlo, não uma mudança de dados (não há dados).
+      var seg = document.getElementById('consumoSeg');
+      if (seg) {
+        seg.addEventListener('click', function (ev) {
+          var b = ev.target.closest('button');
+          if (!b) return;
+          var todos = seg.querySelectorAll('button');
+          for (var k = 0; k < todos.length; k++) todos[k].classList.remove('active');
+          b.classList.add('active');
+          barrasIguais(b.getAttribute('data-escala') === 'anual' ? 5 : 12);
+        });
+      }
+    }
+
+    // Chat: linhas de esqueleto com a anatomia final da mensagem.
+    var lista = document.getElementById('chatLista');
+    if (lista) {
+      var larguras = [[70, 190], [54, 160], [82, 205], [62, 148], [76, 172]];
+      var h = '';
+      for (var j = 0; j < larguras.length; j++) {
+        h += '<div class="chat-item">' +
+               '<div class="chat-av"></div>' +
+               '<div class="chat-corpo">' +
+                 '<div class="chat-topo">' +
+                   '<span class="chat-nome"><span class="cc-skel" style="width:' + larguras[j][0] + 'px"></span></span>' +
+                   '<span class="chat-data">—</span>' +
+                 '</div>' +
+                 '<p class="chat-texto"><span class="cc-skel" style="width:' + larguras[j][1] + 'px"></span></p>' +
+               '</div>' +
+             '</div>';
+      }
+      lista.innerHTML = h;
+    }
+  })();
+
+  autenticarEContinuar(function () {
+    var db = firebase.database();
+
+    // A loja vem do URL. Default sb154 — hoje é a única.
+    var params = new URLSearchParams(window.location.search);
+    var lojaId = params.get('loja') || 'sb154';
+
+    var camEl       = document.getElementById('cam');
+    var camTabsEl   = document.getElementById('camTabs');
+    var camLiveEl   = document.getElementById('camLive');
+    var camLiveTxt  = document.getElementById('camLiveTexto');
+    var camEsperaEl = document.getElementById('camEspera');
+    var camMsgTit   = document.getElementById('camMsgTitulo');
+    var camMsgDet   = document.getElementById('camMsgDetalhe');
+    var subtituloEl = document.getElementById('pageSubtitle');
+    var lojaTabsEl  = document.getElementById('lojaTabs');
+
+    function semSinal(titulo, detalhe) {
+      camMsgTit.textContent = titulo;
+      camMsgDet.textContent = detalhe;
+      camEl.classList.add('sem-sinal');
+      camLiveEl.classList.add('off');
+      camLiveTxt.textContent = 'Sem sinal';
+      var frame = camEl.querySelector('iframe');
+      if (frame) frame.parentNode.removeChild(frame);
+    }
+
+    // Rodapé: separadores de loja. Hoje só há uma; o estado vazio diz isso
+    // em vez de fingir um seletor com uma opção só.
+    function desenharLojaTabs(nome) {
+      lojaTabsEl.innerHTML =
+        '<span class="loja-tab active">' +
+          '<svg class="icon" width="14" height="14"><use href="#i-store"/></svg>' +
+          escapar(nome) +
+        '</span>' +
+        '<span class="loja-vazio">Futuras lojas aparecem aqui.</span>';
+    }
+
+    // ---------------------------------------------------------------
+    // Separadores de câmara. Só UM stream activo de cada vez: trocar de
+    // separador troca o src do MESMO iframe, não abre um segundo.
+    // ---------------------------------------------------------------
+    function montarCameras(host, streams) {
+      var frame = document.createElement('iframe');
+      frame.setAttribute('allow', 'autoplay; fullscreen');
+      frame.setAttribute('allowfullscreen', '');
+      frame.title = 'Câmara da loja';
+      camEl.insertBefore(frame, camEl.firstChild);
+
+      function trocar(src) {
+        frame.src = host + '/stream.html?src=' + encodeURIComponent(src) + '&mode=webrtc';
+      }
+
+      var html = '';
+      for (var i = 0; i < streams.length; i++) {
+        html += '<button class="cam-tab' + (i === 0 ? ' active' : '') + '" type="button" data-src="' +
+                escapar(streams[i].src) + '">' + escapar(streams[i].nome) + '</button>';
+      }
+      camTabsEl.innerHTML = html;
+
+      camTabsEl.addEventListener('click', function (ev) {
+        var b = ev.target.closest('.cam-tab');
+        if (!b || b.classList.contains('active')) return;
+        var todos = camTabsEl.querySelectorAll('.cam-tab');
+        for (var j = 0; j < todos.length; j++) todos[j].classList.remove('active');
+        b.classList.add('active');
+        trocar(b.getAttribute('data-src'));
+      });
+
+      trocar(streams[0].src);
+      camEsperaEl.style.display = 'none';
+      camEl.classList.remove('sem-sinal');
+      camLiveEl.classList.remove('off');
+      camLiveTxt.textContent = 'Live';
+    }
+
+    // ---------------------------------------------------------------
+    // O host das câmaras NUNCA está no HTML: o repositório é público e o
+    // nome MagicDNS da tailnet é informação de rede. Vem sempre daqui.
+    // ---------------------------------------------------------------
+    db.ref('lojas/' + lojaId).once('value').then(function (snap) {
+      var loja = snap.val();
+
+      if (!loja) {
+        subtituloEl.textContent = 'Loja desconhecida';
+        desenharLojaTabs(lojaId);
+        semSinal('Loja não configurada',
+                 'Não existe lojas/' + lojaId + ' no Firebase. Confirma o parâmetro ?loja=.');
+        return;
+      }
+
+      var nome = loja.nome || lojaId;
+      subtituloEl.textContent = loja.morada || nome;
+      document.title = 'GIOCO · Centro de controlo — ' + nome;
+      desenharLojaTabs(nome);
+
+      var cameras = loja.cameras || {};
+      var host = String(cameras.host || '').replace(/\/+$/, '');
+
+      // streams é um objecto; ordenar pelo campo `ordem`.
+      var streams = [];
+      var mapa = cameras.streams || {};
+      for (var k in mapa) {
+        if (!Object.prototype.hasOwnProperty.call(mapa, k)) continue;
+        var s = mapa[k] || {};
+        streams.push({
+          id: k,
+          nome: s.nome || k,
+          src: s.src || k,
+          ordem: typeof s.ordem === 'number' ? s.ordem : 999
+        });
+      }
+      streams.sort(function (a, b) { return (a.ordem - b.ordem) || a.nome.localeCompare(b.nome, 'pt'); });
+
+      if (!host || !streams.length) {
+        semSinal('Câmaras não configuradas',
+                 'Falta lojas/' + lojaId + '/cameras/host ou os streams no Firebase.');
+        return;
+      }
+
+      // -------------------------------------------------------------
+      // SONDA antes de montar o iframe.
+      //
+      // O go2rtc só é alcançável de dentro da tailnet. De fora, o nome
+      // .ts.net nem sequer resolve — e um <iframe> nessas condições falha
+      // EM SILÊNCIO: fica um rectângulo preto e ninguém percebe porquê.
+      // Por isso pergunta-se primeiro, com um fetch curto.
+      //
+      // no-cors porque o go2rtc não devolve headers CORS: a resposta é
+      // opaca (não dá para ler nada dela) mas o fetch RESOLVE se a ligação
+      // se estabeleceu e REJEITA se o DNS ou a rota falharem. É tudo o que
+      // é preciso saber aqui.
+      // -------------------------------------------------------------
+      var ctrl = new AbortController();
+      var expirou = false;
+      var tempoLimite = setTimeout(function () { expirou = true; ctrl.abort(); }, 4000);
+
+      fetch(host + '/api/streams', { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal })
+        .then(function () {
+          clearTimeout(tempoLimite);
+          montarCameras(host, streams);
+        })
+        .catch(function () {
+          clearTimeout(tempoLimite);
+          semSinal('Câmaras indisponíveis',
+                   expirou
+                     ? 'O servidor da loja não respondeu em 4 segundos — é preciso estar ligado à rede Tailscale da loja.'
+                     : 'É preciso estar ligado à rede Tailscale da loja.');
+        });
+
+    }).catch(function (erro) {
+      console.error('Falha a ler a loja:', erro);
+      subtituloEl.textContent = 'Erro a ler a configuração';
+      desenharLojaTabs(lojaId);
+      semSinal('Configuração indisponível',
+               'Não foi possível ler lojas/' + lojaId + ' do Firebase.');
+    });
+  });
+
+});
+</script>
+
+</body>
+</html>

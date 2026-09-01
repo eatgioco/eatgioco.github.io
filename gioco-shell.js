@@ -238,6 +238,10 @@
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' },
+      /* Centro de controlo: cameras, HACCP, vendas do dia e consumo por loja.
+         Icone 'scan' (moldura de visor) por ser o mais proximo de uma camara
+         no sprite — o 'store' ja e o da loja-sao-bento no index. */
+      { href: 'centro-de-controlo.html', icone: 'scan',       label: 'Centro de controlo' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
          no menu, mas não navega para lado nenhum. Com os Resultados a lista
          passou a 10 entradas: é o link morto que fica na 10ª, a única sem
