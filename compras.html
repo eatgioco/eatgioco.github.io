@@ -1711,10 +1711,153 @@
     color:var(--muted);
     line-height:1.55;
   }
+
+  /* ===== Encomenda sugerida ===== */
+  .enc-banner{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:14px 16px;
+    margin:16px 0;
+    border:1px solid var(--line);
+    border-radius:12px;
+    font-size:13.5px;
+    line-height:1.55;
+    color:var(--ink);
+  }
+  .enc-banner.warn{
+    border-color:var(--amber);
+    background:var(--amber-bg);
+  }
+  .enc-banner.bad{
+    border-color:var(--red);
+    background:var(--blush);
+    color:#141414;
+  }
+  .enc-banner strong{ font-weight:600; }
+  .enc-banner .icon{ flex:none; margin-top:2px; }
+
+  /* O compras.html tem um .card local (o cartão de fornecedor: flex column,
+     cursor pointer, height 100%), por isso os painéis desta secção usam o
+     .panel do shell — que aqui não está sobreposto — e declaram a direcção. */
+  .enc-config{
+    display:flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:16px;
+    margin:0 0 20px;
+    padding:14px 16px;
+  }
+  .enc-field{ display:flex; flex-direction:column; gap:6px; }
+  .enc-field label{
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .enc-field input{
+    width:110px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--white);
+    color:var(--ink);
+    font:inherit;
+    font-variant-numeric:tabular-nums;
+  }
+  .enc-config-nota{
+    flex:1 1 260px;
+    min-width:220px;
+    font-size:12.5px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  .enc-group{ margin:0 0 22px; padding:0; display:block; }
+  .enc-group-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+  }
+  .enc-group-head h3{
+    margin:0;
+    font-size:15px;
+    font-weight:600;
+    color:var(--red);
+  }
+  .enc-group-count{ font-size:12.5px; color:var(--muted); }
+  .enc-group-head .spacer{ flex:1; }
+
+  .enc-table-wrap{ overflow-x:auto; }
+  .enc-table{ width:100%; border-collapse:collapse; }
+  .enc-table th{
+    font-size:10.5px;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:var(--muted);
+    text-align:left;
+    padding:10px 16px;
+    font-weight:600;
+  }
+  /* color explícita: o body do shell não inverte a sua própria cor de texto,
+     por isso quem só herda fica a preto no tema escuro. */
+  .enc-table td{
+    padding:11px 16px;
+    font-size:13.5px;
+    border-top:1px solid var(--line);
+    vertical-align:top;
+    color:var(--ink);
+  }
+  .enc-table .enc-n{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .enc-sub{ display:block; font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .enc-sug{ font-weight:600; }
+  .enc-sug.zero{ font-weight:400; color:var(--muted); }
+  .enc-flag{
+    display:inline-block;
+    margin-left:6px;
+    padding:1px 7px;
+    border-radius:100px;
+    font-size:10px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    background:var(--amber-bg);
+    color:var(--amber);
+  }
+
+  .enc-sem{ display:block; }
+  .enc-sem h3{ margin:0 0 6px; font-size:15px; font-weight:600; color:var(--red); }
+  .enc-sem-intro{ font-size:13px; color:var(--muted); line-height:1.55; margin:0 0 14px; }
+  .enc-sem-item{
+    padding:10px 0;
+    border-top:1px solid var(--line);
+    font-size:13.5px;
+    color:var(--ink);
+  }
+  .enc-sem-item:first-of-type{ border-top:none; }
+  .enc-sem-nome{ font-weight:600; }
+  .enc-sem-forn{ color:var(--muted); font-size:12px; margin-left:8px; }
+  .enc-sem-motivos{ margin:4px 0 0; padding-left:18px; color:var(--muted); font-size:12.5px; line-height:1.6; }
+  .enc-sem details summary{
+    cursor:pointer;
+    font-size:13px;
+    color:var(--muted);
+    padding:8px 0;
+  }
+  .enc-vazio{
+    padding:28px 16px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.6;
+  }
 </style>
 </head>
 <body>
 <script src="gioco-shell.js"></script>
+<script src="gioco-consumo.js"></script>
 
 <div class="shell">
 
@@ -1770,6 +1913,7 @@
 <div class="tabs-bar">
   <button type="button" class="tab-btn active" id="tabFornecedor">Por fornecedor</button>
   <button type="button" class="tab-btn" id="tabIngrediente">Por ingrediente</button>
+  <button type="button" class="tab-btn" id="tabEncomenda">Encomenda sugerida</button>
 </div>
 
 <div id="fornecedoresView">
@@ -1808,6 +1952,29 @@
     <div id="ingGrid"></div>
     <div class="empty-state" id="ingEmptyState" style="display:none;">Nenhum ingrediente encontrado.</div>
   </main>
+</div>
+
+<!-- Encomenda sugerida: procura média por dia da semana × horizonte, menos o
+     stock estimado. Só lê; as únicas escritas são encomendasConfig/ e o
+     carrinho (pelo mecanismo normal, um set() por item). -->
+<div id="encomendaView" style="display:none;">
+  <div id="encBanner"></div>
+
+  <div class="panel glass-light enc-config">
+    <div class="enc-field">
+      <label for="encHorizonte">Encomendar para os próximos</label>
+      <input type="number" id="encHorizonte" min="1" max="60" step="1" value="7">
+    </div>
+    <div class="enc-field">
+      <label for="encMargem">Margem de segurança (%)</label>
+      <input type="number" id="encMargem" min="0" max="200" step="1" value="15">
+    </div>
+    <p class="enc-config-nota" id="encConfigNota"></p>
+  </div>
+
+  <div id="encStatus" class="enc-vazio">A carregar vendas, fichas técnicas e contagens…</div>
+  <div id="encGrupos"></div>
+  <div id="encSemSugestao" class="panel glass-light enc-sem" style="display:none;"></div>
 </div>
 
     </div>
@@ -2421,23 +2588,34 @@ window.addEventListener('load', function () {
     }
   });
 
+  var tabEncomenda = document.getElementById('tabEncomenda');
+  var encomendaView = document.getElementById('encomendaView');
+
+  function activarAba(botao) {
+    [tabFornecedor, tabIngrediente, tabEncomenda].forEach(function (b) {
+      b.classList.toggle('active', b === botao);
+    });
+    fornecedoresView.style.display = botao === tabFornecedor ? '' : 'none';
+    ingredientesView.style.display = botao === tabIngrediente ? '' : 'none';
+    encomendaView.style.display = botao === tabEncomenda ? '' : 'none';
+    btnNovo.style.display = botao === tabFornecedor ? 'inline-block' : 'none';
+  }
+
   tabFornecedor.addEventListener('click', function () {
     if (tabFornecedor.classList.contains('active')) return;
-    tabFornecedor.classList.add('active');
-    tabIngrediente.classList.remove('active');
-    fornecedoresView.style.display = '';
-    ingredientesView.style.display = 'none';
-    btnNovo.style.display = 'inline-block';
+    activarAba(tabFornecedor);
   });
 
   tabIngrediente.addEventListener('click', function () {
     if (tabIngrediente.classList.contains('active')) return;
-    tabIngrediente.classList.add('active');
-    tabFornecedor.classList.remove('active');
-    ingredientesView.style.display = '';
-    fornecedoresView.style.display = 'none';
-    btnNovo.style.display = 'none';
+    activarAba(tabIngrediente);
     renderIngGrid();
+  });
+
+  tabEncomenda.addEventListener('click', function () {
+    if (tabEncomenda.classList.contains('active')) return;
+    activarAba(tabEncomenda);
+    encAbrir();
   });
 
   function renderIngStats() {
@@ -4636,6 +4814,545 @@ window.addEventListener('load', function () {
 
     closeOrderModal();
   });
+
+  // ==================================================================
+  // Encomenda sugerida
+  // ==================================================================
+  // Por ingrediente:
+  //   procura  = média vendida POR DIA DA SEMANA nas últimas 4 semanas
+  //              completas (dias sem vendas importadas ficam FORA da média,
+  //              nunca contam como zero), explodida pela ficha técnica com o
+  //              gioco-consumo.js — o mesmo motor do foodcost.html;
+  //   necessidade = soma dos próximos N dias de calendário, cada um com a
+  //              média do seu dia da semana, × (1 + margem);
+  //   stock    = qtdBase da última contagem FECHADA + compras de faturas
+  //              (convertidas pelo fator de compra) − consumo teórico, tudo
+  //              desde essa contagem. Nunca abaixo de zero;
+  //   sugestão = max(0, necessidade − stock), convertida para unidades de
+  //              COMPRA e arredondada PARA CIMA.
+  //
+  // Regra de honestidade: um ingrediente a que falte qualquer uma das peças
+  // (contagem fechada, formato de compra, ficha técnica que o consuma, vendas
+  // na janela) NÃO recebe número nenhum — vai para "Sem sugestão" com o
+  // motivo. Nunca se inventa um valor por omissão.
+  //
+  // ESCRITAS: só encomendasConfig/{horizonteDias,margemPct} (um set() por
+  // chave, nunca update multi-chave) e o carrinho, pelo nó e formato que já
+  // existiam, um set() por item.
+  var ENC_SEMANAS = 4;
+  var ENC_HORIZONTE_DEFAULT = 7;
+  var ENC_MARGEM_DEFAULT = 15;
+  var ENC_IDADE_AVISO_DIAS = 35;
+  var DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+  var encomendasConfigRef = db.ref('encomendasConfig');
+  var encConfig = { horizonteDias: ENC_HORIZONTE_DEFAULT, margemPct: ENC_MARGEM_DEFAULT };
+
+  var encDados = { receitas: {}, preparacoes: {}, mapa: {}, vendasDiario: {}, contagens: {}, faturas: {} };
+  var encLigado = false;         // listeners já criados?
+  var encPorChegar = 0;          // nós ainda sem primeira resposta
+
+  var encBanner = document.getElementById('encBanner');
+  var encStatus = document.getElementById('encStatus');
+  var encGrupos = document.getElementById('encGrupos');
+  var encSemSugestaoEl = document.getElementById('encSemSugestao');
+  var encHorizonteInput = document.getElementById('encHorizonte');
+  var encMargemInput = document.getElementById('encMargem');
+  var encConfigNota = document.getElementById('encConfigNota');
+
+  var CONSC = giocoConsumoEngine({
+    getReceitas:     function () { return encDados.receitas; },
+    getPreparacoes:  function () { return encDados.preparacoes; },
+    getVendasDiario: function () { return encDados.vendasDiario; },
+    getMapa:         function () { return encDados.mapa; }
+  });
+
+  function encISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function encData(iso) { return new Date(iso + 'T00:00:00'); }
+  function encHoje() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+  function encDiasEntre(isoA, isoB) {
+    return Math.round((encData(isoB) - encData(isoA)) / 86400000);
+  }
+  function encQtd(v, unidade) {
+    var n = Number(v);
+    if (!isFinite(n)) return '—';
+    var casas = Math.abs(n) < 10 ? 3 : 2;
+    return n.toLocaleString('pt-PT', { minimumFractionDigits: casas, maximumFractionDigits: casas }) +
+           (unidade ? ' ' + unidade : '');
+  }
+
+  // Formato de compra válido: unidade + fator numérico positivo. Sem ele não
+  // há conversão possível entre a unidade base e a unidade que se encomenda.
+  function encFormatoCompra(id) {
+    var ing = allIngredientes[id];
+    var f = ing && ing.compra;
+    if (f && f.unidade && typeof f.fator === 'number' && isFinite(f.fator) && f.fator > 0) return f;
+    return null;
+  }
+
+  // Últimas ENC_SEMANAS semanas COMPLETAS (segunda a domingo) já terminadas.
+  // A semana em curso fica de fora de propósito: está incompleta e puxava as
+  // médias para baixo.
+  function encJanelaSemanas() {
+    var hoje = encHoje();
+    var desdeSegunda = (hoje.getDay() + 6) % 7;
+    var fim = new Date(hoje);
+    fim.setDate(hoje.getDate() - desdeSegunda - 1);          // domingo passado
+    var inicio = new Date(fim);
+    inicio.setDate(fim.getDate() - (ENC_SEMANAS * 7 - 1));
+    return { de: encISO(inicio), ate: encISO(fim) };
+  }
+
+  // Média vendida por dia da semana, já explodida em ingredientes.
+  function encProcura() {
+    var j = encJanelaSemanas();
+    var porDow = [];
+    for (var i = 0; i < 7; i++) porDow.push({ dias: 0, vendidos: {} });
+
+    var d = encData(j.de), fim = encData(j.ate);
+    while (d <= fim) {
+      var iso = encISO(d);
+      var mes = encDados.vendasDiario[iso.slice(0, 7)];
+      var reg = mes && mes[iso];
+      if (reg && reg.produtos) {
+        var slot = porDow[d.getDay()];
+        slot.dias++;
+        Object.keys(reg.produtos).forEach(function (cod) {
+          var p = reg.produtos[cod];
+          if (!slot.vendidos[cod]) slot.vendidos[cod] = { qtd: 0, valor: 0, desc: p.desc || cod, categoria: p.categoria || '' };
+          slot.vendidos[cod].qtd += Number(p.qtd) || 0;
+          slot.vendidos[cod].valor += Number(p.valor) || 0;
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+
+    var necPorDow = [];
+    var semMapa = {};
+    var diasComVendas = 0;
+    for (var w = 0; w < 7; w++) {
+      var s = porDow[w];
+      diasComVendas += s.dias;
+      if (!s.dias) { necPorDow.push({ temDados: false, dias: 0, ingredientes: {} }); continue; }
+      var medios = {};
+      Object.keys(s.vendidos).forEach(function (cod) {
+        var v = s.vendidos[cod];
+        medios[cod] = { qtd: v.qtd / s.dias, valor: v.valor / s.dias, desc: v.desc, categoria: v.categoria };
+      });
+      var c = CONSC.consumoDeVendidos(medios);
+      c.semMapa.forEach(function (x) { semMapa[x.cod] = x.v.desc; });
+      necPorDow.push({ temDados: true, dias: s.dias, ingredientes: c.acc.ingredientes });
+    }
+
+    return { janela: j, necPorDow: necPorDow, semMapa: semMapa, diasComVendas: diasComVendas };
+  }
+
+  // Necessidade dos próximos N dias de calendário (o primeiro é hoje), cada um
+  // com a média do seu dia da semana, com a margem de segurança aplicada.
+  function encNecessidade(procura, ingId, n, margemPct) {
+    var total = 0;
+    var d = encHoje();
+    for (var i = 0; i < n; i++) {
+      var slot = procura.necPorDow[d.getDay()];
+      if (slot.temDados) total += (slot.ingredientes[ingId] || 0);
+      d.setDate(d.getDate() + 1);
+    }
+    return total * (1 + (Number(margemPct) || 0) / 100);
+  }
+
+  function encUltimaContagemFechada() {
+    var ds = Object.keys(encDados.contagens).filter(function (dia) {
+      return encDados.contagens[dia] && encDados.contagens[dia].estado === 'fechada';
+    }).sort();
+    return ds.length ? ds[ds.length - 1] : null;
+  }
+
+  // Compras por ingrediente desde a contagem, em unidade base. A janela é
+  // (contagem, hoje], a mesma convenção do foodcost.
+  function encComprasDesde(deISO, ateISO) {
+    var out = {};
+    Object.keys(encDados.faturas).forEach(function (fid) {
+      var f = encDados.faturas[fid];
+      if (!f || !f.data) return;
+      if (!(f.data > deISO && f.data <= ateISO)) return;
+      (f.linhas || []).forEach(function (l) {
+        if (!l.ingredienteId) return;
+        if (!out[l.ingredienteId]) out[l.ingredienteId] = { qtdBase: 0, semFormato: false };
+        var fmt = encFormatoCompra(l.ingredienteId);
+        // Sem formato de compra a quantidade da fatura não é convertível: em
+        // vez de a somar como se fosse unidade base (número inventado), o
+        // ingrediente fica marcado e sai das sugestões.
+        if (fmt) out[l.ingredienteId].qtdBase += (Number(l.quantidade) || 0) * fmt.fator;
+        else out[l.ingredienteId].semFormato = true;
+      });
+    });
+    return out;
+  }
+
+  function encCalcular() {
+    var hojeISO = encISO(encHoje());
+    var contagemData = encUltimaContagemFechada();
+    var procura = encProcura();
+    var n = encConfig.horizonteDias;
+    var margem = encConfig.margemPct;
+
+    var res = {
+      hojeISO: hojeISO,
+      contagemData: contagemData,
+      idadeDias: contagemData ? encDiasEntre(contagemData, hojeISO) : null,
+      janela: procura.janela,
+      diasComVendas: procura.diasComVendas,
+      semMapa: procura.semMapa,
+      dowSemDados: [],
+      n: n, margem: margem,
+      grupos: [], semSugestao: [], totalLinhas: 0
+    };
+    for (var w = 0; w < 7; w++) if (!procura.necPorDow[w].temDados) res.dowSemDados.push(w);
+
+    var itensContagem = contagemData ? (encDados.contagens[contagemData].itens || {}) : {};
+    var compras = contagemData ? encComprasDesde(contagemData, hojeISO) : {};
+    var consumoDesde = contagemData
+      ? CONSC.consumoDosDias(CONSC.diasDoPeriodo(contagemData, hojeISO)).acc.ingredientes
+      : {};
+
+    var porFornecedor = {};
+
+    Object.keys(allIngredientes).forEach(function (id) {
+      var ing = allIngredientes[id];
+      if (!ing) return;
+
+      var nec = encNecessidade(procura, id, n, margem);
+      var fmt = encFormatoCompra(id);
+      var motivos = [];
+
+      if (procura.diasComVendas === 0) {
+        motivos.push('Não há vendas importadas nas 4 semanas completas anteriores (' + res.janela.de + ' a ' + res.janela.ate + ').');
+      } else if (nec <= 0) {
+        motivos.push('Nenhuma ficha técnica vendida nestas 4 semanas consome este ingrediente.');
+      }
+      if (!contagemData) {
+        motivos.push('Não há nenhuma contagem fechada — sem ela não há stock de partida.');
+      } else if (!itensContagem[id]) {
+        motivos.push('Não foi contado na contagem fechada de ' + contagemData + '.');
+      }
+      if (!fmt) {
+        motivos.push('Sem formato de compra definido (unidade e fator, na ficha do ingrediente).');
+      }
+
+      if (motivos.length) {
+        res.semSugestao.push({
+          id: id,
+          nome: ing.nome || id,
+          fornecedor: ing.fornecedor || '',
+          temProcura: nec > 0,
+          motivos: motivos
+        });
+        return;
+      }
+
+      var qtdContagem = Number(itensContagem[id].qtdBase) || 0;
+      var entradas = (compras[id] && compras[id].qtdBase) || 0;
+      var consumo = consumoDesde[id] || 0;
+      var stockBruto = CONSC.arred(qtdContagem + entradas - consumo);
+      var esgotado = stockBruto < 0;
+      var stock = Math.max(0, stockBruto);
+
+      var falta = CONSC.arred(Math.max(0, nec - stock));
+      // Arredondar PARA CIMA para unidades inteiras de compra. A tolerância
+      // evita que um 3,0000000001 de vírgula flutuante peça 4 caixas.
+      var unidades = falta > 0 ? Math.max(1, Math.ceil(falta / fmt.fator - 1e-9)) : 0;
+
+      var linha = {
+        id: id,
+        nome: ing.nome || id,
+        unidadeBase: ing.unidade || (itensContagem[id].unidadeBase || ''),
+        stock: stock,
+        esgotado: esgotado,
+        necessidade: CONSC.arred(nec),
+        unidades: unidades,
+        unidadeCompra: fmt.unidade,
+        fator: fmt.fator,
+        qtdBaseSugerida: CONSC.arred(unidades * fmt.fator)
+      };
+
+      var chave = ing.fornecedor || '';
+      if (!porFornecedor[chave]) porFornecedor[chave] = [];
+      porFornecedor[chave].push(linha);
+      res.totalLinhas++;
+    });
+
+    res.grupos = Object.keys(porFornecedor).sort(function (a, b) {
+      if (!a) return 1;
+      if (!b) return -1;
+      return a.localeCompare(b);
+    }).map(function (nome) {
+      var itens = porFornecedor[nome].sort(function (a, b) {
+        if ((b.unidades > 0) !== (a.unidades > 0)) return (b.unidades > 0) ? 1 : -1;
+        return a.nome.localeCompare(b.nome);
+      });
+      return {
+        fornecedor: nome,
+        itens: itens,
+        aEncomendar: itens.filter(function (l) { return l.unidades > 0; }).length
+      };
+    });
+
+    res.semSugestao.sort(function (a, b) {
+      if (a.temProcura !== b.temProcura) return a.temProcura ? -1 : 1;
+      return a.nome.localeCompare(b.nome);
+    });
+
+    return res;
+  }
+
+  // ---------- Render ----------
+  function encRenderBanner(r) {
+    var partes = [];
+    var classe = '';
+
+    if (!r.contagemData) {
+      classe = 'bad';
+      partes.push('<strong>Não há nenhuma contagem fechada.</strong> Sem stock de partida não é possível sugerir nada — todos os ingredientes ficam em “Sem sugestão”. Faz e fecha uma contagem em <a href="contagens.html">Contagens</a>.');
+    } else {
+      var idade = r.idadeDias;
+      var txt = '<strong>Stock de partida: contagem fechada de ' + escapeHtml(r.contagemData) + '</strong> (há ' + idade + ' ' + (idade === 1 ? 'dia' : 'dias') + ').';
+      if (idade > ENC_IDADE_AVISO_DIAS) {
+        classe = 'warn';
+        txt += ' Tem mais de ' + ENC_IDADE_AVISO_DIAS + ' dias: as sugestões são pouco fiáveis — fazer contagem.';
+      }
+      partes.push(txt);
+    }
+
+    if (r.diasComVendas === 0) {
+      classe = classe || 'warn';
+      partes.push('Não há vendas importadas entre ' + r.janela.de + ' e ' + r.janela.ate + ' — sem procura não há necessidade calculável.');
+    } else {
+      var linha = 'Procura: média por dia da semana de ' + r.diasComVendas + ' ' + (r.diasComVendas === 1 ? 'dia' : 'dias') +
+                  ' com vendas importadas entre ' + r.janela.de + ' e ' + r.janela.ate + '.';
+      if (r.dowSemDados.length) {
+        linha += ' Sem dados para ' + r.dowSemDados.map(function (w) { return DIAS_SEMANA[w].toLowerCase(); }).join(', ') +
+                 ' — esses dias do horizonte contam zero, por isso a necessidade está subestimada.';
+        classe = classe || 'warn';
+      }
+      partes.push(linha);
+    }
+
+    var nSemMapa = Object.keys(r.semMapa).length;
+    if (nSemMapa) {
+      partes.push(nSemMapa + ' ' + (nSemMapa === 1 ? 'produto vendido não está ligado' : 'produtos vendidos não estão ligados') +
+                  ' a uma ficha técnica, por isso não consomem ingrediente nenhum aqui. Liga-os no <a href="foodcost.html">Food cost</a>.');
+    }
+
+    encBanner.innerHTML =
+      '<div class="enc-banner ' + classe + '">' +
+        '<svg class="icon" width="16" height="16"><use href="#i-clipboard-check"/></svg>' +
+        '<div>' + partes.join('<br>') + '</div>' +
+      '</div>';
+  }
+
+  function encRenderGrupos(r) {
+    if (!r.grupos.length) {
+      encGrupos.innerHTML = '';
+      return;
+    }
+    encGrupos.innerHTML = r.grupos.map(function (g, gi) {
+      var nome = g.fornecedor || 'Sem fornecedor atribuído';
+      var linhas = g.itens.map(function (l) {
+        var sug = l.unidades > 0
+          ? '<span class="enc-sug">' + l.unidades + ' × ' + escapeHtml(l.unidadeCompra) + '</span>' +
+            '<span class="enc-sub">' + encQtd(l.qtdBaseSugerida, l.unidadeBase) + '</span>'
+          : '<span class="enc-sug zero">—</span><span class="enc-sub">stock chega</span>';
+        var stockTxt = encQtd(l.stock, l.unidadeBase) +
+          (l.esgotado ? '<span class="enc-flag">stock estimado esgotado</span>' : '');
+        return '<tr>' +
+          '<td>' + escapeHtml(l.nome) + '</td>' +
+          '<td class="enc-n">' + stockTxt +
+            '<span class="enc-sub">contagem há ' + r.idadeDias + ' ' + (r.idadeDias === 1 ? 'dia' : 'dias') + '</span></td>' +
+          '<td class="enc-n">' + encQtd(l.necessidade, l.unidadeBase) +
+            '<span class="enc-sub">' + r.n + ' ' + (r.n === 1 ? 'dia' : 'dias') + ' · +' + r.margem + '%</span></td>' +
+          '<td class="enc-n">' + sug + '</td>' +
+          '</tr>';
+      }).join('');
+
+      var botao = g.aEncomendar > 0
+        ? '<button type="button" class="btn-add" data-enc-grupo="' + gi + '">' +
+            '<svg class="icon" width="14" height="14"><use href="#i-shopping-cart"/></svg> Adicionar ao carrinho</button>'
+        : '';
+
+      return '<div class="panel glass-light enc-group">' +
+        '<div class="enc-group-head">' +
+          '<h3>' + escapeHtml(nome) + '</h3>' +
+          '<span class="enc-group-count">' + g.aEncomendar + ' de ' + g.itens.length + ' a encomendar</span>' +
+          '<div class="spacer"></div>' + botao +
+        '</div>' +
+        '<div class="enc-table-wrap"><table class="enc-table"><thead><tr>' +
+          '<th>Ingrediente</th>' +
+          '<th class="enc-n">Stock estimado</th>' +
+          '<th class="enc-n">Necessidade</th>' +
+          '<th class="enc-n">Sugestão</th>' +
+        '</tr></thead><tbody>' + linhas + '</tbody></table></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function encRenderSemSugestao(r) {
+    if (!r.semSugestao.length) {
+      encSemSugestaoEl.style.display = 'none';
+      return;
+    }
+    encSemSugestaoEl.style.display = '';
+
+    function item(s) {
+      return '<div class="enc-sem-item">' +
+        '<span class="enc-sem-nome">' + escapeHtml(s.nome) + '</span>' +
+        (s.fornecedor ? '<span class="enc-sem-forn">' + escapeHtml(s.fornecedor) + '</span>' : '') +
+        '<ul class="enc-sem-motivos">' + s.motivos.map(function (m) {
+          return '<li>' + escapeHtml(m) + '</li>';
+        }).join('') + '</ul>' +
+      '</div>';
+    }
+
+    var comProcura = r.semSugestao.filter(function (s) { return s.temProcura; });
+    var semProcura = r.semSugestao.filter(function (s) { return !s.temProcura; });
+
+    var html = '<h3>Sem sugestão — ' + r.semSugestao.length + ' ' +
+      (r.semSugestao.length === 1 ? 'ingrediente' : 'ingredientes') + '</h3>' +
+      '<p class="enc-sem-intro">Falta-lhes uma das peças do cálculo. Em vez de um número inventado, fica aqui o motivo de cada um.</p>';
+
+    if (comProcura.length) html += comProcura.map(item).join('');
+    if (semProcura.length) {
+      html += '<details' + (comProcura.length ? '' : ' open') + '><summary>' + semProcura.length +
+        ' ' + (semProcura.length === 1 ? 'ingrediente sem procura' : 'ingredientes sem procura') +
+        ' nas últimas 4 semanas</summary>' + semProcura.map(item).join('') + '</details>';
+    }
+
+    encSemSugestaoEl.innerHTML = html;
+  }
+
+  var encResultado = null;
+
+  function encRender() {
+    if (encPorChegar > 0) return;
+    encStatus.style.display = 'none';
+    encResultado = encCalcular();
+    encConfigNota.textContent = 'Necessidade dos próximos ' + encResultado.n + ' dias de calendário a partir de hoje, ' +
+      'cada dia com a média do seu dia da semana, mais ' + encResultado.margem + '% de margem.';
+    encRenderBanner(encResultado);
+    encRenderGrupos(encResultado);
+    encRenderSemSugestao(encResultado);
+    if (!encResultado.totalLinhas) {
+      encStatus.style.display = '';
+      encStatus.textContent = 'Nenhum ingrediente tem as quatro peças necessárias para uma sugestão. Os motivos estão em baixo, um a um.';
+    }
+  }
+
+  // ---------- Carrinho ----------
+  // Pré-carrega o carrinho existente: um set() por item, no mesmo nó e com o
+  // mesmo formato de addAoCarrinho. A quantidade vai em UNIDADE BASE (é o que
+  // o carrinho e o checkout usam), já correspondente às unidades de compra
+  // inteiras sugeridas. Fica editável no carrinho — o fluxo de envio não muda.
+  encGrupos.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-enc-grupo]');
+    if (!btn || !encResultado) return;
+    var g = encResultado.grupos[Number(btn.getAttribute('data-enc-grupo'))];
+    if (!g) return;
+
+    var itens = g.itens.filter(function (l) { return l.unidades > 0; });
+    if (!itens.length) return;
+
+    var jaNoCarrinho = itens.filter(function (l) { return qtdNoCarrinho(l.id) > 0; });
+    if (jaNoCarrinho.length) {
+      var nomes = jaNoCarrinho.map(function (l) { return l.nome; }).join(', ');
+      if (!confirm('Já tens ' + jaNoCarrinho.length + ' destes ingredientes no carrinho (' + nomes +
+                   '). A quantidade deles passa a ser a sugerida. Continuar?')) return;
+    }
+
+    itens.forEach(function (l) {
+      var ing = allIngredientes[l.id];
+      if (!ing) return;
+      carrinhoRef.child(l.id).set({
+        nome: ing.nome || '',
+        fornecedor: ing.fornecedor || '',
+        unidade: ing.unidade || '',
+        qtd: l.qtdBaseSugerida,
+        addedAt: new Date().toISOString(),
+        encomendado: false,
+        encomendadoEm: null,
+        encomendadoVia: null
+      });
+    });
+  });
+
+  // ---------- Config ----------
+  function encLerConfig(val) {
+    var v = val || {};
+    var h = parseInt(v.horizonteDias, 10);
+    var m = parseFloat(v.margemPct);
+    encConfig.horizonteDias = (isFinite(h) && h >= 1 && h <= 60) ? h : ENC_HORIZONTE_DEFAULT;
+    encConfig.margemPct = (isFinite(m) && m >= 0 && m <= 200) ? m : ENC_MARGEM_DEFAULT;
+    encHorizonteInput.value = encConfig.horizonteDias;
+    encMargemInput.value = encConfig.margemPct;
+  }
+
+  // Um set() por chave — nunca um update() multi-chave (ver CLAUDE.md).
+  encHorizonteInput.addEventListener('change', function () {
+    var h = parseInt(encHorizonteInput.value, 10);
+    if (!isFinite(h) || h < 1 || h > 60) { encHorizonteInput.value = encConfig.horizonteDias; return; }
+    encConfig.horizonteDias = h;
+    encomendasConfigRef.child('horizonteDias').set(h);
+    encRender();
+  });
+
+  encMargemInput.addEventListener('change', function () {
+    var m = parseFloat(String(encMargemInput.value).replace(',', '.'));
+    if (!isFinite(m) || m < 0 || m > 200) { encMargemInput.value = encConfig.margemPct; return; }
+    encConfig.margemPct = m;
+    encomendasConfigRef.child('margemPct').set(m);
+    encRender();
+  });
+
+  // ---------- Carregamento (só quando a aba é aberta) ----------
+  // vendasDiario e faturasProcessadas são pesados e não servem para mais nada
+  // na página: ficam por carregar até alguém abrir a aba.
+  function encAbrir() {
+    if (encLigado) { encRender(); return; }
+    encLigado = true;
+
+    var nos = [
+      ['receitas', 'receitas'],
+      ['preparacoes', 'preparacoes'],
+      ['mapaProdutosReceitas', 'mapa'],
+      ['vendasDiario', 'vendasDiario'],
+      ['contagens', 'contagens'],
+      ['faturasProcessadas', 'faturas']
+    ];
+    encPorChegar = nos.length + 1;
+
+    nos.forEach(function (par) {
+      var primeira = true;
+      db.ref(par[0]).on('value', function (snap) {
+        encDados[par[1]] = snap.val() || {};
+        if (primeira) { primeira = false; encPorChegar--; }
+        encRender();
+      }, function (erro) {
+        if (primeira) { primeira = false; encPorChegar--; }
+        encStatus.style.display = '';
+        encStatus.textContent = 'Erro a ler ' + par[0] + ': ' + erro.message;
+      });
+    });
+
+    var primeiraConfig = true;
+    encomendasConfigRef.on('value', function (snap) {
+      encLerConfig(snap.val());
+      if (primeiraConfig) { primeiraConfig = false; encPorChegar--; }
+      encRender();
+    }, function () {
+      if (primeiraConfig) { primeiraConfig = false; encPorChegar--; }
+      encRender();
+    });
+  }
 
   orderModalClose.addEventListener('click', closeOrderModal);
   orderModalCancel.addEventListener('click', closeOrderModal);

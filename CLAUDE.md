@@ -41,7 +41,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | Ficheiro | Módulo | Audiência |
 |---|---|---|
 | `index.html` | Home / menu do OS | Equipa |
-| `compras.html` | Base de dados de fornecedores + encomendas + ingredientes (abas "Por fornecedor" / "Por ingrediente") | Equipa |
+| `compras.html` | Base de dados de fornecedores + encomendas + ingredientes (abas "Por fornecedor" / "Por ingrediente" / "Encomenda sugerida") | Equipa |
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
@@ -51,7 +51,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `foodcost.html` | Variância de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas | Equipa |
 | `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós) | Equipa |
 | `contabilidade.html` | Placeholder | — |
-| `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` | — |
+| `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
@@ -182,6 +182,15 @@ contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
                          próprio (podem estar duas sessões abertas ao mesmo tempo), e
                          estado/fechadaEm são duas escritas independentes.
                          Sem botão de apagar: só o Manel apaga, à mão, no Firebase.
+encomendasConfig      — configuração do painel "Encomenda sugerida" da compras.html
+                         (o ÚNICO que escreve aqui): { horizonteDias, margemPct }.
+                         horizonteDias = para quantos dias de calendário se
+                         encomenda (default 7, 1..60); margemPct = margem de
+                         segurança em % sobre a necessidade (default 15, 0..200).
+                         Duas chaves, DUAS escritas — um set() em
+                         encomendasConfig/horizonteDias e outro em
+                         encomendasConfig/margemPct, nunca um update multi-chave.
+                         Nó em falta ou valor fora do intervalo = defaults
 ```
 
 O `contagens.html` também escreve **`ingredientes/{id}/contagem`** = `{ unidade, fator }`
@@ -194,6 +203,11 @@ A `leitura-faturas.html` (mini-modal ao associar linha→ingrediente) e a
 `foodcost.html` (⚙ na linha) escrevem **`ingredientes/{id}/compra`** =
 `{ unidade, fator }` — o fator converte 1 unidade de FATURA em unidades base
 (ex.: «caixa 250g» com base kg → fator 0.25), espelho do formato `contagem`.
+O painel "Encomenda sugerida" da `compras.html` também lê este `compra` — e é
+por isso que um ingrediente **sem** formato de compra nunca recebe sugestão
+nenhuma: sem `fator` não há conversão entre a unidade base e a unidade que se
+encomenda, e um número inventado seria pior do que a ausência dele.
+
 No foodcost, a quantidade de fatura é convertida (qtd × fator); o selo
 «qtd da fatura» fica só nos ingredientes ainda sem `compra` definido.
 Mesma regra de escrita: um `set()` só nesse path.
