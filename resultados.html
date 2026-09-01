@@ -154,6 +154,19 @@
     padding:26px 10px; text-align:center; color:var(--muted); font-size:13.5px;
   }
 
+  /* ---------- Remoção de linhas (só nesta vista, via localStorage) ---------- */
+  .btn-remover{
+    border:none; background:none; color:var(--muted); cursor:pointer;
+    font-size:13px; line-height:1; padding:2px 6px; border-radius:6px;
+  }
+  .btn-remover:hover{ color:var(--red-ink); background:var(--line); }
+  .repor-row{ margin-top:10px; }
+  .btn-repor{
+    border:none; background:none; color:var(--red-ink); cursor:pointer;
+    font-size:12px; font-weight:600; padding:0;
+  }
+  .btn-repor:hover{ text-decoration:underline; }
+
   /* ---------- Reconciliação ---------- */
   .rec-linhas{ display:flex; flex-wrap:wrap; gap:24px; margin:6px 0 4px; }
   .rec-item .kpi-titulo{ margin-bottom:2px; }
@@ -390,6 +403,44 @@
                           //   caixaMovimentos, suppliers, contas:{abanca,revolut} }
     var mesAtivo = null;
 
+    /* ---------- Linhas removidas à mão ----------
+       O utilizador pode tirar qualquer linha do P&L (✕ nos drill-downs).
+       Fica em localStorage, por mês — a página continua com ZERO escritas
+       no Firebase; noutro browser o P&L volta ao estado calculado. */
+    var EXCL_LS = 'pnlLinhasRemovidas';
+    var exclusoes = (function(){
+      try { return JSON.parse(localStorage.getItem(EXCL_LS)) || {}; }
+      catch(e){ return {}; }
+    })();
+    function gravarExclusoes(){
+      try { localStorage.setItem(EXCL_LS, JSON.stringify(exclusoes)); } catch(e){}
+    }
+    function removido(chave){
+      var ex = exclusoes[mesAtivo];
+      return !!(ex && ex[chave]);
+    }
+    function botaoRemover(chave){
+      return '<button type="button" class="btn-remover" data-remover="' +
+        escapeHtml(chave) + '" title="Remover esta linha do P&L (só nesta vista)">✕</button>';
+    }
+    // Recibos vistos pelo motor de compromissos: sem os que foram removidos
+    // do mês ativo — assim a TSU recalcula pela mesma via de sempre (a lib),
+    // apenas com menos recibos à frente.
+    function recibosFiltrados(){
+      var ex = exclusoes[mesAtivo] || {};
+      var out = {};
+      Object.keys(base.recibos).forEach(function(pid){
+        var meses = base.recibos[pid] || {};
+        var copia = {};
+        Object.keys(meses).forEach(function(p){
+          if (p === mesAtivo && ex['recibo:' + pid]) return;
+          copia[p] = meses[p];
+        });
+        out[pid] = copia;
+      });
+      return out;
+    }
+
     Promise.all([
       db.ref('paymentRequests').once('value'),
       db.ref('recibos').once('value'),
@@ -438,6 +489,24 @@
       document.getElementById('mesSeguinte').addEventListener('click', function(){
         mesAtivo = mesVizinho(mesAtivo, +1); renderMes();
       });
+
+      // Remover/repor linhas: delegação no corpo do P&L, porque as tabelas
+      // são reconstruídas a cada render.
+      document.getElementById('pnlCorpo').addEventListener('click', function(e){
+        var btn = e.target.closest('[data-remover]');
+        if (btn){
+          var ex = exclusoes[mesAtivo] = exclusoes[mesAtivo] || {};
+          ex[btn.getAttribute('data-remover')] = true;
+          gravarExclusoes();
+          renderMes();
+          return;
+        }
+        if (e.target.closest('#btnReporLinhas')){
+          delete exclusoes[mesAtivo];
+          gravarExclusoes();
+          renderMes();
+        }
+      });
     }
 
     /* =========================================================
@@ -459,7 +528,9 @@
           if (m !== mes) return;
           var v = parseFloat(l.montante);
           if (isNaN(v)) return;
-          out.push({ id: id + '/' + i, fornecedor: l.fornecedor || '—',
+          if (removido('payreq:' + id + '/' + i)) return;
+          out.push({ id: id + '/' + i, chave: 'payreq:' + id + '/' + i,
+                     fornecedor: l.fornecedor || '—',
                      valor: v, data: d, referencia: l.referencia || '' });
         });
       });
@@ -501,7 +572,9 @@
       Object.keys(base.recibos).forEach(function(pid){
         var r = base.recibos[pid] && base.recibos[pid][mes];
         if (!r || !r.totais) return;
+        if (removido('recibo:' + pid)) return;
         out.push({
+          chave: 'recibo:' + pid,
           pessoaId: pid,
           nome: (r.pessoa && r.pessoa.nome) || pid,
           sujeito: parseFloat(r.totais.sujeito) || 0,
@@ -532,7 +605,8 @@
           valor = parseFloat(c.valor) || 0;
         }
         if (!valor) return; // 0 € não é custo do mês
-        out.push({ id: id, nome: c.nome || id, valor: valor });
+        if (removido('fixo:' + id)) return;
+        out.push({ id: id, chave: 'fixo:' + id, nome: c.nome || id, valor: valor });
       });
       out.sort(function(a,b){ return b.valor - a.valor; });
       return out;
@@ -558,12 +632,13 @@
         if (!m || m.tipo !== 'saida') return;
         if (!m.dataHora || m.dataHora.slice(0,7) !== mes) return;
         if (!RE_CAIXA_PESSOAL.test(m.motivo || '')) return;
-        itens.push({ origem: 'caixa', desc: m.motivo, data: m.dataHora.slice(0,10),
-                     valor: parseFloat(m.valor) || 0 });
+        if (removido('caixa:' + id)) return;
+        itens.push({ origem: 'caixa', chave: 'caixa:' + id, desc: m.motivo,
+                     data: m.dataHora.slice(0,10), valor: parseFloat(m.valor) || 0 });
       });
       payReqLinhas.forEach(function(l){
         if (!RE_PRESTADOR.test(l.fornecedor)) return;
-        itens.push({ origem: 'pagamentos', desc: l.fornecedor +
+        itens.push({ origem: 'pagamentos', chave: l.chave, desc: l.fornecedor +
                      (l.referencia ? ' · ' + l.referencia : ''),
                      data: l.data.toISOString().slice(0,10), valor: l.valor });
       });
@@ -672,7 +747,8 @@
         if (!fixoNome && /IBELECTRA/i.test(mov.desc)) fixoNome = 'Eletricidade';
         if (fixoNome){ res.porRubrica.fixos += mov.valor; res.explicado += mov.valor; return; }
 
-        if (movimentoParecerFornecedor(mov, fornecedores)){
+        if (!removido('banco:' + mov.conta + '/' + mov.ref) &&
+            movimentoParecerFornecedor(mov, fornecedores)){
           res.porRubrica.cmv += mov.valor; res.explicado += mov.valor; return;
         }
 
@@ -701,7 +777,9 @@
         if (/MATTIA|SUBASH/i.test(mov.desc)) return;
         var nome = movimentoParecerFornecedor(mov, fornecedores);
         if (!nome) return;
+        if (removido('banco:' + mov.conta + '/' + mov.ref)) return;
         extra.push({ desc: mov.desc, fornecedor: nome, data: mov.data,
+                     chave: 'banco:' + mov.conta + '/' + mov.ref,
                      conta: mov.conta, valor: mov.valor });
       });
       return extra;
@@ -716,7 +794,7 @@
     var CE = (typeof giocoCompromissosEngine === 'function')
       ? giocoCompromissosEngine({
           getCompromissos: function(){ return base.compromissosFixos; },
-          getRecibos:      function(){ return base.recibos; },
+          getRecibos:      function(){ return recibosFiltrados(); },
           getPessoas:      function(){ return {}; }, // nomeDaPessoa cai no r.pessoa.nome
           formatEuro: formatEuro,
           parseMontante: function(v){ var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; },
@@ -732,8 +810,8 @@
       // vez, no agregado — vêm do motor partilhado.
       var p = mes.split('-');
       var agg = CE.baseSSDoMes(parseInt(p[0],10), parseInt(p[1],10));
-      if (!agg) return null;
-      var tsu = CE.arredCentimos(agg.base * CE.TSU_TAXA_PATRONAL);
+      var tsu = (agg && !removido('tsu'))
+        ? CE.arredCentimos(agg.base * CE.TSU_TAXA_PATRONAL) : 0;
       var bruto = recibosMes.reduce(function(s,r){ return s + r.sujeito + r.naoSujeito; }, 0);
       return { tsu: tsu, bruto: bruto, total: bruto + tsu };
     }
@@ -775,15 +853,17 @@
       // recibo é incalculável — custos e resultado ficam pendentes em vez de
       // fingir um lucro sem a maior rubrica de pessoal.
       var pessoalPendente = recibos.length > 0 && !pessoalRecibo;
+      var totPessoal = totPessoalRecibo + totPsr;
       var custos = (pessoalPendente || !temAlgumDado)
-        ? null : totCmv + totPessoalRecibo + totPsr + totFixos;
+        ? null : totCmv + totPessoal + totFixos;
       var resultado = (receita != null && custos != null) ? receita - custos : null;
 
       renderKpis(receita, custos, resultado, resumo, pessoalRecibo);
       renderPnl({ mes: mes, receita: receita, resumo: resumo,
                   cmvPayReq: cmvPayReq, cmvExtra: cmvExtra, totCmv: totCmv,
                   recibos: recibos, pessoalRecibo: pessoalRecibo,
-                  pessoalSemRecibo: pessoalSemRecibo, totPsr: totPsr,
+                  pessoalSemRecibo: pessoalSemRecibo, totPessoal: totPessoal,
+                  pessoalPendente: pessoalPendente,
                   fixos: fixos, totFixos: totFixos,
                   custos: custos, resultado: resultado, temAlgumDado: temAlgumDado });
 
@@ -844,14 +924,16 @@
         var linhas = d.cmvPayReq.map(function(l){
           return '<tr><td>' + escapeHtml(l.data.toISOString().slice(0,10)) + '</td>' +
             '<td>' + escapeHtml(l.fornecedor) + '</td><td>pedido de pagamento</td>' +
-            '<td class="num">' + formatEuro(l.valor) + '</td></tr>';
+            '<td class="num">' + formatEuro(l.valor) + '</td>' +
+            '<td class="num">' + botaoRemover(l.chave) + '</td></tr>';
         }).join('') + d.cmvExtra.map(function(l){
           return '<tr><td>' + escapeHtml(l.data) + '</td>' +
             '<td>' + escapeHtml(l.fornecedor) + '</td><td>banco (' + escapeHtml(l.conta) + ') · ' +
-            escapeHtml(l.desc) + '</td><td class="num">' + formatEuro(l.valor) + '</td></tr>';
+            escapeHtml(l.desc) + '</td><td class="num">' + formatEuro(l.valor) + '</td>' +
+            '<td class="num">' + botaoRemover(l.chave) + '</td></tr>';
         }).join('');
         cmvDrill = drill((d.cmvPayReq.length + d.cmvExtra.length) + ' compras',
-          '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th>', linhas);
+          '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th><th></th>', linhas);
       }
       h += '<tr><td class="pnl-rubrica">CMV / Compras' +
         '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores</div>' +
@@ -859,54 +941,54 @@
         (d.cmvPayReq.length || d.cmvExtra.length ? formatEuro(d.totCmv)
           : '<span class="pnl-sub">sem compras concluídas</span>') + '</td></tr>';
 
-      // Pessoal com recibo
-      var prCell, prDrill = '';
-      if (!d.recibos.length){
-        prCell = '<span class="pnl-sub">sem recibos importados neste mês</span>';
-      } else if (!d.pessoalRecibo){
-        prCell = '<span class="pnl-sub">gioco-compromissos.js em falta — rubrica pendente</span>';
+      // Pessoal - rubrica ÚNICA: recibos + TSU + pagamentos sem recibo.
+      var pesCell, pesDrill = '';
+      var nItens = d.recibos.length + (d.pessoalRecibo && d.pessoalRecibo.tsu ? 1 : 0) +
+                   d.pessoalSemRecibo.length;
+      if (d.pessoalPendente){
+        pesCell = '<span class="pnl-sub">gioco-compromissos.js em falta — rubrica pendente</span>';
+      } else if (!nItens){
+        pesCell = '<span class="pnl-sub">sem custos de pessoal este mês</span>';
       } else {
-        prCell = formatEuro(d.pessoalRecibo.total);
-        var linhasR = d.recibos.map(function(r){
+        pesCell = formatEuro(d.totPessoal);
+        var linhasPes = d.recibos.map(function(r){
           return '<tr><td>' + escapeHtml(r.nome) + '</td><td>recibo (sujeito + não sujeito)</td>' +
-            '<td class="num">' + formatEuro(r.sujeito + r.naoSujeito) + '</td></tr>';
-        }).join('') +
-        '<tr><td>TSU patronal</td><td>23,75% da soma dos sujeitos, arredondada uma vez (gioco-compromissos.js)</td>' +
-        '<td class="num">' + formatEuro(d.pessoalRecibo.tsu) + '</td></tr>';
-        prDrill = drill(d.recibos.length + ' recibos + TSU patronal',
-          '<th>Item</th><th>Fonte</th><th class="num">Valor</th>', linhasR);
-      }
-      h += '<tr><td class="pnl-rubrica">Pessoal com recibo' +
-        (d.recibos.length && !d.pessoalRecibo ? '<span class="selo-pendente">pendente</span>' : '') +
-        '<div class="pnl-sub">recibos do mês + TSU patronal derivada</div>' + prDrill +
-        '</td><td class="num">' + prCell + '</td></tr>';
-
-      // Pessoal sem recibo
-      var psrDrill = '';
-      if (d.pessoalSemRecibo.length){
-        var linhasP = d.pessoalSemRecibo.map(function(i){
-          return '<tr><td>' + escapeHtml(i.data) + '</td>' +
-            '<td>' + escapeHtml(i.desc) + '</td><td>' + escapeHtml(i.origem) + '</td>' +
-            '<td class="num">' + formatEuro(i.valor) + '</td></tr>';
+            '<td class="num">' + formatEuro(r.sujeito + r.naoSujeito) + '</td>' +
+            '<td class="num">' + botaoRemover(r.chave) + '</td></tr>';
         }).join('');
-        psrDrill = drill(d.pessoalSemRecibo.length + ' pagamentos',
-          '<th>Data</th><th>Descrição</th><th>Origem</th><th class="num">Valor</th>', linhasP);
+        if (d.pessoalRecibo && d.pessoalRecibo.tsu){
+          linhasPes += '<tr><td>TSU patronal</td>' +
+            '<td>23,75% da soma dos sujeitos, arredondada uma vez (gioco-compromissos.js)</td>' +
+            '<td class="num">' + formatEuro(d.pessoalRecibo.tsu) + '</td>' +
+            '<td class="num">' + botaoRemover('tsu') + '</td></tr>';
+        }
+        linhasPes += d.pessoalSemRecibo.map(function(i){
+          return '<tr><td>' + escapeHtml(i.desc) + '</td>' +
+            '<td>sem recibo · ' + escapeHtml(i.origem) + ' · ' + escapeHtml(i.data) +
+            ' <span class="selo-estimativa">estimativa</span></td>' +
+            '<td class="num">' + formatEuro(i.valor) + '</td>' +
+            '<td class="num">' + botaoRemover(i.chave) + '</td></tr>';
+        }).join('');
+        pesDrill = drill(nItens + (nItens === 1 ? ' item' : ' itens'),
+          '<th>Item</th><th>Fonte</th><th class="num">Valor</th><th></th>', linhasPes);
       }
-      h += '<tr><td class="pnl-rubrica">Pessoal sem recibo' +
-        '<span class="selo-estimativa">estimativa</span>' +
-        '<div class="pnl-sub">caixa + pedidos de pagamento a prestadores (Subash, Mattia…)</div>' + psrDrill +
-        '</td><td class="num">' + (d.pessoalSemRecibo.length ? formatEuro(d.totPsr)
-          : '<span class="pnl-sub">sem pagamentos este mês</span>') + '</td></tr>';
+      h += '<tr><td class="pnl-rubrica">Pessoal' +
+        (d.pessoalPendente ? '<span class="selo-pendente">pendente</span>' : '') +
+        (!d.pessoalPendente && d.pessoalSemRecibo.length
+          ? '<span class="selo-estimativa">inclui estimativas</span>' : '') +
+        '<div class="pnl-sub">recibos do mês + TSU patronal derivada + pagamentos sem recibo (caixa e prestadores)</div>' +
+        pesDrill + '</td><td class="num">' + pesCell + '</td></tr>';
 
       // Fixos
       var fxDrill = '';
       if (d.fixos.length){
         var linhasF = d.fixos.map(function(f){
           return '<tr><td>' + escapeHtml(f.nome) + '</td>' +
-            '<td class="num">' + formatEuro(f.valor) + '</td></tr>';
+            '<td class="num">' + formatEuro(f.valor) + '</td>' +
+            '<td class="num">' + botaoRemover(f.chave) + '</td></tr>';
         }).join('');
         fxDrill = drill(d.fixos.length + ' compromissos',
-          '<th>Compromisso</th><th class="num">Valor mensal</th>', linhasF);
+          '<th>Compromisso</th><th class="num">Valor mensal</th><th></th>', linhasF);
       }
       h += '<tr><td class="pnl-rubrica">Fixos' +
         '<div class="pnl-sub">compromissos fixos sem pessoal e sem TSU (evita dupla contagem)</div>' + fxDrill +
@@ -918,6 +1000,15 @@
         '<td class="num">' + formatEuro(d.resultado) + '</td></tr>';
 
       h += '</tbody></table>';
+
+      // Linhas removidas à mão neste mês: sempre reversível, sempre à vista.
+      var nRemovidas = Object.keys(exclusoes[d.mes] || {}).length;
+      if (nRemovidas){
+        h += '<div class="repor-row"><button type="button" class="btn-repor" id="btnReporLinhas">' +
+          'Repor ' + nRemovidas + (nRemovidas === 1 ? ' linha removida' : ' linhas removidas') +
+          ' deste mês</button></div>';
+      }
+
       corpo.innerHTML = h;
     }
 
