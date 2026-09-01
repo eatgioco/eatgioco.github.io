@@ -28,10 +28,11 @@
 <style>
   /* ======================================================================
      resultados.html — P&L mensal em ótica de caixa (valores c/ IVA) +
-     classificação de movimentos. Escritas no Firebase SÓ em plAjustes/
-     (exclusões reversíveis), classificacaoRegras/ e classificacaoMovimentos/
-     — um set() por registo, nunca update() multi-chave. Tudo o resto é
-     leitura pura.
+     classificação de movimentos em duas dimensões (rubrica do P&L +
+     despesa concreta). Escritas no Firebase SÓ em plAjustes/ (exclusões
+     reversíveis), classificacaoRegras/, classificacaoMovimentos/ e
+     classificacaoDespesas/ (catálogo do autocomplete) — um set() por
+     registo, nunca update() multi-chave. Tudo o resto é leitura pura.
      Layout, sidebar, vidro, tema, .card, .kpi e tabelas vêm do shell.
      ====================================================================== */
 
@@ -213,6 +214,33 @@
   }
   .clf-form-inner input[type="text"]{ min-width:220px; text-transform:uppercase; }
   .clf-hint{ flex-basis:100%; font-size:11.5px; color:var(--muted); }
+
+  /* Segunda dimensao: a despesa concreta. Selo deliberadamente diferente dos
+     de rubrica (auto/manual): contorno em vez de pastilha cheia, sem
+     maiusculas — e um nome proprio, nao um estado. */
+  .selo-despesa{
+    display:inline-block; margin-left:6px; padding:1px 8px; border-radius:20px;
+    border:1px solid var(--line); background:var(--dough); color:var(--ink);
+    font-size:10.5px; font-weight:600; vertical-align:1px; white-space:nowrap;
+  }
+  .clf-form-inner input.clf-despesa{ text-transform:none; min-width:170px; }
+  .clf-desp-wrap{ position:relative; display:inline-block; }
+  .clf-sugestoes{
+    position:absolute; z-index:20; top:100%; left:0; min-width:100%;
+    max-height:190px; overflow:auto; margin-top:2px;
+    background:var(--white); border:1px solid var(--line); border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.14);
+  }
+  .clf-sugestoes button{
+    display:block; width:100%; text-align:left; border:none; background:none;
+    color:var(--ink); font:inherit; font-size:12.5px; padding:6px 10px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .clf-sugestoes button:hover, .clf-sugestoes button:focus{
+    background:var(--dough); outline:none;
+  }
+  .desp-resumo{ margin-top:8px; font-size:12px; color:var(--muted); line-height:1.7; }
+  .desp-resumo b{ color:var(--ink); font-weight:600; }
 </style>
 </head>
 <body>
@@ -547,7 +575,8 @@
       db.ref('contasBancarias/revolut/movimentos').once('value'),
       db.ref('vendas').once('value'),
       db.ref('classificacaoRegras').once('value'),
-      db.ref('classificacaoMovimentos').once('value')
+      db.ref('classificacaoMovimentos').once('value'),
+      db.ref('classificacaoDespesas').once('value')
     ]).then(function(snaps){
       base = {
         paymentRequests: snaps[0].val() || {},
@@ -558,7 +587,8 @@
         contas: { abanca: snaps[5].val() || {}, revolut: snaps[6].val() || {} },
         vendas: snaps[7].val() || {},
         classificacaoRegras: snaps[8].val() || {},
-        classificacaoMovimentos: snaps[9].val() || {}
+        classificacaoMovimentos: snaps[9].val() || {},
+        classificacaoDespesas: snaps[10].val() || {}
       };
 
       // Mês por omissão: o corrente se já tiver vendas; senão o último mês
@@ -604,7 +634,10 @@
       // Pré-visualização ao vivo da regra enquanto o padrão é editado.
       document.getElementById('recCorpo').addEventListener('input', function(e){
         var form = e.target.closest('.clf-form');
-        if (form) atualizarPreviewRegra(form);
+        if (!form) return;
+        atualizarPreviewRegra(form);
+        if (e.target.getAttribute('data-campo') === 'despesa')
+          atualizarSugestoesDespesa(form);
       });
     }
 
@@ -816,11 +849,51 @@
     // movimento no RTDB, logo já é uma chave válida; '~' não colide).
     function idMovimento(mov){ return mov.conta + '~' + mov.ref; }
 
+    /* ---------------------------------------------------------
+       Segunda dimensao: a DESPESA (entidade concreta - "Meta Ads",
+       "EDP"). A rubrica diz onde o movimento entra no P&L; a despesa
+       diz o que ele e concretamente. Aprende-se pelo mesmo mecanismo
+       de regras. classificacaoDespesas/ e so um catalogo para o
+       autocomplete: cria-se na primeira utilizacao de um nome novo e
+       nunca se apaga automaticamente.
+       --------------------------------------------------------- */
+    function idDespesa(nome){
+      return normalizarPadrao(nome).replace(/[^A-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+    function nomeLimpoDespesa(nome){
+      return String(nome || '').replace(/\s+/g, ' ').trim();
+    }
+    // Nome canonico: se o id ja existe no catalogo, vale o nome de la - e o
+    // que evita "meta ads" e "Meta Ads" como despesas diferentes.
+    function canonizarDespesa(nome){
+      var id = idDespesa(nome);
+      if (!id) return '';
+      var d = base.classificacaoDespesas[id];
+      return (d && d.nome) ? String(d.nome) : nomeLimpoDespesa(nome);
+    }
+    // Devolve o nome canonico, criando a entrada do catalogo se for nova.
+    // Sem despesa -> resolve '' sem escrever nada.
+    function garantirDespesa(nome){
+      var id = idDespesa(nome);
+      if (!id) return Promise.resolve('');
+      if (base.classificacaoDespesas[id]) return Promise.resolve(canonizarDespesa(nome));
+      var reg = { nome: nomeLimpoDespesa(nome), criadoEm: new Date().toISOString() };
+      return firebase.database().ref('classificacaoDespesas/' + id).set(reg)
+        .then(function(){ base.classificacaoDespesas[id] = reg; return reg.nome; });
+    }
+    function listaDespesas(){
+      var cat = base.classificacaoDespesas || {};
+      return Object.keys(cat).map(function(k){
+        return (cat[k] && cat[k].nome) ? String(cat[k].nome) : k;
+      }).sort(function(a, b){ return a.localeCompare(b, 'pt'); });
+    }
+
+    // Prioridade inalterada (override individual > regra com o padrao mais
+    // longo). A despesa segue a mesma resolucao, campo a campo: a do
+    // override vence; senao vale a da regra que casou; senao nao ha despesa.
     function classificarMovimento(mov){
       var id = idMovimento(mov);
-      var ov = base.classificacaoMovimentos[id];
-      if (ov && ov.rubrica)
-        return { id:id, rubrica:ov.rubrica, modo:'manual', regraId: ov.regraId || null };
       var alvo = normalizarPadrao(mov.desc + ' ' + (mov.extra || ''));
       var melhor = null;
       Object.keys(base.classificacaoRegras).forEach(function(rid){
@@ -828,14 +901,21 @@
         if (!r || !r.padrao || !r.rubrica) return;
         var p = normalizarPadrao(r.padrao);
         if (p && alvo.indexOf(p) !== -1 && (!melhor || p.length > melhor.plen))
-          melhor = { id:id, rubrica:r.rubrica, modo:'auto', regraId:rid, plen:p.length };
+          melhor = { id:id, rubrica:r.rubrica, modo:'auto', despesa: r.despesa || null,
+                     regraId:rid, plen:p.length };
       });
+      var ov = base.classificacaoMovimentos[id];
+      if (ov && ov.rubrica)
+        return { id:id, rubrica:ov.rubrica, modo:'manual',
+                 despesa: ov.despesa || (melhor ? melhor.despesa : null) || null,
+                 regraId: ov.regraId || null };
       return melhor;
     }
 
-    function escreverOverride(id, rubrica, regraId){
+    function escreverOverride(id, rubrica, regraId, despesa){
       var o = { rubrica: rubrica, manual: true, criadoEm: new Date().toISOString() };
       if (regraId) o.regraId = regraId;
+      if (despesa) o.despesa = despesa;
       return firebase.database().ref('classificacaoMovimentos/' + id).set(o)
         .then(function(){ base.classificacaoMovimentos[id] = o; });
     }
@@ -844,25 +924,29 @@
       alert('Não foi possível gravar a classificação: ' +
         (err && err.message ? err.message : err));
     }
-    function guardarClassificacao(id, rubrica, criarRegra, padrao, regraCorrigida){
+    function guardarClassificacao(id, rubrica, despesa, criarRegra, padrao, regraCorrigida){
       var mov = recMovsPorId[id];
-      if (criarRegra && padrao){
-        var rref = firebase.database().ref('classificacaoRegras').push();
-        var regra = { padrao: padrao, rubrica: rubrica,
-                      criadoEm: new Date().toISOString(),
-                      origemExemplo: mov ? mov.desc : '' };
-        rref.set(regra).then(function(){
-          base.classificacaoRegras[rref.key] = regra;
-          // Se o padrão editado já não apanhar o próprio movimento, fica
-          // também o override — o utilizador classificou-o, tem de contar.
-          var alvo = normalizarPadrao(mov ? mov.desc + ' ' + (mov.extra || '') : '');
-          if (alvo.indexOf(normalizarPadrao(padrao)) === -1)
-            return escreverOverride(id, rubrica, rref.key).then(renderMes);
-          renderMes();
-        }).catch(erroEscrita);
-      } else {
-        escreverOverride(id, rubrica, regraCorrigida || null).then(renderMes).catch(erroEscrita);
-      }
+      // O catalogo primeiro: o nome canonico e o que fica na regra e no
+      // override, para as duas dimensoes falarem sempre do mesmo nome.
+      garantirDespesa(despesa).then(function(nome){
+        if (criarRegra && padrao){
+          var rref = firebase.database().ref('classificacaoRegras').push();
+          var regra = { padrao: padrao, rubrica: rubrica,
+                        criadoEm: new Date().toISOString(),
+                        origemExemplo: mov ? mov.desc : '' };
+          if (nome) regra.despesa = nome;
+          return rref.set(regra).then(function(){
+            base.classificacaoRegras[rref.key] = regra;
+            // Se o padrao editado ja nao apanhar o proprio movimento, fica
+            // tambem o override - o utilizador classificou-o, tem de contar.
+            var alvo = normalizarPadrao(mov ? mov.desc + ' ' + (mov.extra || '') : '');
+            if (alvo.indexOf(normalizarPadrao(padrao)) === -1)
+              return escreverOverride(id, rubrica, rref.key, nome).then(renderMes);
+            renderMes();
+          });
+        }
+        return escreverOverride(id, rubrica, regraCorrigida || null, nome).then(renderMes);
+      }).catch(erroEscrita);
     }
 
     // Estado do último render da reconciliação: movimentos por id (para o
@@ -896,6 +980,34 @@
         (m.length === 1 ? '' : 's') + ' de ' + escapeHtml(nomeMes(mesAtivo)) +
         (m.length ? ':<br>' + lista +
           (m.length > 8 ? '<br>… e mais ' + (m.length - 8) : '') : '.');
+    }
+
+    // Autocomplete da despesa: match sem acentos e sem maiusculas
+    // (normalizarPadrao faz as duas), sugestao = nome canonico do catalogo.
+    function sugestoesDespesa(txt){
+      var q = normalizarPadrao(txt);
+      return listaDespesas().filter(function(nome){
+        return !q || normalizarPadrao(nome).indexOf(q) !== -1;
+      }).slice(0, 8);
+    }
+    function fecharSugestoesDespesa(){
+      var cx = document.querySelectorAll('.clf-sugestoes');
+      for (var i = 0; i < cx.length; i++){ cx[i].hidden = true; cx[i].innerHTML = ''; }
+    }
+    function atualizarSugestoesDespesa(form){
+      var inp = form.querySelector('[data-campo="despesa"]');
+      var cx = form.querySelector('.clf-sugestoes');
+      if (!inp || !cx) return;
+      var s = sugestoesDespesa(inp.value);
+      // Sugerir exatamente o que ja esta escrito nao ajuda ninguem.
+      if (!s.length || (s.length === 1 && normalizarPadrao(s[0]) === normalizarPadrao(inp.value))){
+        cx.hidden = true; cx.innerHTML = ''; return;
+      }
+      cx.innerHTML = s.map(function(nome){
+        return '<button type="button" data-despesa="' + escapeHtml(nome) + '">' +
+          escapeHtml(nome) + '</button>';
+      }).join('');
+      cx.hidden = false;
     }
 
     function apagarRegra(rid){
@@ -1050,6 +1162,7 @@
           if (clf.modo === 'auto' && clf.regraId)
             res.regrasUso[clf.regraId] = (res.regrasUso[clf.regraId] || 0) + 1;
           res.classificados.push({ mov: mov, id: clf.id, rubrica: clf.rubrica,
+                                   despesa: clf.despesa || null,
                                    modo: clf.modo, regraId: clf.regraId });
           if (clf.rubrica === 'interno'){
             // sai da reconciliação, como as transferências internas detetadas
@@ -1254,18 +1367,47 @@
       return modo === 'auto' ? '<span class="selo-auto">auto</span>'
                              : '<span class="selo-manual">manual</span>';
     }
+    // Segundo selo, so quando ha despesa. A despesa e metadado: nunca mexe
+    // em valores, so diz o que o movimento e concretamente.
+    function seloDespesa(despesa){
+      return despesa ? '<span class="selo-despesa">' + escapeHtml(despesa) + '</span>' : '';
+    }
     // Linha de drill do P&L para um movimento classificado. A correção
     // faz-se no drill da reconciliação, por isso aqui não há ✕.
     function linhaClfPnl(c, nCols){
       return '<tr><td>' + escapeHtml(c.mov.data) + '</td>' +
-        '<td>' + escapeHtml(c.mov.desc) + '</td>' +
+        '<td>' + escapeHtml(c.mov.desc) + seloDespesa(c.despesa) + '</td>' +
         '<td>banco (' + escapeHtml(c.mov.conta) + ') · classificado' + seloClf(c.modo) + '</td>' +
         '<td class="num">' + formatEuro(c.mov.valor) + '</td>' +
         (nCols > 4 ? '<td></td>' : '') + '</tr>';
     }
 
-    function drill(resumoTxt, headHtml, linhasHtml){
+    // Total por despesa dentro de uma rubrica do P&L, por valor descendente.
+    // "Sem despesa" fecha a soma com o total da rubrica: alem dos movimentos
+    // classificados sem despesa, apanha tudo o que vem das outras fontes
+    // (recibos, pedidos de pagamento, compromissos fixos).
+    function resumoDespesas(total, lista){
+      var porNome = {}, comDespesa = 0, algum = false;
+      (lista || []).forEach(function(c){
+        if (!c.despesa) return;
+        algum = true;
+        porNome[c.despesa] = (porNome[c.despesa] || 0) + c.mov.valor;
+        comDespesa += c.mov.valor;
+      });
+      if (!algum) return '';
+      var partes = Object.keys(porNome).map(function(nome){
+        return { nome: nome, valor: porNome[nome] };
+      }).sort(function(a, b){ return b.valor - a.valor; });
+      var resto = (total || 0) - comDespesa;
+      if (Math.abs(resto) >= 0.005) partes.push({ nome: 'Sem despesa', valor: resto });
+      return '<div class="desp-resumo">Por despesa: ' + partes.map(function(x){
+        return escapeHtml(x.nome) + ' <b>' + formatEuro(x.valor) + '</b>';
+      }).join(' · ') + '</div>';
+    }
+
+    function drill(resumoTxt, headHtml, linhasHtml, topoHtml){
       return '<details class="drill"><summary>' + escapeHtml(resumoTxt) + '</summary>' +
+        (topoHtml || '') +
         '<table class="drill-table"><thead><tr>' + headHtml + '</tr></thead><tbody>' +
         linhasHtml + '</tbody></table></details>';
     }
@@ -1312,7 +1454,8 @@
             '<td class="num">' + botaoExcluir(l.chave, 'cmv') + '</td></tr>';
         }).join('') + d.clfCmv.map(function(c){ return linhaClfPnl(c, 5); }).join('');
         cmvDrill = drill((d.cmvPayReq.length + d.cmvExtra.length + d.clfCmv.length) + ' compras',
-          '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th><th></th>', linhas);
+          '<th>Data</th><th>Fornecedor</th><th>Origem</th><th class="num">Valor</th><th></th>',
+          linhas, resumoDespesas(d.totCmv, d.clfCmv));
       }
       h += '<tr><td class="pnl-rubrica">CMV / Compras' +
         '<div class="pnl-sub">pedidos de pagamento concluídos no mês + saídas bancárias de fornecedores (valores c/ IVA)</div>' +
@@ -1358,13 +1501,14 @@
             '<td class="num">' + botaoExcluir(i.chave, 'pessoal') + '</td></tr>';
         }).join('');
         linhasPes += d.clfPessoal.map(function(c){
-          return '<tr><td>' + escapeHtml(c.mov.desc) + '</td>' +
+          return '<tr><td>' + escapeHtml(c.mov.desc) + seloDespesa(c.despesa) + '</td>' +
             '<td>banco (' + escapeHtml(c.mov.conta) + ') · ' + escapeHtml(c.mov.data) +
             ' · classificado' + seloClf(c.modo) + '</td>' +
             '<td class="num">' + formatEuro(c.mov.valor) + '</td><td></td></tr>';
         }).join('');
         pesDrill = drill(nItens + (nItens === 1 ? ' item' : ' itens'),
-          '<th>Item</th><th>Fonte</th><th class="num">Valor</th><th></th>', linhasPes);
+          '<th>Item</th><th>Fonte</th><th class="num">Valor</th><th></th>', linhasPes,
+          resumoDespesas(d.totPessoal, d.clfPessoal));
       }
       h += '<tr><td class="pnl-rubrica">Pessoal' +
         (d.pessoalPendente ? '<span class="selo-pendente">pendente</span>' : '') +
@@ -1383,11 +1527,13 @@
         }).join('') + d.clfFixos.map(function(c){
           return '<tr><td>' + escapeHtml(c.mov.desc) +
             ' <span class="pnl-sub" style="display:inline">banco (' + escapeHtml(c.mov.conta) +
-            ') · ' + escapeHtml(c.mov.data) + '</span>' + seloClf(c.modo) + '</td>' +
+            ') · ' + escapeHtml(c.mov.data) + '</span>' + seloClf(c.modo) +
+            seloDespesa(c.despesa) + '</td>' +
             '<td class="num">' + formatEuro(c.mov.valor) + '</td><td></td></tr>';
         }).join('');
         fxDrill = drill((d.fixos.length + d.clfFixos.length) + ' compromissos',
-          '<th>Compromisso</th><th class="num">Valor mensal</th><th></th>', linhasF);
+          '<th>Compromisso</th><th class="num">Valor mensal</th><th></th>', linhasF,
+          resumoDespesas(d.totFixos, d.clfFixos));
       }
       h += '<tr><td class="pnl-rubrica">Fixos' +
         '<div class="pnl-sub">compromissos fixos sem pessoal e sem TSU (evita dupla contagem)</div>' + fxDrill +
@@ -1397,14 +1543,15 @@
       if (d.clfOutros.length){
         var linhasO = d.clfOutros.map(function(c){
           return '<tr><td>' + escapeHtml(c.mov.data) + '</td>' +
-            '<td>' + escapeHtml(c.mov.desc) + seloClf(c.modo) + '</td>' +
+            '<td>' + escapeHtml(c.mov.desc) + seloClf(c.modo) + seloDespesa(c.despesa) + '</td>' +
             '<td>' + escapeHtml(c.mov.conta) + '</td>' +
             '<td class="num">' + formatEuro(c.mov.valor) + '</td></tr>';
         }).join('');
         h += '<tr><td class="pnl-rubrica">Outros custos' +
           '<div class="pnl-sub">movimentos bancários classificados fora das rubricas acima</div>' +
           drill(d.clfOutros.length + (d.clfOutros.length === 1 ? ' movimento' : ' movimentos'),
-            '<th>Data</th><th>Descrição</th><th>Conta</th><th class="num">Valor</th>', linhasO) +
+            '<th>Data</th><th>Descrição</th><th>Conta</th><th class="num">Valor</th>', linhasO,
+            resumoDespesas(d.totOutros, d.clfOutros)) +
           '</td><td class="num">' + formatEuro(d.totOutros) + '</td></tr>';
       }
 
@@ -1495,7 +1642,8 @@
           return '<tr><td>' + escapeHtml(m.data) + '</td>' +
             '<td>' + escapeHtml(m.conta) + '</td>' + celulaDesc(m) +
             '<td class="num">' + formatEuro(m.valor) + '</td>' +
-            '<td>' + (m.clf ? seloClf(m.clf.modo) : '') + '</td></tr>';
+            '<td>' + (m.clf ? seloClf(m.clf.modo) + seloDespesa(m.clf.despesa) : '') +
+            '</td></tr>';
         }).join('');
       }
 
@@ -1519,10 +1667,13 @@
           rec.classificados.map(function(c){
             return '<tr><td>' + escapeHtml(c.mov.data) + '</td>' +
               '<td>' + escapeHtml(c.mov.conta) + '</td>' + celulaDesc(c.mov) +
-              '<td>' + escapeHtml(nomeRubrica(c.rubrica)) + seloClf(c.modo) + '</td>' +
+              '<td>' + escapeHtml(nomeRubrica(c.rubrica)) + seloClf(c.modo) +
+                seloDespesa(c.despesa) + '</td>' +
               '<td class="num">' + formatEuro(c.mov.valor) + '</td>' +
               '<td class="num"><button type="button" class="btn-classificar" data-clf="' +
               escapeHtml(c.id) + '" data-regra="' + escapeHtml(c.regraId || '') +
+              '" data-rubrica="' + escapeHtml(c.rubrica) +
+              '" data-despesa="' + escapeHtml(c.despesa || '') +
               '" data-corrigir="1">Corrigir</button>' +
               (c.modo === 'auto' && c.regraId
                 ? ' <button type="button" class="btn-classificar" data-apagar-regra="' +
@@ -1534,11 +1685,14 @@
       var regrasIds = Object.keys(base.classificacaoRegras);
       if (regrasIds.length){
         h += drill('Regras de classificação (' + regrasIds.length + ')',
-          '<th>Padrão</th><th>Rubrica</th><th class="num">Apanha este mês</th><th></th>',
+          '<th>Padrão</th><th>Rubrica</th><th>Despesa</th>' +
+          '<th class="num">Apanha este mês</th><th></th>',
           regrasIds.map(function(rid){
             var r = base.classificacaoRegras[rid] || {};
             return '<tr><td>' + escapeHtml(r.padrao || '') + '</td>' +
               '<td>' + escapeHtml(nomeRubrica(r.rubrica)) + '</td>' +
+              '<td>' + (r.despesa ? escapeHtml(r.despesa)
+                                  : '<span class="pnl-sub" style="display:inline">\u2014</span>') + '</td>' +
               '<td class="num">' + (rec.regrasUso[rid] || 0) + '</td>' +
               '<td class="num"><button type="button" class="btn-classificar" data-editar-regra="' +
               escapeHtml(rid) + '">Editar</button> ' +
@@ -1559,6 +1713,15 @@
     /* =========================================================
        Formulário de classificação (linha inserida na tabela)
        ========================================================= */
+    // Campo da segunda dimensao, partilhado pelos dois formularios.
+    // Vazio e uma resposta valida: sem despesa, nada se escreve no catalogo.
+    function campoDespesa(valor){
+      return '<label>Despesa (opcional) <span class="clf-desp-wrap">' +
+        '<input type="text" class="clf-despesa" data-campo="despesa" autocomplete="off" ' +
+        'placeholder="ex: Meta Ads" value="' + escapeHtml(valor || '') + '">' +
+        '<span class="clf-sugestoes" hidden></span></span></label>';
+    }
+
     function abrirFormClassificacao(btn){
       var aberta = document.querySelector('.clf-form');
       if (aberta) aberta.parentNode.removeChild(aberta);
@@ -1566,18 +1729,24 @@
       var id = btn.getAttribute('data-clf');
       var corrigir = btn.getAttribute('data-corrigir') === '1';
       var regraAtual = btn.getAttribute('data-regra') || '';
+      // Ao corrigir, o formulario abre com os valores atuais das duas
+      // dimensoes - mudar so a despesa nao pode obrigar a repor a rubrica.
+      var rubricaAtual = btn.getAttribute('data-rubrica') || '';
+      var despesaAtual = btn.getAttribute('data-despesa') || '';
       var mov = recMovsPorId[id];
       var linha = btn.closest('tr');
       if (!mov || !linha) return;
 
       var nCols = linha.children.length;
       var opts = RUBRICAS.map(function(r){
-        return '<option value="' + r.key + '">' + escapeHtml(r.nome) + '</option>';
+        return '<option value="' + r.key + '"' + (r.key === rubricaAtual ? ' selected' : '') +
+          '>' + escapeHtml(r.nome) + '</option>';
       }).join('');
       var tr = document.createElement('tr');
       tr.className = 'clf-form';
       tr.innerHTML = '<td colspan="' + nCols + '"><div class="clf-form-inner">' +
         '<label>Rubrica <select data-campo="rubrica">' + opts + '</select></label>' +
+        campoDespesa(despesaAtual) +
         '<label><input type="checkbox" data-campo="criarRegra"' + (corrigir ? '' : ' checked') +
           '> criar regra com o padrão</label>' +
         '<input type="text" data-campo="padrao" value="' + escapeHtml(sugerirPadrao(mov.desc)) + '">' +
@@ -1585,7 +1754,7 @@
         '<button type="button" class="btn-classificar" data-acao="cancelar">Cancelar</button>' +
         '<span class="clf-hint">' + (corrigir
           ? 'A correção grava um override individual (manual), que vence sempre sobre as regras.'
-          : 'Com regra, todos os movimentos — passados e futuros — cujo descritivo contenha o padrão ficam nesta rubrica, marcados "auto". Sem regra, fica só este movimento.') +
+          : 'Com regra, todos os movimentos — passados e futuros — cujo descritivo contenha o padrão ficam nesta rubrica e nesta despesa, marcados "auto". Sem regra, fica só este movimento.') +
         '</span><span class="clf-preview clf-hint"></span></div></td>';
       tr.setAttribute('data-clf-id', id);
       if (regraAtual) tr.setAttribute('data-clf-regra', regraAtual);
@@ -1610,6 +1779,7 @@
       tr.className = 'clf-form';
       tr.innerHTML = '<td colspan="' + linha.children.length + '"><div class="clf-form-inner">' +
         '<label>Rubrica <select data-campo="rubrica">' + opts + '</select></label>' +
+        campoDespesa(r.despesa || '') +
         '<label>Padrão <input type="text" data-campo="padrao" value="' + escapeHtml(r.padrao || '') + '"></label>' +
         '<button type="button" class="btn-classificar" data-acao="guardar-regra">Guardar</button>' +
         '<button type="button" class="btn-classificar" data-acao="cancelar">Cancelar</button>' +
@@ -1621,6 +1791,22 @@
 
 
     function onRecClick(e){
+      // Escolher uma sugestao usa o nome canonico do catalogo - e assim que
+      // "meta ads" e "Meta Ads" nao viram duas despesas.
+      var sug = e.target.closest('.clf-sugestoes button');
+      if (sug){
+        var forma = sug.closest('.clf-form');
+        var alvo = forma && forma.querySelector('[data-campo="despesa"]');
+        if (alvo){ alvo.value = sug.getAttribute('data-despesa'); alvo.focus(); }
+        fecharSugestoesDespesa();
+        return;
+      }
+      if (e.target.getAttribute && e.target.getAttribute('data-campo') === 'despesa'){
+        atualizarSugestoesDespesa(e.target.closest('.clf-form'));
+        return;
+      }
+      fecharSugestoesDespesa();
+
       var btn = e.target.closest('.btn-classificar');
       if (!btn) return;
 
@@ -1642,20 +1828,27 @@
 
       var rubrica = form.querySelector('[data-campo="rubrica"]').value;
       var padrao = normalizarPadrao(form.querySelector('[data-campo="padrao"]').value);
+      var campoDesp = form.querySelector('[data-campo="despesa"]');
+      var despesa = campoDesp ? nomeLimpoDespesa(campoDesp.value) : '';
 
       if (acao === 'guardar-regra'){
         var rid = form.getAttribute('data-regra-id');
         var r = base.classificacaoRegras[rid];
         if (!r) return;
         if (!padrao){ alert('O padrão da regra está vazio.'); return; }
-        // set() do registo completo no seu próprio path — nunca update()
-        // multi-chave. criadoEm e origemExemplo preservam-se.
-        var novo = { padrao: padrao, rubrica: rubrica,
-                     criadoEm: r.criadoEm || new Date().toISOString(),
-                     origemExemplo: r.origemExemplo || '' };
-        firebase.database().ref('classificacaoRegras/' + rid).set(novo).then(function(){
-          base.classificacaoRegras[rid] = novo;
-          renderMes();
+        garantirDespesa(despesa).then(function(nome){
+          // set() do registo completo no seu próprio path — nunca update()
+          // multi-chave. criadoEm e origemExemplo preservam-se. Despesa
+          // vazia limpa o campo (a chave simplesmente nao volta a existir).
+          var novo = { padrao: padrao, rubrica: rubrica,
+                       criadoEm: r.criadoEm || new Date().toISOString(),
+                       origemExemplo: r.origemExemplo || '' };
+          if (nome) novo.despesa = nome;
+          return firebase.database().ref('classificacaoRegras/' + rid).set(novo)
+            .then(function(){
+              base.classificacaoRegras[rid] = novo;
+              renderMes();
+            });
         }).catch(erroEscrita);
         return;
       }
@@ -1666,7 +1859,7 @@
         alert('O padrão da regra está vazio — escreve um padrão ou desliga "criar regra".');
         return;
       }
-      guardarClassificacao(id, rubrica, criarRegra, padrao,
+      guardarClassificacao(id, rubrica, despesa, criarRegra, padrao,
         form.getAttribute('data-clf-regra') || null);
     }
 

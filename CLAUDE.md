@@ -49,7 +49,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `foodcost.html` | Variância de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas | Equipa |
-| `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós) | Equipa |
+| `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós). Classificação de movimentos em DUAS dimensões: a rubrica do P&L e a despesa concreta ("Meta Ads", "EDP"), ambas aprendidas pelas mesmas regras; a despesa é metadado e nunca mexe em valores | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
@@ -139,24 +139,54 @@ pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas com
                          chave {compromissoId}_{ano}-{mes} = { concluidoEm }
 classificacaoRegras   — regras de classificação de movimentos bancários da
                          resultados.html: {idPush} = { padrao, rubrica, criadoEm,
-                         origemExemplo }. padrao = substring do descritivo,
-                         normalizada (maiúsculas, sem acentos, espaços
-                         colapsados); rubrica ∈ cmv | pessoal | fixos | outros |
-                         impostos | interno. Se várias regras casarem, ganha o
-                         padrão mais longo. Apagar uma regra é permitido (é
-                         configuração, não dados), sempre com confirmação na UI
+                         origemExemplo, despesa? }. padrao = substring do
+                         descritivo, normalizada (maiúsculas, sem acentos,
+                         espaços colapsados); rubrica ∈ cmv | pessoal | fixos |
+                         outros | impostos | interno. despesa é OPCIONAL (nome
+                         de exibição da entidade concreta, ex.: "Meta Ads") —
+                         uma regra pode trazer rubrica, despesa, ou ambas; sem
+                         despesa comporta-se como antes. Se várias regras
+                         casarem, ganha o padrão mais longo. Apagar uma regra é
+                         permitido (é configuração, não dados), sempre com
+                         confirmação na UI
 classificacaoMovimentos — override individual por movimento bancário:
                          {conta}~{ref} = { rubrica, manual:true, regraId?,
-                         criadoEm }. Vence sempre sobre qualquer regra.
+                         criadoEm, despesa? }. Vence sempre sobre qualquer
+                         regra. despesa é OPCIONAL, pelas mesmas razões.
                          PRIORIDADE de classificação na resultados.html:
                          (1) exclusão em plAjustes (o item sai do P&L e vai
                          para "Não classificado"); (2) lógica de reconciliação
                          existente (salários, renda, paymentRequests, internas)
                          — o classificador nunca atua sobre estes; (3) este
                          override; (4) regra de classificacaoRegras; (5) fica
-                         "Não classificado". Com plAjustes, são os TRÊS únicos
-                         nós onde a resultados.html escreve, sempre um set()
-                         por registo (nunca update multi-chave)
+                         "Não classificado". Com plAjustes e
+                         classificacaoDespesas, são os QUATRO únicos nós onde a
+                         resultados.html escreve, sempre um set() por registo
+                         (nunca update multi-chave)
+classificacaoDespesas — catálogo leve das despesas (a SEGUNDA dimensão de
+                         classificação, a par da rubrica): {idDespesa} =
+                         { nome, criadoEm }. idDespesa = nome normalizado
+                         (maiúsculas, sem acentos, espaços colapsados,
+                         caracteres não alfanuméricos → hífen): "Meta Ads" →
+                         META-ADS. Serve APENAS para alimentar o autocomplete
+                         do campo "Despesa (opcional)" e para dar um nome
+                         canónico (evita "meta ads" vs "Meta Ads"). A entrada
+                         é criada na primeira vez que uma despesa nova é usada
+                         e NUNCA é apagada automaticamente; classificar sem
+                         despesa não escreve aqui nada.
+                         RESOLUÇÃO DAS DUAS DIMENSÕES: a rubrica diz onde o
+                         movimento entra no P&L, a despesa diz o que ele é
+                         concretamente. A despesa segue a mesma prioridade da
+                         rubrica, campo a campo — a do override vence; senão
+                         vale a da regra que casou; senão o movimento fica sem
+                         despesa. Um override pode portanto corrigir só a
+                         despesa mantendo a rubrica que veio da regra. A
+                         despesa é METADADO: nunca entra em nenhum cálculo,
+                         só aparece como segundo selo e no sumário "por
+                         despesa" no topo do drill-down de cada rubrica do P&L
+                         (onde "Sem despesa" fecha a soma com o total da
+                         rubrica). Gerir o catálogo (renomear, fundir) ainda
+                         não existe
 plAjustes             — ajustes manuais do P&L (resultados.html, o ÚNICO que
                          escreve aqui): plAjustes/{AAAA-MM}/exclusoes/{idEstavel}
                          = { origem, motivo?, excluidoEm }. idEstavel identifica
