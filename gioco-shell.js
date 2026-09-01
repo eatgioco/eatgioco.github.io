@@ -203,6 +203,75 @@
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
+  /* ---------- NAVEGAÇÃO PARTILHADA ----------
+     Uma única definição das entradas do menu. Antes estava copiada à mão no
+     <body> de cada página, e cada entrada nova obrigava a mexer em todas.
+
+     ALLOW-LIST, NUNCA DENY-LIST. Cada página escolhe o CONJUNTO que quer ver,
+     e o conjunto por omissão é o público. O mrn-dashboard.html é privado: o
+     link dele não pode aparecer em nenhuma página pública, por isso nenhum
+     conjunto o lista — nem sequer o privado, que é o menu de dentro dele e
+     nunca se lista a si próprio. Se um dia isto passasse a deny-list (uma flag
+     "não mostrar"), esquecer a flag numa página nova expunha o link privado.
+
+     O conjunto 'privada' é o cluster que só se alcança a partir do dashboard
+     (tesouraria, tarefas, conta bancária). A primeira entrada chama-se "Home"
+     e não "Dashboard" de propósito — nas páginas públicas há um
+     "Dashboard → index.html" que convida a ser "corrigido" para
+     mrn-dashboard.html, e era assim que o link privado sairia.
+
+     Máximo 8 entradas por conjunto: as regras :nth-child do gioco-shell.css
+     param na 8ª e a partir daí perde-se a animação escalonada. */
+  var GIOCO_NAV_CONJUNTOS = {
+    publica: [
+      { href: 'index.html',      icone: 'layout-dashboard', label: 'Dashboard' },
+      { href: 'receitas.html',   icone: 'chef-hat',         label: 'Receitas' },
+      { href: 'compras.html',    icone: 'shopping-cart',    label: 'Compras' },
+      { href: 'pagamentos.html', icone: 'receipt',          label: 'Pagamentos' },
+      { href: 'vendas.html',     icone: 'bar-chart-2',      label: 'Vendas' },
+      { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
+      { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
+      /* Definições ainda não tem página. Link morto de propósito: fica à vista
+         no menu, mas não navega para lado nenhum. */
+      { href: '#',               icone: 'settings',         label: 'Definições' }
+    ],
+    privada: [
+      { href: 'index.html',      icone: 'layout-dashboard', label: 'Home' },
+      { href: 'tesouraria.html', icone: 'receipt',          label: 'Tesouraria' },
+      { href: 'tarefas.html',    icone: 'pencil',           label: 'Tarefas' },
+      /* conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
+         é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. */
+      { href: 'conta-bancaria.html?conta=abanca', icone: 'trending-up', label: 'Conta bancária' }
+    ]
+  };
+
+  /* ---------- giocoNav(ativo, conjunto) ----------
+     Preenche o <nav> da sidebar (por omissão o #giocoNav) com as entradas do
+     conjunto, marcando `ativo` como .active. `ativo` é o href tal como está
+     na lista — é a ÚNICA coisa que cada página declara.
+
+     Corre SÍNCRONO, chamado por um <script> logo a seguir ao <nav>. Tem de ser
+     assim: há páginas (contagens, equipa) com JS próprio que percorre
+     '#sidebarEl .nav-row' para fechar o painel do menu ao toque, e esse JS
+     corre antes do DOMContentLoaded. Se a nav só aparecesse mais tarde, esse
+     JS não encontrava linha nenhuma e o painel deixava de fechar. */
+  function giocoNav(ativo, conjunto, alvo) {
+    try {
+      var lista = GIOCO_NAV_CONJUNTOS[conjunto || 'publica'];
+      if (!lista) return;
+      var nav = alvo || document.getElementById('giocoNav');
+      if (!nav) return;
+      var html = '';
+      for (var i = 0; i < lista.length; i++) {
+        var e = lista[i];
+        html += '<a class="nav-row' + (e.href === ativo ? ' active' : '') +
+                '" href="' + e.href + '">' + giocoIcon(e.icone, { size: 17 }) +
+                ' <span>' + e.label + '</span></a>';
+      }
+      nav.innerHTML = html;
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+
   /* ---------- ARRANQUE ---------- */
   function giocoShellInit() {
     injectSprite();
@@ -220,6 +289,8 @@
 
   /* API global (mantém os nomes usados pelos onclick inline da referência) */
   window.giocoIcon = giocoIcon;
+  window.giocoNav = giocoNav;
+  window.GIOCO_NAV_CONJUNTOS = GIOCO_NAV_CONJUNTOS;
   window.GIOCO_ICON_NAMES = GIOCO_ICON_NAMES;
   window.giocoShellInit = giocoShellInit;
   window.setIcon = setIcon;

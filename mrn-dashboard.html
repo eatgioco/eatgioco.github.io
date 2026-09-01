@@ -47,8 +47,6 @@
 
   body{ -webkit-font-smoothing:antialiased; }
 
-  /* Os itens do menu sao links reais (<a>), estilizados pelo .nav-row do shell. */
-  .nav-row{ text-decoration:none; }
 
   /* Rodape da sidebar: utilizador fixo, sem sessoes nem logout. */
   .foot-avatar{
@@ -1718,23 +1716,12 @@
       <div class="word">GIOCO OS<span>painel privado</span></div>
     </div>
 
-    <!-- Página PRIVADA: link não partilhado. Esta lista é própria e nunca deve
-         listar mrn-dashboard.html. Se a nav subir ao gioco-shell.css/.js, esta
-         página fica de fora (allow-list, nunca deny-list). -->
-    <!-- A lista aqui NÃO é a das páginas públicas: aponta para o cluster que só
-         se alcança a partir daqui (tesouraria, tarefas, conta bancária). A
-         primeira entrada chama-se "Home" e não "Dashboard" de propósito —
-         nas páginas públicas há um "Dashboard → index.html" que convida a ser
-         "corrigido" para mrn-dashboard.html. É assim que o link privado sairia.
-         Máximo 7 entradas: as regras :nth-child do shell param na 7ª. -->
-    <nav>
-      <a class="nav-row" href="index.html"><svg class="icon" width="17" height="17"><use href="#i-layout-dashboard"/></svg> <span>Home</span></a>
-      <a class="nav-row" href="tesouraria.html"><svg class="icon" width="17" height="17"><use href="#i-receipt"/></svg> <span>Tesouraria</span></a>
-      <a class="nav-row" href="tarefas.html"><svg class="icon" width="17" height="17"><use href="#i-pencil"/></svg> <span>Tarefas</span></a>
-      <!-- conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
-           é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. -->
-      <a class="nav-row" href="conta-bancaria.html?conta=abanca"><svg class="icon" width="17" height="17"><use href="#i-trending-up"/></svg> <span>Conta bancária</span></a>
-    </nav>
+    <!-- Página PRIVADA. A lista vive no gioco-shell.js (conjunto 'privada') e
+         NÃO é a das páginas públicas: aponta para o cluster que só se alcança
+         a partir daqui. Nenhum conjunto lista mrn-dashboard.html — é
+         allow-list, nunca deny-list. Ver a nota longa no gioco-shell.js. -->
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('index.html', 'privada');</script>
 
     <div class="sidebar-foot">
       <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->

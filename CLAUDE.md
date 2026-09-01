@@ -223,20 +223,35 @@ Sobre um selo cuja superfície não inverte, o texto é um literal fixo
   especificidade, o local ganha. Uma classe local com o nome de uma do shell
   (`.card`, `.num`) anula-a em silêncio.
 
-**Regra da navegação.** A lista de links da sidebar é declarada **página a
-página**, no `<body>`. Não está no `gioco-shell.css` nem no `.js` — o shell só
-lhe dá estilo (`nav`, `.nav-row`). As páginas públicas partilham a mesma lista
-de 8 entradas (com as Contagens, ícone `clipboard-check`, entre Vendas e
-Equipa), copiada à mão.
+**Regra da navegação.** A lista de links da sidebar vive no `gioco-shell.js`
+(`GIOCO_NAV_CONJUNTOS`), numa única definição. Cada página só declara a entrada
+activa:
 
-O `mrn-dashboard.html` é a **excepção e tem de continuar a ser**: é privado, o
-link não é partilhado, e tem lista própria (Home, Tesouraria, Tarefas, Conta
-bancária) que **nunca se lista a si própria**. A primeira entrada chama-se
-"Home" e não "Dashboard" de propósito — nas páginas públicas há um
-`Dashboard → index.html` que convida a ser "corrigido" para
-`mrn-dashboard.html`, e era assim que o link privado sairia. Se um dia a nav
-subir ao shell, tem de ser **allow-list** (cada página declara o que quer ver),
-nunca deny-list: numa deny-list, esquecer a flag expõe a página.
+```html
+<nav id="giocoNav"></nav>
+<script>giocoNav('receitas.html');</script>
+```
+
+O `giocoNav(ativo, conjunto)` corre **síncrono**, num `<script>` logo a seguir
+ao `<nav>`. Tem de ser assim: a `contagens.html` e a `equipa.html` têm JS
+próprio que percorre `#sidebarEl .nav-row` antes do `DOMContentLoaded` (o menu
+ao toque), e com a nav a aparecer mais tarde esse JS não encontrava linha
+nenhuma. Não passar isto para `DOMContentLoaded`.
+
+Há dois conjuntos, e é **allow-list, nunca deny-list**: o conjunto por omissão
+é `publica` (8 entradas: Dashboard, Receitas, Compras, Pagamentos, Vendas,
+Contagens, Equipa, Definições). O `mrn-dashboard.html` é privado e pede
+`giocoNav('index.html', 'privada')` — lista própria (Home, Tesouraria, Tarefas,
+Conta bancária) que **nunca se lista a si própria**. Nenhum conjunto contém
+`mrn-dashboard.html`: numa deny-list, esquecer a flag numa página nova expunha
+o link.
+
+A primeira entrada do conjunto privado chama-se "Home" e não "Dashboard" de
+propósito — nas páginas públicas há um `Dashboard → index.html` que convida a
+ser "corrigido" para `mrn-dashboard.html`, e era assim que o link privado saía.
+
+O `estilo.html` mantém a nav escrita à mão de propósito: são `<div>` sem href,
+uma montra do componente `.nav-row`, não navegação a sério.
 
 Depois de mexer em navegação, correr:
 
