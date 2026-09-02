@@ -520,6 +520,17 @@
     gap:4px;
   }
 
+  /* Rótulo curto de contexto à direita do título — capacidade nova de
+     seccao(), ainda por usar em nenhuma secção. */
+  .sec-etiqueta{
+    margin-left:auto;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--chart-eixo);
+  }
+
   .sec-corpo .section-sub{ margin:12px 0 14px; }
 
   .vista-btn{
@@ -2586,13 +2597,16 @@
 
   /* corpo fica dentro de um wrapper com id próprio, escondido quando colapsada.
      ctrl (opcional) são os botões de troca de vista, colocados no cabeçalho. */
-  function seccao(titulo, sub, corpo, ctrl){
+  /* `etiqueta` (opcional, 5º parâmetro): rótulo curto à direita do título,
+     ainda por usar em nenhuma secção — só a capacidade. */
+  function seccao(titulo, sub, corpo, ctrl, etiqueta){
     var id = slugSeccao(titulo);
     var aberta = seccaoAberta(id);
     return '<div class="section" data-sec="' + id + '">' +
       '<div class="sec-head' + (aberta ? '' : ' fechada') + '" data-sec-toggle="' + id + '">' +
         '<span class="sec-seta">' + (aberta ? '▾' : '▸') + '</span>' +
         '<h2 class="section-title">' + esc(titulo) + '</h2>' +
+        (etiqueta ? '<span class="sec-etiqueta">' + esc(etiqueta) + '</span>' : '') +
         (ctrl ? '<span class="sec-ctrl">' + ctrl + '</span>' : '') +
       '</div>' +
       '<div class="sec-corpo" data-sec-corpo="' + id + '"' + (aberta ? '' : ' hidden') + '>' +
@@ -2867,7 +2881,7 @@
 
     var vista = vistaDe('categorias');
     var grafico;
-    if (vista === 'vertical') grafico = barrasVerticais(itens);
+    if (vista === 'vertical') grafico = barrasVerticais(itens, { paleta:'fatias' });
     else if (vista === 'donut') grafico = donut(itens, { aria:'Mix por categoria' });
     else grafico = '<div class="bars">' + itens.map(function(x){
       return barra(x.label, x.valor, max, x.texto, undefined, x.alt);
@@ -2946,7 +2960,7 @@
 
     var vista = vistaDe('pagamentos');
     var grafico;
-    if (vista === 'vertical') grafico = barrasVerticais(itens, { alt:true });
+    if (vista === 'vertical') grafico = barrasVerticais(itens, { paleta:'fatias' });
     else if (vista === 'donut') grafico = donut(itens, { aria:'Meios de pagamento' });
     else grafico = '<div class="bars">' + itens.map(function(x){
       return barra(x.label, x.valor, max, x.texto, undefined, true);

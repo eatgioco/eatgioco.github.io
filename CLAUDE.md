@@ -381,6 +381,19 @@ com `<use href="#i-...">`, para o sprite já estar no DOM.
 carrega `gioco-charts.css`/`.js` e usa `GiocoChart.*`. Nunca reimplementar por
 página; correcções vão sempre para o `gioco-charts`, igual à regra do shell.
 
+Funções disponíveis: `barra()` (linha de barra horizontal HTML/CSS, para
+listas), `barrasHorizontais()` (conjunto horizontal com eixo e régua),
+`barrasVerticais()` (colunas em SVG), `linha()` (linha suavizada, com
+`opts.series` para multi-série), `donut()` e `cores()` (tokens do tema
+activo). Ver o comentário de cabeçalho de `gioco-charts.js` para as opts de
+cada uma.
+
+O estilo é o padrão do OS para qualquer gráfico novo: gridlines ténues
+(nunca eixos grossos), escala sempre em valores redondos — nunca presa ao
+máximo exacto dos dados —, uma cor neutra para o que não é destaque e uma
+única cor de destaque (nunca uma cor por barra, excepto no donut, que usa
+as fatias `--fatia-*`).
+
 **Tokens.** Nunca redeclarar num `<style>` de página o que o shell já dá. A
 semântica é o que interessa, não o nome:
 

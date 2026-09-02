@@ -28,6 +28,27 @@
     --fatia-6:#C9C2B4;
   }
 
+  /* Acabamento dos gráficos: gridlines quase invisíveis, texto de eixo no
+     --muted, neutro para barras não destacadas (nem --line, claro de mais
+     para uma barra, nem --fatia-4). */
+  :root{
+    --chart-grid:rgba(20,20,20,0.07);
+    --chart-eixo:var(--muted);
+    --chart-neutro:#DDD5CB;
+    --chart-neutro-forte:#CFC5B8;
+  }
+  [data-theme="dark"]{
+    --chart-grid:rgba(242,237,228,0.09);
+    /* Redeclarar mesmo sendo o mesmo valor textual: o data-theme vive no
+       <body>, não no <html>, e um var(--muted) só declarado no :root
+       resolve-se contra o --muted do :root (claro) e fica assim herdado —
+       precisa de ser redeclarado aqui para se resolver contra o --muted
+       de quem tem data-theme="dark". */
+    --chart-eixo:var(--muted);
+    --chart-neutro:#3A342C;
+    --chart-neutro-forte:#4A423A;
+  }
+
   /* ---------- Barras horizontais ---------- */
   .bars{
     margin-top:16px;
@@ -55,16 +76,15 @@
     text-overflow:ellipsis;
   }
 
+  /* A barra assenta directamente sobre o card — sem fundo nem moldura
+     próprios, só a folga para a linha ficar legível. */
   .bar-track{
     flex:1 1 40px;
-    min-width:40px;
+    min-width:60px;
     height:18px;
-    background:var(--white);
-    border:1px solid var(--line);
     border-radius:100px;
     overflow:hidden;
     position:relative;
-    min-width:60px;
   }
 
   .bar-fill{
@@ -105,59 +125,29 @@
     background:var(--white);
   }
 
-  /* ---------- Barras verticais ---------- */
-  .vbars{
+  /* Legenda de multi-série da linha() — só aparece com mais do que uma série. */
+  .chart-legenda{
     display:flex;
     flex-wrap:wrap;
-    align-items:flex-end;
-    gap:6px 4px;
-    margin-top:16px;
-    padding:8px 0 0;
+    justify-content:center;
+    gap:18px;
+    margin:0 0 8px;
+    font-size:11px;
+    color:var(--ink);
   }
 
-  .vbar-col{
-    flex:1 1 46px;
-    min-width:46px;
+  .chart-legenda-item{
     display:flex;
-    flex-direction:column;
     align-items:center;
-    gap:4px;
-    min-height:0;
+    gap:6px;
   }
 
-  .vbar-valor{
-    font-size:9.5px;
-    font-weight:700;
-    font-variant-numeric:tabular-nums;
-    white-space:nowrap;
-  }
-
-  .vbar-track{
-    width:100%;
-    height:150px;
-    display:flex;
-    align-items:flex-end;
-    background:var(--white);
-    border:1px solid var(--line);
-    border-top:0;
-    border-radius:0 0 8px 8px;
-    overflow:hidden;
-  }
-
-  .vbar-fill{
-    display:block;
-    width:100%;
-    background:var(--red);
-  }
-
-  .vbar-fill.alt{ background:var(--fatia-2); }
-
-  .vbar-label{
-    font-size:9.5px;
-    color:var(--muted);
-    text-align:center;
-    line-height:1.2;
-    overflow-wrap:anywhere;
+  .chart-legenda-dot{
+    flex:0 0 9px;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    display:inline-block;
   }
 
   /* ---------- Donut ---------- */
@@ -175,16 +165,43 @@
     width:200px;
     height:200px;
     border-radius:50%;
-    border:1px solid var(--line);
   }
 
   .donut::after{
     content:'';
     position:absolute;
-    inset:30%;
+    inset:38%;
     background:var(--dough);
     border:1px solid var(--line);
     border-radius:50%;
+    z-index:0;
+  }
+
+  .donut-centro{
+    position:absolute;
+    inset:38%;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    text-align:center;
+  }
+
+  .donut-centro-valor{
+    font-size:16px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.1;
+  }
+
+  .donut-centro-label{
+    font-size:9px;
+    font-weight:600;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--chart-eixo);
   }
 
   .donut-legenda{
@@ -206,9 +223,9 @@
   }
 
   .donut-chip{
-    flex:0 0 12px;
-    width:12px;
-    height:12px;
+    flex:0 0 10px;
+    width:10px;
+    height:10px;
     border-radius:3px;
     border:1px solid var(--line);
   }
@@ -220,8 +237,17 @@
   }
 
   .donut-valor{
-    flex:0 0 auto;
+    flex:0 0 72px;
+    text-align:right;
     font-weight:700;
     font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+
+  .donut-pct{
+    flex:0 0 48px;
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+    color:var(--muted);
     white-space:nowrap;
   }
