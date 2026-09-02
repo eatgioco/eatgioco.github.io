@@ -776,6 +776,10 @@
         bar.setAttribute('fill-opacity', '1');
         bar.style.opacity = '1';
       } else {
+        // Repor a cor original antes de escurecer — senão uma barra
+        // realçada num hover anterior fica "pintada" para sempre.
+        bar.setAttribute('fill', bar.getAttribute('data-cor-original'));
+        bar.setAttribute('fill-opacity', bar.getAttribute('data-opacidade-original') || '1');
         bar.style.opacity = '0.55';
       }
     }
