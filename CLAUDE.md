@@ -388,6 +388,15 @@ listas), `barrasHorizontais()` (conjunto horizontal com eixo e régua),
 activo). Ver o comentário de cabeçalho de `gioco-charts.js` para as opts de
 cada uma.
 
+`linha()` e `barrasVerticais()` não devolvem SVG directamente — devolvem um
+`<div class="chart-host">` vazio, desenhado só depois de `GiocoChart.montar()`
+medir a largura real do host (viewBox = essa largura, escala sempre 1:1,
+nunca um viewBox fixo esticado por CSS). Chamar `GiocoChart.montar()` depois
+de qualquer `innerHTML` que possa ter criado `.chart-host` novos — no
+vendas.html isso é no fim de `renderVistas()` e ao expandir uma secção. Têm
+também tooltip com realce ao passar o rato/tocar (snap à coluna/ponto mais
+próximo).
+
 O estilo é o padrão do OS para qualquer gráfico novo: gridlines ténues
 (nunca eixos grossos), escala sempre em valores redondos — nunca presa ao
 máximo exacto dos dados —, uma cor neutra para o que não é destaque e uma

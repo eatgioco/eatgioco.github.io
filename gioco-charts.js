@@ -7,8 +7,31 @@
    Sem dependências externas. Carregar depois do gioco-shell.css/js.
 
    ------------------------------------------------------------------------
+   Render em duas fases (linha() e barrasVerticais())
+   ------------------------------------------------------------------------
+   Estas duas funções não devolvem SVG — devolvem um <div class="chart-host">
+   vazio com os dados no dataset. O SVG só é desenhado depois de o host estar
+   no DOM e ter uma largura real (clientWidth), com viewBox = essa largura em
+   píxeis — por isso a escala é sempre 1:1, nunca um viewBox fixo esticado
+   por CSS. GiocoChart.montar(raiz) trata disto:
+
+     - Chamar GiocoChart.montar() (ou montar(umElemento)) depois de qualquer
+       innerHTML que possa ter criado .chart-host novos — no vendas.html, no
+       fim de renderVistas() e ao expandir uma secção colapsada.
+     - Um ResizeObserver único (partilhado por todos os hosts) redesenha
+       quando a largura muda mais de 8px, com debounce de 120ms.
+     - Um host com clientWidth 0 (secção colapsada) fica por desenhar até o
+       próprio ResizeObserver disparar quando ganhar largura.
+     - Sem ResizeObserver no browser: desenha uma vez e não redesenha.
+
+   ------------------------------------------------------------------------
    API pública (window.GiocoChart)
    ------------------------------------------------------------------------
+
+   .montar(raiz)
+       Percorre os .chart-host dentro de `raiz` (por omissão, document) e
+       desenha-os / liga-lhes o ResizeObserver. Idempotente — um host já
+       montado não é tocado outra vez.
 
    .barra(label, valor, max, texto, delta, alt)
        Uma linha de barra horizontal (HTML/CSS, não SVG) — para listas onde
@@ -25,9 +48,10 @@
        opts.aria
 
    .barrasVerticais(itens, opts)
-       Colunas em SVG com escala Y em "nice numbers" e gridlines
-       horizontais ténues — a mesma escala e grelha da .linha().
-       itens = [{ label, valor, curto, alt }]
+       Colunas em SVG à escala real (ver "Render em duas fases" acima), com
+       escala Y em "nice numbers" e gridlines horizontais ténues.
+       itens = [{ label, valor, curto, alt }] — valor 0 ou null/undefined é
+               "sem dados": sem barra, sem valor, etiqueta a 55% de opacidade.
        opts.paleta       — 'destaque' (omissão) ou 'fatias'.
                            'destaque': neutro + a coluna de maior valor a
                            var(--red) (ver opts.destacarMax/opts.alt abaixo).
@@ -42,24 +66,30 @@
        opts.destacarMax  — (só paleta:'destaque') por omissão true: a coluna
                            de maior valor fica em var(--red), as restantes
                            em var(--chart-neutro)
-       opts.valores      — por omissão false: mostra o valor (`curto`) em
-                           cima de cada coluna
+       opts.valores      — por omissão true: mostra o valor (`curto`, ou a
+                           forma abreviada, ou nenhum — decisão automática e
+                           igual para o gráfico inteiro, ver TAREFA 3)
        opts.zeroForcado  — por omissão true: passa para escalaY()
+       opts.altura       — px, por omissão 260
        opts.aria
 
    .linha(itens, opts)
        Linha suavizada (interpolação cúbica monótona — nunca ultrapassa os
        pontos), sem eixos grossos, só gridlines horizontais ténues e
-       etiquetas nos dois eixos.
+       etiquetas nos dois eixos, à escala real.
        itens = [{ label, valor, curto }]   — ignorado se opts.series vier
-       opts.series   — [{ nome, cor, itens:[{label,valor}] }] para
+       opts.series   — [{ nome, cor, itens:[{label,valor,curto}] }] para
                        multi-série; cores por omissão: var(--red),
                        var(--ink), var(--fatia-3), var(--fatia-4)
        opts.area     — preenche sob a curva (só com uma única série)
        opts.zeroForcado — passa para escalaY()
        opts.etiqueta — rótulo curto no canto superior direito (maiúsculas)
+       opts.altura   — px, por omissão 260
        opts.fmtY     — função opcional para formatar as etiquetas do eixo Y
-                       (por omissão fmtCurto(v) + '€')
+                       (por omissão fmtMarca(v) + '€'); NOTA: como os args
+                       atravessam JSON (render em duas fases), uma função
+                       aqui não sobrevive — só útil se vier a ser preciso
+                       chamar o renderer directamente no futuro.
        opts.aria
 
    .donut(itens, opts)
@@ -73,10 +103,19 @@
    .CORES_FATIA      — as 6 cores do donut, como strings var(--fatia-N)
 
    ------------------------------------------------------------------------
+   Interacção (linha() e barrasVerticais())
+   ------------------------------------------------------------------------
+   Ao passar o rato ou tocar, o valor SNAPA para a coluna/ponto mais próximo
+   (uma faixa invisível por categoria capta o rato, não é preciso acertar na
+   barra) e aparece um tooltip por cima, com a barra em destaque (ou a linha
+   com um ponto e uma guia vertical). Um toque fora do gráfico, ou um
+   segundo toque na mesma coluna, esconde o tooltip.
+
+   ------------------------------------------------------------------------
    Estilo — padrão do OS para qualquer gráfico novo:
    gridlines ténues (nunca eixos grossos), escala sempre em valores
-   redondos (nunca presa ao máximo dos dados), neutro + uma única cor de
-   destaque (nunca uma cor por barra a não ser no donut).
+   redondos (nunca presa ao máximo exacto dos dados), neutro + uma única cor
+   de destaque (nunca uma cor por barra a não ser no donut ou paleta:'fatias').
    ========================================================================== */
 (function () {
 
@@ -132,6 +171,14 @@
   /* O texto dentro dos SVG segue a mesma regra do resto da página: Inter. */
   var SVG_FONTE = 'Inter, sans-serif';
 
+  /* Proporções fixas em píxeis reais — nunca derivadas de aspect ratio,
+     porque o viewBox passa a ser a largura real do host (ver montar()). */
+  var MARGEM_ESQ = 52, MARGEM_DIR = 16, MARGEM_TOPO = 26;
+  var MARGEM_BASE = 34, MARGEM_BASE_ROD = 64;
+  var FONTE_EIXO = 11, FONTE_VALOR = 10;
+  var ALTURA_OMISSAO = 260;
+  var CHAR_LARGURA_VALOR = 5.6;
+
   /* ======================================================================
      Escala "nice numbers" — partilhada por linha() e barrasVerticais(), para
      o eixo Y nunca ficar preso ao máximo exacto dos dados. Escolhe um passo
@@ -183,7 +230,9 @@
   }
 
   /* "1,4k" acima de 1000, "1,2M" acima de 1 000 000 — uma casa decimal só
-     quando útil (2k, não 2,0k). Abaixo de 1000, inteiro com separador pt-PT. */
+     quando útil (2k, não 2,0k). Abaixo de 1000, inteiro com separador pt-PT.
+     Para VALORES (dados) — pode arredondar. Ver fmtMarca() para eixos, onde
+     arredondar mentiria sobre o valor exacto da marca. */
   function arredUmaCasa(n){
     var r = Math.round(n * 10) / 10;
     if (Math.abs(r - Math.round(r)) < 1e-9) return intFmt(Math.round(r));
@@ -199,6 +248,30 @@
     else if (v >= 1000) texto = arredUmaCasa(v / 1000) + 'k';
     else texto = intFmt(Math.round(v));
     return (neg ? '-' : '') + texto;
+  }
+
+  /* Formatação exacta para MARCAS DE EIXO (nunca dados): o valor mostrado
+     tem de ser exactamente o da marca, nunca arredondado — 1250 → "1,25k",
+     não "1,3k". Tenta 0, 1, depois 2 casas; se nenhuma for exacta, escreve
+     por extenso com separador de milhares em vez de mentir. */
+  function fmtMarca(v){
+    v = Number(v) || 0;
+    var neg = v < 0;
+    v = Math.abs(v);
+    if (v < 1000) return (neg ? '-' : '') + intFmt(Math.round(v));
+
+    var unidade = v >= 1000000 ? 1000000 : 1000;
+    var sufixo = v >= 1000000 ? 'M' : 'k';
+    var n = v / unidade;
+    for (var casas = 0; casas <= 2; casas++){
+      var mult = Math.pow(10, casas);
+      var r = Math.round(n * mult) / mult;
+      if (Math.abs(r * unidade - v) < 0.5){
+        var texto = casas === 0 ? intFmt(r) : r.toFixed(casas).replace('.', ',');
+        return (neg ? '-' : '') + texto + sufixo;
+      }
+    }
+    return (neg ? '-' : '') + intFmt(Math.round(v));
   }
 
   /* Decide se as etiquetas do eixo X cabem na horizontal; se não couberem,
@@ -221,6 +294,30 @@
     }
     var salto = Math.max(1, Math.ceil(diagonal / passo));
     return { rotar:true, salto:salto, extraPadB: Math.min(diagonal, 70) };
+  }
+
+  /* Decide se cabem valores fixos por cima das colunas — decisão global
+     para o gráfico inteiro (nunca metade das barras com valor, metade sem).
+     Tenta primeiro o `curto` do item (ou fmtCurto se não vier); se não
+     couber, tenta a forma abreviada (fmtCurto); se ainda não couber,
+     desliga tudo e confia no tooltip. Categorias sem dados não entram na
+     conta (não mostram valor de qualquer forma). */
+  function decidirValores(lista, espacoPorColuna){
+    var largura1 = 0, largura2 = 0, temAlgum = false;
+    lista.forEach(function(x){
+      var v = (x.valor === null || x.valor === undefined) ? 0 : (Number(x.valor) || 0);
+      if (!v) return;
+      temAlgum = true;
+      var t1 = (x.curto != null && x.curto !== '') ? String(x.curto) : fmtCurto(v);
+      var t2 = fmtCurto(v);
+      largura1 = Math.max(largura1, t1.length * CHAR_LARGURA_VALOR);
+      largura2 = Math.max(largura2, t2.length * CHAR_LARGURA_VALOR);
+    });
+    if (!temAlgum) return { mostrar:false, curto:false };
+    var disponivel = espacoPorColuna * 0.92;
+    if (largura1 <= disponivel) return { mostrar:true, curto:false };
+    if (largura2 <= disponivel) return { mostrar:true, curto:true };
+    return { mostrar:false, curto:false };
   }
 
   /* Interpolação cúbica monótona (Fritsch–Carlson): a curva passa pelos
@@ -283,7 +380,9 @@
 
   /* Conjunto de barras horizontais com eixo — a régua por baixo (escalaY
      aplicada ao eixo X) e gridlines verticais ténues por trás das barras.
-     Opacidade decrescente do primeiro ao último item, sobre var(--red). */
+     Opacidade decrescente do primeiro ao último item, sobre var(--red).
+     Fora do âmbito do render em duas fases (viewBox fixo, como antes) —
+     ainda não usada em nenhuma página. */
   function barrasHorizontais(itens, opts){
     opts = opts || {};
     if (!itens || !itens.length) return '';
@@ -303,8 +402,8 @@
 
     function fmtX(v){
       if (opts.formato === 'percent') return dec(v, 0) + '%';
-      if (opts.formato === 'euro') return fmtCurto(v) + '€';
-      return fmtCurto(v);
+      if (opts.formato === 'euro') return fmtMarca(v) + '€';
+      return fmtMarca(v);
     }
 
     function px(v){ return labelW + (escala.max > 0 ? (v / escala.max) * plotW : 0); }
@@ -357,9 +456,13 @@
     return tok('--fatia-' + (idx + 1), FATIA_HEX_FALLBACK[idx]);
   }
 
-  /* Colunas em SVG — a mesma escalaY e gridlines da linha(), para as duas
-     vistas serem visualmente consistentes ao trocar entre elas. */
-  function barrasVerticais(itens, opts){
+  /* ======================================================================
+     Renderers reais — chamados só depois de o host ter uma largura L
+     conhecida (ver montar() lá em baixo). L é a largura REAL em píxeis,
+     por isso o viewBox usa L directamente: escala sempre 1:1.
+     ====================================================================== */
+
+  function renderColunasSVG(itens, opts, L){
     opts = opts || {};
     if (!itens || !itens.length) return '';
 
@@ -372,22 +475,30 @@
     var eixoCor = tok('--chart-eixo', C.muted);
 
     var destacarMax = paleta === 'destaque' && opts.destacarMax !== false;
-    var valores = lista.map(function(x){ return Number(x.valor) || 0; });
-    var maxDados = Math.max.apply(null, valores.concat([0]));
-    var iMax = 0;
-    valores.forEach(function(v, i){ if (v > valores[iMax]) iMax = i; });
-
-    var escala = escalaY(maxDados, 0, 5, { zeroForcado: opts.zeroForcado });
 
     var n = lista.length;
-    var W = 720, H = 240, PADL = 54, PADR = 12, PADT = 16, PADB0 = 30;
-    var plotW = W - PADL - PADR;
-    var passo = plotW / n;
+    var valoresNum = lista.map(function(x){ return (x.valor === null || x.valor === undefined) ? 0 : (Number(x.valor) || 0); });
+    var semDadosFlags = lista.map(function(x){ return x.valor === null || x.valor === undefined || Number(x.valor) === 0; });
+    var maxDados = Math.max.apply(null, valoresNum.concat([0]));
+    var iMax = 0;
+    valoresNum.forEach(function(v, i){ if (v > valoresNum[iMax]) iMax = i; });
+
+    var A = opts.altura || ALTURA_OMISSAO;
+    var PADL = MARGEM_ESQ, PADR = MARGEM_DIR, PADT = MARGEM_TOPO;
+
+    var plotW = L - PADL - PADR;
+    var espacoPorColuna = plotW / n;
 
     var labels = lista.map(function(x){ return x.label; });
-    var plano = planoX(labels, passo, 11);
-    var PADB = PADB0 + plano.extraPadB;
-    var plotH = H - PADT - PADB;
+    var plano = planoX(labels, espacoPorColuna, FONTE_EIXO);
+    var PADB = plano.rotar ? MARGEM_BASE_ROD : MARGEM_BASE;
+    var plotH = A - PADT - PADB;
+
+    var querValores = opts.valores !== false;
+    var decisaoValores = querValores ? decidirValores(lista, espacoPorColuna) : { mostrar:false, curto:false };
+
+    var nAlvoY = decisaoValores.mostrar ? 3 : 5;
+    var escala = escalaY(maxDados, 0, nAlvoY, { zeroForcado: opts.zeroForcado });
 
     function py(v){
       var t = escala.max > escala.min ? ((Number(v) || 0) - escala.min) / (escala.max - escala.min) : 0;
@@ -396,54 +507,83 @@
 
     var grade = escala.marcas.map(function(v){
       var y = py(v);
-      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) +
+      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (L - PADR) + '" y2="' + y.toFixed(1) +
           '" stroke="' + gridCor + '" stroke-width="1"/>' +
         '<text x="' + (PADL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" ' +
-          'font-family="' + SVG_FONTE + '" font-size="10" fill="' + eixoCor + '">' + esc(fmtCurto(v)) + '</text>';
+          'font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO + '" fill="' + eixoCor + '">' + esc(fmtMarca(v)) + '</text>';
     }).join('');
 
-    var largura = Math.max(2, passo * 0.65);
-    var gap = passo - largura;
+    var larguraBarra = Math.min(44, espacoPorColuna * 0.62);
+    if (espacoPorColuna - larguraBarra < 8) larguraBarra = espacoPorColuna - 8;
+    if (larguraBarra < 3) larguraBarra = 3;
 
-    var barras = lista.map(function(x, i){
-      var v = Number(x.valor) || 0;
-      var xPos = PADL + i * passo + gap / 2;
-      var yTop = py(v);
-      var altura = Math.max(0, (H - PADB) - yTop);
-      var cor;
+    var barras = '', valoresTxt = '', rotulos = '', zonas = '';
+
+    lista.forEach(function(x, i){
+      var v = valoresNum[i];
+      var semDados = semDadosFlags[i];
+      var xCentro = PADL + i * espacoPorColuna + espacoPorColuna / 2;
+      var xBarra = xCentro - larguraBarra / 2;
+      var yBase = A - PADB;
+      var yTop = semDados ? yBase : py(v);
+      var altura = semDados ? 0 : Math.max(0, yBase - yTop);
+
+      var cor, destacada;
       if (paleta === 'fatias'){
         cor = corFatia(i);
+        destacada = true;
       } else {
         var efeitoAlt = (x.alt === undefined) ? opts.alt : x.alt;
-        cor = efeitoAlt ? C.red : ((destacarMax && i === iMax) ? C.red : neutro);
+        destacada = !!(efeitoAlt || (destacarMax && i === iMax));
+        cor = destacada ? C.red : neutro;
       }
-      var valorTxt = (opts.valores === true)
-        ? '<text x="' + (xPos + largura / 2).toFixed(1) + '" y="' + (yTop - 6).toFixed(1) + '" text-anchor="middle" ' +
-          'font-family="' + SVG_FONTE + '" font-size="10" font-weight="700" fill="' + C.ink + '">' + esc(x.curto || '') + '</text>'
-        : '';
-      return '<rect x="' + xPos.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + largura.toFixed(1) +
-        '" height="' + altura.toFixed(1) + '" fill="' + cor + '"/>' + valorTxt;
-    }).join('');
 
-    var marcasX = labels.map(function(l, i){
-      if (i % plano.salto !== 0 && i !== n - 1) return '';
-      var x = PADL + i * passo + passo / 2;
-      var y = H - PADB + 14;
-      if (plano.rotar){
-        return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="end" transform="rotate(-45 ' +
-          x.toFixed(1) + ' ' + y.toFixed(1) + ')" font-family="' + SVG_FONTE + '" font-size="11" fill="' + eixoCor + '">' + esc(l) + '</text>';
+      var textoCompleto = (x.curto != null && x.curto !== '') ? String(x.curto) : fmtCurto(v);
+
+      if (!semDados){
+        barras += '<rect class="chart-bar" data-idx="' + i + '" data-cor-original="' + cor +
+          '" data-destacada="' + (destacada ? '1' : '0') + '" x="' + xBarra.toFixed(1) + '" y="' + yTop.toFixed(1) +
+          '" width="' + larguraBarra.toFixed(1) + '" height="' + altura.toFixed(1) + '" fill="' + cor + '"/>';
+
+        if (decisaoValores.mostrar){
+          var textoValor = decisaoValores.curto ? fmtCurto(v) : textoCompleto;
+          var corValor = destacada ? C.redInk : C.ink;
+          valoresTxt += '<text x="' + xCentro.toFixed(1) + '" y="' + (yTop - 4).toFixed(1) + '" text-anchor="middle" ' +
+            'font-family="' + SVG_FONTE + '" font-size="' + FONTE_VALOR + '" font-weight="600" fill="' + corValor + '">' +
+            esc(textoValor) + '</text>';
+        }
       }
-      return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" ' +
-        'font-family="' + SVG_FONTE + '" font-size="11" fill="' + eixoCor + '">' + esc(l) + '</text>';
-    }).join('');
 
-    return '<div class="curve-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
-        esc(opts.aria || 'Barras verticais') + '">' + grade + barras + marcasX + '</svg></div>';
+      if (i % plano.salto === 0 || i === n - 1){
+        var yLabel = A - PADB + 16;
+        var opacidadeLabel = semDados ? 0.55 : 1;
+        if (plano.rotar){
+          rotulos += '<text x="' + xCentro.toFixed(1) + '" y="' + yLabel + '" text-anchor="end" transform="rotate(-45 ' +
+            xCentro.toFixed(1) + ' ' + yLabel + ')" font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO +
+            '" fill="' + eixoCor + '" opacity="' + opacidadeLabel + '">' + esc(x.label) + '</text>';
+        } else {
+          rotulos += '<text x="' + xCentro.toFixed(1) + '" y="' + yLabel + '" text-anchor="middle" ' +
+            'font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO + '" fill="' + eixoCor +
+            '" opacity="' + opacidadeLabel + '">' + esc(x.label) + '</text>';
+        }
+      }
+
+      zonas += '<rect class="chart-hover-zone" data-idx="' + i + '" data-label="' + esc(x.label) +
+        '" data-curto="' + esc(textoCompleto) + '" data-sem-dados="' + (semDados ? '1' : '0') +
+        '" data-x="' + xCentro.toFixed(1) + '" data-y-topo="' + yTop.toFixed(1) +
+        '" x="' + (PADL + i * espacoPorColuna).toFixed(1) + '" y="' + PADT +
+        '" width="' + espacoPorColuna.toFixed(1) + '" height="' + plotH.toFixed(1) + '"/>';
+    });
+
+    return '<svg viewBox="0 0 ' + L + ' ' + A + '" role="img" aria-label="' +
+        esc(opts.aria || 'Barras verticais') + '">' +
+      grade + barras + valoresTxt + rotulos + zonas +
+      '</svg>';
   }
 
   var AREA_ID = 0;
 
-  function linha(itens, opts){
+  function renderLinhaSVG(itens, opts, L){
     opts = opts || {};
     var C = coresTema();
     var coresSerie = [C.red, C.ink, tok('--fatia-3', '#E4694E'), tok('--fatia-4', '#8C857B')];
@@ -464,14 +604,15 @@
     var minDados = Math.min.apply(null, todosValores.concat([0]));
     var escala = escalaY(maxDados, minDados, 5, { zeroForcado: opts.zeroForcado });
 
-    var W = 720, H = 240, PADL = 60, PADR = 18, PADT = 24, PADB0 = 40;
-    var passo = n > 1 ? (W - PADL - PADR) / (n - 1) : 0;
-    function px(i){ return n > 1 ? PADL + i * passo : PADL + (W - PADL - PADR) / 2; }
+    var A = opts.altura || ALTURA_OMISSAO;
+    var PADL = MARGEM_ESQ, PADR = MARGEM_DIR, PADT = MARGEM_TOPO;
+    var passo = n > 1 ? (L - PADL - PADR) / (n - 1) : 0;
+    function px(i){ return n > 1 ? PADL + i * passo : PADL + (L - PADL - PADR) / 2; }
 
     var labels = base.map(function(x){ return x.label; });
-    var plano = planoX(labels, passo, 10);
-    var PADB = PADB0 + plano.extraPadB;
-    var plotH = H - PADT - PADB;
+    var plano = planoX(labels, passo, FONTE_EIXO);
+    var PADB = plano.rotar ? MARGEM_BASE_ROD : MARGEM_BASE;
+    var plotH = A - PADT - PADB;
 
     function py(v){
       var t = escala.max > escala.min ? ((Number(v) || 0) - escala.min) / (escala.max - escala.min) : 0;
@@ -480,29 +621,29 @@
 
     var gridCor = tok('--chart-grid', 'rgba(20,20,20,0.07)');
     var eixoCor = tok('--chart-eixo', C.muted);
-    var fmtY = opts.fmtY || function(v){ return fmtCurto(v) + '€'; };
+    var fmtY = opts.fmtY || function(v){ return fmtMarca(v) + '€'; };
 
     var marcasY = escala.marcas.map(function(v){
       var y = py(v);
-      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) +
+      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (L - PADR) + '" y2="' + y.toFixed(1) +
           '" stroke="' + gridCor + '" stroke-width="1"/>' +
         '<text x="' + (PADL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" ' +
-          'font-family="' + SVG_FONTE + '" font-size="10" fill="' + eixoCor + '">' + esc(fmtY(v)) + '</text>';
+          'font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO + '" fill="' + eixoCor + '">' + esc(fmtY(v)) + '</text>';
     }).join('');
 
     var marcasX = labels.map(function(l, i){
       if (i % plano.salto !== 0 && i !== n - 1) return '';
-      var x = px(i), y = H - PADB + 14;
+      var x = px(i), y = A - PADB + 16;
       if (plano.rotar){
         return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="end" transform="rotate(-45 ' +
-          x.toFixed(1) + ' ' + y.toFixed(1) + ')" font-family="' + SVG_FONTE + '" font-size="10" fill="' + eixoCor + '">' + esc(l) + '</text>';
+          x.toFixed(1) + ' ' + y.toFixed(1) + ')" font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO + '" fill="' + eixoCor + '">' + esc(l) + '</text>';
       }
       return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" ' +
-        'font-family="' + SVG_FONTE + '" font-size="10" fill="' + eixoCor + '">' + esc(l) + '</text>';
+        'font-family="' + SVG_FONTE + '" font-size="' + FONTE_EIXO + '" fill="' + eixoCor + '">' + esc(l) + '</text>';
     }).join('');
 
     var defs = '', areas = '';
-    var linhas = seriesList.map(function(s){
+    var linhasEls = seriesList.map(function(s){
       if (!s.itens.length || s.itens.length < 2) return '';
       var pts = s.itens.map(function(x, i){ return [px(i), py(x.valor)]; });
       var caminho = caminhoMonotono(pts);
@@ -516,7 +657,7 @@
           '<stop offset="1" stop-color="' + s.cor + '" stop-opacity="0"/></linearGradient>';
         areas += '<path d="' + caminhoArea + '" fill="url(#' + idGrad + ')" stroke="none"/>';
       }
-      return '<path d="' + caminho + '" fill="none" stroke="' + s.cor + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+      return '<path d="' + caminho + '" fill="none" stroke="' + s.cor + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
     }).join('');
 
     var legenda = '';
@@ -526,15 +667,303 @@
       }).join('') + '</div>';
     }
 
-    var etiqueta = opts.etiqueta ? '<text x="' + (W - PADR) + '" y="' + (PADT - 10) + '" text-anchor="end" ' +
+    var etiqueta = opts.etiqueta ? '<text x="' + (L - PADR) + '" y="' + (PADT - 10) + '" text-anchor="end" ' +
       'font-family="' + SVG_FONTE + '" font-size="10" letter-spacing="0.5" fill="' + eixoCor + '">' +
       esc(String(opts.etiqueta).toUpperCase()) + '</text>' : '';
 
-    return '<div class="curve-wrap">' + legenda + '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+    /* Camada de interacção: guia vertical + um ponto por série, escondidos
+       (opacity 0) até ao hover, e uma faixa por ponto para captar o rato. */
+    var overlay = '<line class="chart-hover-guia" x1="' + PADL + '" y1="' + PADT + '" x2="' + PADL + '" y2="' + (A - PADB) +
+      '" stroke="' + gridCor + '" stroke-width="1" opacity="0"/>';
+    seriesList.forEach(function(s){
+      overlay += '<circle class="chart-hover-ponto" cx="0" cy="0" r="4" fill="' + s.cor + '" opacity="0"/>';
+    });
+
+    var zonas = labels.map(function(l, i){
+      var xCentro = px(i);
+      var xIni = n > 1 ? xCentro - passo / 2 : PADL;
+      var larguraZona = n > 1 ? passo : (L - PADL - PADR);
+      var valoresInfo = seriesList.map(function(s){
+        var item = s.itens[i];
+        if (!item) return null;
+        var v = Number(item.valor) || 0;
+        var y = py(v);
+        var textoCurto = (item.curto != null && item.curto !== '') ? String(item.curto) : fmtCurto(v);
+        return { nome: s.nome, cor: s.cor, curto: textoCurto, y: Math.round(y * 100) / 100 };
+      }).filter(function(x){ return x; });
+      return '<rect class="chart-hover-zone" data-idx="' + i + '" data-label="' + esc(l) + '" data-x="' + xCentro.toFixed(1) +
+        '" data-valores="' + esc(JSON.stringify(valoresInfo)) + '" x="' + xIni.toFixed(1) + '" y="' + PADT +
+        '" width="' + Math.max(0, larguraZona).toFixed(1) + '" height="' + plotH.toFixed(1) + '"/>';
+    }).join('');
+
+    return legenda + '<svg viewBox="0 0 ' + L + ' ' + A + '" role="img" aria-label="' +
         esc(opts.aria || 'Gráfico de linha') + '">' +
       (defs ? '<defs>' + defs + '</defs>' : '') +
-      marcasY + areas + linhas + marcasX + etiqueta +
-      '</svg></div>';
+      marcasY + areas + linhasEls + marcasX + etiqueta + overlay + zonas +
+      '</svg>';
+  }
+
+  /* ======================================================================
+     Interacção: tooltip com snap à coluna/ponto mais próximo, mais o
+     realce (recolorir a barra, ou guia + ponto na linha).
+     ====================================================================== */
+
+  function construirTipColunas(zone){
+    var label = zone.getAttribute('data-label') || '';
+    var semDados = zone.getAttribute('data-sem-dados') === '1';
+    var valorTxt = semDados ? 'sem vendas' : (zone.getAttribute('data-curto') || '');
+    return '<div class="chart-tip-label">' + esc(label) + '</div>' +
+      '<div class="chart-tip-valor">' + esc(valorTxt) + '</div>';
+  }
+
+  function construirTipLinha(zone){
+    var label = zone.getAttribute('data-label') || '';
+    var valores;
+    try { valores = JSON.parse(zone.getAttribute('data-valores') || '[]'); } catch(e){ valores = []; }
+    var corpo;
+    if (valores.length > 1){
+      corpo = valores.map(function(v){
+        return '<div class="chart-tip-serie">' +
+          '<span class="chart-tip-chip" style="background:' + esc(v.cor) + '"></span>' +
+          '<span class="chart-tip-nome">' + esc(v.nome || '') + '</span>' +
+          '<span class="chart-tip-valor2">' + esc(v.curto) + '</span></div>';
+      }).join('');
+    } else {
+      corpo = '<div class="chart-tip-valor">' + esc(valores.length ? valores[0].curto : 'sem dados') + '</div>';
+    }
+    return '<div class="chart-tip-label">' + esc(label) + '</div>' + corpo;
+  }
+
+  function menorY(zone){
+    var valores;
+    try { valores = JSON.parse(zone.getAttribute('data-valores') || '[]'); } catch(e){ valores = []; }
+    var y = Infinity;
+    valores.forEach(function(v){ if (v.y < y) y = v.y; });
+    return isFinite(y) ? y : MARGEM_TOPO;
+  }
+
+  function realcarColuna(host, idx){
+    var vermelho = tok('--red', '#D91124');
+    var neutroForte = tok('--chart-neutro-forte', '#CFC5B8');
+    var barras = host.querySelectorAll('.chart-bar');
+    for (var i = 0; i < barras.length; i++){
+      var bar = barras[i];
+      var bIdx = Number(bar.getAttribute('data-idx'));
+      if (bIdx === idx){
+        var destacada = bar.getAttribute('data-destacada') === '1';
+        bar.setAttribute('fill', destacada ? neutroForte : vermelho);
+        bar.style.opacity = '1';
+      } else {
+        bar.style.opacity = '0.55';
+      }
+    }
+  }
+
+  function restaurarColunas(host){
+    var barras = host.querySelectorAll('.chart-bar');
+    for (var i = 0; i < barras.length; i++){
+      barras[i].setAttribute('fill', barras[i].getAttribute('data-cor-original'));
+      barras[i].style.opacity = '1';
+    }
+  }
+
+  function realcarLinha(host, zone){
+    var x = Number(zone.getAttribute('data-x'));
+    var guia = host.querySelector('.chart-hover-guia');
+    if (guia){
+      guia.setAttribute('x1', x);
+      guia.setAttribute('x2', x);
+      guia.setAttribute('opacity', '1');
+    }
+    var valores;
+    try { valores = JSON.parse(zone.getAttribute('data-valores') || '[]'); } catch(e){ valores = []; }
+    var pontos = host.querySelectorAll('.chart-hover-ponto');
+    for (var i = 0; i < pontos.length; i++){
+      var info = valores[i];
+      if (!info){ pontos[i].setAttribute('opacity', '0'); continue; }
+      pontos[i].setAttribute('cx', x);
+      pontos[i].setAttribute('cy', info.y);
+      pontos[i].setAttribute('opacity', '1');
+    }
+  }
+
+  function restaurarLinha(host){
+    var guia = host.querySelector('.chart-hover-guia');
+    if (guia) guia.setAttribute('opacity', '0');
+    var pontos = host.querySelectorAll('.chart-hover-ponto');
+    for (var i = 0; i < pontos.length; i++) pontos[i].setAttribute('opacity', '0');
+  }
+
+  /* Centra o tip sobre xCentro, acima de yTopo; encosta à margem do host em
+     vez de sair pela lateral, e desce para baixo se não couber por cima. */
+  function posicionarTip(host, tip, xCentro, yTopo){
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    tip.style.display = 'block';
+    var larguraTip = tip.offsetWidth;
+    var alturaTip = tip.offsetHeight;
+    var larguraHost = host.clientWidth;
+
+    var left = xCentro - larguraTip / 2;
+    if (left < 4) left = 4;
+    if (left + larguraTip > larguraHost - 4) left = Math.max(4, larguraHost - 4 - larguraTip);
+
+    var top = yTopo - alturaTip - 10;
+    if (top < 4) top = yTopo + 10;
+
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+    tip.style.visibility = 'visible';
+  }
+
+  function ligarInteractividade(host, tipo){
+    var tip = host.querySelector('.chart-tip');
+    var zonas = host.querySelectorAll('.chart-hover-zone');
+    var activo = null;
+
+    function mostrar(idx, zone){
+      if (tipo === 'colunas') realcarColuna(host, idx);
+      else realcarLinha(host, zone);
+
+      tip.innerHTML = tipo === 'colunas' ? construirTipColunas(zone) : construirTipLinha(zone);
+
+      var xCentro = Number(zone.getAttribute('data-x'));
+      var yTopo = tipo === 'colunas' ? Number(zone.getAttribute('data-y-topo')) : menorY(zone);
+      posicionarTip(host, tip, xCentro, yTopo);
+      activo = idx;
+    }
+
+    function esconder(){
+      if (activo === null) return;
+      activo = null;
+      tip.style.visibility = 'hidden';
+      if (tipo === 'colunas') restaurarColunas(host);
+      else restaurarLinha(host);
+    }
+
+    for (var i = 0; i < zonas.length; i++){
+      (function(zone){
+        var idx = Number(zone.getAttribute('data-idx'));
+        zone.addEventListener('pointerenter', function(){ mostrar(idx, zone); });
+        zone.addEventListener('pointerdown', function(){
+          if (activo === idx) esconder(); else mostrar(idx, zone);
+        });
+      })(zonas[i]);
+    }
+
+    host.addEventListener('pointerleave', esconder);
+
+    // Toque fora do gráfico esconde o tooltip; auto-remove-se quando o host
+    // sair do DOM (evita acumular listeners de hosts substituídos por um
+    // novo innerHTML — vendas.html reconstrói secções inteiras a cada render).
+    function aoTocarFora(ev){
+      if (!document.body.contains(host)){
+        document.removeEventListener('pointerdown', aoTocarFora);
+        return;
+      }
+      if (activo !== null && !host.contains(ev.target)) esconder();
+    }
+    document.addEventListener('pointerdown', aoTocarFora);
+  }
+
+  /* ======================================================================
+     montar(): liga o ResizeObserver partilhado e desenha cada .chart-host
+     assim que tiver uma largura real. Ver o comentário de topo do ficheiro.
+     ====================================================================== */
+
+  function obterEstadoHost(host){
+    if (!host._gcEstado) host._gcEstado = { largura:null, timer:null };
+    return host._gcEstado;
+  }
+
+  function desenharHost(host, largura){
+    largura = largura || host.clientWidth;
+    if (!largura) return;
+    var estado = obterEstadoHost(host);
+    estado.largura = largura;
+
+    var tipo = host.getAttribute('data-gc-tipo');
+    var args;
+    try { args = JSON.parse(host.getAttribute('data-gc-args') || '{}'); } catch(e){ args = {}; }
+
+    var html;
+    if (tipo === 'linha') html = renderLinhaSVG(args.itens, args.opts || {}, largura);
+    else if (tipo === 'colunas') html = renderColunasSVG(args.itens, args.opts || {}, largura);
+    else return;
+
+    host.innerHTML = html;
+    var tip = document.createElement('div');
+    tip.className = 'chart-tip';
+    host.appendChild(tip);
+
+    ligarInteractividade(host, tipo);
+  }
+
+  var _ro = null, _roIniciado = false;
+  function obterResizeObserver(){
+    if (_roIniciado) return _ro;
+    _roIniciado = true;
+    if (typeof ResizeObserver === 'undefined') return null;
+    _ro = new ResizeObserver(function(entries){
+      for (var i = 0; i < entries.length; i++){
+        var entry = entries[i];
+        var host = entry.target;
+        if (!document.body.contains(host)){
+          try { _ro.unobserve(host); } catch(e){}
+          continue;
+        }
+        var largura = Math.round(entry.contentRect.width);
+        if (largura <= 0) continue;
+        var estado = obterEstadoHost(host);
+        if (estado.largura !== null && Math.abs(estado.largura - largura) < 8) continue;
+        if (estado.timer) clearTimeout(estado.timer);
+        (function(hostRef, larguraRef, estadoRef){
+          estadoRef.timer = setTimeout(function(){
+            estadoRef.timer = null;
+            desenharHost(hostRef, larguraRef);
+          }, 120);
+        })(host, largura, estado);
+      }
+    });
+    return _ro;
+  }
+
+  function montar(raiz){
+    raiz = raiz || document;
+    if (!raiz.querySelectorAll) return;
+    var hosts = raiz.querySelectorAll('.chart-host');
+    var ro = obterResizeObserver();
+    for (var i = 0; i < hosts.length; i++){
+      var host = hosts[i];
+      if (host._gcMontado) continue;
+      host._gcMontado = true;
+
+      if (!ro){
+        // Sem ResizeObserver: desenha uma vez e não observa mais.
+        desenharHost(host, host.clientWidth);
+        continue;
+      }
+      ro.observe(host);
+      var larguraInicial = host.clientWidth;
+      if (larguraInicial > 0) desenharHost(host, larguraInicial);
+      // Largura 0 (secção colapsada): o próprio ResizeObserver dispara
+      // quando o host ganhar largura — nada mais a fazer aqui.
+    }
+  }
+
+  function linha(itens, opts){
+    opts = opts || {};
+    var baseItens = (opts.series && opts.series.length) ? (opts.series[0].itens || []) : (itens || []);
+    if (!baseItens.length) return '';
+    var argsObj = { itens: itens || [], opts: opts };
+    return '<div class="chart-host" data-gc-tipo="linha" data-gc-args="' + esc(JSON.stringify(argsObj)) + '"></div>';
+  }
+
+  function barrasVerticais(itens, opts){
+    opts = opts || {};
+    if (!itens || !itens.length) return '';
+    var argsObj = { itens: itens, opts: opts };
+    return '<div class="chart-host" data-gc-tipo="colunas" data-gc-args="' + esc(JSON.stringify(argsObj)) + '"></div>';
   }
 
   function donut(itens, opts){
@@ -578,6 +1007,7 @@
   }
 
   window.GiocoChart = {
+    montar: montar,
     barra: barra,
     barrasHorizontais: barrasHorizontais,
     barrasVerticais: barrasVerticais,

@@ -3157,6 +3157,11 @@
 
     estado.seccoes[id] = aberta;
     escreverPrefs(LS_SECCOES, estado.seccoes);
+
+    // O host de um gráfico dentro desta secção pode ter tido largura 0
+    // enquanto estava escondida; o ResizeObserver trata disto sozinho, mas
+    // montar() de propósito aqui também, como rede de segurança.
+    if (aberta && window.GiocoChart) GiocoChart.montar(corpo);
   }
 
   function renderVistas(){
@@ -3200,6 +3205,7 @@
       vistaPares(p);
 
     ligarVoltarMes(alvo);
+    if (window.GiocoChart) GiocoChart.montar(alvo);
 
     // Cabeçalho de secção: abre/fecha o corpo e guarda o estado.
     var cabsSeccao = alvo.querySelectorAll('[data-sec-toggle]');

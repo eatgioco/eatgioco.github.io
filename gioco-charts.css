@@ -150,6 +150,91 @@
     display:inline-block;
   }
 
+  /* ---------- Render em duas fases (linha()/barrasVerticais()) ----------
+     O host fica vazio até GiocoChart.montar() medir a largura real e
+     desenhar o SVG com viewBox = essa largura — por isso o svg não precisa
+     de esticar (nem encolher) nada, ao contrário do .curve-wrap antigo. */
+  .chart-host{
+    position:relative;
+    margin-top:16px;
+    /* deixa o scroll vertical da página passar por cima do gráfico ao
+       tocar, só a interacção horizontal/pontual é capturada pelas faixas */
+    touch-action:pan-y;
+  }
+
+  .chart-host svg{
+    display:block;
+    width:100%;
+    height:auto;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:var(--white);
+  }
+
+  /* Faixa invisível por coluna/ponto — é o que capta o rato/toque, para não
+     ser preciso acertar exactamente na barra ou no ponto da linha. */
+  .chart-hover-zone{
+    fill:transparent;
+    cursor:pointer;
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .chart-bar{ transition:fill 120ms ease, opacity 120ms ease; }
+    .chart-hover-guia, .chart-hover-ponto{ transition:opacity 120ms ease; }
+  }
+
+  /* Tooltip — um único <div>, não SVG, filho do .chart-host (relative) e
+     reutilizado entre hovers. */
+  .chart-tip{
+    position:absolute;
+    z-index:2;
+    visibility:hidden;
+    pointer-events:none;
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 10px;
+    box-shadow:0 4px 16px rgba(20,20,20,0.16);
+    white-space:nowrap;
+    font-family:'Inter', sans-serif;
+  }
+
+  .chart-tip-label{
+    margin:0 0 2px;
+    font-size:10px;
+    color:var(--chart-eixo);
+  }
+
+  .chart-tip-valor{
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+  }
+
+  .chart-tip-serie{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--ink);
+  }
+
+  .chart-tip-serie + .chart-tip-serie{ margin-top:3px; }
+
+  .chart-tip-chip{
+    flex:0 0 8px;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+  }
+
+  .chart-tip-nome{ color:var(--chart-eixo); }
+
+  .chart-tip-valor2{
+    font-weight:600;
+    margin-left:10px;
+  }
+
   /* ---------- Donut ---------- */
   .donut-wrap{
     display:flex;
