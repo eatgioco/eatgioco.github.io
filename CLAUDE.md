@@ -287,6 +287,37 @@ Mesma regra de escrita: um `set()` só nesse path.
 O único sem zero à esquerda é o período do `pagamentosConcluidos`. Confundi-los é o erro
 clássico deste modelo de dados.
 
+### Loja SB154 — ar condicionado (`lojas/sb154/ac`)
+
+O A/C Giatsu (módulo Midea, LAN da loja) é lido e comandado por um serviço Python
+no **PC do POS** (`sb154`, tailnet `eatgioco.com`, IP Tailscale `100.97.211.74`),
+não pelo browser. Código em `servicos/ac-bridge/` (sem segredos; a chave do
+aparelho vive só no POS em `C:\gioco\ac\ac-sb154-midea.json`).
+
+```
+lojas/sb154/ac/estado              — escrito SÓ pelo serviço (PATCH raso a cada 30 s se
+                                     mudou, heartbeat 5 min): ligado, modo (cool|heat|fan|
+                                     dry|auto), tempAlvo, tempAmbiente, tempExterior,
+                                     ventilacao, alertaFiltro, codigoErro, atualizadoEm (ISO),
+                                     fonte ('sb154'), erro? ('sem ligação ao A/C')
+lojas/sb154/ac/comandos/{pushId}   — escrito pela centro-de-controlo.html com push().set():
+                                     tipo (ligar|desligar|tempAlvo|modo), valor, pedidoEm,
+                                     origem, estado (pendente|executado|falhou); o serviço
+                                     acrescenta executadoEm e erro? folha a folha.
+                                     NUNCA apagar; comandos > 10 min ficam 'falhou'/'expirado'.
+```
+
+- A página considera o serviço "sem resposta" quando `atualizadoEm` tem mais de 2 min:
+  dial neutro e botões desativados. Um comando sem resposta em 15 s é reposto no cliente.
+- Operar no POS: `ssh POS@100.97.211.74` (Win32-OpenSSH, shell cmd.exe; chave pública do
+  portátil do Manel em `administrators_authorized_keys`). Tarefa agendada
+  `gioco-ac-bridge` (SYSTEM, ao arranque): reiniciar com
+  `schtasks /End /TN gioco-ac-bridge` + `schtasks /Run /TN gioco-ac-bridge`.
+  Log em `C:\gioco\ac\ac_bridge.log`.
+- **Pendente quando as Rules fecharem:** `".indexOn": ["estado"]` em
+  `lojas/$loja/ac/comandos` (hoje o serviço apanha o 400 e filtra localmente) e token do
+  serviço na variável de ambiente `FIREBASE_AUTH` da tarefa.
+
 ## Restrições críticas (não ignorar)
 
 1. **Repo PÚBLICO** — zero segredos no código (tokens, passwords, app secrets). IBANs já existem, risco assumido.

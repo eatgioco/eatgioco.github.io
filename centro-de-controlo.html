@@ -232,6 +232,39 @@
     box-shadow:0 1px 3px rgba(0,0,0,0.25);
   }
 
+  /* ---- Cartão vivo (estado real do A/C via lojas/{loja}/ac/estado) ---- */
+  .ac-dial .arco{
+    fill:none; stroke:var(--red); stroke-width:10; stroke-linecap:round;
+    transition:stroke-dasharray .3s ease, opacity .2s;
+  }
+  .cc-card.ac-off .ac-dial .arco{ stroke:var(--muted); }
+  .cc-card.ac-neutro .ac-dial .arco{ opacity:0; }
+  .ac-temp.on{ color:var(--ink); }
+  /* Valor pedido mas ainda não confirmado pela loja. */
+  .ac-temp.pendente{ opacity:.45; }
+  .ac-sub{
+    margin-top:10px;
+    font-size:11px; line-height:1.4;
+    color:var(--muted); text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .ac-sub b{ color:var(--ink); font-weight:600; }
+  .ac-passo:not(:disabled){ cursor:pointer; }
+  .ac-passo:not(:disabled):hover{ border-color:var(--ink); }
+  .ac-modo:not(:disabled){ cursor:pointer; opacity:1; }
+  .ac-modo:not(:disabled):hover{ border-color:var(--ink); }
+  .ac-modo.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .cc-switch:not(:disabled){ cursor:pointer; opacity:1; }
+  .cc-switch.on{ background:var(--red); }
+  .cc-switch.on::after{ left:20px; }
+  .cc-selo-linha{ gap:6px; }
+  .ac-aviso{
+    margin:10px 0 0; min-height:0;
+    font-size:11.5px; line-height:1.4;
+    color:var(--red); text-align:center;
+  }
+  .ac-aviso:empty{ display:none; }
+
   /* ======================================================================
      2. TEMPERATURAS HACCP
      ====================================================================== */
@@ -631,39 +664,48 @@
              ============================================================ -->
         <div class="cc-col">
 
-          <!-- 1. AR CONDICIONADO -->
-          <div class="cc-card card glass-light">
+          <!-- 1. AR CONDICIONADO — cartão vivo. Estado em lojas/{loja}/ac/estado,
+               comandos em lojas/{loja}/ac/comandos (ver montarAC() em baixo). -->
+          <div class="cc-card card glass-light ac-neutro" id="acCard">
             <div class="cc-head">
               <h3>Ar condicionado</h3>
               <div class="sp"></div>
-              <button class="cc-switch" type="button" disabled title="Ligar (indisponível)" aria-label="Ligar (indisponível)"></button>
+              <button class="cc-switch" type="button" id="acSwitch" disabled title="Ligar / desligar" aria-label="Ligar / desligar"></button>
             </div>
-            <div class="cc-selo-linha"><span class="status warn">Em breve</span></div>
+            <div class="cc-selo-linha">
+              <span class="status warn" id="acFiltro" hidden>Limpar filtro</span>
+              <span class="status warn" id="acSelo">A ligar…</span>
+            </div>
 
             <div class="ac-dial">
               <svg viewBox="0 0 100 100" aria-hidden="true">
                 <!-- Arco aberto em baixo: r=42, perímetro 263.9; 3/4 disso
-                     (197.9) é o trilho, rodado 135° para abrir para baixo. -->
+                     (197.9) é o trilho, rodado 135° para abrir para baixo.
+                     O .arco preenche a fracção (tempAlvo-16)/14 do trilho. -->
                 <circle class="trilho" cx="50" cy="50" r="42" stroke-dasharray="197.9 263.9"></circle>
+                <circle class="arco" id="acArco" cx="50" cy="50" r="42" stroke-dasharray="0 263.9"></circle>
               </svg>
               <div class="ac-centro">
-                <div class="ac-temp">—<sup>°C</sup></div>
-                <div class="ac-estado">Sem ligação</div>
+                <div class="ac-temp" id="acTemp">—<sup>°C</sup></div>
+                <div class="ac-estado" id="acEstado">Sem dados</div>
               </div>
             </div>
 
+            <div class="ac-sub" id="acSub">Interior <b>—</b> · Exterior <b>—</b></div>
+
             <div class="ac-passos">
-              <button class="ac-passo" type="button" disabled aria-label="Baixar temperatura">−</button>
-              <button class="ac-passo" type="button" disabled aria-label="Subir temperatura">+</button>
+              <button class="ac-passo" type="button" id="acMenos" disabled aria-label="Baixar temperatura">−</button>
+              <button class="ac-passo" type="button" id="acMais" disabled aria-label="Subir temperatura">+</button>
             </div>
 
-            <div class="ac-modos">
-              <button class="ac-modo" type="button" disabled>Frio</button>
-              <button class="ac-modo" type="button" disabled>Ventilação</button>
-              <button class="ac-modo" type="button" disabled>Calor</button>
+            <div class="ac-modos" id="acModos">
+              <button class="ac-modo" type="button" data-modo="cool" disabled>Frio</button>
+              <button class="ac-modo" type="button" data-modo="fan" disabled>Ventilação</button>
+              <button class="ac-modo" type="button" data-modo="heat" disabled>Calor</button>
             </div>
 
-            <p class="cc-nota">Integração NetHome Plus (Midea) por confirmar.</p>
+            <p class="ac-aviso" id="acAviso"></p>
+            <p class="cc-nota" id="acNota">À espera do serviço da loja…</p>
           </div>
 
           <!-- 2. TEMPERATURAS HACCP -->
@@ -959,6 +1001,237 @@ window.addEventListener('load', function () {
   })();
 
   // ===================================================================
+  // AR CONDICIONADO — cartão vivo.
+  //
+  // O browser NUNCA fala com o A/C: lê lojas/{loja}/ac/estado (escrito pelo
+  // serviço gioco-ac-bridge no PC da loja) e pede alterações com push() em
+  // lojas/{loja}/ac/comandos. O serviço marca cada comando 'executado' ou
+  // 'falhou'; os comandos nunca se apagam. Ver servicos/ac-bridge/README.md.
+  // ===================================================================
+  function montarAC(db, lojaId) {
+    var card = document.getElementById('acCard');
+    if (!card) return;
+
+    var el = {
+      sw: document.getElementById('acSwitch'),
+      selo: document.getElementById('acSelo'),
+      filtro: document.getElementById('acFiltro'),
+      temp: document.getElementById('acTemp'),
+      estado: document.getElementById('acEstado'),
+      sub: document.getElementById('acSub'),
+      menos: document.getElementById('acMenos'),
+      mais: document.getElementById('acMais'),
+      modos: card.querySelectorAll('.ac-modo'),
+      aviso: document.getElementById('acAviso'),
+      nota: document.getElementById('acNota'),
+      arco: document.getElementById('acArco')
+    };
+
+    var TMIN = 16, TMAX = 30;
+    var TRILHO = 197.9, PERIM = 263.9;
+    var SEM_RESPOSTA_MS = 2 * 60 * 1000;   // serviço calado há mais de 2 min
+    var CONFIRMACAO_MS = 15 * 1000;        // espera máxima por um comando
+    var NOMES_MODO = { cool: 'Frio', heat: 'Calor', fan: 'Ventilação', dry: 'Desumidificar', auto: 'Auto' };
+
+    var estado = null;      // último lojas/{loja}/ac/estado
+    var pend = null;        // comando em curso: { tipo, valor, ref, timer }
+    var avisoTimer = null;
+
+    function fmtTemp(v) {
+      if (v == null || isNaN(v)) return '—';
+      var n = Number(v);
+      return (Math.round(n * 2) / 2).toString().replace('.', ',');
+    }
+
+    function idadeMs() {
+      if (!estado || !estado.atualizadoEm) return Infinity;
+      var t = Date.parse(estado.atualizadoEm);
+      return isNaN(t) ? Infinity : Date.now() - t;
+    }
+
+    function haQuanto(ms) {
+      if (!isFinite(ms)) return '—';
+      var s = Math.max(0, Math.round(ms / 1000));
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + ' min';
+      return Math.floor(m / 60) + ' h';
+    }
+
+    function setSelo(texto, classe) {
+      el.selo.textContent = texto;
+      el.selo.className = 'status ' + classe;
+    }
+
+    function setBotoes(ativos, alvo) {
+      el.sw.disabled = !ativos;
+      el.menos.disabled = !ativos || (alvo != null && alvo <= TMIN);
+      el.mais.disabled = !ativos || (alvo != null && alvo >= TMAX);
+      for (var i = 0; i < el.modos.length; i++) el.modos[i].disabled = !ativos;
+    }
+
+    function desenharArco(alvo) {
+      if (alvo == null || isNaN(alvo)) { el.arco.setAttribute('stroke-dasharray', '0 ' + PERIM); return; }
+      var f = Math.min(1, Math.max(0, (Number(alvo) - TMIN) / (TMAX - TMIN)));
+      el.arco.setAttribute('stroke-dasharray', (TRILHO * f).toFixed(1) + ' ' + PERIM);
+    }
+
+    function mostrarAviso(texto) {
+      el.aviso.textContent = texto;
+      clearTimeout(avisoTimer);
+      avisoTimer = setTimeout(function () { el.aviso.textContent = ''; }, 5000);
+    }
+
+    function render() {
+      var ms = idadeMs();
+      var vivo = estado && ms < SEM_RESPOSTA_MS;
+
+      card.classList.toggle('ac-neutro', !vivo);
+
+      if (!vivo) {
+        // Sem serviço não há nada em que confiar: dial neutro, botões off.
+        card.classList.remove('ac-off');
+        el.sw.classList.remove('on');
+        el.temp.innerHTML = '—<sup>°C</sup>';
+        el.temp.className = 'ac-temp';
+        el.estado.textContent = estado ? 'Sem resposta' : 'Sem dados';
+        el.sub.innerHTML = 'Interior <b>—</b> · Exterior <b>—</b>';
+        desenharArco(null);
+        for (var k = 0; k < el.modos.length; k++) el.modos[k].classList.remove('active');
+        el.filtro.hidden = true;
+        setSelo(estado ? 'Sem resposta' : 'A ligar…', estado ? 'high' : 'warn');
+        el.nota.textContent = estado
+          ? 'Serviço da loja sem resposta — última leitura há ' + haQuanto(ms) + '.'
+          : 'À espera do serviço da loja…';
+        setBotoes(false, null);
+        return;
+      }
+
+      var ligado = !!estado.ligado;
+      var alvo = (pend && pend.tipo === 'tempAlvo') ? pend.valor : estado.tempAlvo;
+      var modo = (pend && pend.tipo === 'modo') ? pend.valor : estado.modo;
+      if (pend && pend.tipo === 'ligar') ligado = true;
+      if (pend && pend.tipo === 'desligar') ligado = false;
+
+      card.classList.toggle('ac-off', !ligado);
+      el.sw.classList.toggle('on', ligado);
+
+      el.temp.innerHTML = fmtTemp(alvo) + '<sup>°C</sup>';
+      el.temp.className = 'ac-temp' + (ligado ? ' on' : '') + (pend ? ' pendente' : '');
+      desenharArco(alvo);
+
+      if (estado.erro) el.estado.textContent = estado.erro;
+      else if (pend) el.estado.textContent = 'A enviar…';
+      else el.estado.textContent = ligado ? (NOMES_MODO[modo] || modo || '—') : 'Desligado';
+
+      for (var i = 0; i < el.modos.length; i++) {
+        el.modos[i].classList.toggle('active', ligado && el.modos[i].getAttribute('data-modo') === modo);
+      }
+
+      el.sub.innerHTML = 'Interior <b>' + fmtTemp(estado.tempAmbiente) + '°</b> · Exterior <b>' +
+                         fmtTemp(estado.tempExterior) + '°</b>';
+
+      el.filtro.hidden = !estado.alertaFiltro;
+
+      if (estado.erro) setSelo('Erro', 'high');
+      else if (ligado) setSelo('Ligado', 'ok');
+      else setSelo('Desligado', 'warn');
+
+      el.nota.textContent = 'Atualizado há ' + haQuanto(ms) + (estado.erro ? ' · ' + estado.erro : '');
+      setBotoes(!pend, alvo);
+    }
+
+    // O comando fica resolvido quando o estado já reflecte o pedido OU quando
+    // o serviço o marca 'executado'/'falhou'. O que chegar primeiro.
+    function estadoReflete() {
+      if (!pend || !estado) return false;
+      if (pend.tipo === 'tempAlvo') return Number(estado.tempAlvo) === Number(pend.valor);
+      if (pend.tipo === 'modo') return estado.modo === pend.valor && !!estado.ligado;
+      if (pend.tipo === 'ligar') return estado.ligado === true;
+      if (pend.tipo === 'desligar') return estado.ligado === false;
+      return false;
+    }
+
+    function terminarPendente() {
+      if (!pend) return;
+      clearTimeout(pend.timer);
+      if (pend.ref && pend.cb) pend.ref.off('value', pend.cb);
+      pend = null;
+      render();
+    }
+
+    function enviar(tipo, valor) {
+      if (pend || !estado) return;
+      var ref = db.ref('lojas/' + lojaId + '/ac/comandos').push();
+      pend = { tipo: tipo, valor: valor, ref: ref, cb: null, timer: null };
+
+      // Um registo novo: set() num nó filho acabado de criar, nunca no pai.
+      ref.set({
+        tipo: tipo,
+        valor: valor,
+        pedidoEm: new Date().toISOString(),
+        origem: 'centro-de-controlo',
+        estado: 'pendente'
+      }).catch(function (erro) {
+        console.error('Falha a escrever o comando:', erro);
+        mostrarAviso('Não foi possível enviar o comando.');
+        terminarPendente();
+      });
+
+      pend.cb = function (snap) {
+        var c = snap.val();
+        if (!c || c.estado === 'pendente') return;
+        if (c.estado === 'falhou') mostrarAviso('A loja não executou: ' + (c.erro || 'erro desconhecido'));
+        terminarPendente();
+      };
+      ref.on('value', pend.cb);
+
+      pend.timer = setTimeout(function () {
+        mostrarAviso('Sem confirmação da loja');
+        terminarPendente();
+      }, CONFIRMACAO_MS);
+
+      render();
+    }
+
+    el.menos.addEventListener('click', function () {
+      if (!estado) return;
+      var v = Math.max(TMIN, Math.round(Number(estado.tempAlvo) || 24) - 1);
+      enviar('tempAlvo', v);
+    });
+    el.mais.addEventListener('click', function () {
+      if (!estado) return;
+      var v = Math.min(TMAX, Math.round(Number(estado.tempAlvo) || 24) + 1);
+      enviar('tempAlvo', v);
+    });
+    el.sw.addEventListener('click', function () {
+      if (!estado) return;
+      enviar(estado.ligado ? 'desligar' : 'ligar', true);
+    });
+    for (var m = 0; m < el.modos.length; m++) {
+      el.modos[m].addEventListener('click', function (ev) {
+        var modo = ev.currentTarget.getAttribute('data-modo');
+        if (!estado || (estado.ligado && estado.modo === modo)) return;
+        enviar('modo', modo);
+      });
+    }
+
+    db.ref('lojas/' + lojaId + '/ac/estado').on('value', function (snap) {
+      estado = snap.val();
+      if (estadoReflete()) terminarPendente();
+      else render();
+    }, function (erro) {
+      console.error('Falha a ler lojas/' + lojaId + '/ac/estado:', erro);
+      estado = null;
+      render();
+    });
+
+    // "atualizado há Xs" e o limite dos 2 min recalculam-se no cliente.
+    setInterval(render, 10000);
+    render();
+  }
+
+  // ===================================================================
   // CONSUMO ELÉTRICO — € por mês a partir dos débitos bancários.
   //
   // Não existe kWh no Firebase. A fonte real é contasBancarias/{abanca,
@@ -1153,6 +1426,8 @@ window.addEventListener('load', function () {
     var params = new URLSearchParams(window.location.search);
     var lojaId = params.get('loja') || 'sb154';
     consumo.carregar(db);
+
+    montarAC(db, lojaId);
 
     var camEl       = document.getElementById('cam');
     var camTabsEl   = document.getElementById('camTabs');
