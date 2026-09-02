@@ -39,6 +39,10 @@
 
   body{ -webkit-font-smoothing:antialiased; }
 
+  /* Barra do gráfico de consumo com dados reais (a fantasma usa --line). */
+  :root{ --cc-barra:#d9cfbd; }
+  [data-theme="dark"]{ --cc-barra:rgba(255,255,255,0.28); }
+
   .page-subtitle{
     margin:6px 0 0;
     font-size:12px;
@@ -450,8 +454,25 @@
     box-shadow:0 1px 3px rgba(0,0,0,0.10);
   }
 
-  /* Barras fantasma: todas iguais de propósito — a forma do gráfico sem
-     inventar uma leitura mensal que não temos. */
+  /* Valor do último mês com débito, por cima das barras. Só aparece com
+     dados (fica hidden enquanto o cartão está em placeholder). */
+  .cc-valor{
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px;
+    margin-top:8px;
+    font-variant-numeric:tabular-nums;
+  }
+  .cc-valor b{
+    font-family:'Space Mono', monospace;
+    font-size:18px; font-weight:700;
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .cc-valor span{ font-size:11px; color:var(--muted); }
+
+  /* Barras. Sem dados são fantasma (todas iguais de propósito — a forma do
+     gráfico sem inventar uma leitura que não temos). Com dados, cada <i>
+     leva a altura em % do máximo e a barra máxima leva .max (vermelho da
+     marca, a convenção do TicasBoard em gioco-charts). */
   .cc-barras{
     display:flex; align-items:flex-end; gap:5px;
     height:78px; margin-top:6px;
@@ -463,6 +484,9 @@
     background:var(--line);
   }
   [data-theme="dark"] .cc-barras i{ background:rgba(255,255,255,0.10); }
+  .cc-barras.com-dados i{ background:var(--cc-barra); }
+  .cc-barras i.max{ background:var(--red); }
+  [data-theme="dark"] .cc-barras i.max{ background:var(--red); }
   .cc-eixo{
     display:flex; justify-content:space-between;
     margin-top:8px;
@@ -757,13 +781,15 @@
               <p class="cc-nota">Requer Frigate + Raspberry Pi.</p>
             </div>
 
-            <!-- 6. CONSUMO ELÉTRICO -->
+            <!-- 6. CONSUMO ELÉTRICO — € por mês a partir dos débitos bancários
+                 (ver o módulo `consumo` em baixo). Sem kWh: isso fica para um
+                 futuro nó consumoEnergia/{AAAA-MM}. -->
             <div class="cc-card card glass-light">
               <div class="cc-head">
                 <svg class="icon" width="15" height="15"><use href="#i-bar-chart-2"/></svg>
                 <h3>Consumo</h3>
                 <div class="sp"></div>
-                <span class="status warn">Em breve</span>
+                <span class="status warn" id="consumoSelo">Em breve</span>
               </div>
               <div class="cc-seg-linha">
                 <div class="cc-seg" id="consumoSeg">
@@ -771,9 +797,10 @@
                   <button type="button" data-escala="anual">Anual</button>
                 </div>
               </div>
+              <div class="cc-valor" id="consumoValor" hidden><b id="consumoValorNum">—</b><span id="consumoValorMes">—</span></div>
               <div class="cc-barras" id="consumoBarras"></div>
-              <div class="cc-eixo"><span>—</span><span>—</span></div>
-              <p class="cc-nota">Fonte: faturas EDP via OCR — dados mensais, não tempo real.</p>
+              <div class="cc-eixo"><span id="consumoEixoIni">—</span><span id="consumoEixoFim">—</span></div>
+              <p class="cc-nota" id="consumoNota">Fonte: débitos bancários (EDP) — € por mês, sem kWh.</p>
             </div>
 
           </div>
@@ -907,31 +934,8 @@ window.addEventListener('load', function () {
   // de dados. Não dependem do Firebase, por isso correm já.
   // ===================================================================
   (function desenharPlaceholders() {
-    var barras = document.getElementById('consumoBarras');
-
-    function barrasIguais(n) {
-      var s = '';
-      for (var i = 0; i < n; i++) s += '<i></i>';
-      barras.innerHTML = s;
-    }
-
-    if (barras) {
-      barrasIguais(12);
-
-      // O seletor Mensal/Anual troca o número de barras e mais nada: é a
-      // forma do controlo, não uma mudança de dados (não há dados).
-      var seg = document.getElementById('consumoSeg');
-      if (seg) {
-        seg.addEventListener('click', function (ev) {
-          var b = ev.target.closest('button');
-          if (!b) return;
-          var todos = seg.querySelectorAll('button');
-          for (var k = 0; k < todos.length; k++) todos[k].classList.remove('active');
-          b.classList.add('active');
-          barrasIguais(b.getAttribute('data-escala') === 'anual' ? 5 : 12);
-        });
-      }
-    }
+    // As barras fantasma do consumo e o seletor Mensal/Anual vivem no módulo
+    // `consumo` (em baixo): o cartão desenha o placeholder até ter dados.
 
     // Chat: linhas de esqueleto com a anatomia final da mensagem.
     var lista = document.getElementById('chatLista');
@@ -954,12 +958,201 @@ window.addEventListener('load', function () {
     }
   })();
 
+  // ===================================================================
+  // CONSUMO ELÉTRICO — € por mês a partir dos débitos bancários.
+  //
+  // Não existe kWh no Firebase. A fonte real é contasBancarias/{abanca,
+  // revolut}/movimentos, com a MESMA normalização da resultados.html
+  // (saidasBancariasDoMes): só DBIT, ignorar /INTERNA/, Math.abs(amount).
+  // Um movimento é "eletricidade" se, por esta ordem:
+  //   1. classificacaoMovimentos/{conta}~{ref}.despesa casa /eletric|edp|ibelectra/i
+  //   2. a regra de classificacaoRegras com o padrão mais longo que casa
+  //      (padrão normalizado como substring de remittance + creditor
+  //      normalizados) tem despesa a casar a mesma expressão
+  //   3. fallback: /IBELECTRA/i no remittance ou no creditor_name — é o que
+  //      a resultados.html faz hoje.
+  // Só leitura: esta página não escreve em classificacao* nem em
+  // contasBancarias. Sem nenhum movimento de eletricidade fica o
+  // placeholder (badge "Em breve" e barras fantasma).
+  // ===================================================================
+  var consumo = (function () {
+    var seg      = document.getElementById('consumoSeg');
+    var barrasEl = document.getElementById('consumoBarras');
+    var selo     = document.getElementById('consumoSelo');
+    var valorEl  = document.getElementById('consumoValor');
+    var valorNum = document.getElementById('consumoValorNum');
+    var valorMes = document.getElementById('consumoValorMes');
+    var eixoIni  = document.getElementById('consumoEixoIni');
+    var eixoFim  = document.getElementById('consumoEixoFim');
+
+    var MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var RE_ELETRICIDADE = /eletric|edp|ibelectra/i;
+
+    var series = null;      // { mensal:[{chave,valor}], anual:[{chave,valor}], ultimo } ou null
+    var escala = 'mensal';
+
+    function normalizarPadrao(s) {
+      return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase().replace(/\s+/g, ' ').trim();
+    }
+    function fmtEuro(v) {
+      return '€ ' + v.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    // 'AAAA-MM' -> 'Jul 2026' (curto=false) ou 'Jul 26' (curto=true); 'AAAA' -> 'AAAA'.
+    function nomePeriodo(chave, curto) {
+      if (chave.length === 4) return chave;
+      var ano = chave.slice(0, 4), m = parseInt(chave.slice(5, 7), 10);
+      return MESES_ABR[m - 1] + ' ' + (curto ? ano.slice(2) : ano);
+    }
+
+    // A despesa é texto livre ("EDP", "Eletricidade", "Elétrica"): compara-se
+    // sem acentos para o É de "Elétrica" não escapar à expressão.
+    function eDespesaEletrica(despesa) {
+      return RE_ELETRICIDADE.test(normalizarPadrao(despesa));
+    }
+
+    function eEletricidade(conta, ref, m, regras, overrides) {
+      var ov = overrides[conta + '~' + ref];
+      if (ov && ov.despesa) return eDespesaEletrica(ov.despesa);
+      var alvo = normalizarPadrao((m.remittance_information || '') + ' ' + (m.creditor_name || ''));
+      var melhor = null;
+      for (var rid in regras) {
+        if (!Object.prototype.hasOwnProperty.call(regras, rid)) continue;
+        var r = regras[rid];
+        if (!r || !r.padrao || !r.rubrica) continue;
+        var p = normalizarPadrao(r.padrao);
+        if (p && alvo.indexOf(p) !== -1 && (!melhor || p.length > melhor.plen))
+          melhor = { despesa: r.despesa || '', plen: p.length };
+      }
+      if (melhor) return eDespesaEletrica(melhor.despesa);
+      return /IBELECTRA/i.test(m.remittance_information || '') ||
+             /IBELECTRA/i.test(m.creditor_name || '');
+    }
+
+    // contas = { abanca:{ref:mov}, revolut:{ref:mov} }
+    function agregar(contas, regras, overrides) {
+      var porMes = {}, porAno = {}, algum = false;
+      ['abanca', 'revolut'].forEach(function (slug) {
+        var movs = contas[slug] || {};
+        Object.keys(movs).forEach(function (ref) {
+          var m = movs[ref];
+          if (!m || m.credit_debit_indicator !== 'DBIT') return;
+          if (!m.booking_date || m.booking_date.length < 7) return;
+          if (/INTERNA/i.test(m.remittance_information || '')) return;
+          var v = parseFloat(m.amount);
+          if (isNaN(v)) return;
+          if (!eEletricidade(slug, ref, m, regras, overrides)) return;
+          v = Math.abs(v);
+          var mes = m.booking_date.slice(0, 7), ano = m.booking_date.slice(0, 4);
+          porMes[mes] = (porMes[mes] || 0) + v;
+          porAno[ano] = (porAno[ano] || 0) + v;
+          algum = true;
+        });
+      });
+      if (!algum) return null;
+
+      // Mensal: os últimos 12 meses terminados no mês corrente, com os meses
+      // sem movimento a zero (barra mínima, não omitida).
+      var hoje = new Date();
+      var mensal = [];
+      for (var i = 11; i >= 0; i--) {
+        var d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        var chave = d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
+        mensal.push({ chave: chave, valor: porMes[chave] || 0 });
+      }
+      // Anual: todos os anos com dados, por ordem crescente.
+      var anual = Object.keys(porAno).sort().map(function (a) {
+        return { chave: a, valor: porAno[a] };
+      });
+      // Valor em destaque: o último mês com débito até ao mês corrente (que
+      // raramente já o tem; nesse caso é o mês fechado anterior).
+      var ultimo = null;
+      var mesCorrente = mensal[mensal.length - 1].chave;
+      Object.keys(porMes).sort().forEach(function (k) {
+        if (k <= mesCorrente) ultimo = { chave: k, valor: porMes[k] };
+      });
+      return { mensal: mensal, anual: anual, ultimo: ultimo };
+    }
+
+    function barrasFantasma(n) {
+      var s = '';
+      for (var i = 0; i < n; i++) s += '<i></i>';
+      barrasEl.innerHTML = s;
+      barrasEl.classList.remove('com-dados');
+      eixoIni.textContent = '—';
+      eixoFim.textContent = '—';
+    }
+
+    function desenhar() {
+      if (!barrasEl) return;
+      if (!series) { barrasFantasma(escala === 'anual' ? 5 : 12); return; }
+      var lista = series[escala];
+      var max = 0;
+      lista.forEach(function (p) { if (p.valor > max) max = p.valor; });
+      var html = '';
+      lista.forEach(function (p) {
+        var pct = max > 0 ? (p.valor / max * 100) : 0;
+        var eMax = max > 0 && p.valor === max;
+        html += '<i' + (eMax ? ' class="max"' : '') +
+                ' style="height:max(2px,' + pct.toFixed(2) + '%)"' +
+                ' title="' + escapar(fmtEuro(p.valor) + ' · ' + nomePeriodo(p.chave, false)) + '"></i>';
+      });
+      barrasEl.innerHTML = html;
+      barrasEl.classList.add('com-dados');
+      eixoIni.textContent = nomePeriodo(lista[0].chave, true);
+      eixoFim.textContent = nomePeriodo(lista[lista.length - 1].chave, true);
+    }
+
+    if (seg) {
+      seg.addEventListener('click', function (ev) {
+        var b = ev.target.closest('button');
+        if (!b) return;
+        var todos = seg.querySelectorAll('button');
+        for (var k = 0; k < todos.length; k++) todos[k].classList.remove('active');
+        b.classList.add('active');
+        escala = b.getAttribute('data-escala') === 'anual' ? 'anual' : 'mensal';
+        desenhar();
+      });
+    }
+    desenhar(); // placeholder até haver dados
+
+    function receber(contas, regras, overrides) {
+      series = agregar(contas, regras, overrides);
+      if (!series) { desenhar(); return; }
+      if (selo) { selo.textContent = 'Banco'; selo.classList.remove('warn'); selo.classList.add('ok'); }
+      if (series.ultimo && valorEl) {
+        valorNum.textContent = fmtEuro(series.ultimo.valor);
+        valorMes.textContent = nomePeriodo(series.ultimo.chave, false);
+        valorEl.hidden = false;
+      }
+      desenhar();
+    }
+
+    // Só leitura. Falha em qualquer nó → fica o placeholder.
+    function carregar(db) {
+      return Promise.all([
+        db.ref('contasBancarias/abanca/movimentos').once('value'),
+        db.ref('contasBancarias/revolut/movimentos').once('value'),
+        db.ref('classificacaoRegras').once('value'),
+        db.ref('classificacaoMovimentos').once('value')
+      ]).then(function (snaps) {
+        receber({ abanca: snaps[0].val() || {}, revolut: snaps[1].val() || {} },
+                snaps[2].val() || {}, snaps[3].val() || {});
+      }).catch(function (erro) {
+        console.error('Falha a ler o consumo (contasBancarias / classificacao*):', erro);
+      });
+    }
+
+    return { carregar: carregar, agregar: agregar, receber: receber };
+  })();
+
   autenticarEContinuar(function () {
     var db = firebase.database();
 
     // A loja vem do URL. Default sb154 — hoje é a única.
     var params = new URLSearchParams(window.location.search);
     var lojaId = params.get('loja') || 'sb154';
+    consumo.carregar(db);
 
     var camEl       = document.getElementById('cam');
     var camTabsEl   = document.getElementById('camTabs');
