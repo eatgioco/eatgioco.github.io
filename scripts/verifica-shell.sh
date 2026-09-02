@@ -76,7 +76,7 @@ if [ -n "$fuga" ]; then
 fi
 
 # 10. index.html tem de linkar todas as páginas públicas da nav partilhada.
-for p in receitas.html compras.html pagamentos.html vendas.html contagens.html foodcost.html equipa.html; do
+for p in receitas.html compras.html pagamentos.html vendas.html contagens.html gestao.html foodcost.html equipa.html; do
   grep -q "href=\"$p\"" index.html || erro "index.html: falta cartão/link para $p"
 done
 

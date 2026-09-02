@@ -2477,6 +2477,13 @@ window.addEventListener('load', function () {
     });
   }
 
+  // Deep-link ?ingrediente=ID (vindo da gestao.html): abre a ficha desse
+  // ingrediente na primeira carga dos dados. Só uma vez, nunca em re-renders.
+  var deepLinkIngrediente = (function () {
+    var m = /[?&]ingrediente=([^&]+)/.exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : null;
+  })();
+
   ingredientesRef.on('value', function (snapshot) {
     allIngredientes = snapshot.val() || {};
     if (ingredientesSection && ingredientesSection.style.display !== 'none') {
@@ -2486,6 +2493,11 @@ window.addEventListener('load', function () {
     renderIngStats();
     renderIngChips();
     renderIngGrid();
+    if (deepLinkIngrediente && allIngredientes[deepLinkIngrediente]) {
+      var alvo = deepLinkIngrediente;
+      deepLinkIngrediente = null;
+      setTimeout(function () { openIngModal(alvo); }, 0);
+    }
   }, function (error) {
     ingStatusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
   });

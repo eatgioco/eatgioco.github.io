@@ -1400,7 +1400,7 @@ window.addEventListener('load', function () {
   function cardArtigoHtml(id, receita, calc) {
     calc = calc || custoDoArtigo(receita);
 
-    var html = '<div class="card glass-light">';
+    var html = '<div class="card glass-light" id="receita-' + escapeHtml(id) + '">';
     html += '<div class="card-head">';
     html += '<div class="card-head-main">';
     html += '<p class="card-eyebrow">' + escapeHtml(receita.categoria || 'Sem categoria') + '</p>';
@@ -1739,10 +1739,27 @@ window.addEventListener('load', function () {
   // Listeners de dados
   // ===================================================================
 
+  // Deep-link ?receita=ID (vindo da gestao.html): depois do primeiro render
+  // completo faz scroll até ao card dessa ficha e realça-o. Só uma vez.
+  var deepLinkReceita = (function () {
+    var m = /[?&]receita=([^&]+)/.exec(window.location.search);
+    return m ? decodeURIComponent(m[1]) : null;
+  })();
+  function aplicarDeepLink() {
+    if (!deepLinkReceita || !carregado.ing || !carregado.prep || !carregado.rec) return;
+    var alvo = document.getElementById('receita-' + deepLinkReceita);
+    deepLinkReceita = null;
+    if (!alvo) return;
+    alvo.scrollIntoView({ block: 'start' });
+    alvo.style.boxShadow = '4px 4px 0 var(--red)';
+    setTimeout(function () { alvo.style.boxShadow = ''; }, 2500);
+  }
+
   ingredientesRef.on('value', function (snap) {
     allIngredientes = snap.val() || {};
     carregado.ing = true;
     render();
+    aplicarDeepLink();
   }, function (error) {
     statusMsg.textContent = 'Erro de ligação à base de dados: ' + error.message;
   });
@@ -1751,12 +1768,14 @@ window.addEventListener('load', function () {
     allPreparacoes = snap.val() || {};
     carregado.prep = true;
     render();
+    aplicarDeepLink();
   });
 
   receitasRef.on('value', function (snap) {
     allReceitas = snap.val() || {};
     carregado.rec = true;
     render();
+    aplicarDeepLink();
   });
 
   // ===================================================================

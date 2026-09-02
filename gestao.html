@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Gestão">
+<!-- device-width: a página é uma folha de cálculo com scroll horizontal e
+     coluna fixa; ao telemóvel espera-se scroll, não zoom out (ver CLAUDE.md,
+     "páginas de device-width"). -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Gestão</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+<script src="gioco-custos.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  /* ======================================================================
+     gestao.html — estilos próprios da página.
+     Layout, vidro, sidebar, .search-box, .btn-add, tabelas e tokens vêm do
+     gioco-shell.css. Aqui só fica o que é específico da folha de cálculo:
+     a grelha com cabeçalho e primeira coluna fixos, as células editáveis
+     vs. calculadas, o toast com "Anular" e os selos de food cost.
+     ====================================================================== */
+
+  :root{
+    --ro-bg:#ECE8E1;          /* célula calculada / escrita por outra página */
+    --ok-flash:rgba(30,122,70,0.28);
+    --fc-alto:#D91124;
+    --sug-bg:rgba(0,68,118,0.08);
+  }
+  [data-theme="dark"]{
+    --ro-bg:#26221c;
+    --ok-flash:rgba(111,211,155,0.28);
+    --fc-alto:#ff7d88;
+    --sug-bg:rgba(95,168,230,0.14);
+  }
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  .foot-avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--mustard); color:#141414;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-size:12px; font-weight:600; color:var(--red);
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  .status-msg{ margin:14px 0 0; font-size:12.5px; color:var(--muted); font-weight:500; }
+
+  /* ---------- Separadores ---------- */
+  .tabs{ display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+  .tab-btn{
+    font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600;
+    background:var(--white); color:var(--ink);
+    border:1.5px solid var(--line); border-radius:100px;
+    padding:9px 18px; cursor:pointer; transition:border-color .15s ease;
+  }
+  .tab-btn:hover{ border-color:var(--red); }
+  .tab-btn.active{ background:var(--ink); border-color:var(--ink); color:var(--dough); }
+  .tab-count{ font-weight:400; opacity:.65; margin-left:6px; }
+
+  /* ---------- Barra de ferramentas ---------- */
+  .barra{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 12px; margin:18px 0 12px; }
+  .search-box.gestao-search{ flex:1 1 220px; max-width:340px; margin:0; min-width:0; }
+  .search-box.gestao-search input{
+    flex:1; min-width:0; background:none; border:none; outline:none;
+    font-family:'Inter',sans-serif; font-size:13px; color:var(--ink);
+  }
+  .search-box.gestao-search input::placeholder{ color:var(--muted); }
+
+  .btn{
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+    background:var(--white); color:var(--ink);
+    border:1.5px solid var(--line); border-radius:100px;
+    padding:8px 14px; cursor:pointer; white-space:nowrap;
+  }
+  .btn:hover{ border-color:var(--red); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+  select.mes{
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+    background:var(--white); color:var(--ink);
+    border:1.5px solid var(--line); border-radius:100px; padding:8px 12px;
+  }
+  .barra .hint{ font-size:12px; color:var(--muted); flex-basis:100%; }
+  .barra .hint b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- Grelha ---------- */
+  .grid-wrap{
+    overflow:auto;
+    max-height:calc(100vh - 250px);
+    min-height:220px;
+    border:1px solid var(--line); border-radius:14px;
+    background:var(--white);
+    -webkit-overflow-scrolling:touch;
+  }
+  table.grid{ width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px; color:var(--ink); }
+  table.grid th, table.grid td{ border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:0; white-space:nowrap; }
+  table.grid th{
+    position:sticky; top:0; z-index:3;
+    background:var(--dough); color:var(--muted);
+    font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.03em;
+    text-align:left; padding:9px 10px; cursor:pointer; user-select:none;
+  }
+  table.grid th.ordenado{ color:var(--ink); }
+  table.grid th .seta{ margin-left:4px; opacity:.7; }
+  table.grid th.arrastavel{ cursor:grab; }
+  table.grid th.arrastando{ opacity:.45; }
+  table.grid th.alvo-esq{ box-shadow:inset 3px 0 0 var(--red); }
+  table.grid th.alvo-dir{ box-shadow:inset -3px 0 0 var(--red); }
+  table.grid th .par{ display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--navy); margin-right:5px; vertical-align:middle; }
+  table.grid th.fixa, table.grid td.fixa{ position:sticky; left:0; z-index:2; }
+  table.grid th.fixa{ z-index:4; }
+  table.grid td.fixa{ background:var(--white); box-shadow:2px 0 0 var(--line); }
+  table.grid tr:hover td{ background-image:linear-gradient(rgba(0,0,0,0.025),rgba(0,0,0,0.025)); }
+
+  table.grid td{ background:var(--white); vertical-align:middle; }
+  table.grid td .cel{ display:block; padding:8px 10px; min-height:34px; line-height:18px; min-width:70px; max-width:320px; overflow:hidden; text-overflow:ellipsis; }
+  table.grid td.editavel .cel{ cursor:text; }
+  table.grid td.editavel.select .cel{ cursor:pointer; }
+  table.grid td.editavel:hover .cel{ box-shadow:inset 0 0 0 1.5px var(--line); }
+  table.grid td.ro{ background:var(--ro-bg); color:var(--muted); }
+  table.grid td.ro .cel{ cursor:default; }
+  table.grid td.ro.link .cel{ cursor:pointer; text-decoration:underline dotted; }
+  table.grid td.num .cel{ text-align:right; font-variant-numeric:tabular-nums; }
+  table.grid td.herdado .cel{ font-style:italic; color:var(--muted); }
+  table.grid td.herdado .cel::before{ content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--muted); margin-right:6px; vertical-align:middle; opacity:.7; }
+  table.grid td.a-editar .cel{ padding:2px; }
+  table.grid td.flash{ animation:flashOk 1.1s ease-out; }
+  table.grid td.flash .cel{ animation:flashOk 1.1s ease-out; }
+  @keyframes flashOk{ 0%{ background-color:var(--ok-flash); } 100%{ background-color:transparent; } }
+  table.grid tr.sem-pos td.fixa{ box-shadow:inset 4px 0 0 var(--mustard), 2px 0 0 var(--line); }
+  table.grid tr.sem-pos td.fixa .cel::after{ content:' · sem artigo POS'; font-size:10.5px; color:var(--amber); font-weight:600; }
+
+  .cel .vazio{ color:var(--muted); font-style:italic; }
+  .cel .muted{ color:var(--muted); }
+  .cel a{ color:var(--ink); text-decoration:none; font-weight:600; }
+  .cel a:hover{ text-decoration:underline; color:var(--red-ink); }
+  .cel .btn-mini{
+    font-family:'Inter',sans-serif; font-size:10.5px; font-weight:600;
+    background:none; color:var(--muted); border:1px solid var(--line); border-radius:100px;
+    padding:1px 7px; margin-left:6px; cursor:pointer; vertical-align:middle;
+  }
+  .cel .btn-mini:hover{ color:var(--red-ink); border-color:var(--red); }
+  .cel .sugestao{ background:var(--sug-bg); color:var(--muted); font-style:italic; padding:2px 8px; border-radius:100px; }
+  .cel .aviso{ color:var(--amber); cursor:help; margin-left:5px; font-style:normal; }
+
+  .fc-ok{ color:var(--green); font-weight:600; }
+  .fc-atencao{ color:var(--amber); font-weight:600; }
+  .fc-alto{ color:var(--fc-alto); font-weight:600; }
+
+  /* Controlo de edição dentro da célula */
+  .grid input.edit, .grid select.edit{
+    font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink);
+    background:var(--white); border:1.5px solid var(--red); border-radius:8px;
+    padding:6px 8px; width:100%; min-width:110px; outline:none; box-sizing:border-box;
+  }
+  .grid input.edit.num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+  .vazio-tabela{ padding:40px 20px; text-align:center; color:var(--muted); font-size:13.5px; }
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:var(--dough);
+    border-radius:100px; padding:10px 14px 10px 18px;
+    font-size:13px; font-weight:500;
+    display:flex; align-items:center; gap:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
+    z-index:90; max-width:calc(100vw - 32px);
+  }
+  .toast.on{ opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
+  .toast.erro{ background:var(--red); color:var(--on-red); }
+  .toast .toast-btn{
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    background:var(--dough); color:var(--ink); border:none; border-radius:100px;
+    padding:6px 12px; cursor:pointer;
+  }
+  .toast.erro .toast-btn{ background:var(--on-red); color:var(--red); }
+  body.shell-mobile .toast{ bottom:calc(72px + env(safe-area-inset-bottom)); }
+
+  /* ---------- Modal (lista "usado em", confirmação) ---------- */
+  .modal-overlay{ display:none; position:fixed; inset:0; background:rgba(20,20,20,0.55); z-index:80; padding:40px 20px; overflow:auto; }
+  .modal-overlay.open{ display:block; }
+  .modal{ background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:16px; max-width:520px; margin:0 auto; padding:22px; }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:14px; }
+  .modal-title{ font-family:'Inter',sans-serif; font-size:15px; font-weight:700; margin:0; }
+  .modal-close{ background:none; border:1px solid var(--line); color:var(--ink); border-radius:100px; width:30px; height:30px; cursor:pointer; font-size:16px; }
+  .modal ul{ margin:0; padding-left:18px; font-size:13.5px; line-height:1.7; }
+  .modal p{ font-size:13.5px; line-height:1.55; margin:0 0 14px; }
+  .modal .acoes{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+</style>
+</head>
+<body class="shell-mobile">
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('gestao.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-pencil"/></svg>GIOCO · <b>Gestão</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Ingredientes e produtos em massa</p>
+
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <p class="status-msg" id="statusMsg">A carregar…</p>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="ingredientes" id="tabIngredientes">Ingredientes<span class="tab-count" id="countIngredientes"></span></button>
+        <button class="tab-btn" data-tab="produtos" id="tabProdutos">Produtos<span class="tab-count" id="countProdutos"></span></button>
+      </div>
+
+      <div class="barra">
+        <div class="search-box gestao-search">
+          <svg class="icon" width="14" height="14"><use href="#i-search"/></svg>
+          <input type="text" id="pesquisa" placeholder="Procurar…" autocomplete="off">
+        </div>
+        <select class="mes" id="mesSel" hidden></select>
+        <button type="button" class="btn" id="btnReporOrdem" title="Repor a ordem original das colunas">Repor ordem</button>
+        <p class="hint" id="hint"></p>
+      </div>
+
+      <div class="grid-wrap" id="gridWrap"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="nav-overlay" id="navOverlay"></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span>
+  <button type="button" class="toast-btn" id="toastBtn" hidden>Anular</button>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 class="modal-title" id="modalTitulo"></h3>
+      <button type="button" class="modal-close" id="modalFechar" aria-label="Fechar">×</button>
+    </div>
+    <div id="modalCorpo"></div>
+    <div class="acoes" id="modalAcoes" hidden>
+      <button type="button" class="btn" id="modalCancelar">Cancelar</button>
+      <button type="button" class="btn-add" id="modalConfirmar">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  autenticarEContinuar(function () {
+  var db = firebase.database();
+
+  // ===================================================================
+  // Utilitários
+  // ===================================================================
+
+  var normalizar = GiocoCustos.normalizarTexto;
+
+  function escapeHtml(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function fmtEuros(v, casas) {
+    if (typeof v !== 'number' || isNaN(v)) return '—';
+    return v.toFixed(casas === undefined ? 2 : casas).replace('.', ',') + ' €';
+  }
+  function fmtNum(v, casas) {
+    if (typeof v !== 'number' || isNaN(v)) return '';
+    var s = (casas === undefined ? String(Math.round(v * 10000) / 10000) : v.toFixed(casas));
+    return s.replace('.', ',');
+  }
+  function fmtPct(v) {
+    if (typeof v !== 'number' || isNaN(v)) return '—';
+    return v.toFixed(1).replace('.', ',') + '%';
+  }
+  function fmtData(iso) {
+    if (!iso) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso);
+  }
+  function parseNum(s) {
+    if (typeof s === 'number') return isNaN(s) ? null : s;
+    var t = String(s === null || s === undefined ? '' : s).trim().replace(/\s/g, '').replace(',', '.');
+    if (t === '') return null;
+    if (!/^-?\d*\.?\d+$/.test(t) && !/^-?\d+\.?\d*$/.test(t)) return NaN;
+    var n = parseFloat(t);
+    return isNaN(n) ? NaN : n;
+  }
+  function igual(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
+
+  function nomeMes(mes) {
+    var nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var p = String(mes).split('-');
+    return (nomes[parseInt(p[1], 10) - 1] || p[1]) + ' ' + p[0];
+  }
+
+  // Unidades. A unidade base guarda-se como o resto do OS já guarda ('kg',
+  // 'lt', 'un' — contagens.html e compras.html usam 'lt' para litro); o
+  // rótulo "L" é só apresentação. Valores fora da lista que já existam num
+  // registo entram como opção extra para nunca se perderem ao editar.
+  var UNIDADES_BASE = [
+    { v:'kg', l:'kg' }, { v:'lt', l:'L' }, { v:'un', l:'un' }
+  ];
+  var UNIDADES_FORMATO = ['kg', 'lt', 'un', 'caixa', 'saco', 'garrafa', 'cx 6', 'tabuleiro'];
+  function labelUnidade(u) {
+    if (!u) return '';
+    var n = normalizar(u);
+    if (n === 'lt' || n === 'l') return 'L';
+    return u;
+  }
+
+  var TIPO_ARMAZENAMENTO = [
+    { v:'', l:'Não definido' }, { v:'ambiente', l:'Ambiente' }, { v:'refrigerado', l:'Refrigerado' }, { v:'congelado', l:'Congelado' }
+  ];
+  // Mesma lista da compras.html (ficha do ingrediente).
+  var LOCAIS_ARMAZENAMENTO = [
+    "Bancada Fria EDENOX MPS-250HC", "Bancada Fria AMITEK AK941", "Bancada Fria AMITEK AK943T",
+    "Placa Fria Drop-in 3GN", "MLL ECO 40", "MLL ECO 50", "Máquina de Gelo EURFRIGOR ECP25",
+    "Despensa", "Arrumo", "Bancada"
+  ];
+  var ALERGENIOS = {
+    GL:"Glúten", CR:"Crustáceos", OV:"Ovos", PE:"Peixe", AM:"Amendoim", SO:"Soja", LE:"Leite/Lactose",
+    FC:"Frutos de casca rija", AI:"Aipo", MO:"Mostarda", SE:"Sésamo", SU:"Dióxido de enxofre e sulfitos",
+    TR:"Tremoço", MOL:"Moluscos"
+  };
+  var CATEGORIAS_RECEITA = ['Focaccia', 'Maritozzo Salgado', 'Maritozzo Doce', 'Side', 'Bebida'];
+  var CATEGORIAS_POS = ['Comida', 'Bebida', 'Outro'];
+
+  // ===================================================================
+  // Estado
+  // ===================================================================
+
+  var ingredientes = {}, receitas = {}, preparacoes = {}, categoriasIng = {}, suppliers = {};
+  var catalogo = {}, mapaProdutos = {};
+  var produtosMes = {};        // { 'AAAA-MM': { chave: {qtd, valor, ...} } }
+  var mesesComVendas = [];
+  var mesAtivo = null;
+  var carregado = { ing:false, rec:false, prep:false, cat:false, sup:false, catalogo:false, mapa:false, meses:false };
+
+  var abaAtiva = 'ingredientes';
+  var termo = '';
+  var ordenacao = { ingredientes: { col:null, dir:1 }, produtos: { col:null, dir:1 } };
+  var emEdicao = null;         // célula em edição (td)
+  var renderPendente = false;
+
+  var statusMsg = document.getElementById('statusMsg');
+  var gridWrap = document.getElementById('gridWrap');
+  var pesquisa = document.getElementById('pesquisa');
+  var mesSel = document.getElementById('mesSel');
+  var hint = document.getElementById('hint');
+
+  // ===================================================================
+  // Colunas. Um "grupo" é a unidade de arrasto: uma coluna, ou um par que
+  // nunca se separa (compra unidade+fator, contagem unidade+fator,
+  // preço+data). A primeira coluna é fixa e nunca se move.
+  // ===================================================================
+
+  var COLUNAS = {
+    ingredientes: [
+      { id:'nome',        grupo:'nome',     label:'Nome',                fixa:true },
+      { id:'categoria',   grupo:'categoria',label:'Categoria' },
+      { id:'fornecedor',  grupo:'fornecedor', label:'Fornecedor' },
+      { id:'unidade',     grupo:'unidade',  label:'Unidade base' },
+      { id:'compraUnidade', grupo:'compra', label:'Compra: unidade', par:true },
+      { id:'compraFator', grupo:'compra',   label:'Compra: fator', par:true, num:true },
+      { id:'preco',       grupo:'preco',    label:'Preço última compra', par:true, ro:true, num:true },
+      { id:'data',        grupo:'preco',    label:'Data', par:true, ro:true },
+      { id:'custoBase',   grupo:'custoBase', label:'€ / unidade base', ro:true, num:true },
+      { id:'contUnidade', grupo:'contagem', label:'Contagem: unidade', par:true },
+      { id:'contFator',   grupo:'contagem', label:'Contagem: fator', par:true, num:true },
+      { id:'aliases',     grupo:'aliases',  label:'Aliases' },
+      { id:'tipoArm',     grupo:'tipoArm',  label:'Tipo de armazenamento' },
+      { id:'localArm',    grupo:'localArm', label:'Local de armazenamento' },
+      { id:'alergenios',  grupo:'alergenios', label:'Alergénios', ro:true },
+      { id:'usadoEm',     grupo:'usadoEm',  label:'Usado em', ro:true, num:true },
+      { id:'foto',        grupo:'foto',     label:'Foto', ro:true }
+    ],
+    produtos: [
+      { id:'ficha',       grupo:'ficha',    label:'Ficha técnica', fixa:true, ro:true },
+      { id:'categoria',   grupo:'categoria', label:'Categoria' },
+      { id:'artigoPos',   grupo:'artigoPos', label:'Artigo POS' },
+      { id:'catPos',      grupo:'catPos',   label:'Categoria POS' },
+      { id:'pvp',         grupo:'pvp',      label:'PVP', num:true },
+      { id:'pvpLiquido',  grupo:'pvpLiquido', label:'PVP s/IVA', ro:true, num:true },
+      { id:'custo',       grupo:'custo',    label:'Custo', ro:true, num:true },
+      { id:'foodCost',    grupo:'foodCost', label:'Food cost %', ro:true, num:true },
+      { id:'margemUnit',  grupo:'margemUnit', label:'Margem unitária', ro:true, num:true },
+      { id:'unidadesMes', grupo:'unidadesMes', label:'Unidades no mês', ro:true, num:true },
+      { id:'valorMes',    grupo:'valorMes', label:'Valor no mês', ro:true, num:true },
+      { id:'margemMes',   grupo:'margemMes', label:'Margem no mês', ro:true, num:true }
+    ]
+  };
+
+  function gruposPorOmissao(aba) {
+    var vistos = [], out = [];
+    COLUNAS[aba].forEach(function (c) { if (vistos.indexOf(c.grupo) === -1) { vistos.push(c.grupo); out.push(c.grupo); } });
+    return out;
+  }
+  function chaveOrdem(aba) { return 'gestao.ordem.' + aba; }
+  function ordemGrupos(aba) {
+    var base = gruposPorOmissao(aba);
+    var guardada = null;
+    try { guardada = JSON.parse(localStorage.getItem(chaveOrdem(aba)) || 'null'); } catch (e) { guardada = null; }
+    if (!Array.isArray(guardada)) return base;
+    // Só grupos válidos, na ordem guardada; os que faltarem entram no fim.
+    var out = guardada.filter(function (g) { return base.indexOf(g) !== -1; });
+    base.forEach(function (g) { if (out.indexOf(g) === -1) out.push(g); });
+    if (out[0] !== base[0]) { out.splice(out.indexOf(base[0]), 1); out.unshift(base[0]); }
+    return out;
+  }
+  function guardarOrdem(aba, grupos) {
+    try { localStorage.setItem(chaveOrdem(aba), JSON.stringify(grupos)); } catch (e) { /* sem storage */ }
+  }
+  function colunasOrdenadas(aba) {
+    var grupos = ordemGrupos(aba);
+    var out = [];
+    grupos.forEach(function (g) { COLUNAS[aba].forEach(function (c) { if (c.grupo === g) out.push(c); }); });
+    return out;
+  }
+
+  // ===================================================================
+  // Dados derivados
+  // ===================================================================
+
+  function categoriasIngOrdenadas() {
+    return Object.keys(categoriasIng).sort(function (a, b) {
+      return String(categoriasIng[a] || a).localeCompare(String(categoriasIng[b] || b));
+    });
+  }
+  function nomesFornecedores() {
+    return Object.keys(suppliers).map(function (id) { return suppliers[id] && suppliers[id].nome; })
+      .filter(Boolean).sort(function (a, b) { return a.localeCompare(b); });
+  }
+
+  // Quem usa cada ingrediente: fichas (receitas) e preparações.
+  var usoIngredientes = {};
+  function recalcularUsos() {
+    usoIngredientes = {};
+    function add(ingId, nome, tipo) {
+      if (!ingId) return;
+      if (!usoIngredientes[ingId]) usoIngredientes[ingId] = [];
+      if (!usoIngredientes[ingId].some(function (u) { return u.nome === nome && u.tipo === tipo; })) {
+        usoIngredientes[ingId].push({ nome:nome, tipo:tipo });
+      }
+    }
+    Object.keys(receitas).forEach(function (id) {
+      var r = receitas[id];
+      (Array.isArray(r.componentes) ? r.componentes : []).forEach(function (c) {
+        if (c.tipo === 'ingrediente') add(c.ingredienteId, r.nome || 'Sem nome', 'ficha');
+      });
+    });
+    Object.keys(preparacoes).forEach(function (id) {
+      var p = preparacoes[id];
+      (Array.isArray(p.ingredientes) ? p.ingredientes : []).forEach(function (c) {
+        add(c.ingredienteId, p.nome || 'Sem nome', 'preparação');
+      });
+    });
+  }
+
+  function contagemHerdada(ing) { return !ing.contagem; }
+  function contagemEfetiva(ing) {
+    if (ing.contagem) return { unidade: ing.contagem.unidade || '', fator: ing.contagem.fator, herdada:false };
+    var c = ing.compra || {};
+    return { unidade: c.unidade || '', fator: c.fator, herdada:true };
+  }
+
+  function slugFoto(nome) {
+    return normalizar(nome).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  // Fotos: img/ingredientes/{slug}.webp. Sondar ficheiro a ficheiro enchia a
+  // consola com um 404 por ingrediente (a pasta ainda não existe), por isso
+  // lê-se UMA vez o manifesto img/ingredientes/index.json — um array de slugs
+  // — e é por ele que a coluna Foto decide ✓ / —. Sem manifesto, tudo "—".
+  var fotosManifesto = null;   // null = ainda não lido; {} = lido
+  function carregarManifestoFotos() {
+    fetch('img/ingredientes/index.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .catch(function () { return []; })
+      .then(function (lista) {
+        fotosManifesto = {};
+        (Array.isArray(lista) ? lista : []).forEach(function (s) { fotosManifesto[String(s).replace(/\.webp$/i, '')] = true; });
+        Object.keys(fotosManifesto).forEach(atualizarFoto);
+      });
+  }
+  function temFoto(slug) { return !!(fotosManifesto && fotosManifesto[slug]); }
+  function atualizarFoto(slug) {
+    Array.prototype.forEach.call(gridWrap.querySelectorAll('td[data-col="foto"][data-slug="' + slug + '"] .cel'), function (cel) {
+      cel.innerHTML = temFoto(slug) ? '✓' : '<span class="muted">—</span>';
+    });
+  }
+  carregarManifestoFotos();
+
+  // Artigo POS ligado a uma ficha (chave do catálogo), ou null.
+  function artigosDaFicha(recId) {
+    return Object.keys(catalogo).filter(function (k) { return catalogo[k] && catalogo[k].receitaId === recId; });
+  }
+  // Sugestão de ligação: primeiro o mapa da foodcost.html (ligação já feita à
+  // mão noutra página), depois o nome normalizado. Nunca se grava sozinha.
+  function sugerirArtigo(recId) {
+    var rec = receitas[recId];
+    if (!rec) return null;
+    var livre = function (k) { return catalogo[k] && !catalogo[k].receitaId; };
+    var viaMapa = Object.keys(mapaProdutos).filter(function (k) {
+      return mapaProdutos[k] && mapaProdutos[k].receitaId === recId && livre(k);
+    });
+    if (viaMapa.length) return viaMapa[0];
+    var n = normalizar(rec.nome);
+    if (!n) return null;
+    var cands = Object.keys(catalogo).filter(function (k) {
+      if (!livre(k)) return false;
+      var d = normalizar(catalogo[k].desc);
+      return d === n || d.indexOf(n) !== -1 || (n.indexOf(d) !== -1 && d.length >= 4);
+    });
+    if (!cands.length) return null;
+    cands.sort(function (a, b) { return normalizar(catalogo[a].desc).length - normalizar(catalogo[b].desc).length; });
+    return cands[0];
+  }
+
+  function calcProduto(recId) {
+    var rec = receitas[recId];
+    var calc = GiocoCustos.custoReceita(rec, ingredientes, preparacoes);
+    var artigos = artigosDaFicha(recId);
+    var chave = artigos[0] || null;
+    var vend = (chave && produtosMes[mesAtivo] && produtosMes[mesAtivo][chave]) || null;
+    var unidades = vend && typeof vend.qtd === 'number' ? vend.qtd : null;
+    var valor = vend && typeof vend.valor === 'number' ? vend.valor : null;
+    var margemUnit = (calc.completo && calc.pvpLiquido !== null) ? calc.pvpLiquido - calc.custo : null;
+    return {
+      calc: calc, chave: chave, artigos: artigos,
+      unidades: unidades, valor: valor,
+      margemUnit: margemUnit,
+      margemMes: (margemUnit !== null && unidades !== null) ? margemUnit * unidades : null
+    };
+  }
+
+  // ===================================================================
+  // Valores por célula (texto para pesquisa/ordenação + html)
+  // ===================================================================
+
+  function valorCelula(aba, col, id) {
+    if (aba === 'ingredientes') {
+      var ing = ingredientes[id];
+      var cont = contagemEfetiva(ing);
+      switch (col.id) {
+        case 'nome': return { v: ing.nome || '', html: escapeHtml(ing.nome || '') || '<span class="vazio">sem nome</span>' };
+        case 'categoria': return { v: categoriasIng[ing.categoria] || ing.categoria || '', html: ing.categoria ? escapeHtml(categoriasIng[ing.categoria] || ing.categoria) : '<span class="vazio">—</span>' };
+        case 'fornecedor': return { v: ing.fornecedor || '', html: ing.fornecedor ? escapeHtml(ing.fornecedor) : '<span class="vazio">—</span>' };
+        case 'unidade': return { v: labelUnidade(ing.unidade), html: ing.unidade ? escapeHtml(labelUnidade(ing.unidade)) : '<span class="vazio">—</span>' };
+        case 'compraUnidade': return { v: (ing.compra && ing.compra.unidade) || '', html: (ing.compra && ing.compra.unidade) ? escapeHtml(labelUnidade(ing.compra.unidade)) : '<span class="vazio">—</span>' };
+        case 'compraFator': { var f = ing.compra && typeof ing.compra.fator === 'number' ? ing.compra.fator : null; return { v: f, html: f === null ? '<span class="vazio">—</span>' : fmtNum(f) }; }
+        case 'preco': return { v: typeof ing.precoUltimaCompra === 'number' ? ing.precoUltimaCompra : null, html: typeof ing.precoUltimaCompra === 'number' ? fmtEuros(ing.precoUltimaCompra, 2) : '<span class="muted">—</span>' };
+        case 'data': return { v: ing.dataUltimaCompra || '', html: ing.dataUltimaCompra ? escapeHtml(fmtData(ing.dataUltimaCompra)) : '<span class="muted">—</span>' };
+        case 'custoBase': { var c = GiocoCustos.custoIngrediente(ing); return { v: c, html: c === null ? '<span class="muted">—</span>' : fmtEuros(c, 3) + ' <span class="muted">/ ' + escapeHtml(labelUnidade(ing.unidade) || 'un') + '</span>' }; }
+        case 'contUnidade': return { v: cont.unidade || '', html: cont.unidade ? escapeHtml(labelUnidade(cont.unidade)) : '<span class="vazio">—</span>', herdado: cont.herdada };
+        case 'contFator': { var cf = typeof cont.fator === 'number' ? cont.fator : null; return { v: cf, html: (cf === null ? '<span class="vazio">—</span>' : fmtNum(cf)) + (cont.herdada ? '' : ' <button type="button" class="btn-mini" data-acao="herdar" title="Voltar a herdar da compra (remove o nó contagem)">herdar</button>'), herdado: cont.herdada }; }
+        case 'aliases': { var al = Array.isArray(ing.aliases) ? ing.aliases.filter(Boolean) : []; return { v: al.join(', '), html: al.length ? escapeHtml('(' + al.join(', ') + ')') : '<span class="vazio">+ adicionar</span>' }; }
+        case 'tipoArm': { var t = TIPO_ARMAZENAMENTO.filter(function (x) { return x.v === (ing.tipoArmazenamento || ''); })[0]; return { v: ing.tipoArmazenamento || '', html: ing.tipoArmazenamento ? escapeHtml(t ? t.l : ing.tipoArmazenamento) : '<span class="vazio">—</span>' }; }
+        case 'localArm': return { v: ing.localArmazenamento || '', html: ing.localArmazenamento ? escapeHtml(ing.localArmazenamento) : '<span class="vazio">—</span>' };
+        case 'alergenios': { var a = Array.isArray(ing.alergenios) ? ing.alergenios : []; var txt = a.map(function (k) { return ALERGENIOS[k] || k; }).join(', '); return { v: txt, html: txt ? escapeHtml(txt) : '<span class="muted">—</span>' }; }
+        case 'usadoEm': { var n = (usoIngredientes[id] || []).length; return { v: n, html: n ? String(n) : '<span class="muted">0</span>' }; }
+        case 'foto': { var s = slugFoto(ing.nome); var est = temFoto(s); return { v: est ? 1 : 0, html: est ? '✓' : '<span class="muted">—</span>', slug: s }; }
+      }
+    } else {
+      var rec = receitas[id];
+      var p = calcProduto(id);
+      switch (col.id) {
+        case 'ficha': return { v: rec.nome || '', html: '<a href="receitas.html?receita=' + encodeURIComponent(id) + '" title="Abrir a ficha técnica">' + escapeHtml(rec.nome || 'Sem nome') + '</a>' };
+        case 'categoria': return { v: rec.categoria || '', html: rec.categoria ? escapeHtml(rec.categoria) : '<span class="vazio">—</span>' };
+        case 'artigoPos': {
+          if (p.chave) {
+            var extra = p.artigos.length > 1 ? ' <span class="muted">+' + (p.artigos.length - 1) + '</span>' : '';
+            return { v: catalogo[p.chave].desc || p.chave, html: escapeHtml(catalogo[p.chave].desc || p.chave) + ' <span class="muted">' + escapeHtml(p.chave) + '</span>' + extra };
+          }
+          var sug = sugerirArtigo(id);
+          if (sug) return { v: '', html: '<span class="sugestao">sugestão: ' + escapeHtml(catalogo[sug].desc || sug) + '</span> <button type="button" class="btn-mini" data-acao="confirmarSugestao" data-chave="' + escapeHtml(sug) + '">ligar</button>', sugestao: sug };
+          return { v: '', html: '<span class="vazio">— sem ligação —</span>' };
+        }
+        case 'catPos': return { v: p.chave ? (catalogo[p.chave].categoria || '') : '', html: p.chave ? (catalogo[p.chave].categoria ? escapeHtml(catalogo[p.chave].categoria) : '<span class="vazio">—</span>') : '<span class="muted">—</span>' };
+        case 'pvp': return { v: p.calc.pvp, html: p.calc.pvp === null ? '<span class="vazio">—</span>' : fmtEuros(p.calc.pvp, 2) };
+        case 'pvpLiquido': return { v: p.calc.pvpLiquido, html: p.calc.pvpLiquido === null ? '<span class="muted">—</span>' : fmtEuros(p.calc.pvpLiquido, 2) };
+        case 'custo': {
+          var av = p.calc.avisos;
+          var h = (p.calc.completo ? '' : '≥ ') + fmtEuros(p.calc.custo, 2);
+          if (av.length) h += '<span class="aviso" title="' + escapeHtml(av.join('\n')) + '">⚠</span>';
+          return { v: p.calc.custo, html: h };
+        }
+        case 'foodCost': {
+          var fc = p.calc.foodCost;
+          if (fc === null) return { v: null, html: '<span class="muted">—</span>' };
+          var cls = fc < 30 ? 'fc-ok' : (fc <= 38 ? 'fc-atencao' : 'fc-alto');
+          return { v: fc, html: '<span class="' + cls + '">' + fmtPct(fc) + '</span>' };
+        }
+        case 'margemUnit': return { v: p.margemUnit, html: p.margemUnit === null ? '<span class="muted">—</span>' : fmtEuros(p.margemUnit, 2) };
+        case 'unidadesMes': return { v: p.unidades, html: p.chave ? (p.unidades === null ? '<span class="muted">0</span>' : fmtNum(p.unidades)) : '<span class="muted">—</span>' };
+        case 'valorMes': return { v: p.valor, html: p.chave ? (p.valor === null ? '<span class="muted">—</span>' : fmtEuros(p.valor, 2)) : '<span class="muted">—</span>' };
+        case 'margemMes': return { v: p.margemMes, html: p.margemMes === null ? '<span class="muted">—</span>' : fmtEuros(p.margemMes, 2) };
+      }
+    }
+    return { v: '', html: '' };
+  }
+
+  // ===================================================================
+  // Render
+  // ===================================================================
+
+  function tudoCarregado() {
+    return carregado.ing && carregado.rec && carregado.prep && carregado.cat && carregado.sup && carregado.catalogo && carregado.mapa && carregado.meses;
+  }
+
+  function idsFiltrados(aba) {
+    var fonte = aba === 'ingredientes' ? ingredientes : receitas;
+    var cols = COLUNAS[aba];
+    var t = normalizar(termo);
+    var ids = Object.keys(fonte).filter(function (id) {
+      if (!t) return true;
+      var texto = cols.map(function (c) { var r = valorCelula(aba, c, id); return r.v === null || r.v === undefined ? '' : String(r.v); }).join(' ');
+      return normalizar(texto).indexOf(t) !== -1;
+    });
+    var ord = ordenacao[aba];
+    var colOrd = ord.col ? cols.filter(function (c) { return c.id === ord.col; })[0] : null;
+    if (colOrd) {
+      ids.sort(function (a, b) {
+        var va = valorCelula(aba, colOrd, a).v, vb = valorCelula(aba, colOrd, b).v;
+        var na = (va === null || va === undefined || va === ''), nb = (vb === null || vb === undefined || vb === '');
+        if (na && nb) return 0; if (na) return 1; if (nb) return -1;
+        var r = (typeof va === 'number' && typeof vb === 'number') ? va - vb : normalizar(va).localeCompare(normalizar(vb));
+        return r * ord.dir;
+      });
+    } else {
+      ids.sort(function (a, b) {
+        var na = normalizar(fonte[a].nome), nb = normalizar(fonte[b].nome);
+        return na.localeCompare(nb);
+      });
+    }
+    return ids;
+  }
+
+  function render() {
+    if (!tudoCarregado()) return;
+    if (emEdicao) { renderPendente = true; return; }
+    renderPendente = false;
+
+    document.getElementById('countIngredientes').textContent = '(' + Object.keys(ingredientes).length + ')';
+    document.getElementById('countProdutos').textContent = '(' + Object.keys(receitas).length + ')';
+    statusMsg.textContent = abaAtiva === 'ingredientes'
+      ? 'Clica numa célula branca para editar. Grava ao sair da célula ou com Enter; Esc cancela.'
+      : 'Custo e food cost via gioco-custos.js, os mesmos das Receitas. Vendas do mês selecionado.';
+    mesSel.hidden = abaAtiva !== 'produtos';
+    hint.innerHTML = abaAtiva === 'produtos'
+      ? 'Linhas assinaladas a amarelo ainda não têm artigo POS ligado. As <b>sugestões</b> só ficam gravadas depois de carregares em "ligar".'
+      : 'Contagem em <i>itálico</i> é herdada da compra (sem escrita própria). Preço e data vêm da leitura de faturas.';
+
+    var aba = abaAtiva;
+    var cols = colunasOrdenadas(aba);
+    var ids = idsFiltrados(aba);
+    var ord = ordenacao[aba];
+
+    var html = '<table class="grid"><thead><tr>';
+    cols.forEach(function (c, i) {
+      var cls = [];
+      if (c.fixa) cls.push('fixa'); else cls.push('arrastavel');
+      if (ord.col === c.id) cls.push('ordenado');
+      html += '<th class="' + cls.join(' ') + '" data-col="' + c.id + '" data-grupo="' + c.grupo + '"' + (c.fixa ? '' : ' draggable="true"') + '>' +
+              (c.par ? '<span class="par" title="Par: move-se em conjunto"></span>' : '') +
+              escapeHtml(c.label) + (ord.col === c.id ? '<span class="seta">' + (ord.dir === 1 ? '▲' : '▼') + '</span>' : '') + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    if (!ids.length) {
+      html += '<tr><td colspan="' + cols.length + '"><div class="vazio-tabela">' +
+              (termo ? 'Nenhum resultado para "' + escapeHtml(termo) + '".' : 'Sem registos.') + '</div></td></tr>';
+    }
+
+    ids.forEach(function (id) {
+      var rowCls = '';
+      if (aba === 'produtos' && !artigosDaFicha(id).length) rowCls = ' class="sem-pos"';
+      html += '<tr data-id="' + escapeHtml(id) + '"' + rowCls + '>';
+      cols.forEach(function (c) {
+        var r = valorCelula(aba, c, id);
+        var cls = [];
+        if (c.fixa) cls.push('fixa');
+        if (c.num) cls.push('num');
+        var ro = c.ro || (aba === 'produtos' && c.id === 'catPos' && !artigosDaFicha(id).length);
+        if (ro) cls.push('ro'); else cls.push('editavel');
+        if (!ro && tipoEditor(aba, c.id) === 'select') cls.push('select');
+        if (r.herdado) cls.push('herdado');
+        if (aba === 'ingredientes' && (c.id === 'alergenios' || c.id === 'usadoEm')) cls.push('link');
+        html += '<td class="' + cls.join(' ') + '" data-col="' + c.id + '"' + (r.slug ? ' data-slug="' + r.slug + '"' : '') + '><span class="cel">' + r.html + '</span></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    gridWrap.innerHTML = html;
+
+  }
+
+  // ===================================================================
+  // Edição
+  // ===================================================================
+
+  function tipoEditor(aba, colId) {
+    if (aba === 'ingredientes') {
+      if (['categoria', 'fornecedor', 'unidade', 'compraUnidade', 'contUnidade', 'tipoArm', 'localArm'].indexOf(colId) !== -1) return 'select';
+      if (['compraFator', 'contFator'].indexOf(colId) !== -1) return 'num';
+      return 'text';
+    }
+    if (['categoria', 'artigoPos', 'catPos'].indexOf(colId) !== -1) return 'select';
+    if (colId === 'pvp') return 'num';
+    return 'text';
+  }
+
+  function opcoesSelect(aba, colId, atual) {
+    var ops = [];
+    function push(v, l) { if (!ops.some(function (o) { return o.v === v; })) ops.push({ v:v, l:(l === undefined ? v : l) }); }
+    if (aba === 'ingredientes') {
+      if (colId === 'categoria') { push('', '— sem categoria —'); categoriasIngOrdenadas().forEach(function (k) { push(k, categoriasIng[k] || k); }); if (atual) push(atual, categoriasIng[atual] || atual); }
+      else if (colId === 'fornecedor') { push('', '— sem fornecedor —'); nomesFornecedores().forEach(function (n) { push(n); }); if (atual) push(atual); }
+      else if (colId === 'unidade') { push('', '—'); UNIDADES_BASE.forEach(function (u) { push(u.v, u.l); }); if (atual) push(atual, labelUnidade(atual)); }
+      else if (colId === 'compraUnidade' || colId === 'contUnidade') { push('', '—'); UNIDADES_FORMATO.forEach(function (u) { push(u, labelUnidade(u)); }); if (atual) push(atual, labelUnidade(atual)); push('__outro__', 'Outro…'); }
+      else if (colId === 'tipoArm') { TIPO_ARMAZENAMENTO.forEach(function (t) { push(t.v, t.l); }); if (atual) push(atual); }
+      else if (colId === 'localArm') { push('', '— sem local —'); LOCAIS_ARMAZENAMENTO.forEach(function (l) { push(l); }); if (atual) push(atual); push('__outro__', 'Outro…'); }
+    } else {
+      if (colId === 'categoria') { push('', '— sem categoria —'); CATEGORIAS_RECEITA.forEach(function (c) { push(c); }); Object.keys(receitas).forEach(function (id) { if (receitas[id].categoria) push(receitas[id].categoria); }); }
+      else if (colId === 'artigoPos') {
+        push('', '— sem ligação —');
+        Object.keys(catalogo).sort(function (a, b) { return normalizar(catalogo[a].desc).localeCompare(normalizar(catalogo[b].desc)); })
+          .forEach(function (k) { var e = catalogo[k]; var lig = e.receitaId && receitas[e.receitaId] ? ' · ligado a ' + receitas[e.receitaId].nome : ''; push(k, (e.desc || k) + ' (' + k + ')' + lig); });
+      }
+      else if (colId === 'catPos') { push('', '—'); CATEGORIAS_POS.forEach(function (c) { push(c); }); Object.keys(catalogo).forEach(function (k) { if (catalogo[k].categoria) push(catalogo[k].categoria); }); if (atual) push(atual); }
+    }
+    return ops;
+  }
+
+  // Valor "cru" atual de uma célula editável (o que o editor mostra).
+  function valorAtual(aba, colId, id) {
+    if (aba === 'ingredientes') {
+      var ing = ingredientes[id];
+      var cont = contagemEfetiva(ing);
+      switch (colId) {
+        case 'nome': return ing.nome || '';
+        case 'categoria': return ing.categoria || '';
+        case 'fornecedor': return ing.fornecedor || '';
+        case 'unidade': return ing.unidade || '';
+        case 'compraUnidade': return (ing.compra && ing.compra.unidade) || '';
+        case 'compraFator': return (ing.compra && typeof ing.compra.fator === 'number') ? ing.compra.fator : null;
+        case 'contUnidade': return cont.unidade || '';
+        case 'contFator': return typeof cont.fator === 'number' ? cont.fator : null;
+        case 'aliases': return (Array.isArray(ing.aliases) ? ing.aliases.filter(Boolean) : []).map(function (a) { return String(a).replace(/\s+/g, ' '); }).join(', ');
+        case 'tipoArm': return ing.tipoArmazenamento || '';
+        case 'localArm': return ing.localArmazenamento || '';
+      }
+    } else {
+      var rec = receitas[id];
+      var chave = artigosDaFicha(id)[0] || '';
+      switch (colId) {
+        case 'categoria': return rec.categoria || '';
+        case 'artigoPos': return chave;
+        case 'catPos': return chave ? (catalogo[chave].categoria || '') : '';
+        case 'pvp': return typeof rec.pvp === 'number' ? rec.pvp : (rec.pvp ? parseFloat(rec.pvp) : null);
+      }
+    }
+    return '';
+  }
+
+  function abrirEditor(td) {
+    if (emEdicao) fecharEditor(false);
+    var aba = abaAtiva;
+    var colId = td.getAttribute('data-col');
+    var id = td.parentNode.getAttribute('data-id');
+    var tipo = tipoEditor(aba, colId);
+    var atual = valorAtual(aba, colId, id);
+    var cel = td.querySelector('.cel');
+    var ctrl;
+
+    if (tipo === 'select') {
+      ctrl = document.createElement('select');
+      ctrl.className = 'edit';
+      opcoesSelect(aba, colId, atual).forEach(function (o) {
+        var op = document.createElement('option'); op.value = o.v; op.textContent = o.l; ctrl.appendChild(op);
+      });
+      ctrl.value = atual || '';
+    } else {
+      ctrl = document.createElement('input');
+      ctrl.type = 'text';
+      ctrl.className = 'edit' + (tipo === 'num' ? ' num' : '');
+      ctrl.setAttribute('autocomplete', 'off');
+      if (tipo === 'num') { ctrl.setAttribute('inputmode', 'decimal'); ctrl.value = atual === null || atual === undefined ? '' : fmtNum(atual); }
+      else ctrl.value = atual || '';
+    }
+
+    emEdicao = { td:td, aba:aba, colId:colId, id:id, tipo:tipo, atual:atual, ctrl:ctrl, htmlAntes:cel.innerHTML, cancelado:false, fechado:false };
+    td.classList.add('a-editar');
+    cel.innerHTML = '';
+    cel.appendChild(ctrl);
+    ctrl.focus();
+    if (ctrl.select && tipo !== 'select') ctrl.select();
+
+    ctrl.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); emEdicao.cancelado = true; fecharEditor(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); fecharEditor(true); }
+    });
+    ctrl.addEventListener('blur', function () { setTimeout(function () { if (emEdicao && emEdicao.ctrl === ctrl && !emEdicao.fechado) fecharEditor(true); }, 0); });
+    if (tipo === 'select') {
+      ctrl.addEventListener('change', function () {
+        if (ctrl.value === '__outro__') {
+          // "Outro…": troca o select por um campo de texto livre.
+          var inp = document.createElement('input');
+          inp.type = 'text'; inp.className = 'edit'; inp.placeholder = 'Escreve o valor…';
+          cel.innerHTML = ''; cel.appendChild(inp); emEdicao.ctrl = inp; emEdicao.tipo = 'text';
+          inp.focus();
+          inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { e.preventDefault(); emEdicao.cancelado = true; fecharEditor(false); }
+            else if (e.key === 'Enter') { e.preventDefault(); fecharEditor(true); }
+          });
+          inp.addEventListener('blur', function () { setTimeout(function () { if (emEdicao && emEdicao.ctrl === inp && !emEdicao.fechado) fecharEditor(true); }, 0); });
+          return;
+        }
+        fecharEditor(true);
+      });
+    }
+  }
+
+  function fecharEditor(gravar) {
+    var ed = emEdicao;
+    if (!ed || ed.fechado) return;
+    ed.fechado = true;
+    var novo = ed.ctrl.value;
+    var cel = ed.td.querySelector('.cel');
+    cel.innerHTML = ed.htmlAntes;
+    ed.td.classList.remove('a-editar');
+    emEdicao = null;
+
+    if (!gravar || ed.cancelado) { if (renderPendente) render(); return; }
+
+    // Validação numérica: texto e negativos rejeitados; fator nunca 0.
+    var valor = novo;
+    if (ed.tipo === 'num') {
+      var n = parseNum(novo);
+      if (novo.trim() === '') n = null;
+      if (n !== null && (isNaN(n) || n < 0)) { toast('Valor inválido — tem de ser um número não negativo. Valor anterior reposto.', true); if (renderPendente) render(); return; }
+      if ((ed.colId === 'compraFator' || ed.colId === 'contFator') && n === 0) { toast('O fator nunca pode ser 0. Valor anterior reposto.', true); if (renderPendente) render(); return; }
+      if ((ed.colId === 'compraFator' || ed.colId === 'contFator') && n === null && ed.colId === 'contFator' && !contagemHerdada(ingredientes[ed.id])) { toast('A contagem precisa de fator. Para voltar a herdar usa o botão "herdar".', true); if (renderPendente) render(); return; }
+      valor = n;
+    } else if (ed.tipo === 'text') {
+      valor = String(novo).trim();
+    }
+
+    var antes = ed.atual;
+    if (ed.tipo === 'num' ? igual(antes, valor) : String(antes || '') === String(valor || '')) { if (renderPendente) render(); return; }
+
+    var escritas = planearEscritas(ed.aba, ed.colId, ed.id, valor);
+    if (!escritas) { if (renderPendente) render(); return; }
+    if (escritas.confirmar) {
+      confirmar(escritas.confirmar.titulo, escritas.confirmar.texto, function () { executar(escritas, ed.td, ed.colId, ed.id); }, function () { if (renderPendente) render(); });
+      return;
+    }
+    executar(escritas, ed.td, ed.colId, ed.id);
+  }
+
+  // Plano de escrita: lista de { path, antes, depois } — um set() por path,
+  // nunca um update multi-chave nem um set num nó pai.
+  function planearEscritas(aba, colId, id, valor) {
+    var lista = [];
+    var descricao = '';
+    if (aba === 'ingredientes') {
+      var ing = ingredientes[id];
+      var base = 'ingredientes/' + id + '/';
+      var nomeIng = ing.nome || id;
+      switch (colId) {
+        case 'nome': if (!valor) { toast('O nome não pode ficar vazio.', true); return null; } lista.push({ path: base + 'nome', antes: ing.nome, depois: valor }); break;
+        case 'categoria': lista.push({ path: base + 'categoria', antes: ing.categoria, depois: valor || null }); break;
+        case 'fornecedor': lista.push({ path: base + 'fornecedor', antes: ing.fornecedor, depois: valor || null }); break;
+        case 'unidade': lista.push({ path: base + 'unidade', antes: ing.unidade, depois: valor || null }); break;
+        case 'compraUnidade': lista.push({ path: base + 'compra/unidade', antes: ing.compra ? ing.compra.unidade : undefined, depois: valor || null }); break;
+        case 'compraFator': lista.push({ path: base + 'compra/fator', antes: ing.compra ? ing.compra.fator : undefined, depois: valor }); break;
+        case 'contUnidade':
+        case 'contFator': {
+          // Editar a contagem torna-a independente: grava o nó inteiro
+          // { unidade, fator } (dois campos, um set() no path contagem — o
+          // mesmo formato que o contagens.html escreve).
+          var ef = contagemEfetiva(ing);
+          var nova = { unidade: colId === 'contUnidade' ? (valor || null) : (ef.unidade || null), fator: colId === 'contFator' ? valor : (typeof ef.fator === 'number' ? ef.fator : null) };
+          if (nova.fator === null && nova.unidade === null) { toast('A contagem precisa de unidade e fator.', true); return null; }
+          if (typeof nova.fator !== 'number') { toast('Define também o fator de contagem — sem ele o nó não é gravado.', true); return null; }
+          if (!nova.unidade) { toast('Define também a unidade de contagem — sem ela o nó não é gravado.', true); return null; }
+          lista.push({ path: base + 'contagem', antes: ing.contagem ? { unidade: ing.contagem.unidade, fator: ing.contagem.fator } : undefined, depois: nova });
+          break;
+        }
+        case 'aliases': {
+          var antesArr = Array.isArray(ing.aliases) ? ing.aliases.slice() : undefined;
+          // Um alias que não foi mexido mantém a string ORIGINAL (a
+          // leitura-faturas compara sem colapsar espaços: um alias vindo de
+          // uma fatura pode ter quebras de linha que têm de ficar iguais).
+          var colapsar = function (a) { return String(a).replace(/\s+/g, ' ').trim(); };
+          var arr = String(valor || '').replace(/^\s*\(|\)\s*$/g, '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+            .map(function (a) { var orig = (antesArr || []).filter(function (o) { return colapsar(o) === colapsar(a); })[0]; return orig === undefined ? a : orig; });
+          if (igual(antesArr || [], arr)) return null;
+          lista.push({ path: base + 'aliases', antes: antesArr, depois: arr.length ? arr : null });
+          break;
+        }
+        case 'tipoArm': lista.push({ path: base + 'tipoArmazenamento', antes: ing.tipoArmazenamento, depois: valor || null }); break;
+        case 'localArm': lista.push({ path: base + 'localArmazenamento', antes: ing.localArmazenamento, depois: valor || null }); break;
+        default: return null;
+      }
+      descricao = nomeIng;
+    } else {
+      var rec = receitas[id];
+      var chaveAtual = artigosDaFicha(id)[0] || null;
+      switch (colId) {
+        case 'categoria': lista.push({ path: 'receitas/' + id + '/categoria', antes: rec.categoria, depois: valor || null }); break;
+        case 'pvp': lista.push({ path: 'receitas/' + id + '/pvp', antes: rec.pvp, depois: valor }); break;
+        case 'artigoPos': {
+          var conf = null;
+          if (valor && catalogo[valor] && catalogo[valor].receitaId && catalogo[valor].receitaId !== id) {
+            var outra = receitas[catalogo[valor].receitaId];
+            conf = { titulo: 'Artigo já ligado', texto: '"' + (catalogo[valor].desc || valor) + '" já está ligado a "' + ((outra && outra.nome) || catalogo[valor].receitaId) + '". Queres mudar a ligação para "' + (rec.nome || id) + '"?' };
+          }
+          if (chaveAtual && chaveAtual !== valor) lista.push({ path: 'vendas/catalogo/' + chaveAtual + '/receitaId', antes: catalogo[chaveAtual].receitaId, depois: null });
+          if (valor) lista.push({ path: 'vendas/catalogo/' + valor + '/receitaId', antes: catalogo[valor] ? catalogo[valor].receitaId : undefined, depois: id });
+          if (!lista.length) return null;
+          if (conf) lista.confirmar = conf;
+          break;
+        }
+        case 'catPos': if (!chaveAtual) return null; lista.push({ path: 'vendas/catalogo/' + chaveAtual + '/categoria', antes: catalogo[chaveAtual].categoria, depois: valor || null }); break;
+        default: return null;
+      }
+      descricao = rec.nome || id;
+    }
+    lista.descricao = descricao;
+    return lista;
+  }
+
+  // Aplica o plano ao modelo local (para a UI não esperar pelo on('value')).
+  function aplicarLocal(path, valor) {
+    var partes = path.split('/');
+    var raiz = partes.shift();
+    var obj = raiz === 'ingredientes' ? ingredientes : raiz === 'receitas' ? receitas : raiz === 'vendas' ? { catalogo: catalogo } : null;
+    if (!obj) return;
+    var cur = obj;
+    for (var i = 0; i < partes.length - 1; i++) {
+      if (cur[partes[i]] === undefined || cur[partes[i]] === null) cur[partes[i]] = {};
+      cur = cur[partes[i]];
+    }
+    var ult = partes[partes.length - 1];
+    if (valor === null || valor === undefined) delete cur[ult]; else cur[ult] = JSON.parse(JSON.stringify(valor));
+    // Um nó compra/ ou contagem/ que fique vazio desaparece no Firebase.
+    if (raiz === 'ingredientes' && partes.length === 3) {
+      var no = ingredientes[partes[0]] && ingredientes[partes[0]][partes[1]];
+      if (no && typeof no === 'object' && !Object.keys(no).length) delete ingredientes[partes[0]][partes[1]];
+    }
+  }
+
+  function escrever(path, valor) {
+    var ref = db.ref(path);
+    return (valor === null || valor === undefined) ? ref.remove() : ref.set(valor);
+  }
+
+  function executar(escritas, td, colId, id) {
+    var fila = escritas.slice();
+    (function passo() {
+      if (!fila.length) {
+        escritas.forEach(function (e) { aplicarLocal(e.path, e.depois); });
+        recalcularUsos();
+        render();
+        piscar(id, colId);
+        ultimaEscrita = escritas;
+        toast('Gravado: ' + escritas.descricao, false, 'Anular', anular);
+        return;
+      }
+      var e = fila.shift();
+      escrever(e.path, e.depois).then(passo).catch(function (err) {
+        console.error('Falha a gravar', e.path, err);
+        // Repõe o que já tinha ficado escrito neste plano.
+        var feitas = escritas.slice(0, escritas.length - fila.length - 1);
+        var rep = Promise.resolve();
+        feitas.reverse().forEach(function (f) { rep = rep.then(function () { return escrever(f.path, f.antes === undefined ? null : f.antes); }); });
+        rep.then(function () { render(); toast('Não foi possível gravar (' + (err && err.message ? err.message : 'erro') + '). Valor anterior reposto.', true); });
+      });
+    })();
+  }
+
+  var ultimaEscrita = null;
+  function anular() {
+    var esc = ultimaEscrita;
+    if (!esc) return;
+    ultimaEscrita = null;
+    var fila = esc.slice().reverse();
+    (function passo() {
+      if (!fila.length) {
+        esc.forEach(function (e) { aplicarLocal(e.path, e.antes === undefined ? null : e.antes); });
+        recalcularUsos();
+        render();
+        toast('Anulado: ' + esc.descricao, false);
+        return;
+      }
+      var e = fila.shift();
+      escrever(e.path, e.antes === undefined ? null : e.antes).then(passo).catch(function (err) {
+        toast('Não foi possível anular (' + (err && err.message ? err.message : 'erro') + ').', true);
+      });
+    })();
+  }
+
+  function piscar(id, colId) {
+    var tr = gridWrap.querySelector('tr[data-id="' + CSS.escape(id) + '"]');
+    if (!tr) return;
+    var td = tr.querySelector('td[data-col="' + colId + '"]');
+    if (!td) return;
+    td.classList.remove('flash'); void td.offsetWidth; td.classList.add('flash');
+    setTimeout(function () { td.classList.remove('flash'); }, 1200);
+  }
+
+  // ---------- Toast ----------
+  var toastEl = document.getElementById('toast'), toastMsg = document.getElementById('toastMsg'), toastBtn = document.getElementById('toastBtn');
+  var toastTimer = null, toastAcao = null;
+  function toast(msg, erro, rotulo, acao) {
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toastEl.classList.toggle('erro', !!erro);
+    toastAcao = acao || null;
+    toastBtn.hidden = !acao;
+    toastBtn.textContent = rotulo || 'Anular';
+    toastEl.classList.add('on');
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); toastAcao = null; if (!acao) return; ultimaEscrita = null; }, erro ? 5000 : 6000);
+  }
+  toastBtn.addEventListener('click', function () {
+    var a = toastAcao; toastAcao = null; toastEl.classList.remove('on'); clearTimeout(toastTimer);
+    if (a) a();
+  });
+
+  // ---------- Modal ----------
+  var modalOverlay = document.getElementById('modalOverlay'), modalTitulo = document.getElementById('modalTitulo'),
+      modalCorpo = document.getElementById('modalCorpo'), modalAcoes = document.getElementById('modalAcoes');
+  var modalOnConfirm = null, modalOnCancel = null;
+  function abrirModal(titulo, html, onConfirm, onCancel) {
+    modalTitulo.textContent = titulo; modalCorpo.innerHTML = html;
+    modalOnConfirm = onConfirm || null; modalOnCancel = onCancel || null;
+    modalAcoes.hidden = !onConfirm;
+    modalOverlay.classList.add('open');
+  }
+  function fecharModal(confirmado) {
+    modalOverlay.classList.remove('open');
+    var c = modalOnConfirm, k = modalOnCancel; modalOnConfirm = modalOnCancel = null;
+    if (confirmado && c) c(); else if (!confirmado && k) k();
+  }
+  function confirmar(titulo, texto, onConfirm, onCancel) { abrirModal(titulo, '<p>' + escapeHtml(texto) + '</p>', onConfirm, onCancel); }
+  document.getElementById('modalFechar').addEventListener('click', function () { fecharModal(false); });
+  document.getElementById('modalCancelar').addEventListener('click', function () { fecharModal(false); });
+  document.getElementById('modalConfirmar').addEventListener('click', function () { fecharModal(true); });
+  modalOverlay.addEventListener('click', function (e) { if (e.target === modalOverlay) fecharModal(false); });
+
+  // ===================================================================
+  // Interação na grelha
+  // ===================================================================
+
+  gridWrap.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-acao]');
+    var td = e.target.closest('td');
+    if (!td) return;
+    var id = td.parentNode.getAttribute('data-id');
+    var colId = td.getAttribute('data-col');
+    if (!id) return;
+
+    if (btn) {
+      e.preventDefault(); e.stopPropagation();
+      var acao = btn.getAttribute('data-acao');
+      if (acao === 'herdar') {
+        var ing = ingredientes[id];
+        confirmar('Voltar a herdar', 'Remover a contagem própria de "' + (ing.nome || id) + '" e passar a usar o formato de compra (' + ((ing.compra && ing.compra.unidade) || '—') + ' × ' + ((ing.compra && ing.compra.fator) || '—') + ')?', function () {
+          var esc = [{ path: 'ingredientes/' + id + '/contagem', antes: { unidade: ing.contagem.unidade, fator: ing.contagem.fator }, depois: null }];
+          esc.descricao = (ing.nome || id) + ' · contagem volta a herdar';
+          executar(esc, td, colId, id);
+        });
+      } else if (acao === 'confirmarSugestao') {
+        var chave = btn.getAttribute('data-chave');
+        var esc2 = planearEscritas('produtos', 'artigoPos', id, chave);
+        if (!esc2) return;
+        var rec = receitas[id];
+        confirmar('Ligar artigo POS', 'Ligar "' + (catalogo[chave].desc || chave) + '" (' + chave + ') à ficha "' + (rec.nome || id) + '"?', function () { executar(esc2, td, colId, id); });
+      }
+      return;
+    }
+
+    if (e.target.closest('a')) return;
+
+    if (td.classList.contains('ro')) {
+      if (abaAtiva === 'ingredientes' && colId === 'alergenios') { window.location.href = 'compras.html?ingrediente=' + encodeURIComponent(id); return; }
+      if (abaAtiva === 'ingredientes' && colId === 'usadoEm') {
+        var usos = usoIngredientes[id] || [];
+        abrirModal('Usado em · ' + (ingredientes[id].nome || ''), usos.length
+          ? '<ul>' + usos.map(function (u) { return '<li>' + escapeHtml(u.nome) + ' <span style="color:var(--muted)">(' + u.tipo + ')</span></li>'; }).join('') + '</ul>'
+          : '<p>Nenhuma ficha nem preparação usa este ingrediente.</p>');
+        return;
+      }
+      if (abaAtiva === 'produtos' && colId === 'custo') {
+        var p = calcProduto(id);
+        if (p.calc.avisos.length) abrirModal('Avisos de custo · ' + (receitas[id].nome || ''), '<ul>' + p.calc.avisos.map(function (a) { return '<li>' + escapeHtml(a) + '</li>'; }).join('') + '</ul>');
+        return;
+      }
+      return;
+    }
+    if (td.classList.contains('editavel')) {
+      if (emEdicao && emEdicao.td === td) return;
+      abrirEditor(td);
+    }
+  });
+
+  // Bloqueio de colagem/teclado nas células não editáveis (são spans sem
+  // contenteditable, mas deixa-se explícito).
+  gridWrap.addEventListener('paste', function (e) { if (!e.target.closest('input, select')) e.preventDefault(); });
+
+  // Ordenação por clique no cabeçalho.
+  gridWrap.addEventListener('click', function (e) {
+    var th = e.target.closest('th');
+    if (!th || arrastou) { arrastou = false; return; }
+    var col = th.getAttribute('data-col');
+    var ord = ordenacao[abaAtiva];
+    if (ord.col === col) { if (ord.dir === 1) ord.dir = -1; else { ord.col = null; ord.dir = 1; } }
+    else { ord.col = col; ord.dir = 1; }
+    render();
+  });
+
+  // Reordenação por arrasto: move grupos inteiros (os pares nunca se separam).
+  var grupoArrastado = null, arrastou = false;
+  gridWrap.addEventListener('dragstart', function (e) {
+    var th = e.target.closest('th.arrastavel');
+    if (!th) { e.preventDefault(); return; }
+    grupoArrastado = th.getAttribute('data-grupo');
+    arrastou = true;
+    try { e.dataTransfer.setData('text/plain', grupoArrastado); e.dataTransfer.effectAllowed = 'move'; } catch (err) { /* iOS */ }
+    marcarGrupo(grupoArrastado, 'arrastando', true);
+  });
+  gridWrap.addEventListener('dragover', function (e) {
+    var th = e.target.closest('th');
+    if (!th || !grupoArrastado) return;
+    e.preventDefault();
+    limparAlvos();
+    var g = th.getAttribute('data-grupo');
+    if (g === grupoArrastado || th.classList.contains('fixa')) return;
+    var r = th.getBoundingClientRect();
+    var depois = (e.clientX - r.left) > r.width / 2;
+    marcarGrupo(g, depois ? 'alvo-dir' : 'alvo-esq', true);
+  });
+  gridWrap.addEventListener('drop', function (e) {
+    var th = e.target.closest('th');
+    if (!th || !grupoArrastado) return;
+    e.preventDefault();
+    var g = th.getAttribute('data-grupo');
+    if (g !== grupoArrastado && !th.classList.contains('fixa')) {
+      var r = th.getBoundingClientRect();
+      var depois = (e.clientX - r.left) > r.width / 2;
+      var grupos = ordemGrupos(abaAtiva);
+      grupos.splice(grupos.indexOf(grupoArrastado), 1);
+      var idx = grupos.indexOf(g) + (depois ? 1 : 0);
+      grupos.splice(idx, 0, grupoArrastado);
+      guardarOrdem(abaAtiva, grupos);
+    }
+    grupoArrastado = null; limparAlvos(); render();
+  });
+  gridWrap.addEventListener('dragend', function () { grupoArrastado = null; limparAlvos(); setTimeout(function () { arrastou = false; }, 0); Array.prototype.forEach.call(gridWrap.querySelectorAll('th.arrastando'), function (t) { t.classList.remove('arrastando'); }); });
+  function marcarGrupo(g, cls, on) {
+    Array.prototype.forEach.call(gridWrap.querySelectorAll('th[data-grupo="' + g + '"]'), function (t) { t.classList.toggle(cls, on); });
+  }
+  function limparAlvos() {
+    Array.prototype.forEach.call(gridWrap.querySelectorAll('th.alvo-esq, th.alvo-dir'), function (t) { t.classList.remove('alvo-esq', 'alvo-dir'); });
+  }
+
+  document.getElementById('btnReporOrdem').addEventListener('click', function () {
+    try { localStorage.removeItem(chaveOrdem(abaAtiva)); } catch (e) { /* sem storage */ }
+    render();
+  });
+
+  pesquisa.addEventListener('input', function () { termo = pesquisa.value.trim(); render(); });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (btn) {
+    btn.addEventListener('click', function () {
+      if (emEdicao) fecharEditor(true);
+      abaAtiva = btn.getAttribute('data-tab');
+      Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (b) { b.classList.toggle('active', b === btn); });
+      render();
+    });
+  });
+
+  mesSel.addEventListener('change', function () { mesAtivo = mesSel.value || null; render(); });
+
+  // ===================================================================
+  // Dados (leitura). Nada aqui escreve.
+  // ===================================================================
+
+  function marcar(k) { carregado[k] = true; render(); }
+
+  db.ref('ingredientes').on('value', function (s) { ingredientes = s.val() || {}; marcar('ing'); }, function (e) { statusMsg.textContent = 'Erro de ligação à base de dados: ' + e.message; });
+  db.ref('receitas').on('value', function (s) { receitas = s.val() || {}; recalcularUsos(); marcar('rec'); });
+  db.ref('preparacoes').on('value', function (s) { preparacoes = s.val() || {}; recalcularUsos(); marcar('prep'); });
+  db.ref('categoriasIngredientes').on('value', function (s) {
+    var v = s.val() || {}; categoriasIng = {};
+    Object.keys(v).forEach(function (k) { categoriasIng[k] = (v[k] && v[k].label) || k; });
+    marcar('cat');
+  });
+  db.ref('suppliers').on('value', function (s) { suppliers = s.val() || {}; marcar('sup'); });
+  db.ref('vendas/catalogo').on('value', function (s) { catalogo = s.val() || {}; marcar('catalogo'); });
+  db.ref('mapaProdutosReceitas').on('value', function (s) { mapaProdutos = s.val() || {}; marcar('mapa'); });
+
+  // Meses com vendas: lê-se só vendas/{mes}/produtos, mês a mês, desde o
+  // primeiro import (Mai/2026) até ao mês corrente — nunca vendas/ inteiro.
+  (function carregarMeses() {
+    var hoje = new Date();
+    var meses = [];
+    var y = 2026, m = 5;
+    while (y < hoje.getFullYear() || (y === hoje.getFullYear() && m <= hoje.getMonth() + 1)) {
+      meses.push(y + '-' + (m < 10 ? '0' + m : m));
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    Promise.all(meses.map(function (mes) {
+      return db.ref('vendas/' + mes + '/produtos').once('value').then(function (s) {
+        var v = s.val();
+        if (v && Object.keys(v).length) produtosMes[mes] = v;
+      }).catch(function () { /* mês sem nó */ });
+    })).then(function () {
+      mesesComVendas = Object.keys(produtosMes).sort();
+      mesSel.innerHTML = mesesComVendas.length
+        ? mesesComVendas.slice().reverse().map(function (mes) { return '<option value="' + mes + '">' + escapeHtml(nomeMes(mes)) + '</option>'; }).join('')
+        : '<option value="">Sem vendas importadas</option>';
+      mesAtivo = mesesComVendas.length ? mesesComVendas[mesesComVendas.length - 1] : null;
+      mesSel.value = mesAtivo || '';
+      marcar('meses');
+    });
+  })();
+
+  }); // fim de autenticarEContinuar
+});
+</script>
+
+</body>
+</html>

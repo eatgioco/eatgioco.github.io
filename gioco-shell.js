@@ -234,6 +234,8 @@
       { href: 'pagamentos.html', icone: 'receipt',          label: 'Pagamentos' },
       { href: 'vendas.html',     icone: 'bar-chart-2',      label: 'Vendas' },
       { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
+      /* Gestão: folha de cálculo de ingredientes e produtos (edição em massa). */
+      { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },

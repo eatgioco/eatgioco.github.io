@@ -32,7 +32,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   O critério é a existência de hover, **nunca a largura** — e é por isso que tem de ser
   opt-in: sem a classe, uma página desktop-only (`width=1200`) aberta no telemóvel ficava
   com uma barra de 52px desenhada a 1200px e reduzida a zoom out, inutilizável.
-  Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html` e
+  Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html`, `gestao.html` e
   `loja-sao-bento.html` (desde 1 Set/2026: no computador da loja, que tem rato,
   nada muda — o critério é o hover).
 
@@ -51,6 +51,8 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `foodcost.html` | Duas secções independentes: (1) **mapa de produtos ZoneSoft → fichas técnicas**, sempre visível, alimentado pelos produtos distintos de `vendasDiario` nas últimas 4 semanas completas — a MESMA janela do painel "Encomenda sugerida" da `compras.html`, de que o mapa é pré-requisito — com sugestão automática, escolha manual, "Ignorar" e progresso "X de Y produtos tratados"; (2) **variância** de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas. Só (2) depende das contagens: o estado vazio "ainda não há um período para comparar" está confinado a ela, e (1) continua utilizável com zero ou uma contagem | Equipa |
 | `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós). Classificação de movimentos em DUAS dimensões: a rubrica do P&L e a despesa concreta ("Meta Ads", "EDP"), ambas aprendidas pelas mesmas regras; a despesa é metadado e nunca mexe em valores | Equipa |
 | `contabilidade.html` | Placeholder | — |
+| `gestao.html` | Folha de cálculo de **ingredientes** e **produtos** (edição em massa, inline, grava ao sair da célula). Dois separadores: Ingredientes (uma linha por `ingredientes/`; contagem herdada da compra quando não existe `contagem/`) e Produtos (uma linha por `receitas/`, com custo/food cost via `gioco-custos.js`, artigo POS de `vendas/catalogo` e vendas do mês de `vendas/{mes}/produtos`). Escreve SEMPRE um `set()`/`remove()` por path de campo: `ingredientes/{id}/{campo}`, `ingredientes/{id}/compra/{unidade|fator}`, `ingredientes/{id}/contagem` (objeto `{unidade,fator}`, o mesmo formato do contagens.html), `receitas/{id}/{categoria|pvp}`, `vendas/catalogo/{chave}/{receitaId|categoria}`. Nunca escreve em `vendas/{mes}/produtos` nem `vendasDiario/`. Deep-links: `compras.html?ingrediente=ID` e `receitas.html?receita=ID`. Coluna Foto lê o manifesto `img/ingredientes/index.json` (array de slugs) — sem manifesto mostra "—" | Equipa |
+| `gioco-custos.js` | Motor partilhado de custo/food cost (`GiocoCustos`): `custoIngrediente` (precoUltimaCompra ÷ compra.fator), `custoPreparacao`, `custoReceita` (→ custo, avisos[], foodCost %), `foodCost`, `converterFator`. Extraído do receitas.html em Set/2026 sem alterar um cêntimo; receitas.html e gestao.html usam-no — nunca reimplementar por página | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
@@ -135,6 +137,12 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
 mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          escrita SÓ pela foodcost.html. O código é o das chaves de
                          vendasDiario/{AAAA-MM}/{dia}/produtos.
+                         ATENÇÃO (Set/2026): a gestao.html guarda a ligação
+                         artigo POS → ficha noutro sítio, em
+                         vendas/catalogo/{chave}/receitaId (pedido do Manel).
+                         Este mapa continua a ser o que o motor de consumo lê;
+                         a gestao.html só o usa como SUGESTÃO de ligação.
+                         Unificar os dois é trabalho pendente.
                            { receitaId }               — ficha técnica (forma original);
                              cada unidade vendida explode a receita normalmente.
                            { ignorado:true }            — para o que não consome
@@ -367,7 +375,7 @@ mão de propósito).
 
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 
-Páginas já migradas: `receitas.html`, `pagamentos.html`, `vendas.html`,
+Páginas já migradas: `receitas.html`, `gestao.html`, `pagamentos.html`, `vendas.html`,
 `equipa.html`, `mrn-dashboard.html`, `contagens.html`, `compras.html`, `tesouraria.html`, `tarefas.html`, `conta-bancaria.html`, `leitura-faturas.html`, `caixa.html`, `loja-sao-bento.html`, `foodcost.html` (nova, já no shell). Por migrar: `index.html` (e as de suporte:
 `abanca-callback`, `privacidade`, `termos`).
 
