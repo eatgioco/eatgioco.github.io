@@ -57,6 +57,8 @@
     margin-top:40px;
   }
 
+  .hidden{ display:none !important; }
+
   /* Two-column work areas (form/plan on the left, data on the right) */
   .split-grid{
     display:grid;
@@ -1465,6 +1467,22 @@
     </div>
   </div>
 
+  <div class="section hidden" id="migracaoEquipSection">
+    <p class="section-title">Migração de equipamentos 2026</p>
+    <div class="form-card">
+      <p style="font-size:14px;line-height:1.5;margin:0 0 16px;">
+        O nó <code>equipamentos</code> tem atualmente <strong id="migEquipAntesCount">0</strong> registo(s), desatualizado(s)
+        face à lista real da loja. Isto vai criar 22 equipamentos novos e marcar os atuais como inativos —
+        nada é apagado. Nada é escrito até carregares em "Aplicar".
+      </p>
+      <p class="equip-manage-zona-title" style="margin-top:0;">Atual (vai ficar inativo)</p>
+      <div id="migEquipAntes"></div>
+      <p class="equip-manage-zona-title">Novo (vai ser criado)</p>
+      <div id="migEquipNovo"></div>
+      <button type="button" class="btn btn-primary" id="btnAplicarMigracaoEquip" style="margin-top:16px;" onclick="aplicarMigracaoEquip()">Aplicar</button>
+    </div>
+  </div>
+
   <div class="section" id="equip-manage-section">
     <p class="section-title">Equipamentos</p>
     <div id="equipManageWrap"></div>
@@ -1728,6 +1746,8 @@
   var tempRef = db.ref('lojaTemperaturas');
   var fotosRef = db.ref('lojaTemperaturasFotos');
   var pessoasRef = db.ref('pessoas');
+  var configRef = db.ref('config');
+  var equipamentosEstadosRef = db.ref('equipamentosEstados');
 
   var pessoasAtivas = [];
   var pessoasCarregadas = false;
@@ -2004,6 +2024,137 @@
     armario:    { nome:'Armário Refrigerado GN 2/1 HV10001',    zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:8, ativo:true },
     congelador: { nome:'Congelador',                            zona:'Arrumos',  tipo:'congelacao',   limite:-18,  ordem:9, ativo:true }
   };
+
+  /* ---------- Migração 2026: 9 equipamentos antigos -> 22 reais da loja ---------- */
+  var EQUIPAMENTOS_2026 = [
+    { id:'refhorizbebidas',     nome:'2 - Refrigerado Horizontal (Bebidas)',              zona:'Sala principal',        ordem:1,  tipo:'refrigeracao', registaTemperatura:true },
+    { id:'refhorizqueijos',     nome:'3 - Refrigerado Horizontal (Queijo e charcutaria)', zona:'Sala principal',        ordem:2,  tipo:'refrigeracao', registaTemperatura:true },
+    { id:'cavevinho',           nome:'Cave de vinho',                                     zona:'Sala principal',        ordem:3,  tipo:'outro',        registaTemperatura:false, estado:'manutencao' },
+    { id:'cortadorafatiadora',  nome:'Cortadora / Fatiadora',                             zona:'Sala principal',        ordem:4,  tipo:'outro',        registaTemperatura:false },
+    { id:'cubalavamaos',        nome:'Cuba lava-mãos',                                    zona:'Sala principal',        ordem:5,  tipo:'outro',        registaTemperatura:false },
+    { id:'forno',               nome:'Forno',                                             zona:'Sala principal',        ordem:6,  tipo:'outro',        registaTemperatura:false },
+    { id:'maqcerveja',          nome:'Máquina de cerveja',                                zona:'Sala principal',        ordem:7,  tipo:'outro',        registaTemperatura:false },
+    { id:'maqbebidaspressao',   nome:'Máquina de bebidas de pressão',                     zona:'Sala principal',        ordem:8,  tipo:'outro',        registaTemperatura:false },
+    { id:'maqcafe',             nome:'Máquina de café',                                   zona:'Sala principal',        ordem:9,  tipo:'outro',        registaTemperatura:false },
+    { id:'maqgelo',             nome:'Máquina de gelo',                                   zona:'Sala principal',        ordem:10, tipo:'outro',        registaTemperatura:true,  semLimites:true },
+    { id:'maqlavarcopos',       nome:'Máquina de lavar copos',                            zona:'Sala principal',        ordem:11, tipo:'lavagem',      registaTemperatura:true },
+    { id:'placafriaexpositor',  nome:'Placa fria / expositor',                            zona:'Sala principal',        ordem:12, tipo:'refrigeracao', registaTemperatura:true },
+
+    { id:'friohorizcongelados', nome:'1 - Frio horizontal congelados',                    zona:'Zona de preparações',   ordem:1,  tipo:'congelacao',   registaTemperatura:true,  estado:'manutencao' },
+    { id:'friovertical',        nome:'2 - Frio Vertical',                                 zona:'Zona de preparações',   ordem:2,  tipo:'refrigeracao', registaTemperatura:true,  estado:'avariado' },
+    { id:'robotcozinha',        nome:'Robot de Cozinha',                                  zona:'Zona de preparações',   ordem:3,  tipo:'outro',        registaTemperatura:false },
+
+    { id:'caixagorduras',       nome:'Caixa de Gorduras',                                 zona:'Área técnica',          ordem:1,  tipo:'outro',        registaTemperatura:false },
+    { id:'camarafrigorifica',   nome:'Câmara Frigorífica horizontal',                     zona:'Área técnica',          ordem:2,  tipo:'refrigeracao', registaTemperatura:true },
+    { id:'exaustor',            nome:'Exaustor',                                          zona:'Área técnica',          ordem:3,  tipo:'outro',        registaTemperatura:false },
+    { id:'maqlavarloica',       nome:'Máquina de Lavar Loiça',                            zona:'Área técnica',          ordem:4,  tipo:'lavagem',      registaTemperatura:true },
+    { id:'microondas',          nome:'Microondas',                                        zona:'Área técnica',          ordem:5,  tipo:'outro',        registaTemperatura:false },
+    { id:'placafogao1',         nome:'Placa Fogão 1',                                     zona:'Área técnica',          ordem:6,  tipo:'outro',        registaTemperatura:false },
+    { id:'placafogao2',         nome:'Placa de Fogão 2',                                  zona:'Área técnica',          ordem:7,  tipo:'outro',        registaTemperatura:false }
+  ];
+
+  function buildEquipRecordFromDef(def, timestamp){
+    var limites = EQUIP_TIPO_LIMITES_DEFAULT[def.tipo] || { min: null, max: null };
+    return {
+      nome: def.nome,
+      zona: def.zona,
+      ordem: def.ordem,
+      estado: def.estado || 'operacional',
+      estadoDesde: timestamp,
+      ativo: true,
+      registaTemperatura: !!def.registaTemperatura,
+      tipo: def.tipo,
+      limiteMin: def.semLimites ? null : limites.min,
+      limiteMax: def.semLimites ? null : limites.max
+    };
+  }
+
+  var migracaoEquipConcluida = null;
+
+  function atualizarVisibilidadeMigracaoEquip(){
+    var section = document.getElementById('migracaoEquipSection');
+    if (!section) return;
+    section.classList.toggle('hidden', migracaoEquipConcluida !== false);
+  }
+
+  configRef.child('migracaoEquipamentos2026').on('value', function(snapshot){
+    migracaoEquipConcluida = snapshot.val() === true;
+    atualizarVisibilidadeMigracaoEquip();
+    renderMigracaoEquip();
+  });
+
+  function renderMigracaoEquip(){
+    var wrap1 = document.getElementById('migEquipAntes');
+    var wrap2 = document.getElementById('migEquipNovo');
+    if (!wrap1 || !wrap2 || migracaoEquipConcluida !== false) return;
+    if (!equipamentosCarregados){
+      wrap1.innerHTML = '';
+      wrap2.innerHTML = '';
+      return;
+    }
+
+    var atuais = getEquipArray();
+    document.getElementById('migEquipAntesCount').textContent = atuais.length;
+
+    var html1 = atuais.length === 0 ? '<p class="empty-state">Nó equipamentos vazio.</p>' : '';
+    atuais.forEach(function(eq){
+      html1 += '<div class="equip-manage-row" style="cursor:default;">' +
+        '<span class="equip-manage-nome">' + escapeHtml(eq.nome || eq.id) + '</span>' +
+        '<span class="equip-manage-tipo">' + escapeHtml(eq.zona || '') + '</span>' +
+        '</div>';
+    });
+    wrap1.innerHTML = html1;
+
+    var html2 = '';
+    var zonaAtual = null;
+    EQUIPAMENTOS_2026.forEach(function(def){
+      if (def.zona !== zonaAtual){
+        zonaAtual = def.zona;
+        html2 += '<p class="equip-manage-zona-title">' + escapeHtml(zonaAtual) + '</p>';
+      }
+      var tempLabel = def.registaTemperatura ? 'termómetro' : 'sem termómetro';
+      html2 += '<div class="equip-manage-row" style="cursor:default;">' +
+        '<span class="equip-manage-nome">' + escapeHtml(def.nome) + '</span>' +
+        '<span class="equip-manage-tipo">' + tempLabel + '</span>' +
+        '</div>';
+    });
+    wrap2.innerHTML = html2;
+  }
+
+  function aplicarMigracaoEquip(){
+    var btn = document.getElementById('btnAplicarMigracaoEquip');
+    if (btn){ btn.disabled = true; btn.textContent = 'A aplicar...'; }
+
+    var idsExistentes = Object.keys(equipamentos);
+    var idsColidem = EQUIPAMENTOS_2026.filter(function(def){ return idsExistentes.indexOf(def.id) !== -1; });
+    if (idsColidem.length > 0){
+      alert('Já existe(m) equipamento(s) com o id "' + idsColidem.map(function(d){ return d.id; }).join(', ') + '". Migração cancelada.');
+      if (btn){ btn.disabled = false; btn.textContent = 'Aplicar'; }
+      return;
+    }
+
+    var agora = Date.now();
+
+    // Escrita registo a registo (path a path), nunca todas de uma vez:
+    // um write por equipamento, um write por desativação.
+    var tarefas = EQUIPAMENTOS_2026.map(function(def){
+      return function(){ return equipamentosRef.child(def.id).set(buildEquipRecordFromDef(def, agora)); };
+    }).concat(idsExistentes.map(function(id){
+      return function(){ return equipamentosRef.child(id).child('ativo').set(false); };
+    }));
+
+    tarefas.reduce(function(p, tarefa){
+      return p.then(tarefa);
+    }, Promise.resolve()).then(function(){
+      return configRef.child('migracaoEquipamentos2026').set(true);
+    }).then(function(){
+      if (btn){ btn.disabled = false; btn.textContent = 'Aplicar'; }
+    }).catch(function(err){
+      if (btn){ btn.disabled = false; btn.textContent = 'Aplicar'; }
+      alert('Erro na migração: ' + err.message + ' — verifica no Firebase o que já ficou escrito antes de tentar de novo.');
+    });
+  }
+  window.aplicarMigracaoEquip = aplicarMigracaoEquip;
 
   function getEquipArray(){
     return Object.keys(equipamentos).map(function(id){
@@ -2780,6 +2931,7 @@
     populateEquipSelect();
     renderEquipManage();
     renderTemps();
+    renderMigracaoEquip();
   });
 
   carregarPessoas(function(){
