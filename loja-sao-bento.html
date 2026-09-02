@@ -1984,14 +1984,14 @@
     outro: 'Outro'
   };
 
-  var EQUIP_TIPO_LIMITE_DEFAULT = {
-    refrigeracao: 5,
-    congelacao: -18,
-    lavagem: 82,
-    outro: null
+  var EQUIP_TIPO_LIMITES_DEFAULT = {
+    refrigeracao: { min: 0,    max: 5 },
+    congelacao:   { min: -25,  max: -18 },
+    lavagem:      { min: 82,   max: null },
+    outro:        { min: null, max: null }
   };
 
-  var EQUIP_ZONAS = ['Cozinha', 'Bar/Sala', 'Arrumos', 'Pateo Exterior'];
+  var EQUIP_ZONAS = ['Sala principal', 'Zona de preparações', 'Área técnica'];
 
   var EQUIP_SEED = {
     edenox:     { nome:'Bancada Fria EDENOX MPS-250HC',        zona:'Cozinha',  tipo:'refrigeracao', limite:5,    ordem:1, ativo:true },
@@ -2092,9 +2092,9 @@
 
   function isOutOfRange(equipId, temp){
     var eq = equipamentos[equipId];
-    if (!eq || eq.limite === null || eq.limite === undefined) return false;
-    if (eq.tipo === 'refrigeracao' || eq.tipo === 'congelacao') return temp > eq.limite;
-    if (eq.tipo === 'lavagem') return temp < eq.limite;
+    if (!eq || !eq.registaTemperatura) return false;
+    if (eq.limiteMax !== null && eq.limiteMax !== undefined && temp > eq.limiteMax) return true;
+    if (eq.limiteMin !== null && eq.limiteMin !== undefined && temp < eq.limiteMin) return true;
     return false;
   }
 
