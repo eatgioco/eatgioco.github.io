@@ -211,6 +211,27 @@
     margin-top:8px;
   }
 
+  .equip-manage-zona-toggle{
+    background:none;
+    border:none;
+    width:100%;
+    text-align:left;
+    cursor:pointer;
+    padding:0;
+  }
+
+  .equip-ficha-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0 16px;
+  }
+
+  @media (max-width:480px){
+    .equip-ficha-grid{
+      grid-template-columns:1fr;
+    }
+  }
+
   /* ---------- Checklists ---------- */
   .checklist-buttons{
     display:flex;
@@ -1643,23 +1664,59 @@
   </div>
 </div>
 
-<!-- Modal Apagar equipamento (bloqueado — oferece desativar) -->
+<!-- Modal Desativar equipamento -->
 <div class="modal-overlay" id="equipApagarModalOverlay">
   <div class="modal">
     <div class="modal-header">
-      <h2>Não é possível apagar</h2>
+      <h2>Desativar equipamento</h2>
       <button class="modal-close" onclick="closeEquipApagarModal()">×</button>
     </div>
 
     <p style="font-size:14px;line-height:1.5;margin:0;">
-      Equipamentos não podem ser apagados porque há registos históricos de temperatura (HACCP)
-      que referenciam <strong id="equipApagarNome"></strong>. Podes desativá-lo — deixa de
-      aparecer no formulário e na lista, mas o histórico mantém-se intacto.
+      <strong id="equipApagarNome"></strong> deixa de aparecer na lista e no formulário de
+      temperatura, mas o histórico mantém-se intacto. Não é apagado — podes reativá-lo mais
+      tarde no painel de edição.
     </p>
 
     <div class="modal-actions">
       <button type="button" class="btn" onclick="closeEquipApagarModal()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="confirmarDesativarEquip()">Desativar equipamento</button>
+      <button type="button" class="btn btn-primary" onclick="confirmarDesativarEquip()">Desativar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Alterar estado de equipamento -->
+<div class="modal-overlay" id="equipEstadoModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Alterar estado — <span id="equipEstadoNome"></span></h2>
+      <button class="modal-close" onclick="fecharEquipEstadoModal()">×</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="equipEstadoSelect">Estado</label>
+      <select id="equipEstadoSelect">
+        <option value="operacional">Operacional</option>
+        <option value="manutencao">Em manutenção</option>
+        <option value="avariado">Avariado</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="equipEstadoPessoa">Pessoa</label>
+      <select id="equipEstadoPessoa" disabled>
+        <option>A carregar...</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="equipEstadoNota">Nota (opcional)</label>
+      <input type="text" id="equipEstadoNota" placeholder="observações">
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="fecharEquipEstadoModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="equipEstadoSubmitBtn" onclick="confirmarAlterarEstado()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2162,10 +2219,21 @@
     });
   }
 
-  function getEquipAtivosOrdenados(){
+  function compareZonaOrdem(a, b){
+    var za = EQUIP_ZONAS.indexOf(a.zona);
+    var zb = EQUIP_ZONAS.indexOf(b.zona);
+    if (za === -1) za = 999;
+    if (zb === -1) zb = 999;
+    if (za !== zb) return za - zb;
+    return (a.ordem || 0) - (b.ordem || 0);
+  }
+
+  // Só os equipamentos com termómetro e ainda ativos — usado no dropdown/lista
+  // de registo de temperatura. São 9 dos 22 equipamentos.
+  function getEquipComTermometroAtivos(){
     return getEquipArray()
-      .filter(function(e){ return e.ativo !== false; })
-      .sort(function(a, b){ return (a.ordem || 0) - (b.ordem || 0); });
+      .filter(function(e){ return e.registaTemperatura === true && e.ativo !== false; })
+      .sort(compareZonaOrdem);
   }
 
   function slugify(str){
@@ -2256,7 +2324,7 @@
       return;
     }
     var html = '';
-    getEquipAtivosOrdenados().forEach(function(eq){
+    getEquipComTermometroAtivos().forEach(function(eq){
       html += '<button type="button" class="equip-list-item" onclick="openTempForm(\'' + eq.id + '\')">';
       html += '  <span class="equip-num-badge">' + eq.ordem + '</span>';
       html += '  <span class="equip-list-text"><strong>' + escapeHtml(eq.nome) + '</strong><br><span class="equip-list-zone">' + escapeHtml(eq.zona) + '</span></span>';
@@ -2274,7 +2342,7 @@
     }
     var currentVal = sel.value;
     var html = '';
-    getEquipAtivosOrdenados().forEach(function(eq){
+    getEquipComTermometroAtivos().forEach(function(eq){
       html += '<option value="' + eq.id + '">' + eq.ordem + '. ' + escapeHtml(eq.nome) + '</option>';
     });
     sel.innerHTML = html;
@@ -2282,15 +2350,20 @@
     if (currentVal && equipamentos[currentVal]) sel.value = currentVal;
   }
 
+  // Tolerante a ids que já não existem (ex.: os pontos antigos do SVG da
+  // planta) — abre o formulário sem pré-seleção em vez de falhar.
   function openTempForm(id){
     var sel = document.getElementById('temp-equipamento');
-    sel.value = id;
+    var existe = id && Array.prototype.some.call(sel.options, function(opt){ return opt.value === id; });
+    if (existe) sel.value = id;
     document.getElementById('temp-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('temp-valor').focus();
-    var card = document.getElementById('equipcard_' + id);
-    if (card){
-      card.classList.add('highlight');
-      setTimeout(function(){ card.classList.remove('highlight'); }, 1500);
+    if (existe){
+      var card = document.getElementById('equipcard_' + id);
+      if (card){
+        card.classList.add('highlight');
+        setTimeout(function(){ card.classList.remove('highlight'); }, 1500);
+      }
     }
   }
   window.openTempForm = openTempForm;
@@ -2586,13 +2659,13 @@
     });
 
     var idsToShow = {};
-    getEquipAtivosOrdenados().forEach(function(eq){ idsToShow[eq.id] = true; });
+    getEquipComTermometroAtivos().forEach(function(eq){ idsToShow[eq.id] = true; });
     Object.keys(byEquip).forEach(function(id){ idsToShow[id] = true; });
 
     var equipList = Object.keys(idsToShow).map(function(id){
       var eq = equipamentos[id];
       return eq ? Object.assign({ id: id }, eq) : { id: id, nome: id, zona: '', ordem: 9999 };
-    }).sort(function(a, b){ return (a.ordem || 9999) - (b.ordem || 9999); });
+    }).sort(compareZonaOrdem);
 
     var html = '';
     equipList.forEach(function(eq){
@@ -2677,6 +2750,9 @@
   var equipOpenPanelId = null;
   var equipDraft = null;
   var equipApagarPendingId = null;
+  var equipEstadoPendingId = null;
+  var equipMostrarInativos = false;
+  var equipZonasColapsadas = {};
 
   function seedEquipamentos(){
     var btn = document.getElementById('btnSeedEquip');
@@ -2691,6 +2767,35 @@
     });
   }
   window.seedEquipamentos = seedEquipamentos;
+
+  function diasDesde(ts){
+    if (!ts) return null;
+    return Math.max(0, Math.floor((Date.now() - ts) / (24 * 60 * 60 * 1000)));
+  }
+
+  function estadoLabel(estado){
+    if (estado === 'avariado') return 'Avariado';
+    if (estado === 'manutencao') return 'Em manutenção';
+    return 'Operacional';
+  }
+
+  function estadoDotColor(estado){
+    if (estado === 'avariado') return 'var(--red)';
+    if (estado === 'manutencao') return 'var(--amber)';
+    return 'var(--green)';
+  }
+
+  function toggleZonaColapsada(zona){
+    equipZonasColapsadas[zona] = !equipZonasColapsadas[zona];
+    renderEquipManage();
+  }
+  window.toggleZonaColapsada = toggleZonaColapsada;
+
+  function toggleMostrarInativosEquip(){
+    equipMostrarInativos = !equipMostrarInativos;
+    renderEquipManage();
+  }
+  window.toggleMostrarInativosEquip = toggleMostrarInativosEquip;
 
   function toggleEquipPanel(id){
     if (equipOpenPanelId === id){
@@ -2712,10 +2817,12 @@
     equipDraft = {
       nome: '',
       zona: EQUIP_ZONAS[0],
-      tipo: 'refrigeracao',
-      limite: EQUIP_TIPO_LIMITE_DEFAULT.refrigeracao,
       ordem: getEquipArray().length + 1,
-      ativo: true
+      ativo: true,
+      registaTemperatura: false,
+      tipo: 'outro',
+      limiteMin: null,
+      limiteMax: null
     };
     renderEquipManage();
   }
@@ -2730,40 +2837,75 @@
 
   function onEquipTipoChange(){
     var tipo = document.getElementById('equipEdit-tipo').value;
-    var def = EQUIP_TIPO_LIMITE_DEFAULT[tipo];
-    document.getElementById('equipEdit-limite').value = (def === null || def === undefined) ? '' : def;
+    var def = EQUIP_TIPO_LIMITES_DEFAULT[tipo] || { min: null, max: null };
+    document.getElementById('equipEdit-limiteMin').value = (def.min === null || def.min === undefined) ? '' : def.min;
+    document.getElementById('equipEdit-limiteMax').value = (def.max === null || def.max === undefined) ? '' : def.max;
   }
   window.onEquipTipoChange = onEquipTipoChange;
 
   function saveEquip(id){
     var nome = document.getElementById('equipEdit-nome').value.trim();
-    var zona = document.getElementById('equipEdit-zona').value;
-    var tipo = document.getElementById('equipEdit-tipo').value;
-    var limiteRaw = document.getElementById('equipEdit-limite').value.trim();
-    var ordemRaw = document.getElementById('equipEdit-ordem').value.trim();
-    var ativo = document.getElementById('equipEdit-ativo').checked;
-
     if (!nome){
       alert('Indica o nome do equipamento.');
       return;
     }
 
-    var limite = null;
-    if (limiteRaw !== ''){
-      limite = parseFloat(limiteRaw);
-      if (isNaN(limite)){
-        alert('Limite inválido.');
-        return;
-      }
-    }
-
+    var ordemRaw = document.getElementById('equipEdit-ordem').value.trim();
     var ordem = ordemRaw === '' ? 0 : parseInt(ordemRaw, 10);
     if (isNaN(ordem)){
       alert('Ordem inválida.');
       return;
     }
 
-    var record = { nome: nome, zona: zona, tipo: tipo, limite: limite, ordem: ordem, ativo: ativo };
+    function numOrNull(elId){
+      var raw = document.getElementById(elId).value.trim();
+      if (raw === '') return null;
+      var n = parseFloat(raw);
+      if (isNaN(n)) throw new Error('Valor numérico inválido.');
+      return n;
+    }
+
+    var limiteMin, limiteMax, largura, profundidade, altura, potencia, valorAquisicao, periodicidadeManutencao;
+    try {
+      limiteMin = numOrNull('equipEdit-limiteMin');
+      limiteMax = numOrNull('equipEdit-limiteMax');
+      largura = numOrNull('equipEdit-largura');
+      profundidade = numOrNull('equipEdit-profundidade');
+      altura = numOrNull('equipEdit-altura');
+      potencia = numOrNull('equipEdit-potencia');
+      valorAquisicao = numOrNull('equipEdit-valorAquisicao');
+      periodicidadeManutencao = numOrNull('equipEdit-periodicidadeManutencao');
+    } catch (e){
+      alert(e.message);
+      return;
+    }
+
+    var record = {
+      nome: nome,
+      marca: document.getElementById('equipEdit-marca').value.trim() || null,
+      modelo: document.getElementById('equipEdit-modelo').value.trim() || null,
+      numeroSerie: document.getElementById('equipEdit-numeroSerie').value.trim() || null,
+      zona: document.getElementById('equipEdit-zona').value,
+      local: document.getElementById('equipEdit-local').value.trim() || null,
+      ordem: ordem,
+      ativo: document.getElementById('equipEdit-ativo').checked,
+      registaTemperatura: document.getElementById('equipEdit-registaTemperatura').checked,
+      tipo: document.getElementById('equipEdit-tipo').value,
+      limiteMin: limiteMin,
+      limiteMax: limiteMax,
+      largura: largura,
+      profundidade: profundidade,
+      altura: altura,
+      fornecedor: document.getElementById('equipEdit-fornecedor').value.trim() || null,
+      dataAquisicao: document.getElementById('equipEdit-dataAquisicao').value || null,
+      valorAquisicao: valorAquisicao,
+      garantiaAte: document.getElementById('equipEdit-garantiaAte').value || null,
+      potencia: potencia,
+      fichaTecnica: document.getElementById('equipEdit-fichaTecnica').value.trim() || null,
+      periodicidadeManutencao: periodicidadeManutencao,
+      ultimaManutencao: document.getElementById('equipEdit-ultimaManutencao').value || null,
+      notas: document.getElementById('equipEdit-notas').value.trim() || null
+    };
 
     var targetId = id;
     if (!targetId){
@@ -2776,9 +2918,13 @@
         alert('Já existe um equipamento com este identificador ("' + targetId + '"). Escolhe um nome diferente.');
         return;
       }
+      record.estado = 'operacional';
+      record.estadoDesde = Date.now();
     }
 
-    equipamentosRef.child(targetId).set(record).then(function(){
+    // update(), nunca set() — um formulário parcial não pode apagar campos
+    // (estado/estadoDesde/estadoNota, por exemplo) que ele não mostra.
+    equipamentosRef.child(targetId).update(record).then(function(){
       closeEquipPanel();
     }).catch(function(err){
       alert('Erro ao guardar equipamento: ' + err.message);
@@ -2804,17 +2950,7 @@
   function confirmarDesativarEquip(){
     if (!equipApagarPendingId) return;
     var id = equipApagarPendingId;
-    var eq = equipamentos[id];
-    if (!eq){ closeEquipApagarModal(); return; }
-    var record = {
-      nome: eq.nome,
-      zona: eq.zona,
-      tipo: eq.tipo,
-      limite: (eq.limite === undefined ? null : eq.limite),
-      ordem: eq.ordem,
-      ativo: false
-    };
-    equipamentosRef.child(id).set(record).then(function(){
+    equipamentosRef.child(id).child('ativo').set(false).then(function(){
       closeEquipApagarModal();
       closeEquipPanel();
     }).catch(function(err){
@@ -2823,52 +2959,146 @@
   }
   window.confirmarDesativarEquip = confirmarDesativarEquip;
 
+  function abrirAlterarEstado(id){
+    var eq = equipamentos[id];
+    if (!eq) return;
+    equipEstadoPendingId = id;
+    document.getElementById('equipEstadoNome').textContent = eq.nome;
+    document.getElementById('equipEstadoSelect').value = eq.estado || 'operacional';
+    document.getElementById('equipEstadoNota').value = '';
+    document.getElementById('equipEstadoModalOverlay').classList.add('open');
+  }
+  window.abrirAlterarEstado = abrirAlterarEstado;
+
+  function fecharEquipEstadoModal(){
+    equipEstadoPendingId = null;
+    document.getElementById('equipEstadoModalOverlay').classList.remove('open');
+  }
+  window.fecharEquipEstadoModal = fecharEquipEstadoModal;
+
+  function confirmarAlterarEstado(){
+    if (!equipEstadoPendingId) return;
+    var id = equipEstadoPendingId;
+    var eq = equipamentos[id];
+    if (!eq){ fecharEquipEstadoModal(); return; }
+
+    var novoEstado = document.getElementById('equipEstadoSelect').value;
+    var nota = document.getElementById('equipEstadoNota').value.trim();
+    var pessoaSelecao = resolvePessoaSelecao(document.getElementById('equipEstadoPessoa'));
+    var agora = Date.now();
+    var estadoAnterior = eq.estado || 'operacional';
+
+    var btn = document.getElementById('equipEstadoSubmitBtn');
+    if (btn){ btn.disabled = true; btn.textContent = 'A guardar…'; }
+
+    var historico = { de: estadoAnterior, para: novoEstado, nota: nota || null, quando: agora, quem: pessoaSelecao.pessoaNome };
+
+    // Path a path: estado, estadoDesde, estadoNota, e só depois o histórico.
+    equipamentosRef.child(id).child('estado').set(novoEstado)
+      .then(function(){ return equipamentosRef.child(id).child('estadoDesde').set(agora); })
+      .then(function(){ return equipamentosRef.child(id).child('estadoNota').set(nota || null); })
+      .then(function(){ return equipamentosEstadosRef.child(id).push(historico); })
+      .then(function(){
+        if (btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
+        fecharEquipEstadoModal();
+      }).catch(function(err){
+        if (btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
+        alert('Erro ao alterar estado: ' + err.message);
+      });
+  }
+  window.confirmarAlterarEstado = confirmarAlterarEstado;
+
   function buildEquipRowHtml(eq){
-    var tipoLabel = EQUIP_TIPO_LABELS[eq.tipo] || eq.tipo;
-    var limiteLabel = (eq.limite === null || eq.limite === undefined) ? '—' : eq.limite + '°C';
+    var dot = '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + estadoDotColor(eq.estado) + ';flex-shrink:0;"></span>';
+    var marcaModelo = [eq.marca, eq.modelo].filter(Boolean).join(' ');
+    var subtitulo = marcaModelo ? '<br><span class="equip-list-zone">' + escapeHtml(marcaModelo) + '</span>' : '';
     var inativoTag = eq.ativo === false ? '<span class="equip-manage-inativo">Inativo</span>' : '';
+    var diasTxt = '';
+    if (eq.estado && eq.estado !== 'operacional'){
+      var dias = diasDesde(eq.estadoDesde);
+      if (dias !== null) diasTxt = '<span class="equip-manage-tipo">há ' + dias + (dias === 1 ? ' dia' : ' dias') + '</span>';
+    }
     return '<button type="button" class="equip-manage-row" onclick="toggleEquipPanel(\'' + eq.id + '\')">' +
-      '<span class="equip-manage-nome">' + escapeHtml(eq.nome) + inativoTag + '</span>' +
-      '<span class="equip-manage-tipo">' + escapeHtml(tipoLabel) + '</span>' +
-      '<span class="equip-manage-limite">' + limiteLabel + '</span>' +
+      dot +
+      '<span class="equip-manage-nome">' + escapeHtml(eq.nome) + inativoTag + subtitulo + '</span>' +
+      diasTxt +
+      '<span class="equip-manage-tipo">' + escapeHtml(estadoLabel(eq.estado)) + '</span>' +
       '</button>';
   }
 
   function buildEquipPanelHtml(eq){
     var isNovo = !eq;
     var d = equipDraft || {};
+    var val = function(v){ return (v === null || v === undefined) ? '' : v; };
     var html = '<div class="equip-manage-panel">';
 
-    html += '  <div class="field"><label class="field-label" for="equipEdit-nome">Nome</label><input type="text" id="equipEdit-nome" value="' + escapeHtml(d.nome || '') + '"></div>';
+    if (!isNovo){
+      html += '<p class="equip-manage-zona-title" style="margin-top:0;">Estado</p>';
+      html += '<p style="font-size:13px;margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+      html += '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + estadoDotColor(eq.estado) + ';flex-shrink:0;"></span>';
+      html += escapeHtml(estadoLabel(eq.estado));
+      var dias = diasDesde(eq.estadoDesde);
+      if (eq.estado && eq.estado !== 'operacional' && dias !== null) html += ' · há ' + dias + (dias === 1 ? ' dia' : ' dias');
+      if (eq.estadoNota) html += ' · ' + escapeHtml(eq.estadoNota);
+      html += '</p>';
+      html += '<button type="button" class="btn" style="margin-bottom:16px;" onclick="abrirAlterarEstado(\'' + eq.id + '\')">Alterar estado</button>';
+    }
 
-    html += '  <div class="field"><label class="field-label" for="equipEdit-zona">Zona</label><select id="equipEdit-zona">';
+    html += '<p class="equip-manage-zona-title"' + (isNovo ? ' style="margin-top:0;"' : '') + '>Identificação</p>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-nome">Nome</label><input type="text" id="equipEdit-nome" value="' + escapeHtml(val(d.nome)) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-marca">Marca (opcional)</label><input type="text" id="equipEdit-marca" value="' + escapeHtml(val(d.marca)) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-modelo">Modelo (opcional)</label><input type="text" id="equipEdit-modelo" value="' + escapeHtml(val(d.modelo)) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-numeroSerie">Número de série (opcional)</label><input type="text" id="equipEdit-numeroSerie" value="' + escapeHtml(val(d.numeroSerie)) + '"></div>';
+
+    html += '<p class="equip-manage-zona-title">Localização</p>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-zona">Zona</label><select id="equipEdit-zona">';
     EQUIP_ZONAS.forEach(function(z){
       html += '<option value="' + z + '"' + (d.zona === z ? ' selected' : '') + '>' + z + '</option>';
     });
-    html += '  </select></div>';
+    html += '</select></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-local">Local (opcional)</label><input type="text" id="equipEdit-local" value="' + escapeHtml(val(d.local)) + '" placeholder="ex: sob o balcão, junto ao P.O.S."></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-ordem">Ordem</label><input type="number" id="equipEdit-ordem" step="1" value="' + val(d.ordem) + '"></div>';
+    html += '<div class="field" style="display:flex;align-items:center;gap:8px;">';
+    html += '<input type="checkbox" id="equipEdit-ativo" style="width:18px;height:18px;accent-color:var(--red);"' + (d.ativo !== false ? ' checked' : '') + '>';
+    html += '<label class="field-label" style="margin:0;" for="equipEdit-ativo">Ativo</label>';
+    html += '</div>';
 
-    html += '  <div class="field"><label class="field-label" for="equipEdit-tipo">Tipo</label><select id="equipEdit-tipo" onchange="onEquipTipoChange()">';
+    html += '<p class="equip-manage-zona-title">Temperatura</p>';
+    html += '<div class="field" style="display:flex;align-items:center;gap:8px;">';
+    html += '<input type="checkbox" id="equipEdit-registaTemperatura" style="width:18px;height:18px;accent-color:var(--red);"' + (d.registaTemperatura ? ' checked' : '') + '>';
+    html += '<label class="field-label" style="margin:0;" for="equipEdit-registaTemperatura">Regista temperatura (HACCP)</label>';
+    html += '</div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-tipo">Tipo</label><select id="equipEdit-tipo" onchange="onEquipTipoChange()">';
     Object.keys(EQUIP_TIPO_LABELS).forEach(function(t){
       html += '<option value="' + t + '"' + (d.tipo === t ? ' selected' : '') + '>' + EQUIP_TIPO_LABELS[t] + '</option>';
     });
-    html += '  </select></div>';
+    html += '</select></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMin">Limite mínimo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMin" step="0.1" value="' + val(d.limiteMin) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMax">Limite máximo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMax" step="0.1" value="' + val(d.limiteMax) + '"></div>';
 
-    html += '  <div class="field"><label class="field-label" for="equipEdit-limite">Limite (°C) — vazio = sem validação ("Outro")</label><input type="number" id="equipEdit-limite" step="0.1" value="' + (d.limite === null || d.limite === undefined ? '' : d.limite) + '"></div>';
+    html += '<p class="equip-manage-zona-title">Ficha</p>';
+    html += '<div class="equip-ficha-grid">';
+    html += '<div class="field"><label class="field-label" for="equipEdit-largura">Largura (cm)</label><input type="number" id="equipEdit-largura" step="0.1" value="' + val(d.largura) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-profundidade">Profundidade (cm)</label><input type="number" id="equipEdit-profundidade" step="0.1" value="' + val(d.profundidade) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-altura">Altura (cm)</label><input type="number" id="equipEdit-altura" step="0.1" value="' + val(d.altura) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-potencia">Potência (W)</label><input type="number" id="equipEdit-potencia" step="1" value="' + val(d.potencia) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-fornecedor">Fornecedor</label><input type="text" id="equipEdit-fornecedor" value="' + escapeHtml(val(d.fornecedor)) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-valorAquisicao">Valor de aquisição (€)</label><input type="number" id="equipEdit-valorAquisicao" step="0.01" value="' + val(d.valorAquisicao) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-dataAquisicao">Data de aquisição</label><input type="date" id="equipEdit-dataAquisicao" value="' + val(d.dataAquisicao) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-garantiaAte">Garantia até</label><input type="date" id="equipEdit-garantiaAte" value="' + val(d.garantiaAte) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-periodicidadeManutencao">Manutenção a cada (meses)</label><input type="number" id="equipEdit-periodicidadeManutencao" step="1" value="' + val(d.periodicidadeManutencao) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-ultimaManutencao">Última manutenção</label><input type="date" id="equipEdit-ultimaManutencao" value="' + val(d.ultimaManutencao) + '"></div>';
+    html += '</div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-fichaTecnica">Ficha técnica (URL)</label><input type="text" id="equipEdit-fichaTecnica" value="' + escapeHtml(val(d.fichaTecnica)) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-notas">Notas</label><input type="text" id="equipEdit-notas" value="' + escapeHtml(val(d.notas)) + '"></div>';
 
-    html += '  <div class="field"><label class="field-label" for="equipEdit-ordem">Ordem</label><input type="number" id="equipEdit-ordem" step="1" value="' + (d.ordem !== undefined ? d.ordem : '') + '"></div>';
-
-    html += '  <div class="field" style="display:flex;align-items:center;gap:8px;">';
-    html += '    <input type="checkbox" id="equipEdit-ativo" style="width:18px;height:18px;accent-color:var(--red);"' + (d.ativo !== false ? ' checked' : '') + '>';
-    html += '    <label class="field-label" style="margin:0;" for="equipEdit-ativo">Ativo</label>';
-    html += '  </div>';
-
-    html += '  <div class="modal-actions" style="justify-content:flex-start;margin-top:8px;">';
-    html += '    <button type="button" class="btn btn-primary" onclick="saveEquip(' + (isNovo ? 'null' : "'" + eq.id + "'") + ')">Guardar</button>';
-    html += '    <button type="button" class="btn" onclick="closeEquipPanel()">Cancelar</button>';
+    html += '<div class="modal-actions" style="justify-content:flex-start;margin-top:8px;">';
+    html += '<button type="button" class="btn btn-primary" onclick="saveEquip(' + (isNovo ? 'null' : "'" + eq.id + "'") + ')">Guardar</button>';
+    html += '<button type="button" class="btn" onclick="closeEquipPanel()">Cancelar</button>';
     if (!isNovo){
-      html += '    <button type="button" class="btn" style="color:var(--red);" onclick="tentarApagarEquip(\'' + eq.id + '\')">🗑 Apagar</button>';
+      html += '<button type="button" class="btn" style="color:var(--red);" onclick="tentarApagarEquip(\'' + eq.id + '\')">Desativar</button>';
     }
-    html += '  </div>';
+    html += '</div>';
 
     html += '</div>';
     return html;
@@ -2878,20 +3108,21 @@
     var wrap = document.getElementById('equipManageWrap');
     if (!wrap) return;
 
-    var html = '';
-
     if (!equipamentosCarregados){
       wrap.innerHTML = '<p class="empty-state">A carregar...</p>';
       return;
     }
 
+    var html = '';
     var arr = getEquipArray();
+    var ativos = arr.filter(function(e){ return e.ativo !== false; });
+    var inativos = arr.filter(function(e){ return e.ativo === false; });
 
     if (arr.length === 0){
       html += '<button type="button" class="btn-ver-mais" id="btnSeedEquip" onclick="seedEquipamentos()">Criar equipamentos iniciais</button>';
     } else {
       var byZona = {};
-      arr.forEach(function(eq){
+      ativos.forEach(function(eq){
         var zona = eq.zona || 'Outro';
         if (!byZona[zona]) byZona[zona] = [];
         byZona[zona].push(eq);
@@ -2904,13 +3135,17 @@
 
       zonasPresentes.forEach(function(zona){
         var list = byZona[zona].slice().sort(function(a, b){ return (a.ordem || 0) - (b.ordem || 0); });
-        html += '<p class="equip-manage-zona-title">' + escapeHtml(zona) + '</p>';
-        list.forEach(function(eq){
-          html += buildEquipRowHtml(eq);
-          if (equipOpenPanelId === eq.id){
-            html += buildEquipPanelHtml(eq);
-          }
-        });
+        var colapsada = !!equipZonasColapsadas[zona];
+        html += '<button type="button" class="equip-manage-zona-title equip-manage-zona-toggle" onclick="toggleZonaColapsada(\'' + escapeHtml(zona) + '\')">' +
+          (colapsada ? '▸ ' : '▾ ') + escapeHtml(zona) + ' (' + list.length + ')</button>';
+        if (!colapsada){
+          list.forEach(function(eq){
+            html += buildEquipRowHtml(eq);
+            if (equipOpenPanelId === eq.id){
+              html += buildEquipPanelHtml(eq);
+            }
+          });
+        }
       });
     }
 
@@ -2918,6 +3153,21 @@
       (equipOpenPanelId === '__novo__' ? '✕ Cancelar' : '+ Adicionar equipamento') + '</button>';
     if (equipOpenPanelId === '__novo__'){
       html += buildEquipPanelHtml(null);
+    }
+
+    if (inativos.length > 0){
+      html += '<button type="button" class="btn-ver-mais" style="margin-top:14px;" onclick="toggleMostrarInativosEquip()">' +
+        (equipMostrarInativos ? '✕ Esconder desativados' : 'Mostrar desativados (' + inativos.length + ')') + '</button>';
+      if (equipMostrarInativos){
+        html += '<div style="opacity:0.55;margin-top:8px;">';
+        inativos.slice().sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); }).forEach(function(eq){
+          html += buildEquipRowHtml(eq);
+          if (equipOpenPanelId === eq.id){
+            html += buildEquipPanelHtml(eq);
+          }
+        });
+        html += '</div>';
+      }
     }
 
     wrap.innerHTML = html;
@@ -2937,6 +3187,7 @@
   carregarPessoas(function(){
     popularSelectPessoas(document.getElementById('temp-pessoa'));
     popularSelectPessoas(document.getElementById('pedido-pessoa'));
+    popularSelectPessoas(document.getElementById('equipEstadoPessoa'));
     renderComprasFisicas();
     renderChecklists();
   });
