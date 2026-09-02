@@ -64,11 +64,11 @@
                            para var(--red) (uma coluna com `alt` próprio
                            manda sobre isto)
        opts.destacarMax  — (só paleta:'destaque') por omissão true: as 3
-                           colunas de maior valor ficam em var(--red), em
-                           degradê (1ª inteira, 2ª e 3ª cada vez mais claras
-                           — fill-opacity 1 / 0.7 / 0.45); as restantes em
-                           var(--chart-neutro). Categorias sem dados nunca
-                           entram na classificação.
+                           colunas de maior valor ficam em degradê — 1ª
+                           var(--red), 2ª var(--chart-destaque-2), 3ª
+                           var(--chart-destaque-3), cada vez mais claras;
+                           as restantes em var(--chart-neutro). Categorias
+                           sem dados nunca entram na classificação.
        opts.valores      — por omissão true: mostra o valor (`curto`, ou a
                            forma abreviada, ou nenhum — decisão automática e
                            igual para o gráfico inteiro, ver TAREFA 3)
@@ -484,10 +484,10 @@
     var semDadosFlags = lista.map(function(x){ return x.valor === null || x.valor === undefined || Number(x.valor) === 0; });
     var maxDados = Math.max.apply(null, valoresNum.concat([0]));
 
-    /* Top 3 em degradê — 1º var(--red) inteiro, 2º e 3º cada vez mais claros
-       (fill-opacity, não uma cor nova — segue o tema sozinho). Categorias
-       sem dados nunca entram na classificação. */
-    var OPACIDADE_TOPO = [1, 0.7, 0.45];
+    /* Top 3 em degradê — 1º var(--red), 2º e 3º cada vez mais claros (cores
+       dedicadas, não opacidade — ficam sólidas mesmo sobre gridlines).
+       Categorias sem dados nunca entram na classificação. */
+    var CORES_TOPO = [C.red, tok('--chart-destaque-2', '#E4694E'), tok('--chart-destaque-3', '#EDA391')];
     var rankPorIndice = {};
     if (destacarMax){
       var indicesComDados = [];
@@ -541,29 +541,27 @@
       var yTop = semDados ? yBase : py(v);
       var altura = semDados ? 0 : Math.max(0, yBase - yTop);
 
-      var cor, destacada, opacidadeCor;
+      var cor, destacada;
       if (paleta === 'fatias'){
         cor = corFatia(i);
         destacada = true;
-        opacidadeCor = 1;
       } else {
         var efeitoAlt = (x.alt === undefined) ? opts.alt : x.alt;
         var rank = rankPorIndice[i];
         destacada = !!(efeitoAlt || rank !== undefined);
-        cor = destacada ? C.red : neutro;
-        // O alt manual força vermelho inteiro; o degradê só se aplica ao
-        // top 3 automático (destacarMax).
-        opacidadeCor = efeitoAlt ? 1 : (rank !== undefined ? OPACIDADE_TOPO[rank] : 1);
+        // O alt manual força o 1º lugar (vermelho cheio); o degradê é só
+        // para o top 3 automático (destacarMax).
+        cor = efeitoAlt ? C.red : (rank !== undefined ? CORES_TOPO[rank] : neutro);
       }
 
       var textoCompleto = (x.curto != null && x.curto !== '') ? String(x.curto) : fmtCurto(v);
 
       if (!semDados){
         barras += '<rect class="chart-bar" data-idx="' + i + '" data-cor-original="' + cor +
-          '" data-opacidade-original="' + opacidadeCor + '" data-destacada="' + (destacada ? '1' : '0') +
+          '" data-destacada="' + (destacada ? '1' : '0') +
           '" x="' + xBarra.toFixed(1) + '" y="' + yTop.toFixed(1) +
           '" width="' + larguraBarra.toFixed(1) + '" height="' + altura.toFixed(1) +
-          '" fill="' + cor + '" fill-opacity="' + opacidadeCor + '"/>';
+          '" fill="' + cor + '"/>';
 
         if (decisaoValores.mostrar){
           var textoValor = decisaoValores.curto ? fmtCurto(v) : textoCompleto;
@@ -772,14 +770,11 @@
       if (bIdx === idx){
         var destacada = bar.getAttribute('data-destacada') === '1';
         bar.setAttribute('fill', destacada ? neutroForte : vermelho);
-        // Em destaque total, sem o degradê do top 3 — o hover é o que manda.
-        bar.setAttribute('fill-opacity', '1');
         bar.style.opacity = '1';
       } else {
         // Repor a cor original antes de escurecer — senão uma barra
         // realçada num hover anterior fica "pintada" para sempre.
         bar.setAttribute('fill', bar.getAttribute('data-cor-original'));
-        bar.setAttribute('fill-opacity', bar.getAttribute('data-opacidade-original') || '1');
         bar.style.opacity = '0.55';
       }
     }
@@ -789,7 +784,6 @@
     var barras = host.querySelectorAll('.chart-bar');
     for (var i = 0; i < barras.length; i++){
       barras[i].setAttribute('fill', barras[i].getAttribute('data-cor-original'));
-      barras[i].setAttribute('fill-opacity', barras[i].getAttribute('data-opacidade-original') || '1');
       barras[i].style.opacity = '1';
     }
   }
