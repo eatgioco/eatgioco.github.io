@@ -247,10 +247,14 @@
   .ac-modo-chip:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
   .ac-modo-chip .icon{ flex-shrink:0; }
   .ac-modo-chip .sp{ flex:1; text-align:left; }
+  /* O dropdown sai do cartão: o .glass-light tem overflow:hidden e uma camada
+     ::before com mix-blend-mode por cima do conteúdo, e dentro dele a lista
+     ficava cortada e a misturar-se com o que está por baixo. Por isso é
+     position:fixed, movido para o <body> ao abrir, posicionado pelo chip. */
   .ac-dd{
     display:none;
-    position:absolute; left:0; right:0; top:calc(100% + 6px);
-    z-index:20;
+    position:fixed; left:0; top:0; width:240px;
+    z-index:75;   /* abaixo do giocoModal (80) */
     padding:6px;
     border-radius:14px;
     background:var(--white);
@@ -1310,6 +1314,21 @@ window.addEventListener('load', function () {
       el.dd.classList.remove('aberto');
       el.modoChip.setAttribute('aria-expanded', 'false');
     }
+    // Fixo no viewport, por baixo do chip (ou por cima, se não couber em baixo).
+    function posicionarDd() {
+      var r = el.modoChip.getBoundingClientRect();
+      el.dd.style.left = Math.round(r.left) + 'px';
+      el.dd.style.width = Math.round(r.width) + 'px';
+      var h = el.dd.offsetHeight || 220;
+      var top = r.bottom + 6;
+      if (top + h > window.innerHeight - 8 && r.top - 6 - h > 8) top = r.top - 6 - h;
+      el.dd.style.top = Math.round(top) + 'px';
+    }
+    // Ao abrir, a lista passa para o <body>: escapa ao overflow:hidden e às
+    // camadas de vidro do cartão. Os listeners ficam no próprio elemento.
+    if (el.dd.parentNode !== document.body) document.body.appendChild(el.dd);
+    window.addEventListener('scroll', function () { if (ddAberto()) fecharDd(); }, true);
+    window.addEventListener('resize', function () { if (ddAberto()) posicionarDd(); });
     function abrirDd() {
       var actual = modoEfectivo();
       var h = '';
@@ -1322,6 +1341,7 @@ window.addEventListener('load', function () {
       el.dd.innerHTML = h;
       el.dd.classList.add('aberto');
       el.modoChip.setAttribute('aria-expanded', 'true');
+      posicionarDd();
     }
     el.modoChip.addEventListener('click', function () {
       if (ddAberto()) fecharDd();
@@ -1334,7 +1354,7 @@ window.addEventListener('load', function () {
       escolherModo(b.getAttribute('data-modo'));
     });
     document.addEventListener('click', function (ev) {
-      if (ddAberto() && !ev.target.closest('.ac-modo-wrap')) fecharDd();
+      if (ddAberto() && !ev.target.closest('.ac-modo-wrap') && !ev.target.closest('#acDd')) fecharDd();
     });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && ddAberto()) { fecharDd(); el.modoChip.focus(); }
