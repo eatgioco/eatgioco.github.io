@@ -17,7 +17,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
 
@@ -152,21 +152,41 @@
 
   /* ======================================================================
      1. AR CONDICIONADO — o cartão de destaque da coluna esquerda.
+     Estado real em lojas/{loja}/ac/estado; comandos em lojas/{loja}/ac/comandos.
+     Sem tokens novos: só os do shell.
      ====================================================================== */
   .ac-dial{
     width:168px; height:168px;
     margin:4px auto 0;
     position:relative;
+    /* O dial é um slider: sem isto o toque faz scroll da página em vez de
+       arrastar, e o texto do centro ficava seleccionado ao arrastar com rato. */
+    touch-action:none;
+    user-select:none; -webkit-user-select:none;
   }
-  .ac-dial svg{ width:100%; height:100%; transform:rotate(135deg); }
+  .ac-dial svg{ width:100%; height:100%; display:block; overflow:visible; transform:rotate(135deg); }
   .ac-dial .trilho{ fill:none; stroke:var(--line); stroke-width:10; stroke-linecap:round; }
   [data-theme="dark"] .ac-dial .trilho{ stroke:rgba(255,255,255,0.10); }
+  .ac-dial .arco{
+    fill:none; stroke:var(--red); stroke-width:10; stroke-linecap:round;
+    transition:stroke-dasharray .15s ease, opacity .2s;
+  }
+  /* A pega: círculo branco com rebordo vermelho na ponta do arco. */
+  .ac-dial .pega{ fill:var(--white); stroke:var(--red); stroke-width:3; transition:opacity .2s; }
+  .cc-card.ac-off .ac-dial .arco,
+  .cc-card.ac-off .ac-dial .pega{ stroke:var(--muted); }
+  .cc-card.ac-neutro .ac-dial .arco,
+  .cc-card.ac-neutro .ac-dial .pega{ opacity:0; }
+  .ac-dial.arrastavel{ cursor:grab; }
+  .ac-dial.a-arrastar{ cursor:grabbing; }
+  .ac-dial.a-arrastar .arco{ transition:none; }
 
   .ac-centro{
     position:absolute; inset:0;
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
     gap:2px;
+    pointer-events:none;   /* o dial por baixo é que apanha o arrasto */
   }
   .ac-temp{
     font-family:'Inter',sans-serif;
@@ -176,15 +196,26 @@
     color:var(--muted);
   }
   .ac-temp sup{ font-size:16px; font-weight:600; top:-.7em; }
+  .ac-temp.on{ color:var(--ink); }
+  /* Valor pedido (ou a arrastar) mas ainda não confirmado pela loja. */
+  .ac-temp.pendente{ opacity:.45; }
   .ac-estado{
     font-size:10.5px; font-weight:700;
     letter-spacing:.1em; text-transform:uppercase;
     color:var(--muted);
+    text-align:center;
   }
+  .ac-sub{
+    margin-top:10px;
+    font-size:11px; line-height:1.4;
+    color:var(--muted); text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .ac-sub b{ color:var(--ink); font-weight:600; }
 
   .ac-passos{
     display:flex; align-items:center; justify-content:center;
-    gap:12px; margin-top:14px;
+    gap:12px; margin-top:12px;
   }
   .ac-passo{
     width:40px; height:40px; border-radius:50%;
@@ -196,33 +227,89 @@
     font-family:'Inter',sans-serif;
     font-size:19px; font-weight:600; line-height:1;
     display:flex; align-items:center; justify-content:center;
-    cursor:not-allowed;
+    cursor:pointer;
   }
-  .ac-passo:disabled{ opacity:.5; }
+  .ac-passo:hover{ border-color:var(--ink); }
+  .ac-passo:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
 
-  .ac-modos{
-    display:flex; gap:6px; margin-top:16px;
+  /* Modo: um chip com o modo actual que abre um dropdown com os cinco. */
+  .ac-modo-wrap{ position:relative; margin-top:14px; }
+  .ac-modo-chip{
+    width:100%;
+    display:flex; align-items:center; gap:8px;
+    padding:9px 12px;
+    border:1px solid var(--line); border-radius:100px;
+    background:transparent; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    cursor:pointer;
   }
-  .ac-modo{
-    flex:1;
+  .ac-modo-chip:hover, .ac-modo-chip[aria-expanded="true"]{ border-color:var(--ink); }
+  .ac-modo-chip:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .ac-modo-chip .icon{ flex-shrink:0; }
+  .ac-modo-chip .sp{ flex:1; text-align:left; }
+  .ac-dd{
+    display:none;
+    position:absolute; left:0; right:0; top:calc(100% + 6px);
+    z-index:20;
+    padding:6px;
+    border-radius:14px;
+    background:var(--white);
     border:1px solid var(--line);
-    background:transparent;
-    color:var(--ink);
-    border-radius:100px;
-    padding:8px 4px;
-    font-family:'Inter',sans-serif;
-    font-size:11px; font-weight:600;
-    cursor:not-allowed;
-    opacity:.55;
+    box-shadow:0 12px 32px rgba(0,0,0,0.16);
   }
+  .ac-dd.aberto{ display:block; }
+  .ac-dd button{
+    width:100%;
+    display:flex; align-items:center; gap:8px;
+    padding:9px 10px;
+    border:none; border-radius:10px;
+    background:transparent; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:500;
+    text-align:left; cursor:pointer;
+  }
+  .ac-dd button:hover{ background:var(--dough); }
+  .ac-dd button.active{ background:var(--ink); color:var(--white); }
 
-  /* Interruptor decorativo do canto superior direito. Desligado e inerte. */
+  /* Ventilação: presets em linha; 'custom' não realça nenhum e mostra o valor. */
+  .ac-vent{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-top:12px; }
+  .ac-vent-label{
+    width:100%;
+    font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  .ac-vent button{
+    border:1px solid var(--line); border-radius:100px;
+    background:transparent; color:var(--ink);
+    padding:5px 9px;
+    font-family:'Inter',sans-serif; font-size:10.5px; font-weight:600;
+    cursor:pointer;
+  }
+  .ac-vent button:hover{ border-color:var(--ink); }
+  .ac-vent button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .ac-vent button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .ac-vent-custom{ font-family:'Space Mono',monospace; font-size:11.5px; color:var(--ink); padding:0 4px; }
+  .ac-vent-custom:empty{ display:none; }
+
+  /* "Mais opções": discreto, abre o giocoModal do shell. */
+  .ac-mais{
+    display:flex; align-items:center; gap:6px;
+    margin:12px auto 0; padding:6px 10px;
+    border:none; border-radius:100px;
+    background:transparent; color:var(--muted);
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    cursor:pointer;
+  }
+  .ac-mais:hover{ color:var(--ink); background:var(--dough); }
+  .ac-mais:disabled{ opacity:.5; cursor:not-allowed; background:transparent; color:var(--muted); }
+
+  /* Interruptor (ligar/desligar). Também usado nos toggles do painel. */
   .cc-switch{
     width:38px; height:21px; border-radius:100px;
     background:var(--line);
     border:none; padding:0;
     position:relative; flex-shrink:0;
-    cursor:not-allowed; opacity:.7;
+    cursor:pointer;
+    transition:background .15s;
   }
   [data-theme="dark"] .cc-switch{ background:rgba(255,255,255,0.12); }
   .cc-switch::after{
@@ -230,40 +317,54 @@
     top:3px; left:3px; width:15px; height:15px;
     border-radius:50%; background:var(--white);
     box-shadow:0 1px 3px rgba(0,0,0,0.25);
+    transition:left .15s;
   }
-
-  /* ---- Cartão vivo (estado real do A/C via lojas/{loja}/ac/estado) ---- */
-  .ac-dial .arco{
-    fill:none; stroke:var(--red); stroke-width:10; stroke-linecap:round;
-    transition:stroke-dasharray .3s ease, opacity .2s;
-  }
-  .cc-card.ac-off .ac-dial .arco{ stroke:var(--muted); }
-  .cc-card.ac-neutro .ac-dial .arco{ opacity:0; }
-  .ac-temp.on{ color:var(--ink); }
-  /* Valor pedido mas ainda não confirmado pela loja. */
-  .ac-temp.pendente{ opacity:.45; }
-  .ac-sub{
-    margin-top:10px;
-    font-size:11px; line-height:1.4;
-    color:var(--muted); text-align:center;
-    font-variant-numeric:tabular-nums;
-  }
-  .ac-sub b{ color:var(--ink); font-weight:600; }
-  .ac-passo:not(:disabled){ cursor:pointer; }
-  .ac-passo:not(:disabled):hover{ border-color:var(--ink); }
-  .ac-modo:not(:disabled){ cursor:pointer; opacity:1; }
-  .ac-modo:not(:disabled):hover{ border-color:var(--ink); }
-  .ac-modo.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
-  .cc-switch:not(:disabled){ cursor:pointer; opacity:1; }
   .cc-switch.on{ background:var(--red); }
   .cc-switch.on::after{ left:20px; }
+  .cc-switch:disabled{ cursor:not-allowed; opacity:.6; }
   .cc-selo-linha{ gap:6px; }
+
   .ac-aviso{
     margin:10px 0 0; min-height:0;
     font-size:11.5px; line-height:1.4;
-    color:var(--red); text-align:center;
+    color:var(--red-ink); text-align:center;
   }
   .ac-aviso:empty{ display:none; }
+
+  /* Painel de opções — conteúdo do giocoModal (o contentor é do shell). */
+  .acp-sec{ padding:14px 0; border-top:1px solid var(--line); }
+  .acp-sec:first-child{ border-top:none; padding-top:0; }
+  .acp-titulo{
+    margin:0 0 10px;
+    font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  /* auto-fit: em viewports estreitos os cinco passam a duas linhas em vez de esmagar o texto. */
+  .acp-modos{ display:grid; grid-template-columns:repeat(auto-fit, minmax(88px, 1fr)); gap:6px; }
+  .acp-modos button{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:10px 4px;
+    border:1px solid var(--line); border-radius:12px;
+    background:transparent; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    cursor:pointer;
+  }
+  .acp-modos button:hover{ border-color:var(--ink); }
+  .acp-modos button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .acp-modos button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .acp-slider{ display:flex; align-items:center; gap:12px; }
+  .acp-slider input[type=range]{ flex:1; accent-color:var(--red); margin:0; }
+  .acp-slider input[type=range]:disabled{ opacity:.5; }
+  .acp-slider output{ font-family:'Space Mono',monospace; font-size:14px; min-width:3ch; text-align:right; }
+  .acp-nota{ margin:8px 0 0; font-size:11.5px; color:var(--muted); }
+  .acp-toggle{ display:flex; align-items:center; gap:12px; padding:9px 0; }
+  .acp-toggle + .acp-toggle{ border-top:1px solid var(--line); }
+  .acp-toggle .txt{ flex:1; min-width:0; }
+  .acp-toggle .txt b{ display:block; font-size:12.5px; font-weight:600; }
+  .acp-toggle .txt span{ font-size:11.5px; color:var(--muted); }
+  .acp-kv{ display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:12.5px; }
+  .acp-kv span:last-child{ font-family:'Space Mono',monospace; font-size:12px; text-align:right; }
+  .acp-kv .status{ font-family:'Inter',sans-serif; }
 
   /* ======================================================================
      2. TEMPERATURAS HACCP
@@ -665,7 +766,8 @@
         <div class="cc-col">
 
           <!-- 1. AR CONDICIONADO — cartão vivo. Estado em lojas/{loja}/ac/estado,
-               comandos em lojas/{loja}/ac/comandos (ver montarAC() em baixo). -->
+               comandos em lojas/{loja}/ac/comandos (ver montarAC() em baixo).
+               O painel "Mais opções" é o giocoModal do shell. -->
           <div class="cc-card card glass-light ac-neutro" id="acCard">
             <div class="cc-head">
               <h3>Ar condicionado</h3>
@@ -677,13 +779,15 @@
               <span class="status warn" id="acSelo">A ligar…</span>
             </div>
 
-            <div class="ac-dial">
+            <div class="ac-dial" id="acDial" role="slider" aria-label="Temperatura alvo" aria-valuemin="16" aria-valuemax="30" aria-valuenow="16">
               <svg viewBox="0 0 100 100" aria-hidden="true">
                 <!-- Arco aberto em baixo: r=42, perímetro 263.9; 3/4 disso
                      (197.9) é o trilho, rodado 135° para abrir para baixo.
-                     O .arco preenche a fracção (tempAlvo-16)/14 do trilho. -->
+                     O .arco preenche a fracção (tempAlvo-16)/14 do trilho e a
+                     .pega fica na ponta. -->
                 <circle class="trilho" cx="50" cy="50" r="42" stroke-dasharray="197.9 263.9"></circle>
                 <circle class="arco" id="acArco" cx="50" cy="50" r="42" stroke-dasharray="0 263.9"></circle>
+                <circle class="pega" id="acPega" cx="92" cy="50" r="6.5"></circle>
               </svg>
               <div class="ac-centro">
                 <div class="ac-temp" id="acTemp">—<sup>°C</sup></div>
@@ -698,11 +802,20 @@
               <button class="ac-passo" type="button" id="acMais" disabled aria-label="Subir temperatura">+</button>
             </div>
 
-            <div class="ac-modos" id="acModos">
-              <button class="ac-modo" type="button" data-modo="cool" disabled>Frio</button>
-              <button class="ac-modo" type="button" data-modo="fan" disabled>Ventilação</button>
-              <button class="ac-modo" type="button" data-modo="heat" disabled>Calor</button>
+            <div class="ac-modo-wrap">
+              <button class="ac-modo-chip" type="button" id="acModoChip" disabled aria-haspopup="listbox" aria-expanded="false">
+                <svg class="icon" width="14" height="14"><use id="acModoIco" href="#i-refresh-cw"/></svg>
+                <span class="sp" id="acModoNome">—</span>
+                <svg class="icon" width="13" height="13"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="ac-dd" id="acDd" role="listbox"></div>
             </div>
+
+            <div class="ac-vent" id="acVent"><span class="ac-vent-label">Ventilação</span></div>
+
+            <button class="ac-mais" type="button" id="acOpcoes" disabled>
+              <svg class="icon" width="13" height="13"><use href="#i-sliders"/></svg>Mais opções
+            </button>
 
             <p class="ac-aviso" id="acAviso"></p>
             <p class="cc-nota" id="acNota">À espera do serviço da loja…</p>
@@ -1001,46 +1114,76 @@ window.addEventListener('load', function () {
   })();
 
   // ===================================================================
-  // AR CONDICIONADO — cartão vivo.
+  // AR CONDICIONADO — cartão vivo + painel de opções.
   //
   // O browser NUNCA fala com o A/C: lê lojas/{loja}/ac/estado (escrito pelo
   // serviço gioco-ac-bridge no PC da loja) e pede alterações com push() em
   // lojas/{loja}/ac/comandos. O serviço marca cada comando 'executado' ou
   // 'falhou'; os comandos nunca se apagam. Ver servicos/ac-bridge/README.md.
+  //
+  // Um comando de cada vez: enquanto há um pendente, todos os controlos ficam
+  // desactivados e o valor pedido aparece em estilo "pendente" até o estado
+  // o reflectir, o serviço o marcar, ou passarem 15 s.
   // ===================================================================
   function montarAC(db, lojaId) {
     var card = document.getElementById('acCard');
     if (!card) return;
 
+    function $(id) { return document.getElementById(id); }
     var el = {
-      sw: document.getElementById('acSwitch'),
-      selo: document.getElementById('acSelo'),
-      filtro: document.getElementById('acFiltro'),
-      temp: document.getElementById('acTemp'),
-      estado: document.getElementById('acEstado'),
-      sub: document.getElementById('acSub'),
-      menos: document.getElementById('acMenos'),
-      mais: document.getElementById('acMais'),
-      modos: card.querySelectorAll('.ac-modo'),
-      aviso: document.getElementById('acAviso'),
-      nota: document.getElementById('acNota'),
-      arco: document.getElementById('acArco')
+      sw: $('acSwitch'), selo: $('acSelo'), filtro: $('acFiltro'),
+      dial: $('acDial'), arco: $('acArco'), pega: $('acPega'),
+      temp: $('acTemp'), estado: $('acEstado'), sub: $('acSub'),
+      menos: $('acMenos'), mais: $('acMais'),
+      modoChip: $('acModoChip'), modoIco: $('acModoIco'), modoNome: $('acModoNome'), dd: $('acDd'),
+      vent: $('acVent'), opcoes: $('acOpcoes'),
+      aviso: $('acAviso'), nota: $('acNota')
     };
 
     var TMIN = 16, TMAX = 30;
-    var TRILHO = 197.9, PERIM = 263.9;
+    var VMIN = 1, VMAX = 100;
+    var TRILHO = 197.9, PERIM = 263.9, RAIO = 42;
     var SEM_RESPOSTA_MS = 2 * 60 * 1000;   // serviço calado há mais de 2 min
     var CONFIRMACAO_MS = 15 * 1000;        // espera máxima por um comando
-    var NOMES_MODO = { cool: 'Frio', heat: 'Calor', fan: 'Ventilação', dry: 'Desumidificar', auto: 'Auto' };
+
+    var MODOS = [
+      { id: 'auto', nome: 'Auto',       ico: 'refresh-cw' },
+      { id: 'cool', nome: 'Frio',       ico: 'snowflake' },
+      { id: 'dry',  nome: 'Seco',       ico: 'droplet' },
+      { id: 'heat', nome: 'Calor',      ico: 'flame' },
+      { id: 'fan',  nome: 'Ventilação', ico: 'wind' }
+    ];
+    var PRESETS = [
+      { id: 'auto',       nome: 'Auto' },
+      { id: 'silencioso', nome: 'Silencioso' },
+      { id: 'baixo',      nome: 'Baixo' },
+      { id: 'medio',      nome: 'Médio' },
+      { id: 'alto',       nome: 'Alto' },
+      { id: 'max',        nome: 'Máx' }
+    ];
+    var FLAGS = [
+      { id: 'eco',     nome: 'ECO',     desc: 'Limita o compressor para gastar menos; arrefece mais devagar.' },
+      { id: 'turbo',   nome: 'Boost',   desc: 'Potência máxima durante uns minutos para chegar depressa à temperatura.' },
+      { id: 'sleep',   nome: 'Sleep',   desc: 'Ajusta a temperatura gradualmente durante a noite e baixa o ruído.' },
+      { id: 'display', nome: 'Display', desc: 'Luz do mostrador na unidade interior.' }
+    ];
 
     var estado = null;      // último lojas/{loja}/ac/estado
-    var pend = null;        // comando em curso: { tipo, valor, ref, timer }
+    var pend = null;        // comando em curso: { tipo, valor, ref, cb, timer }
+    var arrasto = null;     // arrasto do dial em curso: { id, valor }
+    var painel = null;      // painel de opções aberto: { body }
     var avisoTimer = null;
+
+    // ---- utilitários -------------------------------------------------
+
+    function modoInfo(id) {
+      for (var i = 0; i < MODOS.length; i++) if (MODOS[i].id === id) return MODOS[i];
+      return { id: id, nome: id || '—', ico: 'refresh-cw' };
+    }
 
     function fmtTemp(v) {
       if (v == null || isNaN(v)) return '—';
-      var n = Number(v);
-      return (Math.round(n * 2) / 2).toString().replace('.', ',');
+      return (Math.round(Number(v) * 2) / 2).toString().replace('.', ',');
     }
 
     function idadeMs() {
@@ -1058,22 +1201,12 @@ window.addEventListener('load', function () {
       return Math.floor(m / 60) + ' h';
     }
 
+    function vivo() { return !!estado && idadeMs() < SEM_RESPOSTA_MS; }
+    function podeControlar() { return vivo() && !pend; }
+
     function setSelo(texto, classe) {
       el.selo.textContent = texto;
       el.selo.className = 'status ' + classe;
-    }
-
-    function setBotoes(ativos, alvo) {
-      el.sw.disabled = !ativos;
-      el.menos.disabled = !ativos || (alvo != null && alvo <= TMIN);
-      el.mais.disabled = !ativos || (alvo != null && alvo >= TMAX);
-      for (var i = 0; i < el.modos.length; i++) el.modos[i].disabled = !ativos;
-    }
-
-    function desenharArco(alvo) {
-      if (alvo == null || isNaN(alvo)) { el.arco.setAttribute('stroke-dasharray', '0 ' + PERIM); return; }
-      var f = Math.min(1, Math.max(0, (Number(alvo) - TMIN) / (TMAX - TMIN)));
-      el.arco.setAttribute('stroke-dasharray', (TRILHO * f).toFixed(1) + ' ' + PERIM);
     }
 
     function mostrarAviso(texto) {
@@ -1082,55 +1215,230 @@ window.addEventListener('load', function () {
       avisoTimer = setTimeout(function () { el.aviso.textContent = ''; }, 5000);
     }
 
+    // Valores "efectivos": o que o utilizador pediu sobrepõe-se ao estado
+    // enquanto o pedido está pendente (ou o dial está a ser arrastado).
+    function alvoEfectivo() {
+      if (arrasto) return arrasto.valor;
+      if (pend && pend.tipo === 'tempAlvo') return pend.valor;
+      return estado ? estado.tempAlvo : null;
+    }
+    function ligadoEfectivo() {
+      if (pend && pend.tipo === 'ligar') return true;
+      if (pend && pend.tipo === 'desligar') return false;
+      if (pend && pend.tipo === 'modo') return true;
+      return !!(estado && estado.ligado);
+    }
+    function modoEfectivo() {
+      if (pend && pend.tipo === 'modo') return pend.valor;
+      return estado ? estado.modo : null;
+    }
+    function presetEfectivo() {
+      if (pend && pend.tipo === 'ventilacaoPreset') return pend.valor;
+      if (pend && pend.tipo === 'ventilacao') return 'custom';
+      return estado ? (estado.ventilacaoPreset || 'custom') : null;
+    }
+    function ventEfectiva() {
+      if (pend && pend.tipo === 'ventilacao') return pend.valor;
+      return estado ? estado.ventilacao : null;
+    }
+    function flagEfectiva(id) {
+      if (pend && pend.tipo === id) return !!pend.valor;
+      return estado ? estado[id] : undefined;
+    }
+
+    // ---- dial --------------------------------------------------------
+
+    function desenharDial(alvo) {
+      if (alvo == null || isNaN(alvo)) {
+        el.arco.setAttribute('stroke-dasharray', '0 ' + PERIM);
+        el.pega.setAttribute('cx', 50 + RAIO); el.pega.setAttribute('cy', 50);
+        return;
+      }
+      var f = Math.min(1, Math.max(0, (Number(alvo) - TMIN) / (TMAX - TMIN)));
+      el.arco.setAttribute('stroke-dasharray', (TRILHO * f).toFixed(1) + ' ' + PERIM);
+      // O svg está rodado 135°; no referencial dele o trilho vai de 0° a 270°.
+      var ang = (270 * f) * Math.PI / 180;
+      el.pega.setAttribute('cx', (50 + RAIO * Math.cos(ang)).toFixed(2));
+      el.pega.setAttribute('cy', (50 + RAIO * Math.sin(ang)).toFixed(2));
+      el.dial.setAttribute('aria-valuenow', String(Math.round(Number(alvo))));
+    }
+
+    // Ponto do ecrã → grau inteiro. Ângulo medido a partir do centro do dial;
+    // 135° (canto inferior esquerdo) é 16 °C, 405° (inferior direito) é 30 °C.
+    // Na abertura de baixo (os 90° que faltam) encosta ao extremo mais perto.
+    function tempDoPonto(ev) {
+      var r = el.dial.getBoundingClientRect();
+      var dx = ev.clientX - (r.left + r.width / 2);
+      var dy = ev.clientY - (r.top + r.height / 2);
+      var a = Math.atan2(dy, dx) * 180 / Math.PI;      // -180..180, horário
+      var g = ((a - 135) % 360 + 360) % 360;           // 0..360 desde o início do trilho
+      if (g > 270) g = g > 315 ? 0 : 270;
+      return Math.round(TMIN + (TMAX - TMIN) * g / 270);
+    }
+
+    function dialActivo() { return podeControlar() && !!estado.ligado; }
+
+    el.dial.addEventListener('pointerdown', function (ev) {
+      if (!dialActivo()) return;
+      ev.preventDefault();
+      try { el.dial.setPointerCapture(ev.pointerId); } catch (e) {}
+      arrasto = { id: ev.pointerId, valor: tempDoPonto(ev) };
+      el.dial.classList.add('a-arrastar');
+      render();
+    });
+    el.dial.addEventListener('pointermove', function (ev) {
+      if (!arrasto || ev.pointerId !== arrasto.id) return;
+      var v = tempDoPonto(ev);
+      if (v !== arrasto.valor) { arrasto.valor = v; render(); }
+    });
+    function largarDial(ev, cancelado) {
+      if (!arrasto || ev.pointerId !== arrasto.id) return;
+      var v = arrasto.valor;
+      arrasto = null;
+      el.dial.classList.remove('a-arrastar');
+      try { el.dial.releasePointerCapture(ev.pointerId); } catch (e) {}
+      if (!cancelado && estado && v !== Math.round(Number(estado.tempAlvo))) enviar('tempAlvo', v);
+      else render();
+    }
+    el.dial.addEventListener('pointerup', function (ev) { largarDial(ev, false); });
+    el.dial.addEventListener('pointercancel', function (ev) { largarDial(ev, true); });
+
+    // ---- dropdown de modo ----------------------------------------------
+
+    function ddAberto() { return el.dd.classList.contains('aberto'); }
+    function fecharDd() {
+      el.dd.classList.remove('aberto');
+      el.modoChip.setAttribute('aria-expanded', 'false');
+    }
+    function abrirDd() {
+      var actual = modoEfectivo();
+      var h = '';
+      for (var i = 0; i < MODOS.length; i++) {
+        var m = MODOS[i];
+        h += '<button type="button" role="option" data-modo="' + m.id + '"' +
+             (m.id === actual && ligadoEfectivo() ? ' class="active" aria-selected="true"' : ' aria-selected="false"') + '>' +
+             '<svg class="icon" width="14" height="14"><use href="#i-' + m.ico + '"/></svg>' + escapar(m.nome) + '</button>';
+      }
+      el.dd.innerHTML = h;
+      el.dd.classList.add('aberto');
+      el.modoChip.setAttribute('aria-expanded', 'true');
+    }
+    el.modoChip.addEventListener('click', function () {
+      if (ddAberto()) fecharDd();
+      else if (podeControlar()) abrirDd();
+    });
+    el.dd.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-modo]');
+      if (!b) return;
+      fecharDd();
+      escolherModo(b.getAttribute('data-modo'));
+    });
+    document.addEventListener('click', function (ev) {
+      if (ddAberto() && !ev.target.closest('.ac-modo-wrap')) fecharDd();
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && ddAberto()) { fecharDd(); el.modoChip.focus(); }
+    });
+
+    function escolherModo(modo) {
+      if (!podeControlar()) return;
+      if (estado.ligado && estado.modo === modo) return;
+      enviar('modo', modo);
+    }
+
+    // ---- ventilação --------------------------------------------------
+
+    (function montarVent() {
+      var h = '<span class="ac-vent-label">Ventilação</span>';
+      for (var i = 0; i < PRESETS.length; i++) {
+        h += '<button type="button" data-preset="' + PRESETS[i].id + '" disabled>' + escapar(PRESETS[i].nome) + '</button>';
+      }
+      h += '<span class="ac-vent-custom" id="acVentCustom"></span>';
+      el.vent.innerHTML = h;
+      el.ventCustom = $('acVentCustom');
+      el.ventBtns = el.vent.querySelectorAll('button[data-preset]');
+    })();
+    el.vent.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-preset]');
+      if (!b || b.disabled) return;
+      var p = b.getAttribute('data-preset');
+      if (!podeControlar() || estado.ventilacaoPreset === p) return;
+      enviar('ventilacaoPreset', p);
+    });
+
+    // ---- render do cartão -------------------------------------------
+
     function render() {
       var ms = idadeMs();
-      var vivo = estado && ms < SEM_RESPOSTA_MS;
+      var on = vivo();
+      card.classList.toggle('ac-neutro', !on);
 
-      card.classList.toggle('ac-neutro', !vivo);
-
-      if (!vivo) {
-        // Sem serviço não há nada em que confiar: dial neutro, botões off.
+      if (!on) {
+        // Sem serviço não há nada em que confiar: dial neutro, tudo desligado.
         card.classList.remove('ac-off');
         el.sw.classList.remove('on');
         el.temp.innerHTML = '—<sup>°C</sup>';
         el.temp.className = 'ac-temp';
         el.estado.textContent = estado ? 'Sem resposta' : 'Sem dados';
         el.sub.innerHTML = 'Interior <b>—</b> · Exterior <b>—</b>';
-        desenharArco(null);
-        for (var k = 0; k < el.modos.length; k++) el.modos[k].classList.remove('active');
+        desenharDial(null);
+        el.dial.classList.remove('arrastavel');
+        el.modoIco.setAttribute('href', '#i-refresh-cw');
+        el.modoNome.textContent = '—';
+        fecharDd();
+        for (var k = 0; k < el.ventBtns.length; k++) { el.ventBtns[k].classList.remove('active'); el.ventBtns[k].disabled = true; }
+        el.ventCustom.textContent = '';
         el.filtro.hidden = true;
         setSelo(estado ? 'Sem resposta' : 'A ligar…', estado ? 'high' : 'warn');
         el.nota.textContent = estado
           ? 'Serviço da loja sem resposta — última leitura há ' + haQuanto(ms) + '.'
           : 'À espera do serviço da loja…';
-        setBotoes(false, null);
+        el.sw.disabled = true; el.menos.disabled = true; el.mais.disabled = true;
+        el.modoChip.disabled = true; el.opcoes.disabled = true;
+        if (painel) renderPainel();
         return;
       }
 
-      var ligado = !!estado.ligado;
-      var alvo = (pend && pend.tipo === 'tempAlvo') ? pend.valor : estado.tempAlvo;
-      var modo = (pend && pend.tipo === 'modo') ? pend.valor : estado.modo;
-      if (pend && pend.tipo === 'ligar') ligado = true;
-      if (pend && pend.tipo === 'desligar') ligado = false;
+      var ligado = ligadoEfectivo();
+      var alvo = alvoEfectivo();
+      var modo = modoInfo(modoEfectivo());
+      var preset = presetEfectivo();
+      var livre = podeControlar();
 
       card.classList.toggle('ac-off', !ligado);
       el.sw.classList.toggle('on', ligado);
+      el.sw.disabled = !livre;
 
       el.temp.innerHTML = fmtTemp(alvo) + '<sup>°C</sup>';
-      el.temp.className = 'ac-temp' + (ligado ? ' on' : '') + (pend ? ' pendente' : '');
-      desenharArco(alvo);
+      el.temp.className = 'ac-temp' + (ligado ? ' on' : '') + ((pend || arrasto) ? ' pendente' : '');
+      desenharDial(alvo);
+      el.dial.classList.toggle('arrastavel', livre && !!estado.ligado);
 
       if (estado.erro) el.estado.textContent = estado.erro;
+      else if (arrasto) el.estado.textContent = 'Largar para definir';
       else if (pend) el.estado.textContent = 'A enviar…';
-      else el.estado.textContent = ligado ? (NOMES_MODO[modo] || modo || '—') : 'Desligado';
-
-      for (var i = 0; i < el.modos.length; i++) {
-        el.modos[i].classList.toggle('active', ligado && el.modos[i].getAttribute('data-modo') === modo);
-      }
+      else el.estado.textContent = ligado ? modo.nome : 'Desligado';
 
       el.sub.innerHTML = 'Interior <b>' + fmtTemp(estado.tempAmbiente) + '°</b> · Exterior <b>' +
                          fmtTemp(estado.tempExterior) + '°</b>';
 
+      el.menos.disabled = !livre || (alvo != null && alvo <= TMIN);
+      el.mais.disabled  = !livre || (alvo != null && alvo >= TMAX);
+
+      el.modoIco.setAttribute('href', '#i-' + modo.ico);
+      el.modoNome.textContent = ligado ? modo.nome : 'Desligado · ' + modo.nome;
+      el.modoChip.disabled = !livre;
+      if (!livre) fecharDd();
+
+      for (var i = 0; i < el.ventBtns.length; i++) {
+        var b = el.ventBtns[i];
+        b.classList.toggle('active', b.getAttribute('data-preset') === preset);
+        b.disabled = !livre || !ligado;
+      }
+      var v = ventEfectiva();
+      el.ventCustom.textContent = (preset === 'custom' && v != null) ? v + '%' : '';
+
+      el.opcoes.disabled = false;
       el.filtro.hidden = !estado.alertaFiltro;
 
       if (estado.erro) setSelo('Erro', 'high');
@@ -1138,17 +1446,24 @@ window.addEventListener('load', function () {
       else setSelo('Desligado', 'warn');
 
       el.nota.textContent = 'Atualizado há ' + haQuanto(ms) + (estado.erro ? ' · ' + estado.erro : '');
-      setBotoes(!pend, alvo);
+
+      if (painel) renderPainel();
     }
+
+    // ---- comandos ----------------------------------------------------
 
     // O comando fica resolvido quando o estado já reflecte o pedido OU quando
     // o serviço o marca 'executado'/'falhou'. O que chegar primeiro.
     function estadoReflete() {
       if (!pend || !estado) return false;
-      if (pend.tipo === 'tempAlvo') return Number(estado.tempAlvo) === Number(pend.valor);
-      if (pend.tipo === 'modo') return estado.modo === pend.valor && !!estado.ligado;
-      if (pend.tipo === 'ligar') return estado.ligado === true;
-      if (pend.tipo === 'desligar') return estado.ligado === false;
+      var t = pend.tipo, v = pend.valor;
+      if (t === 'tempAlvo') return Number(estado.tempAlvo) === Number(v);
+      if (t === 'modo') return estado.modo === v && !!estado.ligado;
+      if (t === 'ligar') return estado.ligado === true;
+      if (t === 'desligar') return estado.ligado === false;
+      if (t === 'ventilacao') return Number(estado.ventilacao) === Number(v);
+      if (t === 'ventilacaoPreset') return estado.ventilacaoPreset === v;
+      if (t === 'eco' || t === 'turbo' || t === 'sleep' || t === 'display') return estado[t] === !!v;
       return false;
     }
 
@@ -1195,26 +1510,146 @@ window.addEventListener('load', function () {
     }
 
     el.menos.addEventListener('click', function () {
-      if (!estado) return;
-      var v = Math.max(TMIN, Math.round(Number(estado.tempAlvo) || 24) - 1);
-      enviar('tempAlvo', v);
+      if (!podeControlar()) return;
+      enviar('tempAlvo', Math.max(TMIN, Math.round(Number(estado.tempAlvo) || 24) - 1));
     });
     el.mais.addEventListener('click', function () {
-      if (!estado) return;
-      var v = Math.min(TMAX, Math.round(Number(estado.tempAlvo) || 24) + 1);
-      enviar('tempAlvo', v);
+      if (!podeControlar()) return;
+      enviar('tempAlvo', Math.min(TMAX, Math.round(Number(estado.tempAlvo) || 24) + 1));
     });
     el.sw.addEventListener('click', function () {
-      if (!estado) return;
+      if (!podeControlar()) return;
       enviar(estado.ligado ? 'desligar' : 'ligar', true);
     });
-    for (var m = 0; m < el.modos.length; m++) {
-      el.modos[m].addEventListener('click', function (ev) {
-        var modo = ev.currentTarget.getAttribute('data-modo');
-        if (!estado || (estado.ligado && estado.modo === modo)) return;
-        enviar('modo', modo);
+
+    // ---- painel de opções (giocoModal do shell) ----------------------
+
+    el.opcoes.addEventListener('click', function () {
+      if (!vivo() || !window.giocoModal) return;
+      abrirPainel();
+    });
+
+    function abrirPainel() {
+      var body = document.createElement('div');
+      var h = '';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Modo</p><div class="acp-modos" id="acpModos">';
+      for (var i = 0; i < MODOS.length; i++) {
+        h += '<button type="button" data-modo="' + MODOS[i].id + '">' +
+             '<svg class="icon" width="16" height="16"><use href="#i-' + MODOS[i].ico + '"/></svg>' + escapar(MODOS[i].nome) + '</button>';
+      }
+      h += '</div></div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Ventilação fina</p>' +
+           '<div class="acp-slider"><input type="range" id="acpVent" min="' + VMIN + '" max="' + VMAX + '" step="1">' +
+           '<output id="acpVentOut">—</output></div>' +
+           '<p class="acp-nota" id="acpVentNota"></p></div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Funções</p>';
+      for (var f = 0; f < FLAGS.length; f++) {
+        h += '<div class="acp-toggle" data-flag-row="' + FLAGS[f].id + '">' +
+             '<div class="txt"><b>' + escapar(FLAGS[f].nome) + '</b><span>' + escapar(FLAGS[f].desc) + '</span></div>' +
+             '<button type="button" class="cc-switch" data-flag="' + FLAGS[f].id + '" aria-label="' + escapar(FLAGS[f].nome) + '"></button>' +
+             '</div>';
+      }
+      h += '</div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Aparelho</p>' +
+           '<div class="acp-kv" id="acpHum"><span>Humidade interior</span><span id="acpHumVal">—</span></div>' +
+           '<div class="acp-kv"><span>Código de erro</span><span id="acpErro">—</span></div>' +
+           '<div class="acp-kv"><span>Filtro</span><span id="acpFiltro">—</span></div>' +
+           '<p class="acp-nota" id="acpFiltroNota" hidden>Limpar o filtro reduz o consumo e melhora o caudal de ar.</p>' +
+           '<div class="acp-kv"><span>Última leitura</span><span id="acpLeitura">—</span></div>' +
+           '<p class="acp-nota" id="acpAviso"></p>' +
+           '</div>';
+
+      body.innerHTML = h;
+      painel = { body: body };
+
+      body.querySelector('#acpModos').addEventListener('click', function (ev) {
+        var b = ev.target.closest('button[data-modo]');
+        if (!b || b.disabled) return;
+        escolherModo(b.getAttribute('data-modo'));
       });
+      var slider = body.querySelector('#acpVent');
+      slider.addEventListener('input', function () {
+        body.querySelector('#acpVentOut').textContent = slider.value + '%';
+      });
+      // change, não input: só envia ao largar.
+      slider.addEventListener('change', function () {
+        if (!podeControlar()) return;
+        var v = Math.min(VMAX, Math.max(VMIN, Math.round(Number(slider.value))));
+        if (Number(estado.ventilacao) === v) { renderPainel(); return; }
+        enviar('ventilacao', v);
+      });
+      body.addEventListener('click', function (ev) {
+        var b = ev.target.closest('button[data-flag]');
+        if (!b || b.disabled) return;
+        var id = b.getAttribute('data-flag');
+        if (!podeControlar()) return;
+        enviar(id, !flagEfectiva(id));
+      });
+
+      window.giocoModal.open({
+        titulo: 'Ar condicionado — opções',
+        conteudo: body,
+        onClose: function () { painel = null; }
+      });
+      renderPainel();
     }
+
+    function renderPainel() {
+      if (!painel) return;
+      var b = painel.body;
+      var on = vivo();
+      var livre = podeControlar();
+      var ligado = ligadoEfectivo();
+      var modo = modoEfectivo();
+      var preset = presetEfectivo();
+
+      var modos = b.querySelectorAll('#acpModos button');
+      for (var i = 0; i < modos.length; i++) {
+        modos[i].classList.toggle('active', on && ligado && modos[i].getAttribute('data-modo') === modo);
+        modos[i].disabled = !livre;
+      }
+
+      var slider = b.querySelector('#acpVent');
+      var out = b.querySelector('#acpVentOut');
+      var nota = b.querySelector('#acpVentNota');
+      var v = ventEfectiva();
+      if (v != null && !isNaN(v)) { slider.value = String(Math.min(VMAX, Math.max(VMIN, Number(v)))); out.textContent = Math.round(Number(v)) + '%'; }
+      else { out.textContent = '—'; }
+      slider.disabled = !livre || !ligado || preset === 'auto';
+      nota.textContent = preset === 'auto'
+        ? 'Em Auto o aparelho escolhe a ventilação. Escolhe outro preset no cartão para ajustar à mão.'
+        : (preset === 'custom' ? 'Valor personalizado.' : 'Arrasta para um valor personalizado; os presets do cartão continuam disponíveis.');
+
+      var sws = b.querySelectorAll('button[data-flag]');
+      for (var j = 0; j < sws.length; j++) {
+        var id = sws[j].getAttribute('data-flag');
+        var val = flagEfectiva(id);
+        var row = b.querySelector('[data-flag-row="' + id + '"]');
+        // Sem o campo no estado (ex.: display não exposto), a linha não aparece.
+        if (row) row.hidden = !on || typeof val !== 'boolean';
+        sws[j].classList.toggle('on', val === true);
+        sws[j].disabled = !livre;
+      }
+
+      var hum = b.querySelector('#acpHum');
+      var temHum = on && estado && typeof estado.humidade === 'number';
+      hum.hidden = !temHum;
+      if (temHum) b.querySelector('#acpHumVal').textContent = estado.humidade + '%';
+
+      b.querySelector('#acpErro').textContent = on ? (estado.codigoErro ? String(estado.codigoErro) : 'Sem erro') : '—';
+      var filtroEl = b.querySelector('#acpFiltro');
+      filtroEl.innerHTML = on ? (estado.alertaFiltro ? '<span class="status warn">Limpar filtro</span>' : 'OK') : '—';
+      b.querySelector('#acpFiltroNota').hidden = !(on && estado.alertaFiltro);
+      var t = estado && estado.atualizadoEm ? new Date(estado.atualizadoEm) : null;
+      b.querySelector('#acpLeitura').textContent = (t && !isNaN(t)) ? t.toLocaleString('pt-PT') : '—';
+      b.querySelector('#acpAviso').textContent = on ? (estado.erro || '') : 'Serviço da loja sem resposta — controlos desactivados.';
+    }
+
+    // ---- ligação ao estado -----------------------------------------
 
     db.ref('lojas/' + lojaId + '/ac/estado').on('value', function (snap) {
       estado = snap.val();

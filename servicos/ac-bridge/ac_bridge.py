@@ -12,6 +12,10 @@ Ciclo:
   - a cada 3 s consulta lojas/{loja}/ac/comandos com estado 'pendente',
     executa por ordem de pedidoEm e marca 'executado' / 'falhou'.
 
+Tipos de comando: ligar, desligar, tempAlvo (16–30), modo (cool|heat|fan|dry|
+auto), ventilacao (1–100), ventilacaoPreset (silencioso|baixo|medio|alto|max|
+auto), eco / turbo / sleep / display (bool).
+
 Variáveis de ambiente (todas opcionais):
   AC_BRIDGE_KEYFILE   caminho do JSON com {device_id, ip, token, key}
   AC_BRIDGE_LOJA      id da loja no Firebase (default sb154)
@@ -25,6 +29,7 @@ import json
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from logging.handlers import RotatingFileHandler
 
@@ -48,6 +53,7 @@ HEARTBEAT = 5 * 60           # s: escreve o estado mesmo sem alterações
 COMANDO_VALIDADE = 10 * 60   # s: comandos mais velhos que isto expiram
 FALHAS_PARA_ALERTA = 3       # leituras falhadas seguidas até marcar erro
 TEMP_MIN, TEMP_MAX = 16, 30
+VENT_MIN, VENT_MAX = 1, 100
 
 MODOS = {
     "cool": AC.OperationalMode.COOL,
@@ -58,6 +64,19 @@ MODOS = {
 }
 MODOS_INV = {v: k for k, v in MODOS.items()}
 MODOS_INV[AC.OperationalMode.SMART_DRY] = "dry"
+
+# Presets de ventilação ↔ enum da biblioteca (valores 20/40/60/80/100/102).
+PRESETS = {
+    "silencioso": AC.FanSpeed.SILENT,
+    "baixo": AC.FanSpeed.LOW,
+    "medio": AC.FanSpeed.MEDIUM,
+    "alto": AC.FanSpeed.HIGH,
+    "max": AC.FanSpeed.MAX,
+    "auto": AC.FanSpeed.AUTO,
+}
+PRESETS_INV = {int(v): k for k, v in PRESETS.items()}
+
+FLAGS_BOOL = ("eco", "turbo", "sleep")   # propriedades com setter directo
 
 ESTADO_PATH = f"lojas/{LOJA}/ac/estado"
 COMANDOS_PATH = f"lojas/{LOJA}/ac/comandos"
@@ -90,6 +109,16 @@ def parse_iso(s):
         return d
     except Exception:
         return None
+
+
+def como_bool(v):
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)) and v in (0, 1):
+        return bool(v)
+    if isinstance(v, str) and v.lower() in ("true", "false"):
+        return v.lower() == "true"
+    raise ValueError(f"valor booleano inválido: {v!r}")
 
 
 # ---------------------------------------------------------------- firebase REST
@@ -145,6 +174,10 @@ async def ligar_ac(chave) -> AC:
     await dev.authenticate(chave["token"], chave["key"])
     try:
         await dev.get_capabilities()
+        log.info("capacidades: eco=%s turbo=%s display=%s humidade=%s ventCustom=%s modos=%s",
+                 dev.supports_eco, dev.supports_turbo, dev.supports_display_control,
+                 dev.supports_humidity, dev.supports_custom_fan_speed,
+                 [MODOS_INV.get(m, str(m)) for m in dev.supported_operation_modes])
     except Exception as e:
         log.warning("capabilities falharam (%s) — a continuar sem elas", e)
     return dev
@@ -157,17 +190,29 @@ def estado_do_ac(dev: AC) -> dict:
         fan = int(fan)
     except Exception:
         fan = None
-    return {
+    estado = {
         "ligado": bool(dev.power_state),
         "modo": modo,
         "tempAlvo": dev.target_temperature,
         "tempAmbiente": dev.indoor_temperature,
         "tempExterior": dev.outdoor_temperature,
         "ventilacao": fan,
+        "ventilacaoPreset": PRESETS_INV.get(fan, "custom") if fan is not None else "custom",
+        "eco": bool(dev.eco),
+        "turbo": bool(dev.turbo),
+        "sleep": bool(dev.sleep),
         "alertaFiltro": bool(dev.filter_alert) if dev.filter_alert is not None else False,
         "codigoErro": dev.error_code if dev.error_code else 0,
         "fonte": LOJA,
     }
+    # O Giatsu reporta display_on mas não anuncia controlo do display, e o
+    # toggle não tem efeito (testado 2026-09-02). Só se publica o campo quando
+    # o aparelho diz que o controla — a página esconde o toggle sem o campo.
+    if dev.display_on is not None and dev.supports_display_control:
+        estado["display"] = bool(dev.display_on)
+    if dev.supports_humidity and dev.indoor_humidity is not None:
+        estado["humidade"] = dev.indoor_humidity
+    return estado
 
 
 class Bridge:
@@ -258,6 +303,52 @@ class Bridge:
             fb_put(f"{COMANDOS_PATH}/{cid}/erro", erro)
         fb_put(f"{COMANDOS_PATH}/{cid}/estado", estado)
 
+    async def aplicar(self, tipo: str, valor):
+        """Traduz um comando validado em alterações no dispositivo e envia-as.
+        Levanta ValueError para valor inválido; qualquer outra excepção é
+        tratada como falha de ligação."""
+        dev = self.dev
+        if tipo == "ligar":
+            dev.power_state = True
+        elif tipo == "desligar":
+            dev.power_state = False
+        elif tipo == "tempAlvo":
+            t = float(valor)
+            if not (TEMP_MIN <= t <= TEMP_MAX):
+                raise ValueError(f"tempAlvo fora de {TEMP_MIN}–{TEMP_MAX}")
+            dev.target_temperature = t
+        elif tipo == "modo":
+            if valor not in MODOS:
+                raise ValueError(f"modo inválido: {valor}")
+            dev.operational_mode = MODOS[valor]
+            dev.power_state = True
+        elif tipo == "ventilacao":
+            try:
+                v = int(valor)
+            except (TypeError, ValueError):
+                raise ValueError(f"ventilacao inválida: {valor!r}")
+            if not (VENT_MIN <= v <= VENT_MAX):
+                raise ValueError(f"ventilacao fora de {VENT_MIN}–{VENT_MAX}")
+            dev.fan_speed = v
+        elif tipo == "ventilacaoPreset":
+            if valor not in PRESETS:
+                raise ValueError(f"ventilacaoPreset inválido: {valor}")
+            dev.fan_speed = PRESETS[valor]
+        elif tipo in FLAGS_BOOL:
+            setattr(dev, tipo, como_bool(valor))
+        elif tipo == "display":
+            # Não há setter: a biblioteca só alterna. Só se mexe se o estado
+            # actual for diferente do pedido (toggle_display já faz refresh).
+            querido = como_bool(valor)
+            if not dev.supports_display_control:
+                raise ValueError("o aparelho não suporta controlo do display")
+            if dev.display_on is not None and dev.display_on != querido:
+                await dev.toggle_display()
+            return
+        else:
+            raise ValueError(f"tipo desconhecido: {tipo}")
+        await dev.apply()
+
     async def executar(self, cid: str, cmd: dict):
         tipo = cmd.get("tipo")
         valor = cmd.get("valor")
@@ -270,23 +361,7 @@ class Bridge:
         try:
             await self.garantir_dev()
             await self.dev.refresh()          # apply() envia o estado completo
-            if tipo == "ligar":
-                self.dev.power_state = True
-            elif tipo == "desligar":
-                self.dev.power_state = False
-            elif tipo == "tempAlvo":
-                t = float(valor)
-                if not (TEMP_MIN <= t <= TEMP_MAX):
-                    raise ValueError(f"tempAlvo fora de {TEMP_MIN}–{TEMP_MAX}")
-                self.dev.target_temperature = t
-            elif tipo == "modo":
-                if valor not in MODOS:
-                    raise ValueError(f"modo inválido: {valor}")
-                self.dev.operational_mode = MODOS[valor]
-                self.dev.power_state = True
-            else:
-                raise ValueError(f"tipo desconhecido: {tipo}")
-            await self.dev.apply()
+            await self.aplicar(tipo, valor)
             log.info("comando %s executado: %s=%s", cid, tipo, valor)
             self.marcar(cid, "executado")
         except Exception as e:
@@ -339,7 +414,6 @@ def main():
             return
         except Exception as e:
             log.error("loop principal caiu (%s) — a reiniciar em 10 s", e)
-            import time
             time.sleep(10)
 
 

@@ -380,6 +380,47 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 .cat-chip .circle{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
 .cat-chip span{ font-weight:600; font-size:13.5px; white-space:nowrap; }
 
+/* ===== MODAL (giocoModal, gioco-shell.js) =====
+   Painel sobreposto genérico. Sem tokens novos: superfície --white (que no
+   tema escuro resolve para a superfície escura), texto --ink, rebordos --line.
+   O fundo escurecido é o mesmo do menu ao toque (rgba(20,20,20,0.45)). */
+.gioco-modal-overlay{
+  position:fixed; inset:0; z-index:80;
+  display:none; align-items:center; justify-content:center;
+  padding:24px;
+  background:rgba(20,20,20,0.45);
+}
+.gioco-modal-overlay.aberto{ display:flex; }
+body.gioco-modal-open{ overflow:hidden; }
+.gioco-modal{
+  width:min(560px, 100%);
+  max-height:88vh;
+  max-height:88dvh;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  border-radius:18px;
+  padding:22px 24px 24px;
+  color:var(--ink);
+  box-shadow:0 24px 60px rgba(0,0,0,0.28);
+}
+/* O vidro do .glass-light é translúcido; por cima de uma página cheia ficava
+   ilegível, por isso o modal leva fundo sólido por baixo do vidro. */
+.gioco-modal.glass-light{ background:var(--white); }
+.gioco-modal.glass-light:hover{ transform:none; }
+.gioco-modal-head{ display:flex; align-items:center; gap:12px; margin:0 0 18px; }
+.gioco-modal-titulo{
+  flex:1; margin:0;
+  font-family:'Inter',sans-serif; font-weight:700; font-size:15px;
+}
+.gioco-modal-close{
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  border:1px solid var(--line); background:transparent; color:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; padding:0;
+}
+.gioco-modal-close:hover{ border-color:var(--ink); }
+.gioco-modal-body{ font-size:12.5px; line-height:1.5; }
+
 /* ===== MENU AO TOQUE — barra inferior + painel para cima =====
    Vinha duplicado no <style> da equipa.html e da contagens.html. Sobe ao
    shell tal e qual, com uma unica mudanca: e OPT-IN. So vale nas paginas

@@ -56,6 +56,13 @@
     '<symbol id="i-trending-down" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></symbol>',
     '<symbol id="i-trending-up" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>',
     '<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>',
+    '<symbol id="i-droplet" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></symbol>',
+    '<symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>',
+    '<symbol id="i-refresh-cw" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>',
+    '<symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>',
+    '<symbol id="i-snowflake" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><line x1="3.34" y1="7" x2="20.66" y2="17"/><line x1="3.34" y1="17" x2="20.66" y2="7"/><polyline points="9 4.5 12 7 15 4.5"/><polyline points="9 19.5 12 17 15 19.5"/><polyline points="3.6 11.2 6.9 12 5.4 15.1"/><polyline points="18.6 8.9 17.1 12 20.4 12.8"/></symbol>',
+    '<symbol id="i-wind" viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></symbol>',
+    '<symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -67,7 +74,9 @@
     'clipboard-check', 'layout-dashboard', 'log-out', 'message-square', 'moon',
     'more-vertical', 'menu', 'panel-left', 'pencil', 'phone', 'plus', 'receipt',
     'scan', 'search', 'settings', 'shopping-cart', 'store', 'sun', 'trash-2', 'trending-down',
-    'trending-up', 'users'
+    'trending-up', 'users',
+    // Set/2026, para o A/C do centro de controlo e o modal do shell (traço Feather):
+    'droplet', 'flame', 'refresh-cw', 'sliders', 'snowflake', 'wind', 'x'
   ];
 
   function injectSprite() {
@@ -347,6 +356,76 @@
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
+
+  /* ---------- MODAL (giocoModal) ----------
+     Componente único do shell para painéis sobrepostos (ex.: opções do A/C
+     no centro de controlo). Cria o overlay uma vez, no body, e reutiliza-o.
+       giocoModal.open({ titulo, conteudo, onClose }) → devolve o elemento .gioco-modal-body
+         conteudo: Node ou string HTML (já escapada por quem chama).
+       giocoModal.close()
+       giocoModal.isOpen()
+     Fecha com Esc, clique no fundo escuro ou no botão ×. Enquanto está
+     aberto, body.gioco-modal-open bloqueia o scroll da página. */
+  var modalEl = null, modalBody = null, modalTitulo = null, modalOnClose = null, modalFocoAnterior = null;
+
+  function modalCriar(){
+    if (modalEl) return;
+    modalEl = document.createElement('div');
+    modalEl.className = 'gioco-modal-overlay';
+    modalEl.setAttribute('role', 'dialog');
+    modalEl.setAttribute('aria-modal', 'true');
+    modalEl.innerHTML =
+      '<div class="gioco-modal glass-light">' +
+        '<div class="gioco-modal-head">' +
+          '<h2 class="gioco-modal-titulo" id="giocoModalTitulo"></h2>' +
+          '<button type="button" class="gioco-modal-close" aria-label="Fechar">' +
+            '<svg class="icon" width="16" height="16"><use href="#i-x"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="gioco-modal-body"></div>' +
+      '</div>';
+    modalEl.setAttribute('aria-labelledby', 'giocoModalTitulo');
+    document.body.appendChild(modalEl);
+    modalBody = modalEl.querySelector('.gioco-modal-body');
+    modalTitulo = modalEl.querySelector('.gioco-modal-titulo');
+    modalEl.querySelector('.gioco-modal-close').addEventListener('click', modalClose);
+    // Só o fundo fecha: um clique dentro do painel não chega aqui com target=overlay.
+    modalEl.addEventListener('mousedown', function(ev){ if (ev.target === modalEl) modalClose(); });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && modalIsOpen()) { ev.preventDefault(); modalClose(); }
+    });
+  }
+
+  function modalIsOpen(){ return !!(modalEl && modalEl.classList.contains('aberto')); }
+
+  function modalOpen(opts){
+    opts = opts || {};
+    modalCriar();
+    modalTitulo.textContent = opts.titulo || '';
+    modalBody.innerHTML = '';
+    if (opts.conteudo && typeof opts.conteudo !== 'string') modalBody.appendChild(opts.conteudo);
+    else if (opts.conteudo) modalBody.innerHTML = opts.conteudo;
+    modalOnClose = typeof opts.onClose === 'function' ? opts.onClose : null;
+    modalFocoAnterior = document.activeElement;
+    modalEl.classList.add('aberto');
+    document.body.classList.add('gioco-modal-open');
+    var btn = modalEl.querySelector('.gioco-modal-close');
+    if (btn) btn.focus();
+    return modalBody;
+  }
+
+  function modalClose(){
+    if (!modalIsOpen()) return;
+    modalEl.classList.remove('aberto');
+    document.body.classList.remove('gioco-modal-open');
+    var cb = modalOnClose; modalOnClose = null;
+    if (modalFocoAnterior && modalFocoAnterior.focus) { try { modalFocoAnterior.focus(); } catch (e) {} }
+    modalFocoAnterior = null;
+    if (cb) cb();
+  }
+
+  var giocoModal = { open: modalOpen, close: modalClose, isOpen: modalIsOpen };
+
   /* ---------- ARRANQUE ---------- */
   function giocoShellInit() {
     injectSprite();
@@ -375,4 +454,5 @@
   window.toggleThemeSwitch = toggleThemeSwitch;
   window.toggleSidebarPin = toggleSidebarPin;
   window.giocoReadStoredTheme = readStoredTheme;
+  window.giocoModal = giocoModal;
 })();

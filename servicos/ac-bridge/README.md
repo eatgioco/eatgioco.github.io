@@ -12,11 +12,16 @@ automático) — o mesmo padrão do go2rtc.
 
 - `lojas/sb154/ac/estado` — `ligado, modo (cool|heat|fan|dry|auto), tempAlvo,
   tempAmbiente, tempExterior, ventilacao, alertaFiltro, codigoErro,
-  atualizadoEm (ISO 8601), fonte, erro?`. PATCH raso a cada 30 s se algo mudou,
+  atualizadoEm (ISO 8601), fonte, erro?, ventilacaoPreset (preset ou 'custom'),
+  eco, turbo, sleep`. `display` e `humidade` só aparecem se o aparelho anunciar
+  a capacidade — o Giatsu da SB154 não anuncia nenhuma das duas (o toggle do
+  display não tem efeito nele; a página esconde o toggle sem o campo). PATCH raso a cada 30 s se algo mudou,
   ou de 5 em 5 min como heartbeat.
-- `lojas/sb154/ac/comandos/{pushId}` — `tipo (ligar|desligar|tempAlvo|modo),
-  valor, pedidoEm, origem, estado (pendente|executado|falhou), executadoEm,
-  erro?`. Consultados a cada 3 s; nunca apagados, só marcados. Comandos com
+- `lojas/sb154/ac/comandos/{pushId}` — `tipo, valor, pedidoEm, origem, estado
+  (pendente|executado|falhou), executadoEm, erro?`. Tipos: `ligar`, `desligar`,
+  `tempAlvo` (16–30), `modo` (cool|heat|fan|dry|auto), `ventilacao` (1–100),
+  `ventilacaoPreset` (silencioso|baixo|medio|alto|max|auto → FanSpeed 20/40/60/80/100/102),
+  `eco` / `turbo` / `sleep` (bool). Consultados a cada 3 s; nunca apagados, só marcados. Comandos com
   mais de 10 min são marcados `falhou` / `expirado`.
 
 ## Instalar / operar no POS (SSH: `ssh POS@100.97.211.74`, shell cmd.exe)

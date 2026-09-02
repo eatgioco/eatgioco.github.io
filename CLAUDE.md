@@ -298,15 +298,24 @@ aparelho vive só no POS em `C:\gioco\ac\ac-sb154-midea.json`).
 lojas/sb154/ac/estado              — escrito SÓ pelo serviço (PATCH raso a cada 30 s se
                                      mudou, heartbeat 5 min): ligado, modo (cool|heat|fan|
                                      dry|auto), tempAlvo, tempAmbiente, tempExterior,
-                                     ventilacao, alertaFiltro, codigoErro, atualizadoEm (ISO),
-                                     fonte ('sb154'), erro? ('sem ligação ao A/C')
+                                     ventilacao (1–100), ventilacaoPreset (silencioso|baixo|
+                                     medio|alto|max|auto|custom), eco, turbo, sleep (bool),
+                                     alertaFiltro, codigoErro, atualizadoEm (ISO), fonte ('sb154'),
+                                     erro? ('sem ligação ao A/C'). display e humidade só se o
+                                     aparelho anunciar a capacidade (o da SB154 não anuncia).
 lojas/sb154/ac/comandos/{pushId}   — escrito pela centro-de-controlo.html com push().set():
-                                     tipo (ligar|desligar|tempAlvo|modo), valor, pedidoEm,
+                                     tipo (ligar|desligar|tempAlvo|modo|ventilacao|
+                                     ventilacaoPreset|eco|turbo|sleep|display), valor, pedidoEm,
                                      origem, estado (pendente|executado|falhou); o serviço
                                      acrescenta executadoEm e erro? folha a folha.
                                      NUNCA apagar; comandos > 10 min ficam 'falhou'/'expirado'.
 ```
 
+- O cartão: dial SVG deslizante (pointer events, snap a graus inteiros, envia ao largar),
+  chip de modo com dropdown, presets de ventilação e "Mais opções", que abre o
+  **`giocoModal`** do shell (`gioco-shell.js`: `giocoModal.open({titulo, conteudo, onClose})`,
+  `.close()`, `.isOpen()`; CSS `.gioco-modal-*` em `gioco-shell.css`; fecha com Esc, fundo ou ×).
+  É o componente de painel sobreposto para todo o OS — não criar modais por página.
 - A página considera o serviço "sem resposta" quando `atualizadoEm` tem mais de 2 min:
   dial neutro e botões desativados. Um comando sem resposta em 15 s é reposto no cliente.
 - Operar no POS: `ssh POS@100.97.211.74` (Win32-OpenSSH, shell cmd.exe; chave pública do
