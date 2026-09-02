@@ -54,6 +54,8 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
+| `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
+| `gioco-charts.js` | `GiocoChart.*` — funções que desenham barras/colunas/linha/donut em HTML/SVG | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
 | `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU | Só Manel |
 | `tarefas.html` | Tarefas, prazos e fixados do dia | Só Manel |
@@ -374,6 +376,10 @@ Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
 `<link rel="stylesheet" href="gioco-shell.css">`. A seguir a
 `<body>`, `<script src="gioco-shell.js"></script>` — antes de qualquer markup
 com `<use href="#i-...">`, para o sprite já estar no DOM.
+
+**Gráficos.** Qualquer página que precise de barras, colunas, linha ou donut
+carrega `gioco-charts.css`/`.js` e usa `GiocoChart.*`. Nunca reimplementar por
+página; correcções vão sempre para o `gioco-charts`, igual à regra do shell.
 
 **Tokens.** Nunca redeclarar num `<style>` de página o que o shell já dá. A
 semântica é o que interessa, não o nome:

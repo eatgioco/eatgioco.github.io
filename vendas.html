@@ -22,6 +22,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="gioco-charts.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -36,28 +37,6 @@
      gioco-shell.css. Aqui fica só o que é específico do importador SAF-T
      e das vistas de análise.
      ====================================================================== */
-
-  /* Fatias do donut: vermelho e preto da marca mais tons intermédios, na
-     mesma paleta. Par claro/escuro obrigatório — uma fatia é superfície, por
-     isso o mínimo é 3:1 contra o cartão (WCAG 1.4.11, objectos gráficos):
-       claro  (#F8F7F4) → 1:4,83  2:17,20  3:3,05  4:3,41  5:6,84  6:5,22
-       escuro (#221F1A) → 1:3,17  2:14,08  3:5,03  4:4,50  5:6,68  6:9,27
-     O --fatia-2 (preto) e o --fatia-6 (bege) trocam de papel entre temas —
-     cada um era invisível no tema onde agora não está. O --fatia-5 clareia.
-     Os outros três aguentam os dois temas sem mudar. */
-  :root{
-    --fatia-1:#D91124;
-    --fatia-2:#141414;
-    --fatia-3:#E4694E;
-    --fatia-4:#8C857B;
-    --fatia-5:#A6202C;
-    --fatia-6:#6E675C;
-  }
-  [data-theme="dark"]{
-    --fatia-2:#F2EDE4;
-    --fatia-5:#FF7D88;
-    --fatia-6:#C9C2B4;
-  }
 
   body{
     -webkit-font-smoothing:antialiased;
@@ -415,73 +394,6 @@
   .pos{ color:var(--green); }
   .neg{ color:var(--red-ink); }
 
-  /* ---------- Barras horizontais ---------- */
-  .bars{
-    margin-top:16px;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-
-  .bar-row{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-
-  /* flex:0 1 (e não 0 0) de propósito: a coluna de conteúdo é mais estreita
-     do que era antes da Fase 2, porque a sidebar ocupa 84px. Com base fixa a
-     linha da barra transbordava; assim encolhe em vez de empurrar a página. */
-  .bar-label{
-    font-size:11.5px;
-    flex:0 1 74px;
-    min-width:0;
-    color:var(--muted);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-
-  .bar-track{
-    flex:1 1 40px;
-    min-width:40px;
-    height:18px;
-    background:var(--white);
-    border:1px solid var(--line);
-    border-radius:100px;
-    overflow:hidden;
-    position:relative;
-    min-width:60px;
-  }
-
-  .bar-fill{
-    display:block;
-    height:100%;
-    background:var(--red);
-  }
-
-  .bar-fill.alt{ background:var(--fatia-2); }
-
-  .bar-value{
-    font-size:11.5px;
-    font-weight:700;
-    font-variant-numeric:tabular-nums;
-    flex:0 1 96px;
-    min-width:0;
-    text-align:right;
-    white-space:nowrap;
-  }
-
-  .bar-delta{
-    font-size:11.5px;
-    font-variant-numeric:tabular-nums;
-    flex:0 1 74px;
-    min-width:0;
-    text-align:right;
-    white-space:nowrap;
-    color:var(--muted);
-  }
-
   /* Rodapé de secção. Nome próprio: o .legend do shell é a legenda em flex
      com bolinhas de cor, isto é um parágrafo de nota. Não são a mesma coisa
      e não vale a pena forçá-las a sê-lo. */
@@ -538,16 +450,6 @@
   .hidden{ display:none !important; }
 
   .cat-grid td select{ padding:7px 9px; font-size:13px; }
-
-  .curve-wrap{ margin-top:16px; }
-  .curve-wrap svg{
-    width:100%;
-    height:auto;
-    display:block;
-    border:1px solid var(--line);
-    border-radius:14px;
-    background:var(--white);
-  }
 
   /* ---------- Secções colapsáveis ---------- */
   .sec-global{
@@ -636,127 +538,6 @@
   .vista-btn:hover{ border-color:var(--ink); color:var(--ink); }
   .vista-btn.activo{ border-color:var(--ink); background:var(--ink); color:var(--white); }
 
-  /* ---------- Barras verticais ---------- */
-  .vbars{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:flex-end;
-    gap:6px 4px;
-    margin-top:16px;
-    padding:8px 0 0;
-  }
-
-  .vbar-col{
-    flex:1 1 46px;
-    min-width:46px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:4px;
-    min-height:0;
-  }
-
-  .vbar-valor{
-    font-size:9.5px;
-    font-weight:700;
-    font-variant-numeric:tabular-nums;
-    white-space:nowrap;
-  }
-
-  .vbar-track{
-    width:100%;
-    height:150px;
-    display:flex;
-    align-items:flex-end;
-    background:var(--white);
-    border:1px solid var(--line);
-    border-top:0;
-    border-radius:0 0 8px 8px;
-    overflow:hidden;
-  }
-
-  .vbar-fill{
-    display:block;
-    width:100%;
-    background:var(--red);
-  }
-
-  .vbar-fill.alt{ background:var(--fatia-2); }
-
-  .vbar-label{
-    font-size:9.5px;
-    color:var(--muted);
-    text-align:center;
-    line-height:1.2;
-    overflow-wrap:anywhere;
-  }
-
-  /* ---------- Donut ---------- */
-  .donut-wrap{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    gap:24px;
-    margin-top:16px;
-  }
-
-  .donut{
-    position:relative;
-    flex:0 0 auto;
-    width:200px;
-    height:200px;
-    border-radius:50%;
-    border:1px solid var(--line);
-  }
-
-  .donut::after{
-    content:'';
-    position:absolute;
-    inset:30%;
-    background:var(--dough);
-    border:1px solid var(--line);
-    border-radius:50%;
-  }
-
-  .donut-legenda{
-    flex:1 1 240px;
-    min-width:0;
-    list-style:none;
-    margin:0;
-    padding:0;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-
-  .donut-item{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    font-size:11.5px;
-  }
-
-  .donut-chip{
-    flex:0 0 12px;
-    width:12px;
-    height:12px;
-    border-radius:3px;
-    border:1px solid var(--line);
-  }
-
-  .donut-nome{
-    flex:1 1 auto;
-    min-width:0;
-    overflow-wrap:anywhere;
-  }
-
-  .donut-valor{
-    flex:0 0 auto;
-    font-weight:700;
-    font-variant-numeric:tabular-nums;
-    white-space:nowrap;
-  }
-
   /* ---------- Erro de autenticação (padrão do OS) ---------- */
   #authErro{ display:none; margin:18px 0 0; }
   #authErro.on{ display:block; }
@@ -786,6 +567,7 @@
 </head>
 <body>
 <script src="gioco-shell.js"></script>
+<script src="gioco-charts.js"></script>
 
 <div class="shell">
 
@@ -2833,163 +2615,18 @@
     }).join('') + '</span>';
   }
 
-  /* Cores dos SVG gerados em JS. Os atributos stroke/fill de SVG não aceitam
-     var(--token), por isso os tokens do tema são lidos do <body> no momento do
-     render. É isto que faz os gráficos seguirem o tema activo em vez de ficarem
-     presos às cores do tema claro, como estavam antes da Fase 2. */
-  function coresTema(){
-    var cs = window.getComputedStyle(document.body);
-    function tok(nome, alternativa){
-      var v = cs.getPropertyValue(nome);
-      v = v ? v.trim() : '';
-      return v || alternativa;
-    }
-    return {
-      ink:   tok('--ink',   '#141414'),
-      line:  tok('--line',  '#f0e6d6'),
-      muted: tok('--muted', '#6b6660'),
-      red:   tok('--red',   '#D91124'),
-      /* Mesma regra do shell: o --red é superfície (traços, pontos, fatias),
-         o --red-ink é texto. Sobre fundo escuro o --red dá 3,17:1 — chega
-         para um traço (3:1), não chega para texto (4,5:1). */
-      redInk: tok('--red-ink', '#D91124')
-    };
-  }
-
-  /* O texto dentro dos SVG segue a mesma regra do resto da página: Inter. */
+  /* barra/barrasVerticais/graficoLinha/donut/coresTema/CORES_FATIA vivem em
+     gioco-charts.js — estes nomes ficam como aliases finos para o resto do
+     ficheiro continuar a chamá-los sem alteração. SVG_FONTE e coresTema()
+     continuam precisos localmente porque a curva de Lorenz (Concentração),
+     que fica aqui, usa-os directamente. */
   var SVG_FONTE = 'Inter, sans-serif';
-
-  function barra(label, valor, max, texto, delta, alt){
-    var largura = max > 0 ? Math.max(0, valor / max) * 100 : 0;
-    return '<div class="bar-row">' +
-      '<span class="bar-label">' + esc(label) + '</span>' +
-      '<span class="bar-track"><span class="bar-fill' + (alt ? ' alt' : '') + '" style="width:' + largura.toFixed(2) + '%"></span></span>' +
-      '<span class="bar-value">' + texto + '</span>' +
-      (delta === undefined ? '' : '<span class="bar-delta">' + delta + '</span>') +
-      '</div>';
-  }
-
-  /* Vistas alternativas — todas recebem itens = [{ label, valor, texto, curto }].
-     `texto` é o HTML usado na vista horizontal; `curto` é a versão compacta
-     para a etiqueta em cima da barra vertical / do ponto máximo da linha. */
-
-  function barrasVerticais(itens, opts){
-    opts = opts || {};
-    var max = 0;
-    itens.forEach(function(x){ max = Math.max(max, Number(x.valor) || 0); });
-    var colunas = itens.map(function(x){
-      var v = Number(x.valor) || 0;
-      // 1% de altura mínima para uma barra não nula não desaparecer.
-      var altura = max > 0 ? (v > 0 ? Math.max(v / max * 100, 1) : 0) : 0;
-      var alt = (x.alt === undefined) ? opts.alt : x.alt;
-      return '<div class="vbar-col">' +
-        '<span class="vbar-valor">' + (x.curto || '') + '</span>' +
-        '<span class="vbar-track"><span class="vbar-fill' + (alt ? ' alt' : '') +
-          '" style="height:' + altura.toFixed(2) + '%"></span></span>' +
-        '<span class="vbar-label">' + esc(x.label) + '</span>' +
-      '</div>';
-    }).join('');
-    return '<div class="vbars">' + colunas + '</div>';
-  }
-
-  function graficoLinha(itens, opts){
-    opts = opts || {};
-    if (!itens.length) return '';
-    var fmtY = opts.fmtY || function(v){ return intFmt(Math.round(v)) + '€'; };
-    var C = coresTema();
-
-    var W = 720, H = 240, PADL = 60, PADR = 18, PADT = 24, PADB = 46;
-    var n = itens.length;
-    var max = 0, iMax = 0;
-    itens.forEach(function(x, i){
-      var v = Number(x.valor) || 0;
-      if (v > max){ max = v; iMax = i; }
-    });
-    var escala = max > 0 ? max : 1;
-
-    var passo = n > 1 ? (W - PADL - PADR) / (n - 1) : 0;
-    function px(i){ return n > 1 ? PADL + i * passo : PADL + (W - PADL - PADR) / 2; }
-    function py(v){ return H - PADB - (Number(v) || 0) / escala * (H - PADT - PADB); }
-
-    var caminho = itens.map(function(x, i){
-      return (i === 0 ? 'M' : 'L') + px(i).toFixed(1) + ' ' + py(x.valor).toFixed(1);
-    }).join(' ');
-
-    // Eixo Y: 0, metade e máximo.
-    var marcasY = [0, 0.5, 1].map(function(f){
-      var v = escala * f;
-      var y = py(v);
-      return '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) +
-          '" stroke="' + (f === 0 ? C.ink : C.line) + '" stroke-width="' + (f === 0 ? 2 : 1) + '"/>' +
-        '<text x="' + (PADL - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" ' +
-          'font-family="' + SVG_FONTE + '" font-size="10" fill="' + C.muted + '">' + esc(fmtY(v)) + '</text>';
-    }).join('');
-
-    // Com muitos pontos (31 dias) só se escrevem alguns labels, para não sobreporem.
-    var salto = Math.max(1, Math.ceil(n / 12));
-    var marcasX = itens.map(function(x, i){
-      if (i % salto !== 0 && i !== n - 1) return '';
-      return '<text x="' + px(i).toFixed(1) + '" y="' + (H - PADB + 16) + '" text-anchor="middle" ' +
-        'font-family="' + SVG_FONTE + '" font-size="10" fill="' + C.muted + '">' + esc(x.label) + '</text>';
-    }).join('');
-
-    var destaque = max > 0 ?
-      '<circle cx="' + px(iMax).toFixed(1) + '" cy="' + py(max).toFixed(1) + '" r="5" fill="' + C.red + '" stroke="' + C.ink + '" stroke-width="2"/>' +
-      '<text x="' + px(iMax).toFixed(1) + '" y="' + Math.max(PADT - 6, py(max) - 12).toFixed(1) + '" text-anchor="middle" ' +
-        'font-family="' + SVG_FONTE + '" font-size="11" fill="' + C.redInk + '">' +
-        esc((itens[iMax].curto || fmtY(max)) + ' · ' + itens[iMax].label) + '</text>' : '';
-
-    return '<div class="curve-wrap"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
-        esc(opts.aria || 'Gráfico de linha') + '">' +
-      marcasY +
-      '<line x1="' + PADL + '" y1="' + PADT + '" x2="' + PADL + '" y2="' + (H - PADB) + '" stroke="' + C.ink + '" stroke-width="2"/>' +
-      '<path d="' + caminho + '" fill="none" stroke="' + C.red + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
-      destaque + marcasX +
-      '</svg></div>';
-  }
-
-  var CORES_FATIA = ['var(--fatia-1)','var(--fatia-2)','var(--fatia-3)','var(--fatia-4)','var(--fatia-5)','var(--fatia-6)'];
-
-  function donut(itens, opts){
-    opts = opts || {};
-    if (!itens.length) return '';
-
-    // Nunca mais fatias do que cores: o excedente junta-se em "Outros".
-    // Assim não há duas fatias adjacentes (nem a primeira com a última) da mesma cor.
-    var lista = itens.slice();
-    if (lista.length > CORES_FATIA.length){
-      var cabeca = lista.slice(0, CORES_FATIA.length - 1);
-      var resto = lista.slice(CORES_FATIA.length - 1);
-      cabeca.push({
-        label: 'Outros (' + resto.length + ')',
-        valor: resto.reduce(function(acc, x){ return acc + (Number(x.valor) || 0); }, 0)
-      });
-      lista = cabeca;
-    }
-
-    var total = lista.reduce(function(acc, x){ return acc + (Number(x.valor) || 0); }, 0);
-    var angulo = 0;
-    var paradas = [];
-    var legenda = lista.map(function(x, i){
-      var v = Number(x.valor) || 0;
-      var cor = CORES_FATIA[i % CORES_FATIA.length];
-      var fim = (i === lista.length - 1) ? 360 : angulo + (total ? v / total * 360 : 0);
-      paradas.push(cor + ' ' + angulo.toFixed(3) + 'deg ' + fim.toFixed(3) + 'deg');
-      angulo = fim;
-      return '<li class="donut-item">' +
-        '<span class="donut-chip" style="background:' + cor + '"></span>' +
-        '<span class="donut-nome">' + esc(x.label) + '</span>' +
-        '<span class="donut-valor">' + (x.curto || eur(v)) +
-          ' · ' + (total ? dec(v / total * 100, 1) : '0,0') + '%</span>' +
-      '</li>';
-    }).join('');
-
-    return '<div class="donut-wrap">' +
-      '<div class="donut" role="img" aria-label="' + esc(opts.aria || 'Distribuição') +
-        '" style="background:conic-gradient(' + paradas.join(',') + ')"></div>' +
-      '<ul class="donut-legenda">' + legenda + '</ul>' +
-    '</div>';
-  }
+  var CORES_FATIA = GiocoChart.CORES_FATIA;
+  function coresTema(){ return GiocoChart.cores(); }
+  function barra(a,b,c,d,e,f){ return GiocoChart.barra(a,b,c,d,e,f); }
+  function barrasVerticais(i,o){ return GiocoChart.barrasVerticais(i,o); }
+  function graficoLinha(i,o){ return GiocoChart.linha(i,o); }
+  function donut(i,o){ return GiocoChart.donut(i,o); }
 
   function deltaTexto(actual, anterior){
     if (anterior === null || anterior === undefined) return '—';
