@@ -227,6 +227,10 @@
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:11px;
     color:var(--muted);
+    /* Reserva a linha mesmo vazia: sem isto a coluna da pasta (nota vazia
+       até se autorizar uma) e a do ZoneSoft ficam com alturas diferentes e
+       os botões deixam de alinhar na .import-row. */
+    min-height:14px;
   }
 
   /* ---------- Progresso ---------- */
@@ -647,6 +651,10 @@
               <button type="button" class="link-mini" id="btnMudarPasta">mudar pasta</button>
             </div>
             <span class="pasta-nome" id="pastaNome"></span>
+          </div>
+          <div class="pasta-col">
+            <button type="button" class="btn" id="btnZoneSoft">Exportar do ZoneSoft</button>
+            <span class="pasta-nome" id="zsIntervalo"></span>
           </div>
         </div>
         <p class="file-name" id="fileName">Nenhum ficheiro escolhido</p>
@@ -2458,6 +2466,7 @@
         el('semDados').classList.remove('hidden');
         estado.mesActivo = '';
         popularDias();
+        actualizarAtalhoZoneSoft();
         return;
       }
 
@@ -2473,6 +2482,7 @@
       estado.mesActivo = alvo;
       popularDias();
       renderVistas();
+      actualizarAtalhoZoneSoft();
     });
   }
 
@@ -3450,6 +3460,81 @@
       .then(function(){ el('btnPasta').disabled = false; });
   }
 
+  /* ---------- Atalho para a exportação SAF-T do ZoneSoft ----------
+     O ZoneSoft pede o intervalo em DD-MM-YYYY. O início é o próprio último
+     dia já carregado (inclusive) e não o seguinte: esse dia pode ter sido
+     importado a meio, e reimportá-lo por cima é inofensivo porque a gravação
+     é dia a dia. */
+  var ZONESOFT_URL = 'https://zsbmsv2.zonesoft.org/#!/docs-saft-exportacao';
+  var zsTimer = null;
+
+  // Maior chave de porDia em todos os meses já lidos. Só olha para
+  // estado.dados — nenhuma leitura nova ao Firebase.
+  function ultimoDiaCarregado(){
+    var maior = null;
+    Object.keys(estado.dados || {}).forEach(function(mes){
+      var p = estado.dados[mes];
+      if (!p || !p.porDia) return;
+      Object.keys(p.porDia).forEach(function(dia){
+        if (!maior || dia > maior) maior = dia;
+      });
+    });
+    return maior;
+  }
+
+  // '2026-08-27' -> '27-08-2026'
+  function ptDeIso(iso){
+    return iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
+  }
+
+  function textoIntervaloZoneSoft(){
+    var ultimo = ultimoDiaCarregado();
+    if (!ultimo) return 'Sem dias carregados — escolhe as datas à mão';
+    return 'Exporta de ' + ptDeIso(ultimo) + ' até ' + ptDeIso(isoDeData(new Date()));
+  }
+
+  function actualizarAtalhoZoneSoft(){
+    var alvo = el('zsIntervalo');
+    if (!alvo) return;
+    if (zsTimer){ clearTimeout(zsTimer); zsTimer = null; }
+    alvo.textContent = textoIntervaloZoneSoft();
+  }
+
+  function ligarZoneSoft(){
+    var btn = el('btnZoneSoft');
+    if (!btn) return;
+
+    btn.addEventListener('click', function(){
+      var ultimo = ultimoDiaCarregado();
+      var copiar = null;
+
+      // O botão abre sempre o ZoneSoft; a cópia é um extra que pode falhar
+      // (sem clipboard API, sem permissão, contexto não seguro).
+      if (ultimo && navigator.clipboard && navigator.clipboard.writeText){
+        try {
+          copiar = navigator.clipboard.writeText(ptDeIso(ultimo));
+        } catch (e) { copiar = null; }
+      }
+
+      if (copiar && copiar.then){
+        copiar.then(function(){
+          var alvo = el('zsIntervalo');
+          if (!alvo) return;
+          alvo.textContent = 'Data de início ' + ptDeIso(ultimo) + ' copiada';
+          if (zsTimer) clearTimeout(zsTimer);
+          zsTimer = setTimeout(function(){
+            zsTimer = null;
+            actualizarAtalhoZoneSoft();
+          }, 3000);
+        }).catch(function(){});
+      }
+
+      window.open(ZONESOFT_URL, '_blank', 'noopener');
+    });
+
+    actualizarAtalhoZoneSoft();
+  }
+
   function ligarPasta(){
     var btn = el('btnPasta');
     var mudar = el('btnMudarPasta');
@@ -3494,6 +3579,7 @@
 
   ligarDropzone();
   ligarPasta();
+  ligarZoneSoft();
 
   el('btnGravar').addEventListener('click', gravar);
 
