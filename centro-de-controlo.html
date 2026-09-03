@@ -567,6 +567,13 @@
     font-weight:700;
     color:var(--muted);
   }
+  /* Selo neutro do cartão Vendas quando o dia mostrado é uma referência (a
+     semana anterior), nem ok nem warn: só tokens do shell, sem cor nova. */
+  .cc-head .status.ref{ background:var(--dough); border:1px solid var(--line); color:var(--ink); }
+  /* Variação vs. mês anterior: mesmas cores de estado do shell (.k-trend). */
+  .fp-linha .v.up{ color:var(--green); }
+  .fp-linha .v.down{ color:var(--red-ink); }
+  .cc-numero.ativo{ color:var(--ink); }
 
   /* Seletor Mensal/Anual do consumo. */
   .cc-seg-linha{ display:flex; justify-content:flex-end; margin-top:2px; }
@@ -910,17 +917,28 @@
           <!-- FILA DE CARTÕES -->
           <div class="cc-fila">
 
-            <!-- 4. VENDAS HOJE -->
+            <!-- 4. VENDAS HOJE — bruto (c/ IVA, ótica de caixa) de
+                 vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo (ver o módulo
+                 `vendasHoje` em baixo). As vendas de hoje ainda não chegam de
+                 forma automática, por isso: mostra HOJE se o nó existir; senão
+                 o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que
+                 exista (selo "Ref. …"); sem nenhum, fica este placeholder.
+                 Comparação = a N.ª ocorrência do mesmo dia da semana no mês
+                 anterior (N = posição do dia no seu mês; sem N.ª, a última). -->
             <div class="cc-card card glass-light">
               <div class="cc-head">
                 <svg class="icon" width="15" height="15"><use href="#i-trending-up"/></svg>
                 <h3>Vendas hoje</h3>
                 <div class="sp"></div>
-                <span class="status warn">Em breve</span>
+                <span class="status warn" id="vhSelo">Em breve</span>
               </div>
-              <div class="cc-numero">— €</div>
-              <p class="cc-legenda">— vs. mesmo dia da semana anterior</p>
-              <p class="cc-nota">A ligar a vendasDiario.</p>
+              <div class="cc-numero" id="vhNumero">— €</div>
+              <p class="cc-legenda" id="vhLegenda">— vs. mesmo dia da semana anterior</p>
+              <div class="fp-linha" id="vhCmp" hidden>
+                <span id="vhCmpLabel">vs. mês anterior</span>
+                <span class="v" id="vhCmpValor">—</span>
+              </div>
+              <p class="cc-nota" id="vhNota">A ligar a vendasDiario.</p>
             </div>
 
             <!-- 5. FOOTFALL -->
@@ -1874,6 +1892,151 @@ window.addEventListener('load', function () {
     return { carregar: carregar, agregar: agregar, receber: receber };
   })();
 
+  // ===================================================================
+  // VENDAS HOJE — lê vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo (só os nós
+  // dos dias precisos, nunca o vendasDiario inteiro). Usa `bruto` (c/ IVA,
+  // ótica de caixa, como a resultados.html).
+  //   1. Dia principal: hoje se existir (selo "Hoje", ok); senão o mesmo dia
+  //      da semana a −7, −14, −21 ou −28 dias, o primeiro que exista (selo
+  //      "Ref. semana passada" / "Ref. há N semanas", neutro). Nenhum →
+  //      placeholder intacto.
+  //   2. Comparação: N = Math.ceil(diaDoMes/7) do dia principal; no mês
+  //      anterior, a N.ª ocorrência do mesmo dia da semana — ou a última, se
+  //      não houver N.ª (ex.: 31 Ago 2026, 5.ª segunda → 27 Jul, última).
+  //      A chave AAAA-MM vem sempre da própria data, não do mês corrente.
+  // Só leitura. Falha → placeholder.
+  // ===================================================================
+  var vendasHoje = (function () {
+    var selo     = document.getElementById('vhSelo');
+    var numeroEl = document.getElementById('vhNumero');
+    var legenda  = document.getElementById('vhLegenda');
+    var cmpEl    = document.getElementById('vhCmp');
+    var cmpLabel = document.getElementById('vhCmpLabel');
+    var cmpValor = document.getElementById('vhCmpValor');
+    var nota     = document.getElementById('vhNota');
+
+    var MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var MESES_EXT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    var DIAS_EXT  = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    function chaveDia(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
+    function chaveMes(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1); }
+    function deChave(chave) {
+      var a = chave.split('-');
+      return new Date(parseInt(a[0], 10), parseInt(a[1], 10) - 1, parseInt(a[2], 10));
+    }
+    function somarDias(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+    // Mesmo formato do módulo consumo ("€ 1 234,56").
+    function fmtEuro(v) {
+      return '€ ' + Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtDMmm(d) { return d.getDate() + ' ' + MESES_ABR[d.getMonth()]; }
+
+    // Posição do dia no seu mês (1.ª, 2.ª… ocorrência do dia da semana).
+    function posicaoNoMes(d) { return Math.ceil(d.getDate() / 7); }
+
+    // Mesmo dia da semana, na mesma posição (N.ª) do mês anterior; sem N.ª,
+    // a última ocorrência desse dia da semana nesse mês.
+    function diaComparacao(d) {
+      var n = posicaoNoMes(d), dow = d.getDay();
+      var ano = d.getFullYear(), mes = d.getMonth() - 1;
+      if (mes < 0) { mes = 11; ano -= 1; }
+      var primeiro = new Date(ano, mes, 1);
+      var desloc = (dow - primeiro.getDay() + 7) % 7;
+      var dia = 1 + desloc + (n - 1) * 7;
+      var ultimoDia = new Date(ano, mes + 1, 0).getDate();
+      while (dia > ultimoDia) dia -= 7;
+      return new Date(ano, mes, dia);
+    }
+
+    // Verificações da regra da comparação (correm uma vez, no arranque).
+    [['2026-09-03','2026-08-06'], ['2026-08-27','2026-07-23'],
+     ['2026-08-31','2026-07-27'], ['2026-10-01','2026-09-03']].forEach(function (par) {
+      console.assert(chaveDia(diaComparacao(deChave(par[0]))) === par[1],
+        'vendasHoje: comparação de ' + par[0] + ' devia ser ' + par[1] +
+        ', deu ' + chaveDia(diaComparacao(deChave(par[0]))));
+    });
+
+    function lerResumo(db, d) {
+      return db.ref('vendasDiario/' + chaveMes(d) + '/' + chaveDia(d) + '/resumo').once('value')
+        .then(function (snap) {
+          var r = snap.val();
+          return r && typeof r.bruto === 'number' ? r : null;
+        });
+    }
+
+    // principal = { data, resumo, atras } (atras = 0 hoje, 7/14/21/28 senão);
+    // comparacao = { data, resumo|null }.
+    function render(principal, comparacao) {
+      var d = principal.data, r = principal.resumo, sem = principal.atras / 7;
+      if (selo) {
+        selo.classList.remove('warn', 'ok', 'ref');
+        if (sem === 0) { selo.textContent = 'Hoje'; selo.classList.add('ok'); }
+        else {
+          selo.textContent = sem === 1 ? 'Ref. semana passada' : 'Ref. há ' + sem + ' semanas';
+          selo.classList.add('ref');
+        }
+      }
+      numeroEl.textContent = fmtEuro(r.bruto);
+      numeroEl.classList.add('ativo');
+      numeroEl.title = chaveDia(d) + ' · líquido ' + fmtEuro(r.liquido || 0);
+      var docs = Number(r.docs) || 0;
+      var ticket = typeof r.ticket === 'number' ? r.ticket : (docs ? r.bruto / docs : 0);
+      legenda.textContent = (sem === 0 ? 'Hoje, ' : '') + DIAS_EXT[d.getDay()] + ', ' + fmtDMmm(d) +
+        ' · ' + docs + ' docs · ticket ' + fmtEuro(ticket);
+
+      cmpEl.hidden = false;
+      cmpValor.classList.remove('up', 'down');
+      if (comparacao && comparacao.resumo) {
+        var c = comparacao.data, base = comparacao.resumo.bruto;
+        cmpLabel.textContent = 'vs. ' + fmtDMmm(c);
+        cmpEl.title = posicaoNoMes(d) + '.ª ' + DIAS_EXT[d.getDay()] + ' de ' + MESES_EXT[c.getMonth()] +
+          ' (' + chaveDia(c) + ' · ' + fmtEuro(base) + ')';
+        if (base > 0) {
+          var pct = (r.bruto - base) / base * 100;
+          cmpValor.textContent = (pct > 0 ? '▲ +' : pct < 0 ? '▼ −' : '') +
+            Math.abs(pct).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
+          if (pct > 0) cmpValor.classList.add('up');
+          else if (pct < 0) cmpValor.classList.add('down');
+        } else {
+          cmpValor.textContent = '—';
+        }
+      } else {
+        cmpLabel.textContent = 'vs. mês anterior';
+        cmpEl.removeAttribute('title');
+        cmpValor.textContent = '—';
+      }
+      nota.textContent = sem === 0
+        ? 'Comparação com a mesma posição do mês anterior.'
+        : 'Vendas de hoje ainda não são automáticas — mostra o mesmo dia da semana anterior, comparado com a mesma posição do mês anterior.';
+    }
+
+    // Só leitura. Nenhum dia existente ou falha → placeholder intacto.
+    function carregar(db, hoje) {
+      hoje = hoje || new Date();
+      hoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      var atras = [0, 7, 14, 21, 28];
+      return Promise.all(atras.map(function (n) {
+        return lerResumo(db, somarDias(hoje, -n)).catch(function () { return null; });
+      })).then(function (resumos) {
+        var principal = null;
+        for (var i = 0; i < atras.length && !principal; i++) {
+          if (resumos[i]) principal = { data: somarDias(hoje, -atras[i]), resumo: resumos[i], atras: atras[i] };
+        }
+        if (!principal) return;
+        var c = diaComparacao(principal.data);
+        return lerResumo(db, c).catch(function () { return null; }).then(function (rc) {
+          render(principal, { data: c, resumo: rc });
+        });
+      }).catch(function (erro) {
+        console.error('Falha a ler as vendas (vendasDiario):', erro);
+      });
+    }
+
+    return { carregar: carregar, render: render, diaComparacao: diaComparacao, chaveDia: chaveDia, deChave: deChave };
+  })();
+
   autenticarEContinuar(function () {
     var db = firebase.database();
 
@@ -1881,6 +2044,7 @@ window.addEventListener('load', function () {
     var params = new URLSearchParams(window.location.search);
     var lojaId = params.get('loja') || 'sb154';
     consumo.carregar(db);
+    vendasHoje.carregar(db);
 
     montarAC(db, lojaId);
 
