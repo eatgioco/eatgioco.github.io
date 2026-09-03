@@ -586,6 +586,8 @@
   .vh-mes-tit > span:first-child{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .vh-mes-eur{ flex:none; white-space:nowrap; }
   .vh-mes .fp-linha{ padding-top:4px; }
+  /* Acumulado do dia médio até à hora atual: linha fina por baixo de Média/dia. */
+  .vh-agora{ margin-top:6px; padding-top:4px; border-top:1px solid var(--line); }
   .vh-card .cc-nota{ white-space:normal; }
   /* Selo neutro do cartão Vendas quando o dia mostrado é uma referência (a
      semana anterior), nem ok nem warn: só tokens do shell, sem cor nova. */
@@ -971,6 +973,10 @@
                 <div class="fp-linha"><span>Faturação</span><span class="v" id="vhMesBruto">—</span></div>
                 <div class="fp-linha"><span>Ticket</span><span class="v" id="vhMesTicket">—</span></div>
                 <div class="fp-linha"><span>Média/dia</span><span class="v" id="vhMesMedia">—</span></div>
+                <div class="vh-agora" id="vhAgora" hidden>
+                  <div class="fp-linha"><span id="vhAteLabel">Até —</span><span class="v" id="vhAteValor">—</span></div>
+                  <div class="fp-linha"><span id="vhHoraLabel">—</span><span class="v" id="vhHoraValor">—</span></div>
+                </div>
               </div>
               <p class="cc-nota" id="vhNota">Vendas de hoje ainda não são automáticas.</p>
             </div>
@@ -1938,6 +1944,10 @@ window.addEventListener('load', function () {
   //      anterior, a N.ª ocorrência do mesmo dia da semana — ou a última, se
   //      não houver N.ª (ex.: 31 Ago 2026, 5.ª segunda → 27 Jul, última).
   //      A chave AAAA-MM vem sempre da própria data, não do mês corrente.
+  //   3. Resumo do mês (vendas/{AAAA-MM}/resumo) + acumulado do dia médio
+  //      até à hora atual (vendas/{AAAA-MM}/porHora, mesmo mês, mesmo
+  //      fallback ao anterior; nunca lê produtos) — ver giocoAcumuladoHoras.
+  //      Actualiza a cada 60 s a partir da memória.
   // Só leitura. Falha → placeholder.
   // ===================================================================
   var vendasHoje = (function () {
@@ -1956,6 +1966,11 @@ window.addEventListener('load', function () {
     var mesBruto = document.getElementById('vhMesBruto');
     var mesTicket= document.getElementById('vhMesTicket');
     var mesMedia = document.getElementById('vhMesMedia');
+    var agoraEl  = document.getElementById('vhAgora');
+    var ateLabel = document.getElementById('vhAteLabel');
+    var ateValor = document.getElementById('vhAteValor');
+    var horaLabel= document.getElementById('vhHoraLabel');
+    var horaValor= document.getElementById('vhHoraValor');
     var nota     = document.getElementById('vhNota');
 
     var MESES_ABR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -2016,6 +2031,63 @@ window.addEventListener('load', function () {
         var r = snap.val();
         return r && typeof r.bruto === 'number' ? r : null;
       });
+    }
+    function lerPorHoraMes(db, chave) {
+      return db.ref('vendas/' + chave + '/porHora').once('value').then(function (snap) { return snap.val() || null; });
+    }
+
+    /* CÓPIA tal e qual de giocoAcumuladoHoras do vendas.html — alterar as
+       duas ao mesmo tempo (decidiu-se não criar um ficheiro partilhado só
+       para isto). Função pura: média por hora, acumulado hora a hora e
+       acumulado até ao instante `agora` (aproximação LINEAR dentro da hora
+       corrente). Ver o comentário completo no vendas.html. */
+    function giocoAcumuladoHoras(porHora, dias, agora){
+      porHora = porHora || {};
+      dias = Number(dias) || 0;
+      var mediaHora = [], acumulado = [], soma = 0;
+      var primeira = null, ultima = null;
+      for (var h = 0; h < 24; h++){
+        var tem = !!porHora[h];
+        var m = (tem && dias > 0) ? (Number(porHora[h].bruto) || 0) / dias : 0;
+        if (tem){ if (primeira === null) primeira = h; ultima = h; }
+        mediaHora.push(m);
+        soma += m;
+        acumulado.push(soma);
+      }
+      var H = agora.getHours(), M = agora.getMinutes();
+      var completo = ultima !== null && H > ultima;
+      var ateAgora = completo ? soma : ((H > 0 ? acumulado[H - 1] : 0) + mediaHora[H] * (M / 60));
+      return {
+        mediaHora: mediaHora, acumulado: acumulado, ateAgora: ateAgora,
+        horaAtual: porHora[H] ? mediaHora[H] : null, total: soma,
+        hora: H, minuto: M, primeira: primeira, ultima: ultima, completo: completo
+      };
+    }
+
+    // Acumulado do dia médio até à hora atual, por baixo de Média/dia. Sem
+    // dias ou sem porHora → fica escondido. `agora` só para testes.
+    var agoraTimer = null;
+    function renderAgora(chave, dias, porHora, agora) {
+      dias = Number(dias) || 0;
+      if (!(dias > 0) || !porHora) { agoraEl.hidden = true; return; }
+      var a = giocoAcumuladoHoras(porHora, dias, agora || new Date());
+      if (a.primeira === null) { agoraEl.hidden = true; return; }
+      var m = parseInt(chave.slice(5, 7), 10) - 1;
+      var titulo = 'dia médio de ' + MESES_EXT[m] + ', ' + dias + (dias === 1 ? ' dia' : ' dias');
+      ateLabel.textContent = a.completo ? 'Dia completo' : 'Até ' + p2(a.hora) + ':' + p2(a.minuto);
+      ateLabel.title = titulo + (a.completo ? '' : ' · aproximação linear dentro da hora');
+      ateValor.textContent = fmtNum(a.ateAgora);
+      ateValor.title = titulo;
+      horaLabel.textContent = p2(a.hora) + 'h–' + p2((a.hora + 1) % 24) + 'h';
+      horaLabel.title = a.horaAtual === null ? 'fora do horário com vendas' : 'média nessa hora, ' + titulo;
+      horaValor.textContent = a.horaAtual === null ? '—' : fmtNum(a.horaAtual);
+      agoraEl.hidden = false;
+    }
+    // Relógio de 60 s a partir da memória (sem nova leitura).
+    function armarAgora(chave, dias, porHora) {
+      if (agoraTimer) clearInterval(agoraTimer);
+      renderAgora(chave, dias, porHora);
+      agoraTimer = setInterval(function () { renderAgora(chave, dias, porHora); }, 60000);
     }
 
     // principal = { data, resumo, atras } (atras = 0 hoje, 7/14/21/28 senão);
@@ -2113,8 +2185,17 @@ window.addEventListener('load', function () {
       var mesAtual = chaveMes(hoje);
       var mesAnterior = chaveMes(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1));
       var mes = lerResumoMes(db, mesAtual).then(function (r) {
-        if (r) { renderMes(mesAtual, r, false); return; }
-        return lerResumoMes(db, mesAnterior).then(function (ra) { if (ra) renderMes(mesAnterior, ra, true); });
+        if (r) { renderMes(mesAtual, r, false); return mesAtual + '|' + r.dias; }
+        return lerResumoMes(db, mesAnterior).then(function (ra) {
+          if (!ra) return null;
+          renderMes(mesAnterior, ra, true);
+          return mesAnterior + '|' + ra.dias;
+        });
+      }).then(function (escolhido) {
+        // porHora do mesmo mês que o resumo mostrado; só depois do resumo.
+        if (!escolhido) return;
+        var chave = escolhido.split('|')[0], dias = Number(escolhido.split('|')[1]) || 0;
+        return lerPorHoraMes(db, chave).then(function (ph) { armarAgora(chave, dias, ph); });
       }).catch(function (erro) {
         console.error('Falha a ler o resumo do mês (vendas):', erro);
       });
@@ -2122,8 +2203,10 @@ window.addEventListener('load', function () {
       return Promise.all([dia, mes]);
     }
 
-    return { carregar: carregar, render: render, renderMes: renderMes, diaComparacao: diaComparacao, chaveDia: chaveDia, deChave: deChave };
+    return { carregar: carregar, render: render, renderMes: renderMes, renderAgora: renderAgora, giocoAcumuladoHoras: giocoAcumuladoHoras, diaComparacao: diaComparacao, chaveDia: chaveDia, deChave: deChave };
   })();
+  // Exposto para testes automatizados (não usado pela página).
+  window.__cc = { vendasHoje: vendasHoje };
 
   autenticarEContinuar(function () {
     var db = firebase.database();
