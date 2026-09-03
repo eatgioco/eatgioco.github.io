@@ -568,15 +568,23 @@
     color:var(--muted);
   }
   /* Cartão Vendas: tudo numa linha por elemento — nada se parte a meio. */
-  .vh-card .fp-linha > span{ white-space:nowrap; }
-  .vh-card .fp-linha .v{ color:var(--ink); }
-  .vh-card .cc-legenda{ white-space:nowrap; }
+  /* Rótulo à esquerda encolhe com reticências; o valor nunca é cortado. */
+  .vh-card .fp-linha{ min-width:0; }
+  .vh-card .fp-linha > span:first-child{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vh-card .fp-linha .v{ flex:none; white-space:nowrap; color:var(--ink); }
+  /* Delta da comparação: linha própria, à direita, um pouco mais pequeno. */
+  .vh-delta{ display:flex; justify-content:flex-end; padding-top:2px; }
+  .vh-delta .v{ font-size:11.5px; }
   .vh-mes{ margin-top:10px; padding-top:8px; border-top:1px solid var(--line); }
   .vh-mes-tit{
     font-family:'Inter',sans-serif;
-    font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-    color:var(--muted); white-space:nowrap;
+    font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--muted);
+    display:flex; gap:4px; min-width:0;
   }
+  /* Nome do mês encolhe com reticências; o "· €" (unidade dos valores) fica. */
+  .vh-mes-tit > span:first-child{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vh-mes-eur{ flex:none; white-space:nowrap; }
   .vh-mes .fp-linha{ padding-top:4px; }
   .vh-card .cc-nota{ white-space:normal; }
   /* Selo neutro do cartão Vendas quando o dia mostrado é uma referência (a
@@ -584,8 +592,10 @@
   .cc-head .status.ref{ background:var(--dough); border:1px solid var(--line); color:var(--ink); }
   /* Variação vs. mês anterior: mesmas cores de estado do shell (.k-trend). */
   /* Variação vs. mês anterior: mesmas cores de estado do shell (.k-trend). */
-  .vh-card .fp-linha .v.up{ color:var(--green); }
-  .vh-card .fp-linha .v.down{ color:var(--red-ink); }
+  .vh-card .v.up{ color:var(--green); }
+  .vh-card .v.down{ color:var(--red-ink); }
+  /* Bloco do mês com valores longos (5–6 dígitos): 1px mais pequeno. */
+  .vh-mes.compacto .fp-linha{ font-size:11.5px; }
 
   /* Seletor Mensal/Anual do consumo. */
   .cc-seg-linha{ display:flex; justify-content:flex-end; margin-top:2px; }
@@ -937,7 +947,8 @@
                  exista (selo "Semana passada" / "Há N semanas"); sem nenhum,
                  fica este placeholder. Comparação = a N.ª ocorrência do mesmo
                  dia da semana no mês anterior (N = posição do dia no seu mês;
-                 sem N.ª, a última) — só a variação na linha, valor no title.
+                 sem N.ª, a última) — valor do dia de comparação na linha, e
+                 a variação por baixo.
                  Resumo do mês: vendas/{AAAA-MM}/resumo do mês corrente; sem
                  ele, o mês anterior, rotulado "(fechado)". Mesmo componente
                  .cc-valor do cartão Consumo, para os dois ficarem iguais. -->
@@ -951,11 +962,12 @@
               <div class="cc-valor" id="vhValor" hidden><b id="vhValorNum">—</b><span id="vhValorDia">—</span></div>
               <p class="cc-legenda" id="vhLegenda">A ligar a vendasDiario.</p>
               <div class="fp-linha" id="vhCmp" hidden>
-                <span id="vhCmpLabel">vs. mês anterior</span>
+                <span id="vhCmpLabel">vs. mês ant.</span>
                 <span class="v" id="vhCmpValor">—</span>
               </div>
+              <div class="vh-delta" id="vhDelta" hidden><span class="v" id="vhDeltaValor">—</span></div>
               <div class="vh-mes" id="vhMes" hidden>
-                <div class="vh-mes-tit" id="vhMesTit">—</div>
+                <div class="vh-mes-tit"><span id="vhMesTit">—</span><span class="vh-mes-eur" id="vhMesEur" hidden>· €</span></div>
                 <div class="fp-linha"><span>Faturação</span><span class="v" id="vhMesBruto">—</span></div>
                 <div class="fp-linha"><span>Ticket</span><span class="v" id="vhMesTicket">—</span></div>
                 <div class="fp-linha"><span>Média/dia</span><span class="v" id="vhMesMedia">—</span></div>
@@ -1937,6 +1949,8 @@ window.addEventListener('load', function () {
     var cmpEl    = document.getElementById('vhCmp');
     var cmpLabel = document.getElementById('vhCmpLabel');
     var cmpValor = document.getElementById('vhCmpValor');
+    var deltaEl  = document.getElementById('vhDelta');
+    var deltaVal = document.getElementById('vhDeltaValor');
     var mesEl    = document.getElementById('vhMes');
     var mesTit   = document.getElementById('vhMesTit');
     var mesBruto = document.getElementById('vhMesBruto');
@@ -1958,9 +1972,10 @@ window.addEventListener('load', function () {
     }
     function somarDias(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
     // Mesmo formato do módulo consumo ("€ 1 234,56").
-    function fmtEuro(v) {
-      return '€ ' + Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function fmtNum(v) {
+      return Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
+    function fmtEuro(v) { return '€ ' + fmtNum(v); }
     function fmtDMmm(d) { return d.getDate() + ' ' + MESES_ABR[d.getMonth()]; }
     function capitalizar(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
@@ -2030,23 +2045,24 @@ window.addEventListener('load', function () {
       legenda.textContent = docs + ' docs · ticket ' + fmtEuro(ticket);
 
       cmpEl.hidden = false;
-      cmpValor.classList.remove('up', 'down');
+      deltaEl.hidden = true;
+      deltaVal.classList.remove('up', 'down');
       if (comparacao && comparacao.resumo) {
         var c = comparacao.data, base = comparacao.resumo.bruto;
         cmpLabel.textContent = 'vs. ' + fmtDMmm(c);
         cmpEl.title = posicaoNoMes(d) + '.ª ' + DIAS_EXT[d.getDay()] + ' de ' + MESES_EXT[c.getMonth()] +
-          ' (' + chaveDia(c) + '): ' + fmtEuro(base);
+          ' (' + chaveDia(c) + ')';
+        cmpValor.textContent = fmtEuro(base);
         if (base > 0) {
           var pct = (r.bruto - base) / base * 100;
-          cmpValor.textContent = (pct > 0 ? '▲ +' : pct < 0 ? '▼ −' : '') +
+          deltaVal.textContent = (pct > 0 ? '▲ +' : pct < 0 ? '▼ −' : '') +
             Math.abs(pct).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
-          if (pct > 0) cmpValor.classList.add('up');
-          else if (pct < 0) cmpValor.classList.add('down');
-        } else {
-          cmpValor.textContent = '—';
+          if (pct > 0) deltaVal.classList.add('up');
+          else if (pct < 0) deltaVal.classList.add('down');
+          deltaEl.hidden = false;
         }
       } else {
-        cmpLabel.textContent = 'vs. mês anterior';
+        cmpLabel.textContent = 'vs. mês ant.';
         cmpEl.removeAttribute('title');
         cmpValor.textContent = '—';
       }
@@ -2059,11 +2075,16 @@ window.addEventListener('load', function () {
     function renderMes(chave, resumo, fechado) {
       var m = parseInt(chave.slice(5, 7), 10) - 1;
       mesTit.textContent = capitalizar(MESES_EXT[m]) + (fechado ? ' (fechado)' : '');
-      mesTit.title = chave + (resumo.dias ? ' · ' + resumo.dias + ' dias abertos' : '');
+      mesTit.title = capitalizar(MESES_EXT[m]) + ' ' + chave.slice(0, 4) + (fechado ? ' (fechado)' : '') +
+        (resumo.dias ? ' · ' + resumo.dias + ' dias abertos' : '') + ' · valores em €';
+      document.getElementById('vhMesEur').hidden = false;
       var docs = Number(resumo.docs) || 0, dias = Number(resumo.dias) || 0;
-      mesBruto.textContent = fmtEuro(resumo.bruto);
-      mesTicket.textContent = docs ? fmtEuro(typeof resumo.ticket === 'number' ? resumo.ticket : resumo.bruto / docs) : '—';
-      mesMedia.textContent = dias ? fmtEuro(resumo.bruto / dias) : '—';
+      // Valores sem prefixo "€" (está no cabeçalho), para caberem na coluna.
+      mesBruto.textContent = fmtNum(resumo.bruto);
+      mesTicket.textContent = docs ? fmtNum(typeof resumo.ticket === 'number' ? resumo.ticket : resumo.bruto / docs) : '—';
+      mesMedia.textContent = dias ? fmtNum(resumo.bruto / dias) : '—';
+      // Faturação a 5–6 dígitos: 1px mais pequeno só neste bloco.
+      mesEl.classList.toggle('compacto', resumo.bruto >= 10000);
       mesEl.hidden = false;
     }
 
