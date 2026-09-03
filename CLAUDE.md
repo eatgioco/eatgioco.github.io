@@ -51,12 +51,13 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `foodcost.html` | Duas secções independentes: (1) **mapa de produtos ZoneSoft → fichas técnicas**, sempre visível, alimentado pelos produtos distintos de `vendasDiario` nas últimas 4 semanas completas — a MESMA janela do painel "Encomenda sugerida" da `compras.html`, de que o mapa é pré-requisito — com sugestão automática, escolha manual, "Ignorar" e progresso "X de Y produtos tratados"; (2) **variância** de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas. Só (2) depende das contagens: o estado vazio "ainda não há um período para comparar" está confinado a ela, e (1) continua utilizável com zero ou uma contagem | Equipa |
 | `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós). Classificação de movimentos em DUAS dimensões: a rubrica do P&L e a despesa concreta ("Meta Ads", "EDP"), ambas aprendidas pelas mesmas regras; a despesa é metadado e nunca mexe em valores | Equipa |
+| `padroes.html` | Vendas × contexto externo, **só leitura** (fase b, Set/2026). Calendário do mês com o desvio de cada dia face ao **esperado** = mediana do `bruto` de D-7/D-14/D-21/D-28 em `vendas/{mes}/porDia` (mín. 2 valores; lê também o mês anterior); "Esperado vs. real" (linha 2 séries + colunas com |desvio|, negativos a vermelho porque `barrasVerticais` não desenha negativos); cruzamento por fator sobre todo o histórico (chuva, chuva no horário, tMax, feriado, ponte, férias; dia da semana em média de bruto, não desvio) com regra n ≥ 8; detalhe do dia de `vendasDiario/{mes}/{dia}` (só o nó do dia, cache de sessão) + `contextoDiario/{dia}`. Contexto lido por intervalo `orderByKey().startAt/endAt` por mês. Nunca escreve | Equipa |
 | `contabilidade.html` | Placeholder | — |
 | `gestao.html` | Folha de cálculo de **ingredientes** e **produtos** (edição em massa, inline, grava ao sair da célula). Dois separadores: Ingredientes (uma linha por `ingredientes/`; contagem herdada da compra quando não existe `contagem/`) e Produtos (uma linha por `receitas/`, com custo/food cost via `gioco-custos.js`, artigo POS de `vendas/catalogo` e vendas do mês de `vendas/{mes}/produtos`). Escreve SEMPRE um `set()`/`remove()` por path de campo: `ingredientes/{id}/{campo}`, `ingredientes/{id}/compra/{unidade|fator}`, `ingredientes/{id}/contagem` (objeto `{unidade,fator}`, o mesmo formato do contagens.html), `receitas/{id}/{categoria|pvp}`, `vendas/catalogo/{chave}/{receitaId|categoria}`. Nunca escreve em `vendas/{mes}/produtos` nem `vendasDiario/`. Deep-links: `compras.html?ingrediente=ID` e `receitas.html?receita=ID`. Coluna Foto lê o manifesto `img/ingredientes/index.json` (array de slugs) — sem manifesto mostra "—" | Equipa |
 | `gioco-custos.js` | Motor partilhado de custo/food cost (`GiocoCustos`): `custoIngrediente` (precoUltimaCompra ÷ compra.fator), `custoPreparacao`, `custoReceita` (→ custo, avisos[], foodCost %), `foodCost`, `converterFator`. Extraído do receitas.html em Set/2026 sem alterar um cêntimo; receitas.html e gestao.html usam-no — nunca reimplementar por página | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
-| `gioco-shell.js` | Sprite de 24 ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
+| `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
 | `gioco-charts.js` | `GiocoChart.*` — funções que desenham barras/colunas/linha/donut em HTML/SVG | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
@@ -135,6 +136,19 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          mrn-dashboard.html e tem de ser igual nos dois ficheiros; a
                          equipa.html tem uma versão REDUZIDA (valorCompromissoDaPessoa)
                          só para o aviso de desativação
+contextoDiario        — contexto externo por dia, chave AAAA-MM-DD, escrito SÓ pelo job
+                         contexto_diario.py do repo mreymao/gioco-bank-sync (06:30 Lisboa);
+                         aqui é só leitura (padroes.html). Sub-nós: calendario{diaSemana
+                         0=seg, nomeDia, fimDeSemana, feriado, feriadoMunicipal, ponte,
+                         semanaMes, ultimosDiasMes, feriasEscolares}, meteo{tMax, tMin,
+                         t13h, precipMm, horasChuva, chuvaLoja, ventoMax, codigo, descricao,
+                         nascer, por, fonte} (observado, Open-Meteo) e meteoPrevisao (mesma
+                         forma, feita na véspera; coexiste com meteo). O RTDB descarta
+                         nulls: feriado/feriadoMunicipal/feriasEscolares podem NÃO existir
+                         — ausente = null. Chaves reservadas para o futuro: eventos,
+                         marketing, operacao, fluxo, parlamento. Ler por intervalo
+                         (orderByKey().startAt/endAt), nunca o nó todo, excepto o cruzamento
+                         histórico da padroes.html (startAt 2026-05-01)
 mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          escrita SÓ pela foodcost.html. O código é o das chaves de
                          vendasDiario/{AAAA-MM}/{dia}/produtos.

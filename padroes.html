@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Padrões">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Padrões</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="gioco-charts.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  /* ======================================================================
+     padroes.html — vendas × contexto externo (fase b, SÓ LEITURA).
+
+     Lê vendas/{mes}/porDia, vendasDiario/{mes}/{dia} (só o dia pedido) e
+     contextoDiario/{dia} (escrito pelo job em gioco-bank-sync). Nunca
+     escreve no Firebase.
+
+     Página desktop-only (viewport width=1200): sem @media queries.
+     ====================================================================== */
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  /* Tokens próprios: fundo das células do calendário pelo desvio (5 níveis).
+     São SUPERFÍCIE com texto --ink por cima, por isso ficam pastel no claro e
+     escuros/dessaturados no escuro. Par obrigatório nos dois temas. */
+  :root{
+    --desvio-neg-forte:#F3B9B9;
+    --desvio-neg:#F9DADA;
+    --desvio-neutro:#EFEBE3;
+    --desvio-pos:#DCEFC8;
+    --desvio-pos-forte:#BFE39A;
+    --desvio-sem:repeating-linear-gradient(135deg, transparent 0 6px, rgba(20,20,20,0.05) 6px 8px);
+  }
+  [data-theme="dark"]{
+    --desvio-neg-forte:#5E2A2E;
+    --desvio-neg:#3E2628;
+    --desvio-neutro:#2A2622;
+    --desvio-pos:#2C3B24;
+    --desvio-pos-forte:#3E5A2C;
+    --desvio-sem:repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,0.06) 6px 8px);
+  }
+
+  .page-subtitle{
+    margin:6px 0 0;
+    font-size:12px; font-weight:600;
+    color:var(--red);
+    letter-spacing:.14em; text-transform:uppercase;
+  }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  /* O ::before do vidro pinta por cima do conteúdo estático. */
+  .pd-card{ position:relative; margin-top:16px; }
+  .pd-card > *{ position:relative; z-index:1; }
+
+  .pd-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
+  .pd-head h3{
+    font-family:'Inter',sans-serif; font-weight:700; font-size:11px;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    margin:0; white-space:nowrap;
+  }
+  .pd-head .sp{ flex:1; }
+  .pd-nota{ margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); font-size:11.5px; line-height:1.5; color:var(--muted); }
+  .pd-vazio{ color:var(--muted); font-size:13px; padding:12px 0; }
+
+  /* Esqueleto: uma ausência, não um carregamento. */
+  .pd-skel{ display:inline-block; height:9px; border-radius:100px; background:var(--line); vertical-align:middle; }
+  [data-theme="dark"] .pd-skel{ background:rgba(255,255,255,0.10); }
+  .pd-skel-bloco{ display:flex; flex-direction:column; gap:12px; padding:6px 0; }
+  .pd-skel-bloco .pd-skel{ height:12px; }
+
+  /* ---------- Selector de mês ---------- */
+  .mes-nav{ display:flex; align-items:center; gap:10px; margin-top:18px; }
+  .mes-btn{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:var(--white); color:var(--ink); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; padding:0;
+    font-family:'Inter',sans-serif; font-size:16px; line-height:1;
+  }
+  .mes-btn:hover{ border-color:var(--ink); }
+  .mes-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .mes-rotulo{ font-family:'Inter',sans-serif; font-weight:700; font-size:16px; min-width:170px; text-align:center; color:var(--ink); }
+
+  /* ---------- BLOCO 1 + 4: calendário à esquerda, detalhe à direita ---------- */
+  .pd-linha{ display:flex; gap:16px; align-items:flex-start; margin-top:16px; }
+  .pd-linha .pd-card{ margin-top:0; }
+  .cal-card{ flex:1; min-width:0; }
+  .dia-card{ width:360px; flex-shrink:0; display:none; }
+  .dia-card.on{ display:block; }
+
+  .cal-grelha{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; }
+  .cal-cab{ font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); text-align:center; padding:2px 0 6px; }
+  .cal-cel{
+    position:relative; min-height:84px; border-radius:10px; padding:8px 8px 6px;
+    background:var(--desvio-neutro); color:var(--ink);
+    border:1.5px solid transparent; cursor:pointer;
+    display:flex; flex-direction:column; gap:2px;
+    text-align:left; font-family:'Inter',sans-serif;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  .cal-cel:hover{ border-color:var(--ink); }
+  .cal-cel.ativa{ border-color:var(--red); box-shadow:4px 4px 0 var(--red); }
+  .cal-cel.vazia{ background:transparent; border:1.5px dashed var(--line); cursor:default; }
+  .cal-cel.n1{ background:var(--desvio-neg-forte); }
+  .cal-cel.n2{ background:var(--desvio-neg); }
+  .cal-cel.n3{ background:var(--desvio-neutro); }
+  .cal-cel.n4{ background:var(--desvio-pos); }
+  .cal-cel.n5{ background:var(--desvio-pos-forte); }
+  .cal-cel.sem-base{ background:var(--desvio-sem), var(--desvio-neutro); }
+  .cal-cel.fechado{ background:transparent; border:1.5px solid var(--line); opacity:.6; }
+  .cal-cel.futuro{ background:transparent; border:1.5px solid var(--line); }
+  .cal-cel.fora{ visibility:hidden; pointer-events:none; }
+
+  .cal-num{ position:absolute; top:6px; right:9px; font-size:11px; font-weight:600; color:var(--muted); }
+  .cal-cel.hoje .cal-num{ color:var(--red-ink); font-weight:700; }
+  .cal-bruto{ font-weight:700; font-size:13.5px; margin-top:12px; font-variant-numeric:tabular-nums; }
+  .cal-desvio{ font-size:11.5px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .cal-desvio.muted, .cal-estado{ color:var(--muted); font-weight:500; font-size:11px; }
+  .cal-icones{ display:flex; gap:4px; flex-wrap:wrap; margin-top:auto; padding-top:4px; min-height:18px; }
+  .cal-ico{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:18px; height:18px; border-radius:5px;
+    background:rgba(20,20,20,0.07); color:var(--ink);
+    font-size:9.5px; font-weight:700; letter-spacing:.02em; line-height:1;
+  }
+  [data-theme="dark"] .cal-ico{ background:rgba(255,255,255,0.10); }
+  .cal-ico .icon{ width:12px; height:12px; stroke-width:2.2; }
+  .cal-ico.chuva{ color:var(--navy); }
+  .cal-ico.calor{ color:var(--red-ink); }
+  .cal-ico.feriado{ background:var(--mustard); color:#141414; }
+  .cal-ico.ponte{ background:var(--blush); color:#3d0810; }
+  .cal-ico.ferias{ background:var(--lime); color:#141414; }
+
+  .cal-legenda{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; font-size:11px; color:var(--muted); }
+  .cal-legenda .sw{ display:inline-block; width:14px; height:10px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
+
+  /* ---------- BLOCO 2 ---------- */
+  .pd-kpis{ display:flex; gap:14px; flex-wrap:wrap; margin:0 0 12px; }
+  .pd-kpi{ flex:1; min-width:150px; border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+  .pd-kpi .k-label{ font-size:11px; font-weight:600; color:var(--muted); margin-bottom:4px; }
+  .pd-kpi .k-value{ font-family:'Inter',sans-serif; font-weight:700; font-size:20px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .pd-kpi .k-value.neg{ color:var(--red-ink); }
+  .pd-kpi .k-value.pos{ color:var(--green); }
+  .pd-sub{ font-size:11.5px; color:var(--muted); margin:10px 0 4px; }
+  .pd-legenda{ display:flex; gap:14px; font-size:11.5px; color:var(--muted); margin:0 0 6px; }
+  .pd-legenda .chip{ display:inline-block; width:10px; height:10px; border-radius:3px; vertical-align:-1px; margin-right:5px; }
+
+  /* ---------- BLOCO 3 ---------- */
+  .fat-grelha{ display:flex; gap:12px; flex-wrap:wrap; }
+  .fat-card{ flex:1; min-width:250px; border:1px solid var(--line); border-radius:12px; padding:12px 14px; color:var(--ink); }
+  .fat-card h4{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; }
+  .fat-linha{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; padding:4px 0; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .fat-linha:first-of-type{ border-top:none; }
+  .fat-linha .rot{ flex:1; }
+  .fat-linha .n{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
+  .fat-linha .val{ font-weight:700; min-width:64px; text-align:right; white-space:nowrap; }
+  .fat-linha .val.neg{ color:var(--red-ink); }
+  .fat-linha .val.pos{ color:var(--green); }
+  .fat-linha.pequena{ color:var(--muted); }
+  .fat-linha.pequena .val{ color:var(--muted); font-weight:500; }
+  .fat-linha .peq{ font-size:10.5px; color:var(--muted); font-style:italic; }
+  .fat-card .pd-vazio{ padding:4px 0; font-size:12px; }
+
+  /* ---------- BLOCO 4 ---------- */
+  .dia-fechar{
+    width:32px; height:32px; border-radius:50%; flex-shrink:0;
+    border:1px solid var(--line); background:transparent; color:var(--ink);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .dia-titulo{ font-family:'Inter',sans-serif; font-weight:700; font-size:15px; margin:0; color:var(--ink); flex:1; }
+  .dia-sec{ margin-top:14px; }
+  .dia-sec h4{ margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .dia-kv{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12.5px; color:var(--ink); }
+  .dia-kv div{ min-width:96px; }
+  .dia-kv .k{ display:block; font-size:10.5px; color:var(--muted); font-weight:600; }
+  .dia-kv .v{ font-weight:700; font-variant-numeric:tabular-nums; }
+  .dia-kv .v.neg{ color:var(--red-ink); }
+  .dia-kv .v.pos{ color:var(--green); }
+  .dia-prev{ margin-top:8px; font-size:11.5px; color:var(--muted); }
+  .dia-prod{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; padding:4px 0; border-top:1px solid var(--line); color:var(--ink); }
+  .dia-prod:first-child{ border-top:none; }
+  .dia-prod .nome{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dia-prod .qtd{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
+  .dia-prod .val{ font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dia-placeholder{ margin-top:14px; padding-top:12px; border-top:1px solid var(--line); display:flex; align-items:center; gap:8px; }
+  .dia-placeholder span{ font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('padroes.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-layout-dashboard"/></svg>GIOCO · <b>Padrões</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Vendas × contexto externo · só leitura</p>
+
+      <!-- Sem sessão anónima a página não lê nada. Escondido até falhar;
+           ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+      <div class="mes-nav">
+        <button type="button" class="mes-btn" id="mesAnt" title="Mês anterior">‹</button>
+        <span class="mes-rotulo" id="mesRotulo">—</span>
+        <button type="button" class="mes-btn" id="mesSeg" title="Mês seguinte">›</button>
+      </div>
+
+      <!-- ============ BLOCO 1 + 4 ============ -->
+      <div class="pd-linha">
+        <div class="card glass-light pd-card cal-card">
+          <div class="pd-head">
+            <h3>Calendário do mês</h3>
+            <span class="sp"></span>
+            <span class="status" id="calEstado" style="display:none"></span>
+          </div>
+          <div id="calCorpo"><div class="pd-skel-bloco"><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span></div></div>
+          <div class="cal-legenda" id="calLegenda">
+            <span><span class="sw" style="background:var(--desvio-neg-forte)"></span>≤ −15%</span>
+            <span><span class="sw" style="background:var(--desvio-neg)"></span>−15…−5%</span>
+            <span><span class="sw" style="background:var(--desvio-neutro)"></span>−5…+5%</span>
+            <span><span class="sw" style="background:var(--desvio-pos)"></span>+5…+15%</span>
+            <span><span class="sw" style="background:var(--desvio-pos-forte)"></span>≥ +15%</span>
+            <span><span class="sw" style="background:var(--desvio-sem),var(--desvio-neutro)"></span>sem baseline</span>
+          </div>
+        </div>
+
+        <div class="card glass-light pd-card dia-card" id="diaCard">
+          <div class="pd-head">
+            <h2 class="dia-titulo" id="diaTitulo">—</h2>
+            <button type="button" class="dia-fechar" id="diaFechar" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>
+          </div>
+          <div id="diaCorpo"></div>
+          <div class="dia-placeholder">
+            <span>Registo manual</span>
+            <span class="status">Em breve</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ BLOCO 2 ============ -->
+      <div class="card glass-light pd-card">
+        <div class="pd-head"><h3>Esperado vs. real</h3></div>
+        <div id="evrCorpo"><div class="pd-skel-bloco"><span class="pd-skel" style="width:60%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span></div></div>
+      </div>
+
+      <!-- ============ BLOCO 3 ============ -->
+      <div class="card glass-light pd-card">
+        <div class="pd-head"><h3>Cruzamento por fator · todo o histórico</h3><span class="sp"></span><span class="status" id="fatEstado" style="display:none"></span></div>
+        <div id="fatCorpo"><div class="pd-skel-bloco"><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:70%"></span></div></div>
+        <p class="pd-nota">Desvio = diferença face à mediana do mesmo dia da semana nas 4 semanas anteriores. Correlação, não causa.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="gioco-charts.js"></script>
+<script>
+window.addEventListener('load', function () {
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  /* ---------------------------------------------------------------------
+     Helpers de formatação (mesmos do vendas.html / gioco-charts.js)
+     --------------------------------------------------------------------- */
+  function el(id){ return document.getElementById(id); }
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function eur(n){
+    n = Number(n) || 0;
+    return n.toLocaleString('pt-PT', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+  }
+  function dec(n, casas){
+    n = Number(n) || 0;
+    if (casas === undefined) casas = 2;
+    return n.toLocaleString('pt-PT', { minimumFractionDigits:casas, maximumFractionDigits:casas });
+  }
+  function intFmt(n){ return (Number(n) || 0).toLocaleString('pt-PT'); }
+  /* Percentagem com sinal: +12,3% / −4,0% (menos tipográfico). */
+  function pctSinal(x, casas){
+    if (x === null || x === undefined || !isFinite(x)) return '—';
+    if (casas === undefined) casas = 1;
+    var v = x * 100;
+    var s = dec(Math.abs(v), casas) + '%';
+    if (Math.abs(v) < Math.pow(10, -casas) / 2) return s;
+    return (v < 0 ? '−' : '+') + s;
+  }
+
+  /* ---------------------------------------------------------------------
+     Datas — tudo em strings AAAA-MM-DD (hora local), sem Date UTC.
+     --------------------------------------------------------------------- */
+  var PRIMEIRO_MES = '2026-05';
+  var NOMES_MES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var NOMES_DIA_CURTO = ['seg','ter','qua','qui','sex','sáb','dom'];
+  var NOMES_DIA = ['segunda','terça','quarta','quinta','sexta','sábado','domingo'];
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function hojeISO(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  function mesDe(dia){ return dia.slice(0, 7); }
+  function paraDate(dia){ var p = dia.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function paraISO(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function somarDias(dia, n){ var d = paraDate(dia); d.setDate(d.getDate() + n); return paraISO(d); }
+  /* 0 = segunda … 6 = domingo (ISO), como contextoDiario.calendario.diaSemana. */
+  function diaSemanaISO(dia){ return (paraDate(dia).getDay() + 6) % 7; }
+  function diasNoMes(mes){ var p = mes.split('-'); return new Date(+p[0], +p[1], 0).getDate(); }
+  function mesSomar(mes, n){
+    var p = mes.split('-'); var d = new Date(+p[0], +p[1] - 1 + n, 1);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+  }
+  function rotuloMes(mes){ var p = mes.split('-'); return NOMES_MES[+p[1] - 1] + ' ' + p[0]; }
+  function rotuloDia(dia){
+    var p = dia.split('-');
+    return NOMES_DIA[diaSemanaISO(dia)] + ', ' + (+p[2]) + ' ' + NOMES_MES[+p[1] - 1].slice(0, 3).toLowerCase() + ' ' + p[0];
+  }
+
+  /* ---------------------------------------------------------------------
+     CONCEITO CENTRAL — esperado e desvio. Função PURA, partilhada pelos
+     blocos 1, 2 e 3.
+
+       esperado(D, porDia) = mediana dos bruto de D-7, D-14, D-21, D-28 que
+       existam em porDia com bruto > 0. Exige pelo menos 2 valores; senão null.
+       desvio = (bruto − esperado) / esperado.
+
+     porDia é um mapa plano { 'AAAA-MM-DD': { bruto, docs } } que já junta os
+     meses precisos (o mês e o anterior — os D-28 dos primeiros dias caem lá).
+
+     Testes mentais:
+       - D=2026-05-29 (sexta), porDia com 05-22=900, 05-15=1000, 05-08=800,
+         05-01=700 → ordenado [700,800,900,1000], mediana = (800+900)/2 = 850.
+       - 05-01 fechado (sem porDia) → só 3 valores [800,900,1000] → mediana 900.
+       - Só 05-22 existe → n=1 < 2 → esperado null (sem baseline).
+       - 05-08 com bruto 0 (mês grava zero em dias sem vendas?) → ignorado.
+       - bruto 850 e esperado 850 → desvio 0. bruto 765 → −0,1.
+     --------------------------------------------------------------------- */
+  function esperadoDe(dia, porDia){
+    var vals = [];
+    for (var k = 1; k <= 4; k++){
+      var ref = porDia[somarDias(dia, -7 * k)];
+      if (ref && Number(ref.bruto) > 0) vals.push(Number(ref.bruto));
+    }
+    if (vals.length < 2) return { esperado:null, n:vals.length, refs:vals };
+    vals.sort(function(a, b){ return a - b; });
+    var m = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
+    return { esperado:m, n:vals.length, refs:vals };
+  }
+  function desvioDe(bruto, esperado){
+    if (esperado === null || esperado === undefined || !(esperado > 0)) return null;
+    if (bruto === null || bruto === undefined) return null;
+    return (Number(bruto) - esperado) / esperado;
+  }
+  /* Classe de nível para o fundo da célula (5 níveis). */
+  function nivelDesvio(d){
+    if (d === null) return null;
+    if (d <= -0.15) return 'n1';
+    if (d < -0.05) return 'n2';
+    if (d <= 0.05) return 'n3';
+    if (d < 0.15) return 'n4';
+    return 'n5';
+  }
+
+  /* ---------------------------------------------------------------------
+     Estado e caches de sessão (nunca se escreve nada)
+     --------------------------------------------------------------------- */
+  var db = null;
+  var HOJE = hojeISO();
+  var MES_CORRENTE = mesDe(HOJE);
+  var estado = {
+    mes: MES_CORRENTE,
+    diaAtivo: null,
+    porDiaMes: {},      // 'AAAA-MM' -> { dia: {bruto, docs} } | null (mês sem porDia)
+    contextoMes: {},    // 'AAAA-MM' -> { dia: contexto } | 'erro'
+    diarioDia: {},      // 'AAAA-MM-DD' -> payload de vendasDiario | null
+    historico: null     // bloco 3: { porDia, contexto } uma vez por sessão
+  };
+
+  function lerPorDia(mes){
+    if (Object.prototype.hasOwnProperty.call(estado.porDiaMes, mes)) return Promise.resolve(estado.porDiaMes[mes]);
+    return db.ref('vendas/' + mes + '/porDia').once('value').then(function(snap){
+      var v = snap.val();
+      estado.porDiaMes[mes] = v && typeof v === 'object' ? v : null;
+      return estado.porDiaMes[mes];
+    });
+  }
+  /* Um intervalo por mês, nunca o nó todo. */
+  function lerContexto(mes){
+    if (Object.prototype.hasOwnProperty.call(estado.contextoMes, mes) && estado.contextoMes[mes] !== 'erro') {
+      return Promise.resolve(estado.contextoMes[mes]);
+    }
+    return db.ref('contextoDiario').orderByKey().startAt(mes + '-01').endAt(mes + '-31').once('value')
+      .then(function(snap){
+        estado.contextoMes[mes] = snap.val() || {};
+        return estado.contextoMes[mes];
+      })
+      .catch(function(e){
+        console.error('contextoDiario/' + mes + ' falhou:', e);
+        estado.contextoMes[mes] = 'erro';
+        return null;
+      });
+  }
+  function lerDiario(dia){
+    if (Object.prototype.hasOwnProperty.call(estado.diarioDia, dia)) return Promise.resolve(estado.diarioDia[dia]);
+    return db.ref('vendasDiario/' + mesDe(dia) + '/' + dia).once('value').then(function(snap){
+      estado.diarioDia[dia] = snap.val() || null;
+      return estado.diarioDia[dia];
+    });
+  }
+  /* Junta o porDia do mês com o do anterior num mapa plano. */
+  function porDiaJunto(mes){
+    var out = {};
+    [mesSomar(mes, -1), mes].forEach(function(m){
+      var p = estado.porDiaMes[m];
+      if (p) Object.keys(p).forEach(function(d){ out[d] = p[d]; });
+    });
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------
+     Ícones de contexto de um dia (sprite do shell; senão glifo de texto de
+     1–2 letras em Inter — sem Space Mono, ver CLAUDE.md; sem emojis).
+     --------------------------------------------------------------------- */
+  function iconesContexto(ctx){
+    if (!ctx) return [];
+    var out = [];
+    var m = ctx.meteo || null, c = ctx.calendario || null;
+    if (m){
+      if (Number(m.precipMm) >= 1){
+        out.push({ cls:'chuva', html:giocoIcon('droplet', { size:12 }),
+          title:'Chuva ' + dec(m.precipMm, 1) + ' mm' + (m.chuvaLoja != null ? '; ' + dec(m.chuvaLoja, 1) + ' mm no horário' : '') });
+      }
+      if (Number(m.chuvaLoja) >= 1){
+        out.push({ cls:'chuva', html:'L', title:'Chuva no horário da loja: ' + dec(m.chuvaLoja, 1) + ' mm' });
+      }
+      if (Number(m.tMax) >= 30){
+        out.push({ cls:'calor', html:giocoIcon('flame', { size:12 }), title:'Calor: máx. ' + dec(m.tMax, 1) + ' °C' });
+      }
+      if (m.tMax != null && Number(m.tMax) <= 15){
+        out.push({ cls:'frio', html:giocoIcon('snowflake', { size:12 }), title:'Frio: máx. ' + dec(m.tMax, 1) + ' °C' });
+      }
+    }
+    if (c){
+      if (c.feriado) out.push({ cls:'feriado', html:'F', title:'Feriado: ' + c.feriado });
+      if (c.feriadoMunicipal) out.push({ cls:'feriado', html:'M', title:'Feriado municipal: ' + c.feriadoMunicipal });
+      if (c.ponte) out.push({ cls:'ponte', html:'P', title:'Ponte' });
+      if (c.feriasEscolares) out.push({ cls:'ferias', html:'FE', title:'Férias escolares: ' + c.feriasEscolares });
+    }
+    return out;
+  }
+  function htmlIcones(lista){
+    return lista.map(function(i){
+      return '<span class="cal-ico ' + i.cls + '" title="' + esc(i.title) + '">' + i.html + '</span>';
+    }).join('');
+  }
+
+  /* ---------------------------------------------------------------------
+     Linhas do mês: para cada dia, bruto/esperado/desvio/estado
+     --------------------------------------------------------------------- */
+  function linhasDoMes(mes){
+    var porDia = porDiaJunto(mes);
+    var temMes = !!estado.porDiaMes[mes];
+    var n = diasNoMes(mes), out = [];
+    for (var d = 1; d <= n; d++){
+      var dia = mes + '-' + pad2(d);
+      var reg = temMes ? estado.porDiaMes[mes][dia] : null;
+      var futuro = dia > HOJE;
+      var bruto = reg && Number(reg.bruto) > 0 ? Number(reg.bruto) : null;
+      var e = esperadoDe(dia, porDia);
+      var linha = { dia:dia, num:d, bruto:bruto, docs:reg ? Number(reg.docs) || 0 : 0, esperado:e.esperado, nRefs:e.n, futuro:futuro };
+      /* Hoje sem porDia ainda não é "fechado": o import do dia só corre depois
+         do fecho. Trata-se como futuro (só contexto). */
+      linha.fechado = !futuro && dia !== HOJE && bruto === null;
+      if (dia === HOJE && bruto === null) linha.futuro = true;
+      linha.desvio = (bruto !== null) ? desvioDe(bruto, e.esperado) : null;
+      out.push(linha);
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------
+     BLOCO 1 — calendário
+     --------------------------------------------------------------------- */
+  function renderCalendario(){
+    var mes = estado.mes;
+    var host = el('calCorpo');
+    var linhas = linhasDoMes(mes);
+    var ctx = estado.contextoMes[mes];
+    var ctxOk = ctx && ctx !== 'erro';
+    var selo = el('calEstado');
+    if (estado.contextoMes[mes] === 'erro'){ selo.style.display = ''; selo.className = 'status warn'; selo.textContent = 'sem contexto'; }
+    else { selo.style.display = 'none'; }
+
+    if (!estado.porDiaMes[mes]){
+      host.innerHTML = '<p class="pd-vazio">sem vendas neste mês</p>';
+      return;
+    }
+
+    var html = '<div class="cal-grelha">';
+    NOMES_DIA_CURTO.forEach(function(nm){ html += '<div class="cal-cab">' + nm + '</div>'; });
+    var offset = diaSemanaISO(mes + '-01');
+    for (var i = 0; i < offset; i++) html += '<div class="cal-cel fora"></div>';
+
+    linhas.forEach(function(l){
+      var cls = 'cal-cel', corpo = '', title = '';
+      var c = ctxOk ? ctx[l.dia] : null;
+      if (l.futuro){
+        cls += ' futuro';
+        corpo = '<span class="cal-estado">&nbsp;</span>';
+        title = 'Dia futuro';
+      } else if (l.fechado){
+        cls += ' fechado';
+        corpo = '<span class="cal-estado" style="margin-top:12px">fechado</span>';
+        title = 'Sem vendas registadas';
+      } else {
+        corpo = '<span class="cal-bruto">' + esc(eur(l.bruto)) + '</span>';
+        if (l.desvio === null){
+          cls += ' sem-base';
+          corpo += '<span class="cal-desvio muted">sem baseline</span>';
+          title = 'sem baseline';
+        } else {
+          cls += ' ' + nivelDesvio(l.desvio);
+          corpo += '<span class="cal-desvio">' + esc(pctSinal(l.desvio)) + '</span>';
+          title = 'Esperado ' + eur(l.esperado) + ' (mediana de ' + l.nRefs + ' semanas)';
+        }
+      }
+      if (l.dia === HOJE) cls += ' hoje';
+      if (l.dia === estado.diaAtivo) cls += ' ativa';
+      html += '<button type="button" class="' + cls + '" data-dia="' + l.dia + '" title="' + esc(title) + '">' +
+        '<span class="cal-num">' + l.num + '</span>' + corpo +
+        '<span class="cal-icones">' + htmlIcones(iconesContexto(c)) + '</span></button>';
+    });
+    html += '</div>';
+    host.innerHTML = html;
+  }
+
+  el('calCorpo').addEventListener('click', function(ev){
+    var cel = ev.target.closest('.cal-cel');
+    if (!cel || !cel.getAttribute('data-dia')) return;
+    abrirDia(cel.getAttribute('data-dia'));
+  });
+
+  /* ---------------------------------------------------------------------
+     BLOCO 2 — esperado vs. real
+     --------------------------------------------------------------------- */
+  function renderEsperadoVsReal(){
+    var mes = estado.mes;
+    var host = el('evrCorpo');
+    if (!estado.porDiaMes[mes]){ host.innerHTML = '<p class="pd-vazio">sem vendas neste mês</p>'; return; }
+    var linhas = linhasDoMes(mes);
+
+    var totReal = 0, totEsp = 0, totRealComEsp = 0;
+    linhas.forEach(function(l){
+      if (l.bruto !== null) totReal += l.bruto;
+      if (l.bruto !== null && l.esperado !== null){ totEsp += l.esperado; totRealComEsp += l.bruto; }
+    });
+    var desvAgg = totEsp > 0 ? (totRealComEsp - totEsp) / totEsp : null;
+    var clsAgg = desvAgg === null ? '' : (desvAgg < -0.005 ? ' neg' : (desvAgg > 0.005 ? ' pos' : ''));
+
+    var real = linhas.map(function(l){ return { label:String(l.num), valor:l.bruto === null ? 0 : Math.round(l.bruto), curto:l.bruto === null ? '' : eur(l.bruto) }; });
+    var esp = linhas.map(function(l){ return { label:String(l.num), valor:l.esperado === null ? 0 : Math.round(l.esperado), curto:l.esperado === null ? '' : eur(l.esperado) }; });
+
+    /* O barrasVerticais() não desenha valores negativos (a escala parte de 0
+       e um valor 0/null é "sem dados"). Em vez de inventar um gráfico novo:
+       colunas com |desvio| em pontos percentuais, as negativas a var(--red)
+       (alt), as positivas em neutro. O sinal vai no texto da coluna e no
+       tooltip. Dias sem esperado ficam sem barra. */
+    var desvios = linhas.map(function(l){
+      var d = l.desvio;
+      var pts = d === null ? null : Math.round(Math.abs(d) * 1000) / 10;
+      if (pts !== null && pts < 0.05) pts = 0.05; // desvio exactamente 0 ainda conta como "com dados"
+      return { label:String(l.num), valor:pts, curto:d === null ? '' : pctSinal(d, 0), alt:d !== null && d < 0 };
+    });
+
+    var C = GiocoChart.cores();
+    host.innerHTML =
+      '<div class="pd-kpis">' +
+        '<div class="pd-kpi"><div class="k-label">Total real</div><div class="k-value">' + esc(eur(totReal)) + '</div></div>' +
+        '<div class="pd-kpi"><div class="k-label">Total esperado · dias com baseline</div><div class="k-value">' + (totEsp > 0 ? esc(eur(totEsp)) : '—') + '</div></div>' +
+        '<div class="pd-kpi"><div class="k-label">Desvio agregado</div><div class="k-value' + clsAgg + '">' + esc(pctSinal(desvAgg)) + '</div></div>' +
+      '</div>' +
+      GiocoChart.linha(null, { altura:240, aria:'Real vs. esperado por dia', series:[
+        { nome:'Real', itens:real },
+        { nome:'Esperado', cor:C.ink, itens:esp }
+      ]}) +
+      '<p class="pd-sub">Desvio por dia, em pontos percentuais — a vermelho abaixo do esperado, neutro acima. Dias sem baseline ficam sem barra.</p>' +
+      GiocoChart.barrasVerticais(desvios, { altura:180, destacarMax:false, aria:'Desvio por dia em %' });
+    GiocoChart.montar(host);
+  }
+
+  /* ---------------------------------------------------------------------
+     BLOCO 3 — cruzamento por fator (todo o histórico)
+     --------------------------------------------------------------------- */
+  var N_MIN = 8;
+
+  function lerHistorico(){
+    if (estado.historico) return Promise.resolve(estado.historico);
+    var meses = [];
+    for (var m = mesSomar(PRIMEIRO_MES, -1); m <= MES_CORRENTE; m = mesSomar(m, 1)) meses.push(m);
+    var pPorDia = Promise.all(meses.map(lerPorDia)).then(function(){
+      var out = {};
+      meses.forEach(function(m){ var p = estado.porDiaMes[m]; if (p) Object.keys(p).forEach(function(d){ out[d] = p[d]; }); });
+      return out;
+    });
+    var pCtx = db.ref('contextoDiario').orderByKey().startAt(PRIMEIRO_MES + '-01').once('value')
+      .then(function(snap){ return snap.val() || {}; });
+    return Promise.all([pPorDia, pCtx]).then(function(r){
+      estado.historico = { porDia:r[0], contexto:r[1] };
+      return estado.historico;
+    });
+  }
+
+  function classificar(dia, ctx){
+    var m = ctx && ctx.meteo, c = ctx && ctx.calendario;
+    var f = { diaSemana: diaSemanaISO(dia) };
+    if (m){
+      if (m.precipMm != null) f.chuva = Number(m.precipMm) >= 1 ? 'Com chuva (≥ 1 mm)' : 'Sem chuva';
+      if (m.chuvaLoja != null) f.chuvaLoja = Number(m.chuvaLoja) >= 1 ? 'Chuva no horário (≥ 1 mm)' : 'Seco no horário';
+      if (m.tMax != null){
+        var t = Number(m.tMax);
+        f.temp = t <= 20 ? '≤ 20 °C' : (t <= 27 ? '21–27 °C' : (t <= 32 ? '28–32 °C' : '≥ 33 °C'));
+      }
+    }
+    if (c){
+      f.feriado = (c.feriado || c.feriadoMunicipal) ? 'Feriado' : 'Dia normal';
+      f.ponte = c.ponte ? 'Ponte' : 'Dia normal';
+      f.ferias = c.feriasEscolares ? 'Férias escolares' : 'Período letivo';
+    }
+    return f;
+  }
+
+  function renderFatores(h){
+    var host = el('fatCorpo');
+    var porDia = h.porDia, ctxAll = h.contexto;
+    var dias = Object.keys(porDia).filter(function(d){ return d >= PRIMEIRO_MES + '-01' && d <= HOJE; }).sort();
+
+    /* Agregação: fator -> rótulo -> { n, soma } */
+    var FATORES = [
+      { id:'chuva',     titulo:'Chuva no dia',              ordem:['Com chuva (≥ 1 mm)','Sem chuva'] },
+      { id:'chuvaLoja', titulo:'Chuva no horário da loja',  ordem:['Chuva no horário (≥ 1 mm)','Seco no horário'] },
+      { id:'temp',      titulo:'Temperatura máx.',          ordem:['≤ 20 °C','21–27 °C','28–32 °C','≥ 33 °C'] },
+      { id:'feriado',   titulo:'Feriado',                   ordem:['Feriado','Dia normal'] },
+      { id:'ponte',     titulo:'Ponte',                     ordem:['Ponte','Dia normal'] },
+      { id:'ferias',    titulo:'Férias escolares',          ordem:['Férias escolares','Período letivo'] }
+    ];
+    var agg = {}, totalComDesvio = 0;
+    FATORES.forEach(function(f){ agg[f.id] = {}; });
+    var dow = []; for (var i = 0; i < 7; i++) dow.push({ n:0, soma:0 });
+
+    dias.forEach(function(dia){
+      var reg = porDia[dia];
+      var bruto = reg && Number(reg.bruto) > 0 ? Number(reg.bruto) : null;
+      if (bruto === null) return;
+      var cls = classificar(dia, ctxAll[dia]);
+      dow[cls.diaSemana].n++; dow[cls.diaSemana].soma += bruto;
+      var d = desvioDe(bruto, esperadoDe(dia, porDia).esperado);
+      if (d === null) return;
+      totalComDesvio++;
+      FATORES.forEach(function(f){
+        var rot = cls[f.id];
+        if (!rot) return;
+        var a = agg[f.id][rot] || (agg[f.id][rot] = { n:0, soma:0 });
+        a.n++; a.soma += d;
+      });
+    });
+
+    function linhaHtml(rot, n, val, ehDesvio){
+      var pequena = n < N_MIN;
+      var cls = pequena ? '' : (ehDesvio ? (val < -0.005 ? ' neg' : (val > 0.005 ? ' pos' : '')) : '');
+      var txt = ehDesvio ? pctSinal(val) : eur(val);
+      return '<div class="fat-linha' + (pequena ? ' pequena' : '') + '">' +
+        '<span class="rot">' + esc(rot) + '</span>' +
+        '<span class="n">' + intFmt(n) + ' ' + (n === 1 ? 'dia' : 'dias') + (pequena ? ' <span class="peq">amostra pequena</span>' : '') + '</span>' +
+        '<span class="val' + cls + '">' + esc(txt) + '</span></div>';
+    }
+
+    var html = '<div class="fat-grelha">';
+    FATORES.forEach(function(f){
+      var a = agg[f.id];
+      var rots = f.ordem.filter(function(r){ return a[r]; });
+      var algum = rots.some(function(r){ return a[r].n >= N_MIN; });
+      html += '<div class="fat-card"><h4>' + esc(f.titulo) + '</h4>';
+      if (!rots.length || !algum){
+        html += '<p class="pd-vazio">ainda sem dados suficientes</p>';
+        rots.forEach(function(r){ html += linhaHtml(r, a[r].n, a[r].soma / a[r].n, true); });
+      } else {
+        rots.forEach(function(r){ html += linhaHtml(r, a[r].n, a[r].soma / a[r].n, true); });
+      }
+      html += '</div>';
+    });
+    /* Dia da semana: média de bruto, não desvio (seria circular). */
+    html += '<div class="fat-card"><h4>Dia da semana · média de vendas</h4>';
+    var algumDow = dow.some(function(x){ return x.n >= N_MIN; });
+    if (!algumDow) html += '<p class="pd-vazio">ainda sem dados suficientes</p>';
+    dow.forEach(function(x, i){ if (x.n) html += linhaHtml(NOMES_DIA[i], x.n, x.soma / x.n, false); });
+    html += '</div></div>';
+    host.innerHTML = html;
+
+    var selo = el('fatEstado');
+    selo.style.display = ''; selo.className = 'status ok';
+    selo.textContent = intFmt(totalComDesvio) + ' dias com desvio';
+  }
+
+  /* ---------------------------------------------------------------------
+     BLOCO 4 — detalhe do dia
+     --------------------------------------------------------------------- */
+  function kv(k, v, cls){
+    return '<div><span class="k">' + esc(k) + '</span><span class="v' + (cls ? ' ' + cls : '') + '">' + esc(v) + '</span></div>';
+  }
+
+  function abrirDia(dia){
+    estado.diaAtivo = dia;
+    renderCalendario();
+    var card = el('diaCard');
+    card.classList.add('on');
+    el('diaTitulo').textContent = rotuloDia(dia);
+    el('diaCorpo').innerHTML = '<div class="pd-skel-bloco"><span class="pd-skel" style="width:70%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:50%"></span></div>';
+
+    var mes = mesDe(dia);
+    var pDiario = dia > HOJE ? Promise.resolve(null) : lerDiario(dia).catch(function(e){ console.error(e); return null; });
+    var pCtx = lerContexto(mes);
+    Promise.all([pDiario, pCtx]).then(function(r){
+      if (estado.diaAtivo !== dia) return;
+      renderDia(dia, r[0], (r[1] && r[1][dia]) || null);
+    });
+  }
+
+  function fecharDia(){
+    estado.diaAtivo = null;
+    el('diaCard').classList.remove('on');
+    renderCalendario();
+  }
+  el('diaFechar').addEventListener('click', fecharDia);
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape' && estado.diaAtivo){ ev.preventDefault(); fecharDia(); }
+  });
+
+  function renderDia(dia, diario, ctx){
+    var html = '';
+    var porDia = porDiaJunto(mesDe(dia));
+    var e = esperadoDe(dia, porDia);
+    var resumo = diario && diario.resumo;
+
+    html += '<div class="dia-sec"><h4>Vendas</h4>';
+    if (resumo){
+      var bruto = Number(resumo.bruto) || 0;
+      var d = desvioDe(bruto, e.esperado);
+      var cls = d === null ? '' : (d < -0.005 ? 'neg' : (d > 0.005 ? 'pos' : ''));
+      html += '<div class="dia-kv">' +
+        kv('Bruto', eur(bruto)) + kv('Docs', intFmt(resumo.docs)) + kv('Ticket', eur(resumo.ticket)) +
+        kv('Esperado', e.esperado === null ? 'sem baseline' : eur(e.esperado)) +
+        kv('Desvio', pctSinal(d), cls) + '</div>';
+      var ph = diario.porHora || {};
+      var horas = Object.keys(ph).map(Number).sort(function(a, b){ return a - b; });
+      if (horas.length){
+        var itens = [];
+        for (var h = horas[0]; h <= horas[horas.length - 1]; h++){
+          var v = ph[String(h)] ? Number(ph[String(h)].bruto) || 0 : 0;
+          itens.push({ label: pad2(h) + 'h', valor: Math.round(v), curto: eur(v) });
+        }
+        html += '<div class="pd-sub">Bruto por hora</div>' + GiocoChart.barrasVerticais(itens, { altura:170, aria:'Bruto por hora' });
+      }
+      var prods = diario.produtos;
+      if (prods && typeof prods === 'object'){
+        var lista = Object.keys(prods).map(function(k){ var p = prods[k] || {}; return { nome: p.desc || k, valor: Number(p.valor) || 0, qtd: Number(p.qtd) || 0 }; })
+          .sort(function(a, b){ return b.valor - a.valor; }).slice(0, 5);
+        if (lista.length){
+          html += '<div class="pd-sub">Top 5 produtos por valor</div>';
+          lista.forEach(function(p){
+            html += '<div class="dia-prod"><span class="nome" title="' + esc(p.nome) + '">' + esc(p.nome) + '</span><span class="qtd">×' + intFmt(p.qtd) + '</span><span class="val">' + esc(eur(p.valor)) + '</span></div>';
+          });
+        }
+      }
+    } else {
+      html += '<p class="pd-vazio">sem vendas registadas</p>';
+    }
+    html += '</div>';
+
+    html += '<div class="dia-sec"><h4>Contexto</h4>';
+    if (!ctx){
+      html += '<p class="pd-vazio">sem contexto para este dia</p>';
+    } else {
+      var c = ctx.calendario, m = ctx.meteo, p = ctx.meteoPrevisao;
+      if (c){
+        html += '<div class="dia-kv">' +
+          kv('Dia', c.nomeDia || NOMES_DIA[diaSemanaISO(dia)]) +
+          kv('Feriado', c.feriado || (c.feriadoMunicipal ? c.feriadoMunicipal + ' (municipal)' : '—')) +
+          kv('Ponte', c.ponte ? 'sim' : 'não') +
+          kv('Férias escolares', c.feriasEscolares || '—') +
+          kv('Semana do mês', String(c.semanaMes || '—')) + '</div>';
+      }
+      var met = m || p;
+      if (met){
+        html += '<div class="dia-kv" style="margin-top:10px">' +
+          kv(m ? 'Meteo' : 'Previsão', met.descricao || '—') +
+          kv('Máx / mín', dec(met.tMax, 1) + ' / ' + dec(met.tMin, 1) + ' °C') +
+          (met.t13h != null ? kv('Às 13h', dec(met.t13h, 1) + ' °C') : '') +
+          kv('Chuva', dec(met.precipMm, 1) + ' mm') +
+          (met.chuvaLoja != null ? kv('Chuva na loja', dec(met.chuvaLoja, 1) + ' mm') : '') +
+          kv('Vento máx.', dec(met.ventoMax, 0) + ' km/h') +
+          kv('Nascer / pôr', (met.nascer || '—') + ' / ' + (met.por || '—')) + '</div>';
+        if (m && p){
+          html += '<p class="dia-prev">Previsão da véspera: máx. ' + esc(dec(p.tMax, 1)) + ' °C (real ' + esc(dec(m.tMax, 1)) + '), chuva ' +
+            esc(dec(p.precipMm, 1)) + ' mm (real ' + esc(dec(m.precipMm, 1)) + ')</p>';
+        }
+      } else {
+        html += '<p class="pd-vazio" style="padding:6px 0">sem meteorologia</p>';
+      }
+    }
+    html += '</div>';
+
+    el('diaCorpo').innerHTML = html;
+    GiocoChart.montar(el('diaCorpo'));
+  }
+
+  /* ---------------------------------------------------------------------
+     Navegação de mês e arranque
+     --------------------------------------------------------------------- */
+  function renderNav(){
+    el('mesRotulo').textContent = rotuloMes(estado.mes);
+    el('mesAnt').disabled = estado.mes <= PRIMEIRO_MES;
+    el('mesSeg').disabled = estado.mes >= MES_CORRENTE;
+  }
+
+  function carregarMes(){
+    var mes = estado.mes;
+    renderNav();
+    if (estado.diaAtivo && mesDe(estado.diaAtivo) !== mes){ estado.diaAtivo = null; el('diaCard').classList.remove('on'); }
+    el('calCorpo').innerHTML = '<div class="pd-skel-bloco"><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span><span class="pd-skel" style="width:100%"></span></div>';
+    el('evrCorpo').innerHTML = '<div class="pd-skel-bloco"><span class="pd-skel" style="width:60%"></span><span class="pd-skel" style="width:100%"></span></div>';
+
+    /* Vendas primeiro (o calendário aparece mesmo que o contexto falhe). */
+    Promise.all([lerPorDia(mesSomar(mes, -1)), lerPorDia(mes)]).then(function(){
+      if (estado.mes !== mes) return;
+      renderCalendario();
+      renderEsperadoVsReal();
+    }).catch(function(e){
+      console.error('porDia falhou:', e);
+      el('calCorpo').innerHTML = '<p class="pd-vazio">Não foi possível ler as vendas deste mês.</p>';
+      el('evrCorpo').innerHTML = '<p class="pd-vazio">Não foi possível ler as vendas deste mês.</p>';
+    });
+    lerContexto(mes).then(function(){
+      if (estado.mes !== mes) return;
+      if (estado.porDiaMes[mes] !== undefined) renderCalendario();
+    });
+  }
+
+  el('mesAnt').addEventListener('click', function(){ if (estado.mes > PRIMEIRO_MES){ estado.mes = mesSomar(estado.mes, -1); carregarMes(); } });
+  el('mesSeg').addEventListener('click', function(){ if (estado.mes < MES_CORRENTE){ estado.mes = mesSomar(estado.mes, 1); carregarMes(); } });
+
+  // Exposto para testes manuais na consola (não usado pela página).
+  window.__padroes = { esperadoDe: esperadoDe, desvioDe: desvioDe, linhasDoMes: linhasDoMes, estado: estado };
+
+  autenticarEContinuar(function () {
+    db = firebase.database();
+    carregarMes();
+    lerHistorico().then(renderFatores).catch(function(e){
+      console.error('histórico falhou:', e);
+      el('fatCorpo').innerHTML = '<p class="pd-vazio">Não foi possível ler o histórico.</p>';
+    });
+  });
+});
+</script>
+</body>
+</html>

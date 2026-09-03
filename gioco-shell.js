@@ -253,6 +253,9 @@
          Icone 'scan' (moldura de visor) por ser o mais proximo de uma camara
          no sprite — o 'store' ja e o da loja-sao-bento no index. */
       { href: 'centro-de-controlo.html', icone: 'scan',       label: 'Centro de controlo' },
+      /* Padrões: vendas × contexto externo (calendário + meteo), só leitura.
+         'layout-dashboard' é o mais próximo de uma grelha/calendário no sprite. */
+      { href: 'padroes.html',    icone: 'layout-dashboard', label: 'Padrões' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
          no menu, mas não navega para lado nenhum. Com os Resultados a lista
          passou a 10 entradas: é o link morto que fica na 10ª, a única sem
