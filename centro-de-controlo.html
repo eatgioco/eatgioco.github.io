@@ -1990,9 +1990,10 @@ window.addEventListener('load', function () {
       cmpValor.classList.remove('up', 'down');
       if (comparacao && comparacao.resumo) {
         var c = comparacao.data, base = comparacao.resumo.bruto;
-        cmpLabel.textContent = 'vs. ' + fmtDMmm(c);
+        // O valor do mês anterior fica visível na linha, não só o delta.
+        cmpLabel.textContent = 'vs. ' + fmtDMmm(c) + ' · ' + fmtEuro(base);
         cmpEl.title = posicaoNoMes(d) + '.ª ' + DIAS_EXT[d.getDay()] + ' de ' + MESES_EXT[c.getMonth()] +
-          ' (' + chaveDia(c) + ' · ' + fmtEuro(base) + ')';
+          ' (' + chaveDia(c) + ')';
         if (base > 0) {
           var pct = (r.bruto - base) / base * 100;
           cmpValor.textContent = (pct > 0 ? '▲ +' : pct < 0 ? '▼ −' : '') +
