@@ -303,6 +303,21 @@
     font-size:11px;
     color:var(--muted);
   }
+  /* Bloco "Agora" de Vendas por hora: os mesmos .kpi do Resumo, só com menos
+     folga por baixo para o gráfico vir logo a seguir. */
+  .agora-row{ margin-top:0; margin-bottom:4px; }
+  /* Coluna extra "acum. € X" nas barras horizontais de Vendas por hora —
+     barra() do gioco-charts não tem 3.ª coluna; acrescenta-se aqui à direita
+     do delta, sem tocar no módulo partilhado. */
+  .bar-acum{
+    font-size:11.5px;
+    font-variant-numeric:tabular-nums;
+    flex:0 0 118px;
+    min-width:0;
+    text-align:right;
+    white-space:nowrap;
+    color:var(--muted);
+  }
 
   /* ---------- Selector ---------- */
   .toolbar{
@@ -1672,7 +1687,9 @@
     mesActivo: '',
     diaActivo: '',         // '' = mês inteiro; senão 'YYYY-MM-DD' dentro de mesActivo
     diaSemanaActivo: '',   // '' ou '0'..'6' (domingo=0, como getDay()) — exclusivo com diaActivo
-    horasModo: 'media',    // em modo dia-da-semana, "Vendas por hora" mostra 'media' ou 'total'
+    horasModo: '',         // "Vendas por hora": 'media' | 'total'; '' = omissão do modo
+                           // (média em dia-da-semana, total em mês — ver vistaHoras)
+    agoraTeste: null,      // só testes: Date fixa para o bloco "Agora" (null = new Date())
     diasCache: {},         // 'mes/dia' -> payload de vendasDiario/ (null = não existe)
     ordemProdutos: 'valor',
     planoMigracao: null,   // plano calculado por verificarMigracao()
@@ -2836,57 +2853,196 @@
       '</tr></thead><tbody>' + linhas + '</tbody></table></div>');
   }
 
+  /* ---------- Acumulado até à hora atual ----------
+     Função PURA, sem estado nem DOM: média por hora, acumulado hora a hora e
+     acumulado até ao instante `agora`. EXISTE UMA CÓPIA tal e qual no módulo
+     vendasHoje do centro-de-controlo.html — alterar as duas ao mesmo tempo
+     (decidiu-se não criar um ficheiro partilhado só para isto).
+       porHora: {0..23: {bruto, docs}} (objecto ou array com buracos, como o
+                Firebase devolve); dias: divisor (nº de dias do conjunto);
+                agora: Date.
+     Devolve { mediaHora[24], acumulado[24], ateAgora, horaAtual, total,
+               hora, minuto, primeira, ultima, completo }:
+       mediaHora[h] = porHora[h].bruto / dias (hora sem chave = 0)
+       acumulado[h] = Σ mediaHora[k], k ≤ h;  total = acumulado[23]
+       ateAgora     = acumulado[H-1] + mediaHora[H] × M/60 — aproximação
+                      LINEAR dentro da hora corrente (as vendas não são
+                      uniformes dentro da hora, mas porHora não tem
+                      granularidade ao minuto); depois da última hora com
+                      dados é o total.
+       horaAtual    = mediaHora[H], ou null se porHora não tem a hora H
+                      (fora do horário com dados)
+       primeira/ultima = primeira e última hora com chave (null sem dados)
+       completo     = já passou a última hora com dados (H > ultima)
+     dias ≤ 0 → tudo a zero (o chamador omite o bloco). */
+  function giocoAcumuladoHoras(porHora, dias, agora){
+    porHora = porHora || {};
+    dias = Number(dias) || 0;
+    var mediaHora = [], acumulado = [], soma = 0;
+    var primeira = null, ultima = null;
+    for (var h = 0; h < 24; h++){
+      var tem = !!porHora[h];
+      var m = (tem && dias > 0) ? (Number(porHora[h].bruto) || 0) / dias : 0;
+      if (tem){ if (primeira === null) primeira = h; ultima = h; }
+      mediaHora.push(m);
+      soma += m;
+      acumulado.push(soma);
+    }
+    var H = agora.getHours(), M = agora.getMinutes();
+    var completo = ultima !== null && H > ultima;
+    var ateAgora = completo ? soma : ((H > 0 ? acumulado[H - 1] : 0) + mediaHora[H] * (M / 60));
+    return {
+      mediaHora: mediaHora, acumulado: acumulado, ateAgora: ateAgora,
+      horaAtual: porHora[H] ? mediaHora[H] : null, total: soma,
+      hora: H, minuto: M, primeira: primeira, ultima: ultima, completo: completo
+    };
+  }
+
+  function agoraVendas(){ return estado.agoraTeste || new Date(); }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  /* Bloco "Agora" (três .kpi) no topo de Vendas por hora. `dias` é o divisor
+     do conjunto; `conjunto` é o texto já com preposição ("de setembro",
+     "das quintas-feiras"). Em dia individual os valores são os reais desse
+     dia, não uma média. Devolve '' sem dias ou sem horas com dados. */
+  function blocoAgora(p, dias, conjunto){
+    if (!(dias > 0)) return '';
+    var a = giocoAcumuladoHoras(p.porHora, dias, agoraVendas());
+    if (a.primeira === null) return '';
+    var individual = !!estado.diaActivo;
+    var hhmm = pad2(a.hora) + ':' + pad2(a.minuto);
+    var rot1 = a.completo ? 'Dia completo' : ('Até ' + hhmm + (individual ? ' nesse dia' : ''));
+    var sub1 = individual
+      ? 'valor real de ' + esc(rotuloDia(estado.diaActivo))
+      : 'dia médio ' + esc(conjunto) + ': ' + intFmt(dias) + (dias === 1 ? ' dia' : ' dias');
+    var rot2 = 'Hora atual ' + pad2(a.hora) + 'h–' + pad2((a.hora + 1) % 24) + 'h';
+    var v2 = a.horaAtual === null ? '—' : eur(a.horaAtual);
+    var sub2 = a.horaAtual === null ? 'fora do horário com vendas' : (individual ? 'nessa hora' : 'média nessa hora');
+    var pctDia = a.total > 0 ? a.ateAgora / a.total * 100 : 0;
+    return '<div class="kpi-row agora-row">' +
+      kpi(rot1, eur(a.ateAgora), sub1) +
+      kpi(rot2, v2, sub2) +
+      kpi('% do dia', dec(pctDia, 0) + '%', individual ? 'do total desse dia' : 'do dia médio completo') +
+      '</div>';
+  }
+
+  /* O bloco "Agora" actualiza-se a cada 60 s a partir dos dados em memória
+     (sem nova leitura). vistaHoras guarda aqui os argumentos; renderVistas
+     limpa o intervalo antes de redesenhar e volta a armá-lo no fim. */
+  var agoraRelogio = { timer: null, args: null };
+  function pararRelogioAgora(){
+    if (agoraRelogio.timer) clearInterval(agoraRelogio.timer);
+    agoraRelogio.timer = null;
+    agoraRelogio.args = null;
+  }
+  function armarRelogioAgora(){
+    if (!agoraRelogio.args) return;
+    agoraRelogio.timer = setInterval(function(){
+      var alvo = document.getElementById('horasAgora');
+      var a = agoraRelogio.args;
+      if (!alvo || !a){ pararRelogioAgora(); return; }
+      alvo.innerHTML = blocoAgora(a.p, a.dias, a.conjunto);
+    }, 60000);
+  }
+
+  /* barra() do gioco-charts só tem valor + delta; a coluna "acum." entra a
+     seguir ao delta, antes do </div> final da linha. */
+  function barraComAcum(html, acumTxt){
+    return html.replace(/<\/div>$/, '<span class="bar-acum">' + acumTxt + '</span></div>');
+  }
+
   function vistaHoras(p){
     var horas = p.porHora || {};
     var chaves = Object.keys(horas).map(Number).sort(function(a, b){ return a - b; });
     if (!chaves.length) return seccao('Vendas por hora', 'Sem hora nos documentos deste mês.', '');
 
+    /* Divisor "dias" da média, por modo: dia da semana → nº de dias agregados
+       (uma quinta sem vendas às 22h conta como zero — é isso que mostra o
+       padrão); mês ou "Todos os meses" → dias abertos do resumo (em __todos
+       mergePayloads já os soma); dia individual → 1. */
+    var modoDow = !!estado.diaSemanaActivo;
+    var individual = !!estado.diaActivo;
+    var dias = individual ? 1 : (modoDow ? (p._diasAgregados || 0) : (Number(p.resumo && p.resumo.dias) || 0));
+    var temMedia = dias > 0;
+
+    /* Toggle Média/Total: por omissão média em modo dia-da-semana e total em
+       modo mês (o que a página sempre mostrou); estado.horasModo guarda a
+       escolha do utilizador ('' = omissão). Em dia individual, ou sem dias,
+       não há média — fica em total. */
+    var modo = estado.horasModo || (modoDow ? 'media' : 'total');
+    if (!temMedia || individual) modo = 'total';
+    var divisor = modo === 'media' ? dias : 1;
+
+    /* O acumulado é SEMPRE de médias (÷ dias), mesmo com o toggle em Total —
+       somar totais de 20 dias hora a hora daria um número sem significado. */
+    var acum = giocoAcumuladoHoras(horas, dias, agoraVendas());
+
     var max = 0;
     chaves.forEach(function(h){ max = Math.max(max, horas[h].bruto || 0); });
-
-    /* Em modo dia-da-semana, por omissão mostra a média por dia agregado:
-       bruto e docs de cada hora ÷ nº de dias que entraram (uma quinta sem
-       vendas às 22h conta como zero — é isso que mostra o padrão). */
-    var modoDow = !!estado.diaSemanaActivo;
-    var divisor = (modoDow && estado.horasModo !== 'total' && p._diasAgregados) ? p._diasAgregados : 1;
     max = max / divisor;
 
     var min = chaves[0], fim = chaves[chaves.length - 1];
     var linhas = [];
     var itens = [];
+    var itensAcum = [];
     var anterior = null;
     for (var h = min; h <= fim; h++){
       var v = (horas[h] ? (horas[h].bruto || 0) : 0) / divisor;
       var docs = (horas[h] ? (horas[h].docs || 0) : 0) / divisor;
       var rotulo = (h < 10 ? '0' : '') + h + ':00';
       var texto = eur(v) + ' <span style="color:var(--muted);font-weight:400;">· ' + intFmt(docs) + '</span>';
-      linhas.push(barra(rotulo, v, max, texto, deltaTexto(v, anterior)));
+      var linha = barra(rotulo, v, max, texto, deltaTexto(v, anterior));
+      if (temMedia) linha = barraComAcum(linha, 'acum. ' + eur(acum.acumulado[h]));
+      linhas.push(linha);
       itens.push({ label:rotulo, valor:v, texto:texto, curto:eur(v) });
+      itensAcum.push({ label:rotulo, valor:acum.acumulado[h], curto:eur(acum.acumulado[h]) });
       anterior = v;
     }
 
     var vista = vistaDe('horas');
     var corpo;
-    if (vista === 'vertical') corpo = barrasVerticais(itens);
-    else if (vista === 'linha') corpo = graficoLinha(itens, { aria:'Vendas por hora' });
+    if (vista === 'vertical') corpo = barrasVerticais(itens);   // sem acumulado: não sobrepor escalas
+    else if (vista === 'linha'){
+      corpo = temMedia
+        ? graficoLinha(itens, { aria:'Vendas por hora', series:[
+            { nome:'Por hora', itens:itens },
+            { nome:'Acumulado', cor:'var(--muted)', itens:itensAcum }
+          ] })
+        : graficoLinha(itens, { aria:'Vendas por hora' });
+    }
     else corpo = '<div class="bars">' + linhas.join('') + '</div>';
 
-    var sub = 'Bruto e nº de documentos por hora; a coluna da direita é a variação face à hora anterior — onde o serviço acelera e onde colapsa.';
+    var conjunto = modoDow
+      ? 'das ' + NOME_PLURAL_DIA[parseInt(estado.diaSemanaActivo, 10)]
+      : (estado.mesActivo === '__todos' ? 'de todos os meses' : 'de ' + nomeMes(estado.mesActivo));
+    var nDias = intFmt(dias) + (dias === 1 ? ' dia' : ' dias');
+    var frase = 'a coluna da direita é a variação face à hora anterior — onde o serviço acelera e onde colapsa.';
+    var fraseAcum = ' O acumulado ("acum." nas barras, linha cinzenta no gráfico de linha) é a soma das médias até cada hora';
+    var sub;
+    if (individual){
+      sub = 'Bruto e nº de documentos por hora desse dia; ' + frase + ' O acumulado é a soma ao longo do dia.';
+    } else if (modo === 'media'){
+      sub = (modoDow ? 'Média por ' + nomeDiaSemanaActivo() : 'Média por dia aberto') + ': bruto e nº de documentos de cada hora ÷ ' +
+        nDias + (modoDow ? ' agregados (um dia sem vendas numa hora conta como zero)' : ' abertos') + '; ' + frase + fraseAcum + '.';
+    } else {
+      sub = (modoDow ? 'Total ' + conjunto + ' agregadas' : 'Total ' + conjunto) + ', hora a hora; ' + frase +
+        (temMedia ? fraseAcum + ' — SEMPRE de médias (÷ ' + nDias + '), mesmo com o Total: somar totais de vários dias hora a hora não daria um número com significado.' : '');
+    }
+
     var ctrl = botoesVista('horas', VISTAS_TEMPO, vista);
-    if (modoDow){
-      var nomeDia = nomeDiaSemanaActivo();
-      var nAgr = p._diasAgregados || 0;
-      var plural = NOME_PLURAL_DIA[parseInt(estado.diaSemanaActivo, 10)];
-      sub = (estado.horasModo !== 'total')
-        ? 'Média por ' + nomeDia + ': bruto e nº de documentos de cada hora ÷ ' + nAgr + (nAgr === 1 ? ' dia agregado' : ' dias agregados') + ' (um dia sem vendas numa hora conta como zero).'
-        : 'Total ' + (nAgr === 1 ? 'da única ' + nomeDia + ' agregada' : 'das ' + nAgr + ' ' + plural + ' agregadas') + ', hora a hora.';
+    if (temMedia && !individual){
+      var rotMedia = modoDow ? 'Média por ' + esc(nomeDiaSemanaActivo()) : 'Média por dia';
       ctrl = '<span class="vista-btns horas-modo">' +
-        '<button type="button" class="vista-btn' + (estado.horasModo !== 'total' ? ' activo' : '') + '" data-horas-modo="media" title="Média por dia agregado">Média por ' + esc(nomeDia) + '</button>' +
-        '<button type="button" class="vista-btn' + (estado.horasModo === 'total' ? ' activo' : '') + '" data-horas-modo="total" title="Soma de todos os dias agregados">Total</button>' +
+        '<button type="button" class="vista-btn' + (modo === 'media' ? ' activo' : '') + '" data-horas-modo="media" title="' + (modoDow ? 'Média por dia agregado' : 'Média por dia aberto') + '">' + rotMedia + '</button>' +
+        '<button type="button" class="vista-btn' + (modo === 'total' ? ' activo' : '') + '" data-horas-modo="total" title="' + (modoDow ? 'Soma de todos os dias agregados' : 'Soma do período') + '">Total</button>' +
         '</span>' + ctrl;
     }
 
-    return seccao('Vendas por hora', sub, corpo, ctrl);
+    /* Bloco "Agora" antes do gráfico; o relógio de 60 s é armado em renderVistas. */
+    agoraRelogio.args = temMedia ? { p:p, dias:dias, conjunto:conjunto } : null;
+    var agora = '<div id="horasAgora">' + blocoAgora(p, dias, conjunto) + '</div>';
+
+    return seccao('Vendas por hora', sub, agora + corpo, ctrl);
   }
 
   function vistaDiaSemana(p){
@@ -3315,6 +3471,7 @@
   }
 
   function renderVistas(){
+    pararRelogioAgora();
     var p = payloadActivo();
     var alvo = el('vistas');
     if (!p){
@@ -3362,6 +3519,7 @@
 
     ligarVoltarMes(alvo);
     if (window.GiocoChart) GiocoChart.montar(alvo);
+    armarRelogioAgora();
 
     // Cabeçalho de secção: abre/fecha o corpo e guarda o estado.
     var cabsSeccao = alvo.querySelectorAll('[data-sec-toggle]');
@@ -3385,7 +3543,7 @@
       });
     }
 
-    // Total / Média por dia em "Vendas por hora" (só em modo dia-da-semana).
+    // Total / Média por dia em "Vendas por hora" (modo dia-da-semana e modo mês).
     var botoesModo = alvo.querySelectorAll('button[data-horas-modo]');
     for (var hm = 0; hm < botoesModo.length; hm++){
       botoesModo[hm].addEventListener('click', function(ev){
@@ -3832,6 +3990,8 @@
     diasDoDiaSemana: diasDoDiaSemana,
     payloadActivo: payloadActivo,
     renderVistas: renderVistas,
+    giocoAcumuladoHoras: giocoAcumuladoHoras,
+    vistaHoras: vistaHoras,
     temSuportePasta: temSuportePasta,
     estado: estado
   };
