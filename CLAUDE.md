@@ -58,7 +58,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `gioco-custos.js` | Motor partilhado de custo/food cost (`GiocoCustos`): `custoIngrediente` (precoUltimaCompra ÷ compra.fator), `custoPreparacao`, `custoReceita` (→ custo, avisos[], foodCost %), `foodCost`, `converterFator`. Extraído do receitas.html em Set/2026 sem alterar um cêntimo; receitas.html e gestao.html usam-no — nunca reimplementar por página | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-faturas.js` | Módulo partilhado de **leitura e arquivo de faturas** (`GiocoFaturas`), SÓ leitura — não escreve em lado nenhum. Extraído da `leitura-faturas.html` em Set/2026 sem alterar comportamento: constantes do Azure Document Intelligence (endpoint, chave F0 — risco aceite, ver comentário —, versão, modelo), `ler(file)` → `{fornecedorTexto, montante, referencia, data, prazoPagamento, linhas}`, `analyzeInvoice`, `fieldText/fieldDateIso/fieldAmount/extrairLinhas`, `fileToBase64/fileToDataUrl/compressImageDataUrl`, `prepararArquivoFatura(file)` (imagem comprimida a 1600 px JPEG 0.8, PDF tal e qual) e `abrirArquivoFatura(dataUrl)`, `normalizeNome` e `findMatchingSupplier(vendorName, allSuppliers)`. Cada página decide onde grava: `leitura-faturas.html` → `faturasProcessadas`/`faturasArquivo`; `caixa.html` → dentro do movimento. Nunca reimplementar por página | — |
-| `gioco-reconciliacao.js` | Motor partilhado de **reconciliação bancária** (`giocoReconciliacaoEngine({getPaymentRequests, getPagamentosConcluidos, getMovimentos, getReconciliacao, compromissos: CE, ref})`, no molde do `gioco-compromissos.js`). `pagamentosConcluidos()` achata linhas pagas + ocorrências de compromissos; `calcular()` → `{itens, porEstado, contadores, autoNovas}`; `pesquisaManual(item)` (±30 dias, 90–110 % do valor); `ligar(chave, mov, 'auto'|'manual')`, `aplicarAutomaticas(res)` e `desligar(chave)` — as únicas escritas, sempre `update()`/`remove()` no caminho `reconciliacaoBancaria/{chave}`. Regra de match e estados documentados no cabeçalho do ficheiro e no nó abaixo. Usado só pela `tesouraria.html`; nunca reimplementar por página | — |
+| `gioco-reconciliacao.js` | Motor partilhado de **reconciliação bancária** (`giocoReconciliacaoEngine({getPaymentRequests, getPagamentosConcluidos, getMovimentos, getReconciliacao, compromissos: CE, ref})`, no molde do `gioco-compromissos.js`). `pagamentosConcluidos()` achata linhas pagas + ocorrências de compromissos; `calcular()` → `{itens, porEstado, contadores, autoNovas}`; `pesquisaManual(item)` (±30 dias, 90–110 % do valor); `ligar(chave, mov, 'auto'|'manual')`, `aplicarAutomaticas(res)` e `desligar(chave)` — as únicas escritas, sempre `update()` no caminho `reconciliacaoBancaria/{chave}` (desligar marca `ligado:false` + `excluidos/`, nunca `remove()`). Regra de match e estados documentados no cabeçalho do ficheiro e no nó abaixo. Usado só pela `tesouraria.html`; nunca reimplementar por página | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
@@ -281,12 +281,18 @@ reconciliacaoBancaria — ligação pagamento pago ↔ movimento bancário real 
                          disputado / valor estimado) · semData (linha sem concluidoEm:
                          só ligação manual, pesquisa a ±30 dias e 90–110 % do valor com o
                          prazo como referência). Cada escrita é um update() no caminho da
-                         chave; a ÚNICA remoção é o Desligar manual com confirmação —
-                         nunca se apaga automaticamente. Depois de desligar, se o
-                         movimento continuar a ser o único candidato o match automático
-                         volta a ligá-lo (comportamento esperado; para o afastar de vez
-                         liga-se o pagamento certo à mão). Os movimentos bancários e os
-                         pagamentos de origem nunca são alterados
+                         chave. NUNCA há remove(): DESLIGAR (manual, com confirmação) é
+                         um PATCH que mantém a entrada e escreve { ligado:false,
+                         desligadoEm, excluidos/{movimentoKey}: ms } com os seis campos da
+                         ligação (conta, movimentoKey, valor, dataMovimento, metodo, em)
+                         a null — a única situação em que se escreve null, e só nesses
+                         campos. Uma entrada só conta como confirmada com ligado !== false
+                         E movimentoKey. O match automático ignora os movimentos em
+                         excluidos/ dessa entrada (se depois de excluir sobrar exactamente
+                         1 candidato, liga-o — é coerente); a pesquisa manual mostra-os na
+                         mesma, marcados "excluído antes", e ligar à mão a um excluído é
+                         permitido (o mesmo update tira a chave de excluidos/). Os
+                         movimentos bancários e os pagamentos de origem nunca são alterados
 plAjustes             — ajustes manuais do P&L (resultados.html, o ÚNICO que
                          escreve aqui): plAjustes/{AAAA-MM}/exclusoes/{idEstavel}
                          = { origem, motivo?, excluidoEm }. idEstavel identifica

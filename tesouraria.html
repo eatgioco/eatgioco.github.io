@@ -3072,6 +3072,7 @@ window.addEventListener('load', function () {
       '<span class="rec-cand-data num">' + fmtDiaISO(m.dia) + '</span>' +
       '<span class="rec-cand-desc">' + escapeHtml(m.desc) + (m.extra && m.extra !== m.desc ? ' <span class="rec-cand-conta">' + escapeHtml(m.extra) + '</span>' : '') + '</span>' +
       '<span class="rec-cand-conta">' + escapeHtml(nomeConta(m.conta)) + '</span>' +
+      (m.excluidoAntes ? '<span class="rec-badge semData" title="Desligado antes deste pagamento; ligar à mão volta a aceitá-lo">excluído antes</span>' : '') +
       '<span class="rec-cand-valor num">' + formatEuro(m.valor) + '</span>' +
       (comLigar ? '<button type="button" class="btn-small" data-rec-ligar="' + escapeHtml(chave) + '" data-rec-conta="' + escapeHtml(m.conta) + '" data-rec-key="' + escapeHtml(m.key) + '">Ligar</button>' : '') +
       '</div>';
@@ -3239,7 +3240,7 @@ window.addEventListener('load', function () {
       var chaveD = desligar.getAttribute('data-rec-desligar');
       var it = itemReconciliacao(chaveD);
       var nome = it ? it.nome : chaveD;
-      if (!confirm('Desligar o movimento bancário de «' + nome + '»?\nA ligação é apagada; o pagamento volta a ser cruzado com o banco.')) return;
+      if (!confirm('Desligar o movimento bancário de «' + nome + '»?\nEste movimento deixa de ser proposto automaticamente a este pagamento; podes voltar a ligá-lo à mão.')) return;
       desligar.disabled = true;
       RE.desligar(chaveD).catch(function(err){
         desligar.disabled = false;

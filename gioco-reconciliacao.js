@@ -20,7 +20,14 @@
      RE.aplicarAutomaticas(res);       // escreve as ligações "auto" (uma por caminho)
 
    Nó: reconciliacaoBancaria/{chavePagamento} =
-         { conta, movimentoKey, valor, dataMovimento, metodo: 'auto'|'manual', em }
+         { conta, movimentoKey, valor, dataMovimento, metodo: 'auto'|'manual', em,
+           ligado?: false, desligadoEm?, excluidos?: { {movimentoKey}: ms } }
+   Uma entrada só conta como ligada com ligado !== false E movimentoKey.
+   Desligar NÃO apaga: é um update() que põe os campos da ligação a null,
+   ligado:false, desligadoEm e regista o movimento em excluidos/{key} — o
+   match automático nunca volta a propor um movimento excluído dessa
+   entrada; a pesquisa manual mostra-o marcado, e ligar à mão a um excluído
+   é permitido (o mesmo update tira-o de excluidos). Nunca há remove().
    Chaves: payreq:{ticketId}~{lineIdx}  |  fixo:{chave de pagamentosConcluidos}
    (a chave de pagamentosConcluidos é {compromissoId}_{ano}-{mes}, mês SEM zero,
    e o id pode trazer o sufixo ~cartao — fica tal e qual).
@@ -35,14 +42,16 @@
      compromisso no período (resolveDia), janela [−3, +5], concluidoEm ignorado;
    - liga automaticamente só com EXACTAMENTE 1 candidato, valor não estimado,
      e se nenhum outro pagamento reclama esse mesmo movimento;
-   - um movimentoKey nunca aparece em duas entradas. Desligar é sempre manual.
+   - um movimentoKey nunca aparece ligado em duas entradas. Desligar é
+     sempre manual e nunca apaga a entrada (ver acima).
 
    ESTADOS: confirmado (há entrada) · aguarda (0 candidatos, dentro da janela)
    · semMovimento (0 candidatos, janela já passou) · ambiguo (2+ candidatos,
    ou 1 candidato disputado / com valor estimado) · semData (sem âncora:
    linha sem concluidoEm — só ligação manual).
 
-   Não escreve em mais nó nenhum e nunca apaga por conta própria. */
+   Não escreve em mais nó nenhum e nunca apaga nada (nem remove(), nem
+   null fora dos seis campos da ligação ao desligar). */
 
 function giocoReconciliacaoEngine(deps){
   'use strict';
@@ -219,21 +228,32 @@ function giocoReconciliacaoEngine(deps){
 
   /* ---------- classificação ---------- */
 
-  // Movimentos já ligados: id do movimento → chave do pagamento.
+  // Uma entrada está ligada só com ligado !== false E movimentoKey — uma
+  // entrada desligada fica no nó (com excluidos/) mas não conta.
+  function entradaLigada(r){
+    return !!(r && r.ligado !== false && r.conta && r.movimentoKey);
+  }
+
+  function excluidosDe(r){
+    return (r && r.excluidos && typeof r.excluidos === 'object') ? r.excluidos : {};
+  }
+
+  // Movimentos ligados: id do movimento → chave do pagamento.
   function movimentosUsados(){
     var rec = __REC();
     var usados = {};
     Object.keys(rec).forEach(function(chave){
       var r = rec[chave];
-      if (r && r.conta && r.movimentoKey) usados[idMovimento(r.conta, r.movimentoKey)] = chave;
+      if (entradaLigada(r)) usados[idMovimento(r.conta, r.movimentoKey)] = chave;
     });
     return usados;
   }
 
   function candidatosDe(item, movs, usados){
     if (item.cents === null || !item.ancora) return [];
+    var excluidos = excluidosDe(__REC()[item.chave]);
     return movs.filter(function(m){
-      if (usados[m.id] || m.cents !== item.cents) return false;
+      if (usados[m.id] || excluidos[m.key] || m.cents !== item.cents) return false;
       var d = diasEntre(item.ancora, m.dia);
       return d !== null && d >= -item.janela.antes && d <= item.janela.depois;
     });
@@ -250,7 +270,9 @@ function giocoReconciliacaoEngine(deps){
     // único candidato não se ligam a ele (ficam os dois ambíguos).
     var reclamacoes = {};
     itens.forEach(function(it){
-      it.ligacao = rec[it.chave] || null;
+      it.registo = rec[it.chave] || null;
+      it.ligacao = entradaLigada(it.registo) ? it.registo : null;
+      it.excluidos = excluidosDe(it.registo);
       it.candidatos = it.ligacao ? [] : candidatosDe(it, movs, usados);
       if (!it.ligacao && it.candidatos.length === 1){
         reclamacoes[it.candidatos[0].id] = (reclamacoes[it.candidatos[0].id] || 0) + 1;
@@ -302,6 +324,7 @@ function giocoReconciliacaoEngine(deps){
   // data nem prazo) vale a tolerância de valor sobre todo o histórico.
   function pesquisaManual(item, referenciaDia){
     var usados = movimentosUsados();
+    var excluidos = excluidosDe(__REC()[item.chave]);
     var ref = referenciaDia || item.ancora || item.esperado || null;
     var cents = item.cents;
     var out = movimentosDebito().filter(function(m){
@@ -315,6 +338,9 @@ function giocoReconciliacaoEngine(deps){
         if (d === null || Math.abs(d) > JANELA_MANUAL_DIAS) return false;
       }
       return true;
+    }).map(function(m){
+      // Excluído por um Desligar anterior: mostra-se na mesma, marcado.
+      return excluidos[m.key] ? Object.assign({}, m, { excluidoAntes: true }) : m;
     });
     if (ref){
       out.sort(function(a, b){
@@ -329,20 +355,25 @@ function giocoReconciliacaoEngine(deps){
 
   function registo(mov, metodo){
     return { conta: mov.conta, movimentoKey: mov.key, valor: mov.valor, dataMovimento: mov.dia,
-             metodo: metodo, em: Date.now() };
+             metodo: metodo, em: Date.now(), ligado: true };
   }
 
   // PATCH no caminho específico. Recusa se o movimento já está ligado a
   // outro pagamento (lido da cópia em memória, que o listener mantém).
+  // Ligar à mão a um movimento excluído é permitido: o mesmo update tira a
+  // chave de excluidos/.
   function ligar(chave, mov, metodo){
     var usados = movimentosUsados();
     if (usados[mov.id] && usados[mov.id] !== chave){
       return Promise.reject(new Error('Este movimento já está ligado a outro pagamento (' + usados[mov.id] + ').'));
     }
-    if (__REC()[chave]){
+    var atual = __REC()[chave];
+    if (entradaLigada(atual)){
       return Promise.reject(new Error('Este pagamento já tem um movimento ligado.'));
     }
-    return deps.ref.child(chave).update(registo(mov, metodo));
+    var patch = registo(mov, metodo);
+    if (excluidosDe(atual)[mov.key]) patch['excluidos/' + mov.key] = null;
+    return deps.ref.child(chave).update(patch);
   }
 
   var aEscrever = false;
@@ -367,9 +398,21 @@ function giocoReconciliacaoEngine(deps){
                         function(e){ aEscrever = false; throw e; });
   }
 
-  // A única remoção permitida — sempre manual, sempre confirmada na UI.
+  // Desligar = "este match está errado". Sempre manual e confirmado na UI.
+  // NUNCA remove(): a entrada fica com ligado:false, desligadoEm e o
+  // movimento em excluidos/{key}, para o match automático não o voltar a
+  // propor. É a única situação em que se escreve null, e só nestes seis
+  // campos da ligação.
   function desligar(chave){
-    return deps.ref.child(chave).remove();
+    var atual = __REC()[chave];
+    if (!entradaLigada(atual)){
+      return Promise.reject(new Error('Este pagamento não tem movimento ligado.'));
+    }
+    var agora = Date.now();
+    var patch = { conta: null, movimentoKey: null, valor: null, dataMovimento: null, metodo: null, em: null,
+                  ligado: false, desligadoEm: agora };
+    patch['excluidos/' + atual.movimentoKey] = agora;
+    return deps.ref.child(chave).update(patch);
   }
 
   return {
@@ -378,7 +421,8 @@ function giocoReconciliacaoEngine(deps){
     centimos: centimos, diaLocal: diaLocal, diasEntre: diasEntre,
     chavePedido: chavePedido, chaveFixo: chaveFixo, parseChaveConcluido: parseChaveConcluido,
     movimentosDebito: movimentosDebito, movimentoPorId: movimentoPorId,
-    movimentosUsados: movimentosUsados, pagamentosConcluidos: pagamentosConcluidos,
+    movimentosUsados: movimentosUsados, entradaLigada: entradaLigada, excluidosDe: excluidosDe,
+    pagamentosConcluidos: pagamentosConcluidos,
     calcular: calcular, itemPorChave: itemPorChave, pesquisaManual: pesquisaManual,
     ligar: ligar, desligar: desligar, aplicarAutomaticas: aplicarAutomaticas
   };
