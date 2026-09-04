@@ -3422,6 +3422,7 @@
       docsAnt += Number(v.docs) || 0;
     });
     var ticketAnt = docsAnt ? brutoAnt / docsAnt : 0;
+    var mediaDiaAnt = chavesAnt.length ? brutoAnt / chavesAnt.length : 0;
 
     var bruto = 0, docs = 0;
     chaves.forEach(function(d){
@@ -3430,6 +3431,7 @@
       docs += Number(v.docs) || 0;
     });
     var ticket = docs ? bruto / docs : 0;
+    var mediaDia = bruto / n;
 
     var sub = 'Primeiros ' + intFmt(n) + ' dias abertos de ' + nomeMes(mes) +
       ' contra os primeiros ' + intFmt(chavesAnt.length) + ' de ' + nomeMes(anterior) + '.';
@@ -3446,6 +3448,8 @@
           nomeMes(anterior) + ': ' + intFmt(docsAnt) + ' · ' + deltaTexto(docs, docsAnt)) +
         kpi('Ticket médio', eur(ticket),
           nomeMes(anterior) + ': ' + eur(ticketAnt) + ' · ' + deltaTexto(ticket, ticketAnt)) +
+        kpi('Média por dia', eur(mediaDia),
+          nomeMes(anterior) + ': ' + eur(mediaDiaAnt) + ' · ' + deltaTexto(mediaDia, mediaDiaAnt)) +
       '</div>' + aviso);
   }
 
