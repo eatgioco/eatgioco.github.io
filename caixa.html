@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#FFEDDA">
 <meta name="apple-mobile-web-app-title" content="GIOCO Caixa">
-<meta name="viewport" content="width=1200">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Caixa</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
-
+  /* Tokens locais (os do shell chegam para tudo o resto). */
+  :root{
+    --caixa-ok-bg:var(--green-bg);
+    --caixa-warn-bg:var(--amber-bg);
+    --caixa-thumb-bg:rgba(0,0,0,0.04);
+  }
+  [data-theme="dark"]{
+    --caixa-thumb-bg:rgba(255,255,255,0.06);
+  }
 
   body{ -webkit-font-smoothing:antialiased; }
 
@@ -34,43 +42,66 @@
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
   }
 
-
-
-
-
-  .brand-mark{
-    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
-    font-size:16px;
-    font-weight:700;
-    letter-spacing:0.5px;
-  }
-
   main{
     display:block;
     margin:0;
     padding:8px 0 40px;
+    color:var(--ink);
   }
 
-
-
-  /* ---------- Layout ---------- */
-  .work-grid{
+  /* ---------- Layout ----------
+     Ferramenta em cima (registo | por devolver troco), listagem completa em
+     baixo a toda a largura. Sem @media: a grelha usa auto-fit e em 375px as
+     duas colunas empilham sozinhas (resumo → registo → por devolver → lista). */
+  .tool-grid{
     display:grid;
-    grid-template-columns:360px minmax(0,1fr);
+    grid-template-columns:repeat(auto-fit, minmax(min(340px,100%),1fr));
     gap:24px;
     align-items:start;
     margin-top:24px;
   }
 
+  .listing-section{
+    margin-top:32px;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .section-title .count{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    background:var(--amber);
+    color:#FFFFFF;
+    padding:2px 8px;
+    border-radius:100px;
+  }
+
+  .section-title .count.zero{
+    background:var(--line);
+    color:var(--muted);
+  }
+
   /* ---------- Summary ---------- */
   .summary-row{
     display:flex;
+    flex-wrap:wrap;
     gap:14px;
     margin-top:28px;
   }
 
   .summary-card{
-    flex:0 0 260px;
+    flex:1 1 200px;
+    max-width:260px;
     background:var(--white);
     border:1px solid var(--line);
     padding:18px;
@@ -95,6 +126,7 @@
     font-weight:700;
     margin:0;
     line-height:1.1;
+    color:var(--ink);
   }
 
   .summary-value.positive{ color:var(--green); }
@@ -146,12 +178,19 @@
   .tipo-btn.saida.active{
     background:var(--red);
     border-color:var(--red);
-    color:var(--white);
+    color:var(--on-red);
   }
 
   .tipo-btn.entrada.active{
     background:var(--green);
     border-color:var(--green);
+    color:#FFFFFF;
+  }
+
+  /* "Vai haver troco?" — mesmo desenho dos botões Saída/Entrada. */
+  .tipo-btn.troco.active{
+    background:var(--ink);
+    border-color:var(--ink);
     color:var(--white);
   }
 
@@ -210,6 +249,7 @@
   .btn-registar:not(:disabled):hover{
     background:var(--red);
     border-color:var(--red);
+    color:var(--on-red);
   }
 
   .btn-registar:disabled{
@@ -226,6 +266,7 @@
   /* ---------- Filter tabs ---------- */
   .filter-tabs{
     display:flex;
+    flex-wrap:wrap;
     gap:8px;
   }
 
@@ -269,9 +310,15 @@
     color:var(--muted);
   }
 
-  /* ---------- List ---------- */
+  /* ---------- List / cards ---------- */
   .list{
     margin-top:16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .pending-list{
     display:flex;
     flex-direction:column;
     gap:10px;
@@ -281,6 +328,7 @@
     background:var(--white);
     border:2px solid var(--line);
     padding:14px 18px;
+    color:var(--ink);
   }
 
   .mov-row.aberto{
@@ -308,7 +356,7 @@
     font-size:11px;
   }
 
-  .mov-tipo-tag.saida{ color:var(--red); }
+  .mov-tipo-tag.saida{ color:var(--red-ink); }
   .mov-tipo-tag.entrada{ color:var(--green); }
 
   .mov-valor{
@@ -318,7 +366,7 @@
     white-space:nowrap;
   }
 
-  .mov-valor.saida{ color:var(--red); }
+  .mov-valor.saida{ color:var(--red-ink); }
   .mov-valor.entrada{ color:var(--green); }
 
   .mov-motivo{
@@ -346,10 +394,55 @@
     letter-spacing:0.5px;
     text-transform:uppercase;
     background:var(--amber);
-    color:var(--white);
+    color:#FFFFFF;
     padding:3px 8px;
     white-space:nowrap;
   }
+
+  /* Linha de fatura/troco por baixo do gasto real. */
+  .fatura-line{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    font-size:12px;
+  }
+
+  .badge-fatura{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    border:1px solid var(--line);
+    background:var(--dough);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .badge-fatura:hover{ border-color:var(--ink); }
+  .badge-fatura:disabled{ cursor:wait; opacity:.6; }
+
+  .badge-fatura.erro{
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+
+  .badge-semfatura{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    background:var(--caixa-warn-bg);
+    color:var(--amber);
+    border:1px solid var(--amber);
+  }
+
+  .troco-ok{ color:var(--green); font-weight:600; }
+  .troco-ko{ color:var(--amber); font-weight:600; }
 
   .btn-acertar{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
@@ -365,26 +458,95 @@
 
   .btn-acertar:hover{
     background:var(--amber);
-    color:var(--white);
+    color:#FFFFFF;
   }
 
+  /* ---------- Devolver troco (formulário inline) ---------- */
   .acertar-form{
     margin-top:10px;
     padding-top:10px;
     border-top:1px dashed var(--line);
   }
 
-  .acertar-row{
-    display:grid;
-    grid-template-columns:220px minmax(0,1fr);
-    gap:12px;
-    margin-bottom:10px;
-  }
-
   .acertar-actions{
     display:flex;
     justify-content:flex-end;
     gap:8px;
+    margin-top:10px;
+  }
+
+  .fatura-bloco{
+    border:1px solid var(--line);
+    background:var(--dough);
+    padding:12px;
+    margin-bottom:12px;
+  }
+
+  .fatura-bloco.disabled{ opacity:.5; pointer-events:none; }
+
+  .btn-upload{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 16px;
+    border:2px solid var(--ink);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .btn-upload:hover{ background:var(--ink); color:var(--white); }
+  .btn-upload:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn-upload input[type="file"]{ display:none; }
+
+  .fatura-preview{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    margin-top:10px;
+  }
+
+  .fatura-thumb{
+    flex:0 0 72px;
+    width:72px;
+    height:72px;
+    object-fit:cover;
+    border:1px solid var(--line);
+    background:var(--caixa-thumb-bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  .fatura-info{ font-size:13px; line-height:1.5; }
+  .fatura-info .lendo{ color:var(--muted); font-style:italic; }
+  .fatura-info .alerta{ color:var(--red-ink); font-weight:600; }
+  .fatura-info .erro{ color:var(--amber); font-weight:600; }
+  .fatura-info .esperado{ font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums; }
+
+  .declaracao{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    cursor:pointer;
+    margin-top:2px;
+  }
+
+  .declaracao input{ width:18px; height:18px; accent-color:var(--red); }
+  .declaracao.disabled{ opacity:.5; pointer-events:none; }
+
+  .confere-line{
+    margin-top:6px;
+    font-size:12px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    min-height:16px;
   }
 
   .btn-guardar{
@@ -396,6 +558,13 @@
     background:var(--ink);
     color:var(--white);
     cursor:pointer;
+  }
+
+  .btn-guardar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
   }
 
   .btn-cancelar{
@@ -433,15 +602,19 @@
     font-size:13px;
   }
 
+  .pending-empty{
+    border:1px dashed var(--line);
+    background:var(--white);
+    text-align:center;
+    padding:28px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
   /* ======================================================================
-     Fase 3 — camada do design system
-     ======================================================================
-     Só aparência. O .page do shell centra e dá a largura; os tokens já
-     invertem com o tema. Fica aqui o que o shell não tem (subtítulo, folga
-     de acções) e o arredondamento — a Fase 0 desta página era de cantos
-     rectos e traço preto de 2px, que passou a 1px em var(--line).
-     Vem no fim de propósito: em empate de especificidade ganha a última
-     regra, e é assim que arredonda o que está escrito acima. */
+     Camada do design system — só aparência. Vem no fim de propósito: em
+     empate de especificidade ganha a última regra, e é assim que arredonda o
+     que está escrito acima. */
 
   .page-subtitle{
     margin:0 0 4px;
@@ -449,16 +622,9 @@
     color:var(--muted);
   }
 
-  .header-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:10px;
-    margin:20px 0 4px;
-  }
-
-  .btn, .tipo-btn, .btn-small, .badge{ border-radius:100px; }
+  .btn, .tipo-btn, .btn-small, .badge, .badge-fatura, .badge-semfatura, .btn-upload{ border-radius:100px; }
   input, select, textarea,
-  .summary-card, .form-card, .modal, .mov-row{ border-radius:12px; }
+  .summary-card, .form-card, .modal, .mov-row, .fatura-bloco, .pending-empty, .fatura-thumb{ border-radius:12px; }
   .modal{ border-radius:16px; }
 
   /* ---------- Erro de autenticação (padrão do OS) ---------- */
@@ -488,8 +654,12 @@
   }
 </style>
 </head>
-<body>
+<!-- Usada ao balcão e ao telemóvel (fotografar o talão no Devolver Troco):
+     viewport device-width + opt-in shell-mobile (ver CLAUDE.md). No
+     computador da loja, com rato, nada muda — o critério é o hover. -->
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
+<script src="gioco-faturas.js"></script>
 
 <div class="shell">
 
@@ -510,12 +680,13 @@
       </div>
     </div>
   </div>
+  <div class="nav-overlay" id="navOverlay"></div>
 
   <div class="main">
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-down"/></svg>GIOCO · <b>Caixa</b></h1>
@@ -551,44 +722,64 @@
     </div>
   </div>
 
-  <div class="work-grid">
-  <div class="form-card">
-    <p class="form-title">Registar movimento</p>
-    <form id="movForm">
-      <div class="tipo-toggle">
-        <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
-        <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
-      </div>
+  <!-- FERRAMENTA DE CAIXA: registo à esquerda, "há por fazer" à direita. -->
+  <div class="tool-grid">
+    <div class="form-card">
+      <p class="form-title">Registar movimento</p>
+      <form id="movForm">
+        <div class="tipo-toggle">
+          <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
+          <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
+        </div>
 
-      <div class="field">
-        <label class="field-label" for="valorInput">Valor (€)</label>
-        <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
-      </div>
+        <div class="field">
+          <label class="field-label" for="valorInput">Valor (€)</label>
+          <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+        </div>
 
-      <div class="field">
-        <label class="field-label" for="motivoSelect">Motivo</label>
-        <select id="motivoSelect" disabled>
-          <option value="">Escolhe primeiro Saída ou Entrada</option>
-        </select>
-      </div>
+        <div class="field">
+          <label class="field-label" for="motivoSelect">Motivo</label>
+          <select id="motivoSelect" disabled>
+            <option value="">Escolhe primeiro Saída ou Entrada</option>
+          </select>
+        </div>
 
-      <div class="field" id="motivoDetalheField" style="display:none;">
-        <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
-        <input type="text" id="motivoDetalheInput" placeholder="">
-      </div>
+        <div class="field" id="motivoDetalheField" style="display:none;">
+          <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
+          <input type="text" id="motivoDetalheInput" placeholder="">
+        </div>
 
-      <div class="field">
-        <label class="field-label" for="pessoaSelect">Pessoa</label>
-        <select id="pessoaSelect" disabled>
-          <option>A carregar...</option>
-        </select>
-      </div>
+        <!-- Só em saídas Compra / Pagamento a fornecedor. Obrigatório. -->
+        <div class="field" id="trocoField" style="display:none;">
+          <span class="field-label">Vai haver troco?</span>
+          <div class="tipo-toggle" style="margin-bottom:0;">
+            <button type="button" class="tipo-btn troco" id="trocoSimBtn">Sim</button>
+            <button type="button" class="tipo-btn troco" id="trocoNaoBtn">Não</button>
+          </div>
+        </div>
 
-      <button type="submit" class="btn-registar" id="registarBtn" disabled>Registar</button>
-    </form>
+        <div class="field">
+          <label class="field-label" for="pessoaSelect">Pessoa</label>
+          <select id="pessoaSelect" disabled>
+            <option>A carregar...</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn-registar" id="registarBtn" disabled>Registar</button>
+      </form>
+    </div>
+
+    <div class="pending-col">
+      <p class="section-title">Por devolver troco <span class="count zero" id="pendingSectionCount">0</span></p>
+      <div class="pending-list" id="pendingList">
+        <div class="pending-empty">A carregar…</div>
+      </div>
+    </div>
   </div>
 
-  <div class="list-col">
+  <!-- LISTAGEM COMPLETA -->
+  <div class="listing-section">
+    <p class="section-title">Todos os movimentos</p>
     <div class="filter-tabs">
       <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
       <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
@@ -606,6 +797,8 @@
         <option value="Troco de compra/saída">Troco de compra/saída</option>
         <option value="Reforço de caixa">Reforço de caixa</option>
         <option value="Outro">Outro</option>
+        <option value="__semFatura">Sem fatura (declarado)</option>
+        <option value="__trocoNaoConferiu">Troco não conferiu</option>
       </select>
     </div>
 
@@ -614,7 +807,6 @@
     <div class="list" id="movList">
       <div class="empty-state">A carregar movimentos…</div>
     </div>
-  </div>
   </div>
 </main>
 
@@ -700,9 +892,19 @@
   var db = firebase.database();
   var movRef = db.ref('caixaMovimentos');
   var pessoasRef = db.ref('pessoas');
+  // Só leitura: serve para o findMatchingSupplier da fatura lida no Devolver Troco.
+  var suppliersRef = db.ref('suppliers');
+  // Foto/PDF da fatura da caixa, fora do movimento para o listener de
+  // caixaMovimentos não carregar base64. NUNCA em faturasArquivo.
+  var arquivoRef = db.ref('caixaFaturasArquivo');
 
   var pessoasAtivas = [];
   var pessoasCarregadas = false;
+  var allSuppliers = {};
+
+  suppliersRef.on('value', function(snapshot){
+    allSuppliers = snapshot.val() || {};
+  });
 
   function carregarPessoas(onUpdate){
     pessoasRef.on('value', function(snapshot){
@@ -742,10 +944,10 @@
 
   var MOTIVO_OPTIONS = {
     saida: [
-      { value: 'compra', label: 'Compra', detailLabel: 'O quê?', detailPlaceholder: 'ex: rúcula Pingo Doce' },
-      { value: 'pagamento', label: 'Pagamento a fornecedor', detailLabel: 'A quem?', detailPlaceholder: 'ex: fornecedor café' },
+      { value: 'compra', label: 'Compra', detailLabel: 'O quê?', detailPlaceholder: 'ex: rúcula Pingo Doce', pergTroco: true },
+      { value: 'pagamento', label: 'Pagamento a fornecedor', detailLabel: 'A quem?', detailPlaceholder: 'ex: fornecedor café', pergTroco: true },
       { value: 'deposito', label: 'Depósito bancário', semAcerto: true },
-      { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
+      { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo', semAcerto: true }
     ],
     entrada: [
       { value: 'troco', label: 'Troco de compra/saída', detailLabel: 'De quê?', detailPlaceholder: 'ex: troco da rúcula Pingo Doce' },
@@ -753,6 +955,8 @@
       { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
     ]
   };
+
+  var TOLERANCIA_TROCO = 0.05;
 
   var allMovs = {};
   var activeFilter = 'hoje';
@@ -765,8 +969,7 @@
     var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     mesFiltroInput.value = ym;
   })();
-  var acertarOpenId = null;
-  var formState = { tipo: null };
+  var formState = { tipo: null, troco: null };
 
   var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
   var tipoEntradaBtn = document.getElementById('tipoEntradaBtn');
@@ -775,17 +978,24 @@
   var motivoDetalheField = document.getElementById('motivoDetalheField');
   var motivoDetalheLabel = document.getElementById('motivoDetalheLabel');
   var motivoDetalheInput = document.getElementById('motivoDetalheInput');
+  var trocoField = document.getElementById('trocoField');
+  var trocoSimBtn = document.getElementById('trocoSimBtn');
+  var trocoNaoBtn = document.getElementById('trocoNaoBtn');
   var pessoaSelect = document.getElementById('pessoaSelect');
   var registarBtn = document.getElementById('registarBtn');
   var movForm = document.getElementById('movForm');
   var movListEl = document.getElementById('movList');
+  var pendingListEl = document.getElementById('pendingList');
+  var pendingSectionCountEl = document.getElementById('pendingSectionCount');
   var saldoHojeValueEl = document.getElementById('saldoHojeValue');
   var pendingCountEl = document.getElementById('pendingCount');
   var pendingTotalEl = document.getElementById('pendingTotal');
   var pendingCardEl = document.getElementById('pendingCard');
 
+  function round2(n){ return Math.round(n * 100) / 100; }
+
   function formatEUR(n){
-    return (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+    return round2(n).toFixed(2).replace('.', ',') + ' €';
   }
 
   function formatHora(iso){
@@ -817,6 +1027,24 @@
     return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
   }
 
+  // motivo é gravado como "Label" (ex: Depósito bancário) ou "Label: detalhe"
+  // (ex: "Compra: rúcula Pingo Doce") — por isso a comparação usa prefixo.
+  function motivoCorrespondeFiltro(motivoTexto, labelFiltro){
+    if (!labelFiltro) return true;
+    if (!motivoTexto) return false;
+    if (motivoTexto === labelFiltro) return true;
+    return motivoTexto.indexOf(labelFiltro + ':') === 0;
+  }
+
+  // Saídas de Compra / Pagamento a fornecedor — as únicas com troco/fatura.
+  // Os movimentos 'aberto' antigos (sem temTroco) contam como temTroco true.
+  function isCompraOuPagamento(m){
+    return m.tipo === 'saida' && (
+      motivoCorrespondeFiltro(m.motivo, 'Compra') ||
+      motivoCorrespondeFiltro(m.motivo, 'Pagamento a fornecedor'));
+  }
+
+  // ---------- Formulário de registo ----------
   function currentMotivoOpcao(){
     var lista = MOTIVO_OPTIONS[formState.tipo] || [];
     return lista.filter(function(o){ return o.value === motivoSelect.value; })[0] || null;
@@ -832,6 +1060,14 @@
     motivoSelect.disabled = lista.length === 0;
     motivoDetalheField.style.display = 'none';
     motivoDetalheInput.value = '';
+    setTroco(null);
+    trocoField.style.display = 'none';
+  }
+
+  function setTroco(resposta){
+    formState.troco = resposta;
+    trocoSimBtn.classList.toggle('active', resposta === 'sim');
+    trocoNaoBtn.classList.toggle('active', resposta === 'nao');
   }
 
   function onMotivoChange(){
@@ -844,13 +1080,17 @@
       motivoDetalheField.style.display = 'none';
       motivoDetalheInput.value = '';
     }
+    var pergunta = !!(opcao && opcao.pergTroco);
+    trocoField.style.display = pergunta ? 'block' : 'none';
+    if (!pergunta) setTroco(null);
     validateForm();
   }
 
   function validateForm(){
     var opcao = currentMotivoOpcao();
     var motivoValido = !!opcao && (!opcao.detailLabel || motivoDetalheInput.value.trim().length > 0);
-    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido;
+    var trocoValido = !opcao || !opcao.pergTroco || formState.troco !== null;
+    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido && trocoValido;
     registarBtn.disabled = !valid;
   }
 
@@ -867,6 +1107,8 @@
   valorInput.addEventListener('input', validateForm);
   motivoSelect.addEventListener('change', onMotivoChange);
   motivoDetalheInput.addEventListener('input', validateForm);
+  trocoSimBtn.addEventListener('click', function(){ setTroco('sim'); validateForm(); });
+  trocoNaoBtn.addEventListener('click', function(){ setTroco('nao'); validateForm(); });
 
   movForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -891,6 +1133,20 @@
       valorDevolvido: semAcerto ? 0 : null,
       notas: null
     };
+
+    // "Vai haver troco?" — Não fecha o movimento na criação; Sim deixa-o
+    // aberto até ao Devolver Troco (com fatura ou declaração).
+    if (opcao.pergTroco){
+      if (formState.troco === 'nao'){
+        novoMov.temTroco = false;
+        novoMov.estado = 'acertado';
+        novoMov.valorDevolvido = 0;
+      } else {
+        novoMov.temTroco = true;
+        novoMov.estado = 'aberto';
+        novoMov.valorDevolvido = null;
+      }
+    }
 
     registarBtn.disabled = true;
     registarBtn.textContent = 'A registar…';
@@ -922,40 +1178,274 @@
   mesFiltroInput.addEventListener('change', renderList);
   motivoFiltroSelect.addEventListener('change', renderList);
 
-  function openAcertar(id){
-    acertarOpenId = id;
-    renderList();
+  // ---------- Devolver Troco ----------
+  // Um só formulário aberto de cada vez. O estado vive aqui (não no DOM) para
+  // sobreviver aos re-renders que o listener de caixaMovimentos dispara.
+  var devolver = null;
+
+  function novoDevolverState(id){
+    return {
+      id: id,
+      file: null,
+      dataUrl: null,        // arquivo preparado (comprimido), pronto a gravar
+      thumbUrl: null,       // object URL só para a miniatura
+      lendo: false,         // Azure em curso
+      leituraTerminada: false,
+      fatura: null,         // resultado do GiocoFaturas.ler
+      erroLeitura: null,
+      semFatura: false,
+      valorDevolvido: '',
+      notas: '',
+      aGuardar: false
+    };
   }
 
-  function cancelAcertar(){
-    acertarOpenId = null;
-    renderList();
+  function openDevolver(id){
+    if (devolver && devolver.thumbUrl) URL.revokeObjectURL(devolver.thumbUrl);
+    devolver = novoDevolverState(id);
+    renderPendentes();
   }
-  window.cancelAcertar = cancelAcertar;
-  window.openAcertar = openAcertar;
 
-  function saveAcertar(id){
-    var devolvidoInput = document.getElementById('devolvido_' + id);
-    var notasInput = document.getElementById('notas_' + id);
-    var devolvido = parseFloat(devolvidoInput.value);
-    if (isNaN(devolvido) || devolvido < 0){
-      alert('Indica um valor devolvido válido.');
-      return;
-    }
-    var notas = notasInput.value.trim();
+  function cancelDevolver(){
+    if (devolver && devolver.thumbUrl) URL.revokeObjectURL(devolver.thumbUrl);
+    devolver = null;
+    renderPendentes();
+  }
+  window.openDevolver = openDevolver;
+  window.cancelDevolver = cancelDevolver;
 
-    movRef.child(id).update({
-      estado: 'acertado',
-      valorDevolvido: devolvido,
-      notas: notas || null
-    }).then(function(){
-      acertarOpenId = null;
+  function trocoEsperadoDe(m, st){
+    if (!st.fatura || typeof st.fatura.montante !== 'number') return null;
+    return round2(m.valor - st.fatura.montante);
+  }
+
+  function onFicheiroEscolhido(input){
+    var file = input.files && input.files[0];
+    if (!file || !devolver) return;
+    var st = devolver;
+    var idLeitura = st.id;
+    st.file = file;
+    st.lendo = true;
+    st.leituraTerminada = false;
+    st.fatura = null;
+    st.erroLeitura = null;
+    st.dataUrl = null;
+    if (st.thumbUrl) URL.revokeObjectURL(st.thumbUrl);
+    st.thumbUrl = (file.type && file.type.indexOf('image/') === 0) ? URL.createObjectURL(file) : null;
+    renderPendentes();
+
+    // Em paralelo: arquivo (foto comprimida / PDF tal e qual) e leitura no Azure.
+    GiocoFaturas.prepararArquivoFatura(file).then(function(dataUrl){
+      if (devolver !== st) return;
+      st.dataUrl = dataUrl;
     }).catch(function(err){
-      alert('Erro ao acertar movimento: ' + err.message);
+      console.error('Erro a preparar o arquivo da fatura:', err);
+      if (devolver !== st) return;
+      st.dataUrl = null;
+    });
+
+    GiocoFaturas.ler(file).then(function(lida){
+      if (devolver !== st || st.id !== idLeitura) return;
+      st.fatura = lida;
+      st.erroLeitura = null;
+    }).catch(function(err){
+      if (devolver !== st || st.id !== idLeitura) return;
+      st.fatura = null;
+      st.erroLeitura = (err && err.message) ? err.message : 'erro desconhecido';
+    }).then(function(){
+      if (devolver !== st) return;
+      st.lendo = false;
+      st.leituraTerminada = true;
+      var m = allMovs[st.id];
+      var esperado = m ? trocoEsperadoDe(m, st) : null;
+      if (esperado !== null && st.valorDevolvido === '') st.valorDevolvido = String(esperado);
+      renderPendentes();
     });
   }
-  window.saveAcertar = saveAcertar;
+  window.onFicheiroEscolhido = onFicheiroEscolhido;
 
+  function onDeclaracaoChange(checkbox){
+    if (!devolver) return;
+    devolver.semFatura = !!checkbox.checked;
+    renderPendentes();
+  }
+  window.onDeclaracaoChange = onDeclaracaoChange;
+
+  function onDevolvidoInput(input){
+    if (!devolver) return;
+    devolver.valorDevolvido = input.value;
+    atualizarConferencia();
+    atualizarGuardar();
+  }
+  window.onDevolvidoInput = onDevolvidoInput;
+
+  function onNotasInput(input){
+    if (devolver) devolver.notas = input.value;
+  }
+  window.onNotasInput = onNotasInput;
+
+  function conferenciaHtml(m, st){
+    var esperado = trocoEsperadoDe(m, st);
+    if (esperado === null || st.semFatura) return '';
+    var dev = parseFloat(st.valorDevolvido);
+    if (isNaN(dev)) return '';
+    var diff = round2(dev - esperado);
+    if (Math.abs(diff) <= TOLERANCIA_TROCO + 1e-9){
+      return '<span class="troco-ok">✓ Troco confere</span>';
+    }
+    return '<span class="troco-ko">≠ Diferença de ' + formatEUR(Math.abs(diff)) + '</span>';
+  }
+
+  function atualizarConferencia(){
+    if (!devolver) return;
+    var el = document.getElementById('confere_' + devolver.id);
+    var m = allMovs[devolver.id];
+    if (el && m) el.innerHTML = conferenciaHtml(m, devolver);
+  }
+
+  function podeGuardar(st){
+    if (st.aGuardar) return false;
+    var comprovativo = st.semFatura || (st.file && st.leituraTerminada);
+    var dev = parseFloat(st.valorDevolvido);
+    return !!comprovativo && !isNaN(dev) && dev >= 0;
+  }
+
+  function atualizarGuardar(){
+    if (!devolver) return;
+    var btn = document.getElementById('guardar_' + devolver.id);
+    if (btn) btn.disabled = !podeGuardar(devolver);
+  }
+
+  function devolverFormHtml(m, st){
+    var id = st.id;
+    var html = '<div class="acertar-form">';
+
+    // a) Fatura / talão
+    html += '<div class="fatura-bloco' + (st.semFatura ? ' disabled' : '') + '">';
+    html += '  <span class="field-label">Fatura / talão</span>';
+    html += '  <label class="btn-upload"' + (st.lendo ? ' style="opacity:.6;pointer-events:none"' : '') + '>';
+    html += '    <svg class="icon" width="16" height="16"><use href="#i-scan"/></svg>';
+    html += (st.file ? 'Trocar fatura' : 'Carregar fatura');
+    html += '    <input type="file" accept="image/*,application/pdf" capture="environment" onchange="onFicheiroEscolhido(this)"' + (st.semFatura ? ' disabled' : '') + '>';
+    html += '  </label>';
+    if (st.file){
+      html += '<div class="fatura-preview">';
+      if (st.thumbUrl){
+        html += '<img class="fatura-thumb" src="' + st.thumbUrl + '" alt="">';
+      } else {
+        html += '<div class="fatura-thumb">PDF</div>';
+      }
+      html += '<div class="fatura-info">';
+      if (st.lendo){
+        html += '<div class="lendo">A ler fatura…</div>';
+      } else if (st.fatura){
+        var mont = st.fatura.montante;
+        html += '<div>Fatura: <strong>' + (typeof mont === 'number' ? formatEUR(mont) : '—') + '</strong>' +
+                (st.fatura.fornecedorTexto ? ' · ' + escapeHtml(st.fatura.fornecedorTexto) : '') + '</div>';
+        var esperado = trocoEsperadoDe(m, st);
+        if (esperado !== null){
+          html += '<div class="esperado">Troco esperado: <strong>' + formatEUR(esperado) + '</strong></div>';
+          if (mont > m.valor){
+            html += '<div class="alerta">Fatura superior ao dinheiro que saiu</div>';
+          }
+        } else {
+          html += '<div class="erro">Sem total legível na fatura — introduz o troco à mão</div>';
+        }
+      } else if (st.erroLeitura){
+        html += '<div class="erro">Não consegui ler a fatura — a foto fica guardada; introduz o troco à mão</div>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+
+    html += '<label class="declaracao' + (st.file ? ' disabled' : '') + '">';
+    html += '  <input type="checkbox" onchange="onDeclaracaoChange(this)"' + (st.semFatura ? ' checked' : '') + (st.file ? ' disabled' : '') + '>';
+    html += '  Declaro que não tenho fatura deste movimento';
+    html += '</label>';
+
+    // b) Valor devolvido
+    html += '<div class="field" style="margin-top:12px;">';
+    html += '  <label class="field-label" for="devolvido_' + id + '">Valor devolvido (€)</label>';
+    html += '  <input type="number" inputmode="decimal" step="0.01" min="0" id="devolvido_' + id + '" value="' + escapeHtml(st.valorDevolvido) + '" oninput="onDevolvidoInput(this)">';
+    html += '  <div class="confere-line" id="confere_' + id + '">' + conferenciaHtml(m, st) + '</div>';
+    html += '</div>';
+
+    // c) Notas + ações
+    html += '<div class="field"><label class="field-label" for="notas_' + id + '">Notas (opcional)</label>';
+    html += '  <input type="text" id="notas_' + id + '" value="' + escapeHtml(st.notas) + '" oninput="onNotasInput(this)"></div>';
+    html += '<div class="acertar-actions">';
+    html += '  <button type="button" class="btn-cancelar" onclick="cancelDevolver()">Cancelar</button>';
+    html += '  <button type="button" class="btn-guardar" id="guardar_' + id + '" onclick="saveDevolver()"' + (podeGuardar(st) ? '' : ' disabled') + '>' + (st.aGuardar ? 'A guardar…' : 'Guardar') + '</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function saveDevolver(){
+    var st = devolver;
+    if (!st || !podeGuardar(st)) return;
+    var m = allMovs[st.id];
+    if (!m) return;
+
+    var devolvido = round2(parseFloat(st.valorDevolvido));
+    var esperado = st.semFatura ? null : trocoEsperadoDe(m, st);
+    var confere = (esperado === null) ? null : (Math.abs(devolvido - esperado) <= TOLERANCIA_TROCO + 1e-9);
+
+    var atualizacao = {
+      estado: 'acertado',
+      valorDevolvido: devolvido,
+      notas: st.notas.trim() || null,
+      fatura: null,
+      semFatura: null,
+      semFaturaDeclaradoPor: null,
+      trocoEsperado: esperado,
+      trocoConfere: confere
+    };
+
+    if (st.semFatura){
+      atualizacao.semFatura = true;
+      atualizacao.semFaturaDeclaradoPor = m.pessoa || 'Outro';
+    } else {
+      var f = st.fatura || {};
+      atualizacao.fatura = {
+        fornecedorTexto: f.fornecedorTexto || null,
+        fornecedorIdEncontrado: f.fornecedorTexto ? (GiocoFaturas.findMatchingSupplier(f.fornecedorTexto, allSuppliers) || null) : null,
+        montante: (typeof f.montante === 'number') ? f.montante : null,
+        referencia: f.referencia || null,
+        data: f.data || null,
+        linhas: (f.linhas && f.linhas.length) ? f.linhas : null,
+        lidaEm: Date.now(),
+        erroLeitura: st.erroLeitura || null
+      };
+    }
+
+    st.aGuardar = true;
+    atualizarGuardar();
+    var btn = document.getElementById('guardar_' + st.id);
+    if (btn) btn.textContent = 'A guardar…';
+
+    // 1.º o arquivo (nó nosso, set aceitável), 2.º o update por caminho no movimento.
+    var passo1 = (!st.semFatura && st.dataUrl)
+      ? arquivoRef.child(st.id).set(st.dataUrl)
+      : Promise.resolve();
+
+    passo1.then(function(){
+      return movRef.child(st.id).update(atualizacao);
+    }).then(function(){
+      if (devolver === st){
+        if (st.thumbUrl) URL.revokeObjectURL(st.thumbUrl);
+        devolver = null;
+      }
+      renderPendentes();
+    }).catch(function(err){
+      st.aGuardar = false;
+      renderPendentes();
+      alert('Erro ao guardar o troco: ' + err.message);
+    });
+  }
+  window.saveDevolver = saveDevolver;
+
+  // ---------- Resumo ----------
   function renderSummary(){
     var entradasHoje = 0;
     var saidasHoje = 0;
@@ -997,16 +1487,119 @@
     pendingCardEl.classList.toggle('pending-active', pendingCount > 0);
   }
 
-  // motivo é gravado como "Label" (ex: Depósito bancário) ou "Label: detalhe"
-  // (ex: "Compra: rúcula Pingo Doce") — por isso a comparação usa prefixo.
-  function motivoCorrespondeFiltro(motivoTexto, labelFiltro){
-    if (!labelFiltro) return true;
-    if (!motivoTexto) return false;
-    if (motivoTexto === labelFiltro) return true;
-    return motivoTexto.indexOf(labelFiltro + ':') === 0;
+  // ---------- Cartão de movimento (partilhado pelas duas secções) ----------
+  function faturaLineHtml(id, m){
+    if (m.tipo !== 'saida' || !isCompraOuPagamento(m)) return '';
+    var html = '';
+    if (m.fatura && !m.fatura.erroLeitura){
+      var mont = m.fatura.montante;
+      html += '<button type="button" class="badge-fatura" onclick="verFatura(\'' + id + '\', this)">' +
+              '<svg class="icon" width="13" height="13"><use href="#i-receipt"/></svg>Fatura ' +
+              (typeof mont === 'number' ? formatEUR(mont) : '—') + '</button>';
+      if (m.trocoConfere === true) html += '<span class="troco-ok">✓ troco conferiu</span>';
+      else if (m.trocoConfere === false) html += '<span class="troco-ko">≠ troco não conferiu</span>';
+    } else if (m.fatura && m.fatura.erroLeitura){
+      html += '<button type="button" class="badge-fatura erro" onclick="verFatura(\'' + id + '\', this)">' +
+              '<svg class="icon" width="13" height="13"><use href="#i-receipt"/></svg>Fatura (leitura falhou)</button>';
+    } else if (m.semFatura === true){
+      html += '<span class="badge-semfatura">Sem fatura (declarado)</span>';
+    }
+    return html ? '<div class="fatura-line">' + html + '</div>' : '';
   }
 
+  function verFatura(id, btn){
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'A carregar…';
+    arquivoRef.child(id).once('value').then(function(snapshot){
+      btn.disabled = false;
+      btn.innerHTML = original;
+      var val = snapshot.val();
+      if (!val){
+        alert('Ficheiro da fatura não encontrado para este movimento.');
+        return;
+      }
+      GiocoFaturas.abrirArquivoFatura(val);
+    }).catch(function(err){
+      btn.disabled = false;
+      btn.innerHTML = original;
+      alert('Erro ao carregar a fatura: ' + err.message);
+    });
+  }
+  window.verFatura = verFatura;
+
+  function movCardHtml(id, m, opts){
+    var isAberto = m.estado === 'aberto';
+    var tipoLabel = m.tipo === 'saida' ? 'SAÍDA' : 'ENTRADA';
+    var sinal = m.tipo === 'saida' ? '−' : '+';
+    var horaLabel = opts.soHora ? formatHora(m.dataHora) : formatDataHora(m.dataHora);
+
+    var html = '<div class="mov-row' + (isAberto ? ' aberto' : '') + '">';
+    html += '  <div class="mov-top">';
+    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
+    html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
+    html += '  </div>';
+    html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
+    html += '  <div class="mov-meta">';
+    html += '    <span class="mov-pessoa">' + escapeHtml(m.pessoa) + '</span>';
+    if (isAberto){
+      html += '    <span class="badge-pending">Por acertar</span>';
+    }
+    html += '  </div>';
+
+    if (m.estado === 'acertado' && m.tipo === 'saida' && m.valorDevolvido !== null && m.valorDevolvido !== undefined){
+      var gastoReal = m.valor - m.valorDevolvido;
+      html += '  <p class="gasto-real">Devolvido ' + formatEUR(m.valorDevolvido) + ' · Gasto real: <strong>' + formatEUR(gastoReal) + '</strong></p>';
+    }
+    html += faturaLineHtml(id, m);
+    if (m.notas){
+      html += '  <p class="notas-txt">' + escapeHtml(m.notas) + '</p>';
+    }
+
+    if (opts.comAcao && isAberto){
+      if (devolver && devolver.id === id){
+        html += devolverFormHtml(m, devolver);
+      } else {
+        html += '  <button type="button" class="btn-acertar" onclick="openDevolver(\'' + id + '\')">↩ Devolver Troco</button>';
+      }
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  // ---------- "Por devolver troco" (sem filtro de data, ordem cronológica) ----------
+  // Todos os 'aberto': hoje só Compra/Pagamento ficam abertos, mas as saídas
+  // "Outro" antigas também eram — sem isto não tinham onde fechar.
+  function renderPendentes(){
+    var ids = Object.keys(allMovs).filter(function(id){
+      return allMovs[id].estado === 'aberto';
+    });
+    ids.sort(function(a, b){
+      return new Date(allMovs[a].dataHora) - new Date(allMovs[b].dataHora);
+    });
+
+    // Se o movimento aberto no formulário deixou de estar pendente (outra
+    // sessão fechou-o), o formulário fecha.
+    if (devolver && ids.indexOf(devolver.id) === -1) devolver = null;
+
+    pendingSectionCountEl.textContent = ids.length;
+    pendingSectionCountEl.classList.toggle('zero', ids.length === 0);
+
+    if (ids.length === 0){
+      pendingListEl.innerHTML = '<div class="pending-empty">Nada por devolver</div>';
+      return;
+    }
+    var html = '';
+    ids.forEach(function(id){
+      html += movCardHtml(id, allMovs[id], { comAcao: true, soHora: false });
+    });
+    pendingListEl.innerHTML = html;
+  }
+
+  // ---------- Listagem completa ----------
   function renderList(){
+    var filtro = motivoFiltroSelect.value;
     var ids = Object.keys(allMovs).filter(function(id){
       var m = allMovs[id];
       var passaPeriodo = true;
@@ -1017,7 +1610,9 @@
         passaPeriodo = !!ym && (m.dataHora || '').slice(0, 7) === ym;
       }
       if (!passaPeriodo) return false;
-      return motivoCorrespondeFiltro(m.motivo, motivoFiltroSelect.value);
+      if (filtro === '__semFatura') return m.semFatura === true;
+      if (filtro === '__trocoNaoConferiu') return m.trocoConfere === false;
+      return motivoCorrespondeFiltro(m.motivo, filtro);
     });
 
     ids.sort(function(a, b){
@@ -1031,67 +1626,18 @@
     }
 
     var html = '';
+    var totalValor = 0;
     ids.forEach(function(id){
-      var m = allMovs[id];
-      var isAberto = m.estado === 'aberto';
-      var tipoLabel = m.tipo === 'saida' ? 'SAÍDA' : 'ENTRADA';
-      var sinal = m.tipo === 'saida' ? '−' : '+';
-      var horaLabel = activeFilter === 'hoje' ? formatHora(m.dataHora) : formatDataHora(m.dataHora);
-
-      html += '<div class="mov-row' + (isAberto ? ' aberto' : '') + '">';
-      html += '  <div class="mov-top">';
-      html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
-      html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
-      html += '  </div>';
-      html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
-      html += '  <div class="mov-meta">';
-      html += '    <span class="mov-pessoa">' + escapeHtml(m.pessoa) + '</span>';
-      if (isAberto){
-        html += '    <span class="badge-pending">Por acertar</span>';
-      }
-      html += '  </div>';
-
-      if (m.estado === 'acertado' && m.tipo === 'saida' && m.valorDevolvido !== null && m.valorDevolvido !== undefined){
-        var gastoReal = m.valor - m.valorDevolvido;
-        html += '  <p class="gasto-real">Devolvido ' + formatEUR(m.valorDevolvido) + ' · Gasto real: <strong>' + formatEUR(gastoReal) + '</strong></p>';
-      }
-      if (m.notas){
-        html += '  <p class="notas-txt">' + escapeHtml(m.notas) + '</p>';
-      }
-
-      if (isAberto){
-        if (acertarOpenId === id){
-          html += '  <div class="acertar-form">';
-          html += '    <div class="acertar-row">';
-          html += '      <div class="field" style="margin-bottom:0;"><label class="field-label">Devolvido (€)</label><input type="number" inputmode="decimal" step="0.01" min="0" id="devolvido_' + id + '"></div>';
-          html += '      <div class="field" style="margin-bottom:0;"><label class="field-label">Notas</label><input type="text" id="notas_' + id + '"></div>';
-          html += '    </div>';
-          html += '    <div class="acertar-actions">';
-          html += '      <button type="button" class="btn-cancelar" onclick="cancelAcertar()">Cancelar</button>';
-          html += '      <button type="button" class="btn-guardar" onclick="saveAcertar(\'' + id + '\')">Guardar</button>';
-          html += '    </div>';
-          html += '  </div>';
-        } else {
-          html += '  <button type="button" class="btn-acertar" onclick="openAcertar(\'' + id + '\')">✓ Acertar</button>';
-        }
-      }
-
-      html += '</div>';
+      html += movCardHtml(id, allMovs[id], { comAcao: false, soHora: activeFilter === 'hoje' });
+      totalValor += allMovs[id].valor;
     });
 
-    var totalValor = 0;
-    ids.forEach(function(id){ totalValor += allMovs[id].valor; });
-    if (ids.length === 0){
-      filterSummaryEl.textContent = '';
-    } else {
-      filterSummaryEl.textContent = ids.length + (ids.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValor);
-    }
-
+    filterSummaryEl.textContent = ids.length + (ids.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValor);
     movListEl.innerHTML = html;
   }
 
   function escapeHtml(str){
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1102,6 +1648,7 @@
   movRef.on('value', function(snapshot){
     allMovs = snapshot.val() || {};
     renderSummary();
+    renderPendentes();
     renderList();
   });
 

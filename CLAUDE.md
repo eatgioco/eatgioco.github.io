@@ -32,7 +32,8 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   O critério é a existência de hover, **nunca a largura** — e é por isso que tem de ser
   opt-in: sem a classe, uma página desktop-only (`width=1200`) aberta no telemóvel ficava
   com uma barra de 52px desenhada a 1200px e reduzida a zoom out, inutilizável.
-  Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html`, `gestao.html` e
+  Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html`, `gestao.html`,
+  `caixa.html` (desde Set/2026: fotografar o talão no Devolver Troco) e
   `loja-sao-bento.html` (desde 1 Set/2026: no computador da loja, que tem rato,
   nada muda — o critério é o hover).
 
@@ -43,7 +44,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `index.html` | Home / menu do OS | Equipa |
 | `compras.html` | Base de dados de fornecedores + encomendas + ingredientes (abas "Por fornecedor" / "Por ingrediente" / "Encomenda sugerida") | Equipa |
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
-| `caixa.html` | Movimentos de dinheiro físico | Equipa |
+| `caixa.html` | Movimentos de dinheiro físico. Layout (Set/2026): resumo no topo ("Saldo hoje" e "Por acertar" — o Manel usa estes textos como indicador, não mudar) → **ferramenta de caixa** em duas colunas (registo à esquerda; "Por devolver troco" à direita, com TODOS os movimentos `aberto` sem filtro de data, ordem cronológica, e o único sítio onde vive o botão "↩ Devolver Troco") → **listagem completa** a toda a largura (filtros Hoje/7 dias/Mês/Tudo + motivos, mais "Sem fatura (declarado)" e "Troco não conferiu"; os `aberto` aparecem com badge "Por acertar" mas sem botão). Em saídas Compra / Pagamento a fornecedor o registo pergunta "Vai haver troco?" (obrigatório): Não → fechado logo (`temTroco:false`, `estado:'acertado'`, `valorDevolvido:0`); Sim → `aberto` até ao Devolver Troco, que exige fatura carregada (lida via `gioco-faturas.js`, foto arquivada em `caixaFaturasArquivo/{id}`) OU a declaração "Declaro que não tenho fatura deste movimento", e depois o valor devolvido (pré-preenchido com `valor − fatura.montante`; diferença > 0,05 € só avisa). Depósito bancário e Outro fecham na criação (`semAcerto`), sem pergunta. Usada ao telemóvel para fotografar o talão: viewport `device-width` + opt-in `shell-mobile`. Escreve só `push()` em `caixaMovimentos` e `update()` por caminho em `caixaMovimentos/{id}` — nunca remove | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
 | `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder | Equipa |
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
@@ -56,6 +57,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `gestao.html` | Folha de cálculo de **ingredientes** e **produtos** (edição em massa, inline, grava ao sair da célula). Dois separadores: Ingredientes (uma linha por `ingredientes/`; contagem herdada da compra quando não existe `contagem/`) e Produtos (uma linha por `receitas/`, com custo/food cost via `gioco-custos.js`, artigo POS de `vendas/catalogo` e vendas do mês de `vendas/{mes}/produtos`). Escreve SEMPRE um `set()`/`remove()` por path de campo: `ingredientes/{id}/{campo}`, `ingredientes/{id}/compra/{unidade|fator}`, `ingredientes/{id}/contagem` (objeto `{unidade,fator}`, o mesmo formato do contagens.html), `receitas/{id}/{categoria|pvp}`, `vendas/catalogo/{chave}/{receitaId|categoria}`. Nunca escreve em `vendas/{mes}/produtos` nem `vendasDiario/`. Deep-links: `compras.html?ingrediente=ID` e `receitas.html?receita=ID`. Coluna Foto lê o manifesto `img/ingredientes/index.json` (array de slugs) — sem manifesto mostra "—" | Equipa |
 | `gioco-custos.js` | Motor partilhado de custo/food cost (`GiocoCustos`): `custoIngrediente` (precoUltimaCompra ÷ compra.fator), `custoPreparacao`, `custoReceita` (→ custo, avisos[], foodCost %), `foodCost`, `converterFator`. Extraído do receitas.html em Set/2026 sem alterar um cêntimo; receitas.html e gestao.html usam-no — nunca reimplementar por página | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
+| `gioco-faturas.js` | Módulo partilhado de **leitura e arquivo de faturas** (`GiocoFaturas`), SÓ leitura — não escreve em lado nenhum. Extraído da `leitura-faturas.html` em Set/2026 sem alterar comportamento: constantes do Azure Document Intelligence (endpoint, chave F0 — risco aceite, ver comentário —, versão, modelo), `ler(file)` → `{fornecedorTexto, montante, referencia, data, prazoPagamento, linhas}`, `analyzeInvoice`, `fieldText/fieldDateIso/fieldAmount/extrairLinhas`, `fileToBase64/fileToDataUrl/compressImageDataUrl`, `prepararArquivoFatura(file)` (imagem comprimida a 1600 px JPEG 0.8, PDF tal e qual) e `abrirArquivoFatura(dataUrl)`, `normalizeNome` e `findMatchingSupplier(vendorName, allSuppliers)`. Cada página decide onde grava: `leitura-faturas.html` → `faturasProcessadas`/`faturasArquivo`; `caixa.html` → dentro do movimento. Nunca reimplementar por página | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
@@ -71,7 +73,29 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 ```
 suppliers             — fornecedores
 paymentRequests       — pedidos de pagamento (status: pendente / concluido / anulado)
-caixaMovimentos       — movimentos de caixa física
+caixaMovimentos       — movimentos de caixa física. Campos novos (Set/2026, chaves
+                         ausentes = null; só em saídas Compra / Pagamento a fornecedor):
+                         temTroco (true|false — resposta a "Vai haver troco?"; os
+                         'aberto' antigos sem o campo contam como true);
+                         fatura { fornecedorTexto, fornecedorIdEncontrado, montante,
+                         referencia, data, linhas, lidaEm, erroLeitura (string|null) }
+                         só quando foi carregada fatura no Devolver Troco — com
+                         erroLeitura preenchido a foto ficou na mesma arquivada;
+                         semFatura:true + semFaturaDeclaradoPor (declaração explícita);
+                         trocoEsperado = valor − fatura.montante quando há montante
+                         lido; trocoConfere = |valorDevolvido − trocoEsperado| ≤ 0,05
+                         (null sem fatura lida). Gasto real continua valor − valorDevolvido.
+                         Escritas: push() na criação e update() por caminho em
+                         caixaMovimentos/{id} — nunca set num nó pai, nunca remove.
+                         REGRA: as faturas da caixa vivem SÓ dentro do movimento —
+                         NUNCA vão para faturasProcessadas nem faturasArquivo, NUNCA
+                         aparecem na leitura-faturas.html e NUNCA geram paymentRequests
+caixaFaturasArquivo   — caixaFaturasArquivo/{movimentoId} = dataUrl da foto/PDF da
+                         fatura do movimento de caixa, comprimido (mesmo formato de
+                         faturasArquivo). Fora do movimento de propósito: o listener de
+                         caixaMovimentos não carrega base64; a listagem lê on demand ao
+                         clicar no badge "Fatura". Escrito só pela caixa.html (set() no
+                         nó próprio, antes do update do movimento)
 lojaChecklistTemplates / lojaChecklistRegistos — checklists abertura/fecho
 equipamentos          — equipamentos da loja (nome, zona, tipo, limite, ordem, ativo);
                          nunca apagados, só desativados — lojaTemperaturas referencia-os por id
