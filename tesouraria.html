@@ -1622,11 +1622,108 @@
     color:var(--muted);
     line-height:1.55;
   }
+
+  /* ---------- Reconciliação bancária ----------
+     Selos de estado por pagamento concluído. Verde/âmbar vêm do shell
+     (--green/--amber + -bg); o vermelho de texto é --red-ink; o fundo
+     vermelho não existe no shell, por isso é local com par escuro. */
+  :root{ --rec-red-bg:#FBE3E5; }
+  [data-theme="dark"]{ --rec-red-bg:rgba(255,125,136,0.14); }
+
+  .rec-badge{
+    display:inline-block;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.4px;
+    text-transform:uppercase;
+    padding:3px 8px;
+    border-radius:100px;
+    white-space:nowrap;
+    border:1px solid transparent;
+    vertical-align:middle;
+  }
+  .rec-badge.confirmado{ background:var(--green-bg); color:var(--green); border-color:var(--green); }
+  .rec-badge.aguarda{ background:var(--dough); color:var(--muted); border-color:var(--line); }
+  .rec-badge.semMovimento{ background:var(--rec-red-bg); color:var(--red-ink); border-color:var(--red-ink); }
+  .rec-badge.ambiguo{ background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
+  .rec-badge.semData{ background:transparent; color:var(--muted); border-color:var(--muted); border-style:dashed; }
+
+  .rec-contador{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 14px;
+    margin:0 0 16px;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .rec-contador .num{ font-weight:700; }
+  .rec-nota{ margin:0 0 14px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+
+  .rec-grupo{ margin-bottom:18px; }
+  .rec-grupo-titulo{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    margin:0 0 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .rec-grupo-titulo .num{ color:var(--ink); }
+
+  /* Cada pagamento é uma linha que se expande; sem @media — flex-wrap
+     parte-se sozinho a 375px. */
+  .rec-item{ border:1px solid var(--line); background:var(--white); margin-bottom:6px; }
+  .rec-item-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 12px;
+    cursor:pointer;
+    flex-wrap:wrap;
+    color:var(--ink);
+  }
+  .rec-item-head:hover{ background:var(--dough); }
+  .rec-item-head .rec-caret{ color:var(--red); width:10px; flex:0 0 auto; }
+  .rec-item-head .rec-nome{ flex:1 1 160px; min-width:0; font-size:13px; font-weight:600; }
+  .rec-item-head .rec-meta{ font-size:12px; color:var(--muted); min-width:0; overflow-wrap:anywhere; }
+  .rec-item-head .rec-valor{ font-weight:700; font-size:13px; white-space:nowrap; }
+  .rec-item-body{
+    border-top:1px dashed var(--line);
+    background:var(--dough);
+    padding:10px 12px 12px;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .rec-item-body .card-row{ padding:2px 0; }
+  .rec-cands-titulo{ margin:10px 0 6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); }
+  .rec-cand{
+    display:flex;
+    align-items:center;
+    gap:8px 12px;
+    flex-wrap:wrap;
+    padding:7px 0;
+    border-top:1px solid var(--line);
+  }
+  .rec-cand:first-of-type{ border-top:0; }
+  .rec-cand .rec-cand-data{ white-space:nowrap; font-weight:600; }
+  .rec-cand .rec-cand-desc{ flex:1 1 180px; min-width:0; overflow-wrap:anywhere; }
+  .rec-cand .rec-cand-conta{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); white-space:nowrap; }
+  .rec-cand .rec-cand-valor{ font-weight:700; white-space:nowrap; }
+  .rec-cand.rec-cand-diff .rec-cand-valor{ color:var(--amber); }
+  .rec-acoes{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .btn-small.rec-desligar{ border-color:var(--red-ink); color:var(--red-ink); }
+  .rec-vazio{ font-size:12.5px; color:var(--muted); padding:6px 0; }
 </style>
 </head>
 <body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-reconciliacao.js"></script>
 
 <div class="shell">
 
@@ -1759,6 +1856,15 @@
       </div>
 
       <p class="empty-state-inline" id="paymentsTicketsEmpty" style="display:none;"></p>
+    </div>
+  </details>
+
+  <details class="tes-details" id="tesReconDetails">
+    <summary>Reconciliação bancária</summary>
+    <div class="tes-details-body">
+      <div class="rec-contador" id="recContador">—</div>
+      <p class="rec-nota">Cada pagamento marcado como pago é cruzado com os débitos das duas contas (valor exacto, até 7 dias depois; débitos directos à volta do dia esperado). Só liga sozinho quando há um único movimento possível. Desligar é sempre manual.</p>
+      <div id="recListas"><p class="tes-empty">A carregar movimentos bancários…</p></div>
     </div>
   </details>
 
@@ -2049,6 +2155,13 @@ window.addEventListener('load', function () {
   var recibosRef = db.ref('recibos');
   var pessoasRef = db.ref('pessoas');
 
+  // Reconciliação bancária: os movimentos das duas contas entram só em
+  // LEITURA (escritos de fora pelo eb_sync.py); a única escrita é em
+  // reconciliacaoBancaria/{chave}, feita pelo gioco-reconciliacao.js.
+  var movsAbancaRef = db.ref('contasBancarias/abanca/movimentos');
+  var movsRevolutRef = db.ref('contasBancarias/revolut/movimentos');
+  var reconciliacaoRef = db.ref('reconciliacaoBancaria');
+
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
   var countEl = document.getElementById('summaryCount');
@@ -2070,6 +2183,11 @@ window.addEventListener('load', function () {
   var allRecibos = {};   // recibos/{pessoaId}/{AAAA-MM}
   var allPessoas = {};   // pessoas/{id} — só leitura, para o vencimento base
   var allSuppliers = {};
+  var movsAbanca = {};        // contasBancarias/abanca/movimentos
+  var movsRevolut = {};       // contasBancarias/revolut/movimentos
+  var allReconciliacao = {};  // reconciliacaoBancaria/
+  var reconCarregado = { abanca: false, revolut: false, rec: false, pedidos: false };
+  var reconAberto = null;     // chave do item expandido na secção
 
   function escapeHtml(str) {
     if (!str) return "";
@@ -2273,6 +2391,8 @@ window.addEventListener('load', function () {
       html += '<div class="payment-line-sub"><span>' + subParts.join(' — ') + '</span>';
       if (isPending && linhaPaga) {
         html += '<span class="payment-line-paid">✓ Pago</span>';
+      } else if (linhaPaga) {
+        html += reconBadge(RE.chavePedido(p.id, idx));
       } else if (isPending) {
         html += '<span class="payment-line-btns">';
         if (l.iban) html += '<button type="button" class="btn-small btn-pagar" data-line="' + idx + '">🏦 Pagar</button>';
@@ -2704,11 +2824,16 @@ window.addEventListener('load', function () {
       h += blocoDiscriminacaoTSU(l.prazoDate);
     }
 
+    if (pago) h += blocoReconciliacaoLinha(chaveReconciliacao(l));
+
     h += '</div>'; // .pay-detalhe-info
 
     h += '<div class="pay-detalhe-actions">';
     if (pago){
       h += '<span class="payment-line-paid">✓ Pago</span>';
+      if (estadoReconciliacao(chaveReconciliacao(l)) === 'confirmado'){
+        h += '<button type="button" class="btn-small rec-desligar" data-rec-desligar="' + escapeHtml(chaveReconciliacao(l)) + '">Desligar</button>';
+      }
     } else {
       if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
         h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
@@ -2869,6 +2994,259 @@ window.addEventListener('load', function () {
       rotuloEstado = CE.rotuloEstado, resolveDia = CE.resolveDia,
       diaDaSaida = CE.diaDaSaida, tipoDe = CE.tipoDe,
       ocorrenciasCompromissos = CE.ocorrenciasCompromissos;
+
+  /* ================================================================
+     Reconciliação bancária (gioco-reconciliacao.js)
+     A lógica vive no módulo; aqui só há a ligação aos dados em memória,
+     os selos por linha e a secção "Reconciliação bancária".
+     ================================================================ */
+
+  var RE = giocoReconciliacaoEngine({
+    getPaymentRequests:      function(){ return allPaymentRequests; },
+    getPagamentosConcluidos: function(){ return allPagamentosConcluidos; },
+    getMovimentos:           function(){ return { abanca: movsAbanca, revolut: movsRevolut }; },
+    getReconciliacao:        function(){ return allReconciliacao; },
+    compromissos:            CE,
+    ref:                     reconciliacaoRef
+  });
+
+  var reconResultado = null;   // último RE.calcular()
+
+  var REC_ESTADOS = {
+    confirmado:   { rotulo: '✓ Confirmado',     titulo: 'Confirmados' },
+    aguarda:      { rotulo: '⏳ Aguarda banco',  titulo: 'Aguardam o banco' },
+    semMovimento: { rotulo: '⚠ Sem movimento',  titulo: 'Sem movimento' },
+    ambiguo:      { rotulo: '? Ambíguo',        titulo: 'Ambíguos' },
+    semData:      { rotulo: '— Sem data',       titulo: 'Sem data de pagamento' }
+  };
+  var REC_ORDEM = ['semMovimento', 'ambiguo', 'semData', 'aguarda', 'confirmado'];
+
+  // Chave de reconciliação de uma linha plana (itensDoMes / linhasCombinadas).
+  function chaveReconciliacao(l){
+    if (l.tipo === 'fixo') return RE.chaveFixo(l.compromissoId + '_' + periodoCompromisso(l.prazoDate));
+    return RE.chavePedido(l.ticketId, l.lineIdx);
+  }
+
+  function reconTudoCarregado(){
+    return reconCarregado.abanca && reconCarregado.revolut && reconCarregado.rec && reconCarregado.pedidos;
+  }
+
+  function recalcularReconciliacao(){
+    reconResultado = RE.calcular();
+    // Match automático só com tudo em memória — antes disso um pagamento
+    // podia parecer ter um único candidato só porque faltava uma conta.
+    if (reconTudoCarregado() && reconResultado.autoNovas.length){
+      RE.aplicarAutomaticas(reconResultado); // o listener redesenha no fim
+    }
+  }
+
+  function itemReconciliacao(chave){
+    return reconResultado ? RE.itemPorChave(reconResultado, chave) : null;
+  }
+
+  function estadoReconciliacao(chave){
+    var it = itemReconciliacao(chave);
+    return it ? it.estado : null;
+  }
+
+  function reconBadge(chave){
+    var estado = estadoReconciliacao(chave);
+    if (!estado || !REC_ESTADOS[estado]) return '';
+    return '<span class="rec-badge ' + estado + '" title="Reconciliação bancária">' + REC_ESTADOS[estado].rotulo + '</span>';
+  }
+
+  function fmtDiaISO(iso){
+    if (!iso) return '—';
+    var p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+  }
+
+  function nomeConta(conta){
+    return conta === 'abanca' ? 'ABANCA' : (conta === 'revolut' ? 'Revolut' : conta);
+  }
+
+  // Linha de movimento bancário, com ou sem botão "Ligar".
+  function htmlMovimento(m, chave, comLigar, item){
+    var diff = item && item.cents !== null && m.cents !== item.cents;
+    return '<div class="rec-cand' + (diff ? ' rec-cand-diff' : '') + '">' +
+      '<span class="rec-cand-data num">' + fmtDiaISO(m.dia) + '</span>' +
+      '<span class="rec-cand-desc">' + escapeHtml(m.desc) + (m.extra && m.extra !== m.desc ? ' <span class="rec-cand-conta">' + escapeHtml(m.extra) + '</span>' : '') + '</span>' +
+      '<span class="rec-cand-conta">' + escapeHtml(nomeConta(m.conta)) + '</span>' +
+      '<span class="rec-cand-valor num">' + formatEuro(m.valor) + '</span>' +
+      (comLigar ? '<button type="button" class="btn-small" data-rec-ligar="' + escapeHtml(chave) + '" data-rec-conta="' + escapeHtml(m.conta) + '" data-rec-key="' + escapeHtml(m.key) + '">Ligar</button>' : '') +
+      '</div>';
+  }
+
+  // Movimento ligado, dentro do bloco de detalhe de uma linha paga
+  // (calendário): o que o banco confirmou, ou o estado se ainda não há nada.
+  function blocoReconciliacaoLinha(chave){
+    var it = itemReconciliacao(chave);
+    if (!it) return '';
+    var h = '<div class="card-row"><span>Banco: ' + reconBadge(chave) + '</span></div>';
+    if (it.estado === 'confirmado' && it.movimento){
+      h += '<div class="card-row"><span class="pay-detalhe-nota">' + fmtDiaISO(it.movimento.dia) + ' · ' +
+           escapeHtml(nomeConta(it.movimento.conta)) + ' · ' + escapeHtml(it.movimento.desc) + ' · ' +
+           formatEuro(it.movimento.valor) + ' (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') + ')</span></div>';
+    } else if (it.estado === 'confirmado'){
+      h += '<div class="card-row"><span class="pay-detalhe-nota">Movimento ligado (' + escapeHtml(nomeConta(it.ligacao.conta)) +
+           ' ' + escapeHtml(it.ligacao.movimentoKey) + ') já não está na sincronização.</span></div>';
+    }
+    return h;
+  }
+
+  function descricaoItem(it){
+    var partes = [];
+    if (it.fonte === 'pedido') partes.push(it.ticketNumero ? 'Pedido #' + it.ticketNumero : 'Pedido');
+    else partes.push('Compromisso ' + it.ano + '-' + pad2(it.mes) + (it.metodo === 'debito' ? ' · débito direto' : ''));
+    if (it.ancora && it.metodo !== 'debito') partes.push('pago ' + fmtDiaISO(it.ancora));
+    else if (it.esperado) partes.push('esperado ' + fmtDiaISO(it.esperado));
+    return partes.join(' · ');
+  }
+
+  function corpoItem(it){
+    var h = '<div class="rec-item-body">';
+    if (it.fonte === 'pedido'){
+      if (it.prazo) h += '<div class="card-row"><span>Prazo: ' + escapeHtml(it.prazo) + '</span></div>';
+      if (it.referencia) h += '<div class="card-row"><span>Referência: ' + escapeHtml(it.referencia) + '</span></div>';
+      h += '<div class="card-row"><span>Marcado como pago: ' + (it.concluidoEm ? fmtDiaISO(RE.diaLocal(it.concluidoEm)) : 'sem data') + '</span></div>';
+    } else {
+      h += '<div class="card-row"><span>Método: ' + (it.metodo === 'debito' ? 'débito direto' : 'transferência') + '</span></div>';
+      if (it.esperado) h += '<div class="card-row"><span>Dia esperado: ' + fmtDiaISO(it.esperado) + '</span></div>';
+      h += '<div class="card-row"><span>Marcado como pago: ' + (it.concluidoEm ? fmtDiaISO(RE.diaLocal(it.concluidoEm)) : 'sem data') + '</span></div>';
+      if (it.estadoValor) h += '<div class="card-row"><span class="pay-detalhe-nota">valor ' + escapeHtml(rotuloEstado(it.estadoValor)) + '</span></div>';
+    }
+    var janela = 'janela ' + fmtDiaISO(addDiasISO(it.ancora, -it.janela.antes)) + ' a ' + fmtDiaISO(addDiasISO(it.ancora, it.janela.depois));
+
+    if (it.estado === 'confirmado'){
+      h += '<p class="rec-cands-titulo">Movimento ligado (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') + ')</p>';
+      h += it.movimento ? htmlMovimento(it.movimento, it.chave, false, it)
+                        : '<p class="rec-vazio">' + escapeHtml(nomeConta(it.ligacao.conta)) + ' ' + escapeHtml(it.ligacao.movimentoKey) + ' — já não está na sincronização.</p>';
+      h += '<div class="rec-acoes"><button type="button" class="btn-small rec-desligar" data-rec-desligar="' + escapeHtml(it.chave) + '">Desligar</button></div>';
+    } else if (it.estado === 'ambiguo'){
+      h += '<p class="rec-cands-titulo">Candidatos (' + janela + ')' + (it.motivoAmbiguo ? ' · ' + escapeHtml(it.motivoAmbiguo) : '') + '</p>';
+      h += it.candidatos.map(function(m){ return htmlMovimento(m, it.chave, true, it); }).join('');
+    } else if (it.estado === 'aguarda'){
+      h += '<p class="rec-vazio">Ainda sem movimento no banco — ' + janela + '.</p>';
+    } else {
+      // semMovimento / semData: pesquisa alargada, ±30 dias e 90–110 % do valor.
+      var lista = RE.pesquisaManual(it, it.ancora || prazoISO(it));
+      h += '<p class="rec-cands-titulo">Pesquisa alargada · ±' + RE.JANELA_MANUAL_DIAS + ' dias · 90–110 % do valor' +
+           (it.cents === null ? ' (sem valor conhecido: só a janela)' : '') + '</p>';
+      h += lista.length ? lista.map(function(m){ return htmlMovimento(m, it.chave, true, it); }).join('')
+                        : '<p class="rec-vazio">Nenhum débito livre nessa janela.</p>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // Prazo dd/mm/aaaa de uma linha de pedido → AAAA-MM-DD (referência da
+  // pesquisa manual quando não há concluidoEm).
+  function prazoISO(it){
+    var d = it.prazo ? ddmmyyyyToDate(it.prazo) : null;
+    return d ? RE.diaLocal(d) : null;
+  }
+
+  function addDiasISO(iso, n){
+    if (!iso) return null;
+    var d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return RE.diaLocal(d);
+  }
+
+  function renderReconciliacaoSeccao(){
+    var contadorEl = document.getElementById('recContador');
+    var listasEl = document.getElementById('recListas');
+    if (!contadorEl || !listasEl || !reconResultado) return;
+
+    var c = reconResultado.contadores;
+    contadorEl.innerHTML =
+      '<span><span class="num">' + c.confirmado + '</span> confirmados</span>' +
+      '<span><span class="num">' + c.aguarda + '</span> aguardam</span>' +
+      '<span><span class="num">' + c.semMovimento + '</span> sem movimento</span>' +
+      '<span><span class="num">' + c.ambiguo + '</span> ambíguos</span>' +
+      (c.semData ? '<span><span class="num">' + c.semData + '</span> sem data</span>' : '');
+
+    if (!reconTudoCarregado()){
+      listasEl.innerHTML = '<p class="tes-empty">A carregar movimentos bancários…</p>';
+      return;
+    }
+    if (!reconResultado.itens.length){
+      listasEl.innerHTML = '<p class="tes-empty">Ainda não há pagamentos marcados como pagos.</p>';
+      return;
+    }
+
+    listasEl.innerHTML = REC_ORDEM.map(function(estado){
+      var lista = reconResultado.porEstado[estado].slice().sort(function(a, b){
+        var da = a.ancora || '', db = b.ancora || '';
+        return da < db ? 1 : (da > db ? -1 : 0);
+      });
+      var h = '<div class="rec-grupo" data-rec-grupo="' + estado + '">' +
+        '<p class="rec-grupo-titulo"><span class="rec-badge ' + estado + '">' + REC_ESTADOS[estado].rotulo + '</span> ' +
+        REC_ESTADOS[estado].titulo + ' <span class="num">' + lista.length + '</span></p>';
+      if (!lista.length){
+        h += '<p class="rec-vazio">Nenhum.</p>';
+      } else {
+        h += lista.map(function(it){
+          var aberto = reconAberto === it.chave;
+          return '<div class="rec-item" data-rec-chave="' + escapeHtml(it.chave) + '">' +
+            '<div class="rec-item-head">' +
+            '<span class="rec-caret">' + (aberto ? '▾' : '▸') + '</span>' +
+            '<span class="rec-nome">' + escapeHtml(it.nome) + '</span>' +
+            '<span class="rec-meta">' + escapeHtml(descricaoItem(it)) + '</span>' +
+            '<span class="rec-valor num">' + (it.cents === null ? '—' : formatEuro(it.cents / 100)) + '</span>' +
+            '</div>' +
+            (aberto ? corpoItem(it) : '') +
+            '</div>';
+        }).join('');
+      }
+      return h + '</div>';
+    }).join('');
+  }
+
+  // Redesenha tudo o que mostra selos: calendário, pendentes, separador
+  // Concluídos e a secção.
+  function renderReconciliacaoTudo(){
+    renderTesouraria();
+    if (currentTab === 'concluido') render();
+  }
+
+  document.getElementById('recListas').addEventListener('click', function(e){
+    if (e.target.closest('button')) return; // Ligar/Desligar tratam-se abaixo
+    var head = e.target.closest('.rec-item-head');
+    if (!head) return;
+    var chave = head.parentNode.getAttribute('data-rec-chave');
+    reconAberto = (reconAberto === chave) ? null : chave;
+    renderReconciliacaoSeccao();
+  });
+
+  // Ligar (manual) e Desligar aparecem na secção e no detalhe do calendário:
+  // delegação ao documento, uma vez.
+  document.addEventListener('click', function(e){
+    var ligar = e.target.closest('[data-rec-ligar]');
+    if (ligar){
+      var chave = ligar.getAttribute('data-rec-ligar');
+      var mov = RE.movimentoPorId(ligar.getAttribute('data-rec-conta'), ligar.getAttribute('data-rec-key'));
+      if (!mov){ alert('Movimento já não está disponível.'); return; }
+      ligar.disabled = true;
+      RE.ligar(chave, mov, 'manual').catch(function(err){
+        ligar.disabled = false;
+        alert('Não foi possível ligar: ' + (err && err.message ? err.message : err));
+      });
+      return;
+    }
+    var desligar = e.target.closest('[data-rec-desligar]');
+    if (desligar){
+      var chaveD = desligar.getAttribute('data-rec-desligar');
+      var it = itemReconciliacao(chaveD);
+      var nome = it ? it.nome : chaveD;
+      if (!confirm('Desligar o movimento bancário de «' + nome + '»?\nA ligação é apagada; o pagamento volta a ser cruzado com o banco.')) return;
+      desligar.disabled = true;
+      RE.desligar(chaveD).catch(function(err){
+        desligar.disabled = false;
+        alert('Não foi possível desligar: ' + (err && err.message ? err.message : err));
+      });
+    }
+  });
 
 
   // Pedidos (pendentes + pagos) e compromissos fixos (pendentes + pagos)
@@ -3058,7 +3436,7 @@ window.addEventListener('load', function () {
         '<span class="tes-tag ' + (l.tipo === 'fixo' ? 'tes-tag-fixo' : 'tes-tag-pedido') + '">' +
         (l.tipo === 'fixo' ? 'Fixo' : 'Pedido') + '</span>' +
         '<span class="pay-line-nome">' + escapeHtml(l.fornecedor) + '</span>' +
-        (l.pago ? '<span class="payment-line-paid">✓ Pago</span>' : '') +
+        (l.pago ? '<span class="payment-line-paid">✓ Pago</span>' + reconBadge(chaveReconciliacao(l)) : '') +
         '<span class="pay-line-valor">' + formatEuro(l.montante) + '</span>' +
         '</div>';
       if (aberta) html += blocoDetalhePagamento(l, true, l.pago);
@@ -3428,6 +3806,7 @@ window.addEventListener('load', function () {
   });
 
   function renderTesouraria(){
+    recalcularReconciliacao();
     var itens = itensDoMes(anoAtivo, mesAtivo);
     itensTesourariaAtual = itens;
     tesMesLabel.textContent = MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
@@ -3438,6 +3817,7 @@ window.addEventListener('load', function () {
     renderTesPendentes();
     renderCompromissos();
     renderAnalise();
+    renderReconciliacaoSeccao();
   }
 
   function mudarMes(delta){
@@ -3829,11 +4209,32 @@ window.addEventListener('load', function () {
 
   paymentRequestsRef.on('value', function (snapshot) {
     allPaymentRequests = snapshot.val() || {};
+    reconCarregado.pedidos = true;
     loadingEl.style.display = 'none';
     render();
     renderTesouraria();
   }, function (error) {
     loadingEl.textContent = 'Erro de ligação à base de dados.';
+  });
+
+  // Sem movimentos de uma conta (nó vazio ou erro de leitura) a página
+  // continua: a conta conta como carregada, só sem candidatos.
+  movsAbancaRef.on('value', function(snapshot){
+    movsAbanca = snapshot.val() || {};
+    reconCarregado.abanca = true;
+    renderReconciliacaoTudo();
+  }, function(){ reconCarregado.abanca = true; renderReconciliacaoTudo(); });
+
+  movsRevolutRef.on('value', function(snapshot){
+    movsRevolut = snapshot.val() || {};
+    reconCarregado.revolut = true;
+    renderReconciliacaoTudo();
+  }, function(){ reconCarregado.revolut = true; renderReconciliacaoTudo(); });
+
+  reconciliacaoRef.on('value', function(snapshot){
+    allReconciliacao = snapshot.val() || {};
+    reconCarregado.rec = true;
+    renderReconciliacaoTudo();
   });
 
   renderTesouraria();
