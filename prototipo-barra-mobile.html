@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Protótipo barra mobile</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<!-- PROTÓTIPO DESCARTÁVEL: só design da barra de navegação mobile em pílula
+     flutuante. Sem Firebase, sem gioco-faturas.js — nada lê nem escreve.
+     O <style> abaixo é a cópia tal e qual do da caixa.html. -->
+<style>
+  /* Tokens locais (os do shell chegam para tudo o resto). */
+  :root{
+    --caixa-ok-bg:var(--green-bg);
+    --caixa-warn-bg:var(--amber-bg);
+    --caixa-thumb-bg:rgba(0,0,0,0.04);
+  }
+  [data-theme="dark"]{
+    --caixa-thumb-bg:rgba(255,255,255,0.06);
+  }
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  h1,h2,h3,.mono{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+  }
+
+  main{
+    display:block;
+    margin:0;
+    padding:8px 0 40px;
+    color:var(--ink);
+  }
+
+  /* ---------- Layout ----------
+     Ferramenta em cima (registo | por devolver troco), listagem completa em
+     baixo a toda a largura. Sem @media: a grelha usa auto-fit e em 375px as
+     duas colunas empilham sozinhas (resumo → registo → por devolver → lista). */
+  .tool-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(340px,100%),1fr));
+    gap:24px;
+    align-items:start;
+    margin-top:24px;
+  }
+
+  .listing-section{
+    margin-top:32px;
+  }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .section-title .count{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    background:var(--amber);
+    color:#FFFFFF;
+    padding:2px 8px;
+    border-radius:100px;
+  }
+
+  .section-title .count.zero{
+    background:var(--line);
+    color:var(--muted);
+  }
+
+  /* ---------- Summary ---------- */
+  .summary-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:28px;
+  }
+
+  .summary-card{
+    flex:1 1 200px;
+    max-width:260px;
+    background:var(--white);
+    border:1px solid var(--line);
+    padding:18px;
+  }
+
+  .summary-card.pending-active{
+    border-color:var(--amber);
+  }
+
+  .summary-label{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 6px;
+  }
+
+  .summary-value{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+    line-height:1.1;
+    color:var(--ink);
+  }
+
+  .summary-value.positive{ color:var(--green); }
+  .summary-value.negative{ color:var(--red); }
+
+  .summary-sub{
+    font-size:11px;
+    color:var(--muted);
+    margin:4px 0 0;
+  }
+
+  /* ---------- Form ---------- */
+  .form-card{
+    background:var(--white);
+    border:1px solid var(--line);
+    padding:20px;
+  }
+
+  .form-title{
+    margin:0 0 12px;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .tipo-toggle{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:12px;
+  }
+
+  .tipo-btn{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:14px;
+    font-weight:700;
+    padding:11px 8px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .tipo-btn:hover{
+    background:var(--dough);
+  }
+
+  .tipo-btn.saida.active{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+  }
+
+  .tipo-btn.entrada.active{
+    background:var(--green);
+    border-color:var(--green);
+    color:#FFFFFF;
+  }
+
+  /* "Vai haver troco?" — mesmo desenho dos botões Saída/Entrada. */
+  .tipo-btn.troco.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--white);
+  }
+
+  .field{
+    margin-bottom:12px;
+  }
+
+  .field-label{
+    display:block;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select{
+    width:100%;
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--dough);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+  }
+
+  .field input[type="number"]{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:18px;
+    font-weight:700;
+  }
+
+  .field input:focus,
+  .field select:focus{
+    outline:none;
+    border-color:var(--ink);
+  }
+
+  .btn-registar{
+    width:100%;
+    padding:12px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--ink);
+    color:var(--white);
+    border:1px solid var(--line);
+    cursor:pointer;
+  }
+
+  .btn-registar:not(:disabled):hover{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+  }
+
+  .btn-registar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+  }
+
+  .btn-registar:not(:disabled):active{
+    transform:translateY(1px);
+  }
+
+  /* ---------- Filter tabs ---------- */
+  .filter-tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .filter-tab{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    padding:9px 18px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .filter-tab.active{
+    background:var(--ink);
+    color:var(--white);
+  }
+
+  .filter-extra{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+
+  .filter-extra input[type="month"],
+  .filter-extra select{
+    padding:9px 12px;
+    border:2px solid var(--line);
+    background:var(--dough);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    color:var(--ink);
+  }
+
+  .filter-summary{
+    margin-top:10px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  /* ---------- List / cards ---------- */
+  .list{
+    margin-top:16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .pending-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .mov-row{
+    background:var(--white);
+    border:2px solid var(--line);
+    padding:14px 18px;
+    color:var(--ink);
+  }
+
+  .mov-row.aberto{
+    border-color:var(--amber);
+  }
+
+  .mov-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .mov-tipo-hora{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .mov-tipo-tag{
+    font-weight:700;
+    font-size:11px;
+  }
+
+  .mov-tipo-tag.saida{ color:var(--red-ink); }
+  .mov-tipo-tag.entrada{ color:var(--green); }
+
+  .mov-valor{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:18px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .mov-valor.saida{ color:var(--red-ink); }
+  .mov-valor.entrada{ color:var(--green); }
+
+  .mov-motivo{
+    margin:8px 0 4px;
+    font-size:14px;
+  }
+
+  .mov-meta{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-top:8px;
+  }
+
+  .mov-pessoa{
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .badge-pending{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--amber);
+    color:#FFFFFF;
+    padding:3px 8px;
+    white-space:nowrap;
+  }
+
+  /* Linha de fatura/troco por baixo do gasto real. */
+  .fatura-line{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    font-size:12px;
+  }
+
+  .badge-fatura{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    border:1px solid var(--line);
+    background:var(--dough);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .badge-fatura:hover{ border-color:var(--ink); }
+  .badge-fatura:disabled{ cursor:wait; opacity:.6; }
+
+  .badge-fatura.erro{
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+
+  .badge-semfatura{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    background:var(--caixa-warn-bg);
+    color:var(--amber);
+    border:1px solid var(--amber);
+  }
+
+  .troco-ok{ color:var(--green); font-weight:600; }
+  .troco-ko{ color:var(--amber); font-weight:600; }
+
+  .btn-acertar{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    padding:8px 16px;
+    border:2px solid var(--amber);
+    background:var(--white);
+    color:var(--amber);
+    cursor:pointer;
+    margin-top:10px;
+  }
+
+  .btn-acertar:hover{
+    background:var(--amber);
+    color:#FFFFFF;
+  }
+
+  /* ---------- Devolver troco (formulário inline) ---------- */
+  .acertar-form{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+  }
+
+  .acertar-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:10px;
+  }
+
+  .fatura-bloco{
+    border:1px solid var(--line);
+    background:var(--dough);
+    padding:12px;
+    margin-bottom:12px;
+  }
+
+  .fatura-bloco.disabled{ opacity:.5; pointer-events:none; }
+
+  .btn-upload{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 16px;
+    border:2px solid var(--ink);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .btn-upload:hover{ background:var(--ink); color:var(--white); }
+  .btn-upload:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn-upload input[type="file"]{ display:none; }
+
+  .fatura-preview{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    margin-top:10px;
+  }
+
+  .fatura-thumb{
+    flex:0 0 72px;
+    width:72px;
+    height:72px;
+    object-fit:cover;
+    border:1px solid var(--line);
+    background:var(--caixa-thumb-bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    color:var(--muted);
+    text-align:center;
+  }
+
+  .fatura-info{ font-size:13px; line-height:1.5; }
+  .fatura-info .lendo{ color:var(--muted); font-style:italic; }
+  .fatura-info .alerta{ color:var(--red-ink); font-weight:600; }
+  .fatura-info .erro{ color:var(--amber); font-weight:600; }
+  .fatura-info .esperado{ font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums; }
+
+  .declaracao{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    cursor:pointer;
+    margin-top:2px;
+  }
+
+  .declaracao input{ width:18px; height:18px; accent-color:var(--red); }
+  .declaracao.disabled{ opacity:.5; pointer-events:none; }
+
+  .confere-line{
+    margin-top:6px;
+    font-size:12px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    min-height:16px;
+  }
+
+  .btn-guardar{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    padding:9px 20px;
+    border:1px solid var(--line);
+    background:var(--ink);
+    color:var(--white);
+    cursor:pointer;
+  }
+
+  .btn-guardar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+  }
+
+  .btn-cancelar{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    padding:9px 20px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  .gasto-real{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .gasto-real strong{
+    color:var(--ink);
+  }
+
+  .notas-txt{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--muted);
+    font-style:italic;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:32px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .pending-empty{
+    border:1px dashed var(--line);
+    background:var(--white);
+    text-align:center;
+    padding:28px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ======================================================================
+     Camada do design system — só aparência. Vem no fim de propósito: em
+     empate de especificidade ganha a última regra, e é assim que arredonda o
+     que está escrito acima. */
+
+  .page-subtitle{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .btn, .tipo-btn, .btn-small, .badge, .badge-fatura, .badge-semfatura, .btn-upload{ border-radius:100px; }
+  input, select, textarea,
+  .summary-card, .form-card, .modal, .mov-row, .fatura-bloco, .pending-empty, .fatura-thumb{ border-radius:12px; }
+  .modal{ border-radius:16px; }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+
+  .auth-box h2{
+    margin:0 0 8px;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
+  }
+
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.55;
+  }
+</style>
+
+<style>
+@media (hover: none){
+  body.shell-mobile .page{ padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+  body.shell-mobile .sidebar,
+  body.shell-mobile .sidebar.collapsed,
+  body.shell-mobile .sidebar.hidden{
+    left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom));
+    border-radius:100px;
+    border-top:1px solid rgba(255,255,255,0.35);
+    border-left:1px solid rgba(255,255,255,0.2);
+    border-right:1px solid rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(0,0,0,0.15);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -6px 14px rgba(0,0,0,0.08), 0 20px 50px rgba(0,0,0,0.22);
+  }
+  body.shell-mobile .sidebar:not(.painel-aberto){ padding:6px; }
+  body.shell-mobile .sidebar:not(.painel-aberto) nav{ gap:0; }
+  body.shell-mobile .sidebar:not(.painel-aberto) .nav-row{
+    flex-direction:column; gap:3px; padding:8px 2px 7px;
+    border-radius:100px; min-height:52px;
+  }
+  body.shell-mobile .sidebar:not(.painel-aberto) .nav-row span{
+    display:block; transform:none; opacity:1; max-width:none;
+    font-size:10px; font-weight:500; letter-spacing:.02em; line-height:1;
+  }
+  body.shell-mobile .sidebar:not(.painel-aberto) .nav-row.active{ flex:1.3 1 0; }
+  body.ativo-vermelho .sidebar .nav-row.active{
+    background:var(--red); color:var(--on-red); border-color:transparent;
+  }
+  body.shell-mobile .sidebar.painel-aberto{ border-radius:28px; }
+}
+.proto-switch{ position:fixed; top:8px; left:50%; transform:translateX(-50%); z-index:99; font-size:11px; padding:6px 12px; border-radius:100px; border:none; color:var(--ink); }
+</style>
+</head>
+
+<body class="shell-mobile">
+<script src="gioco-shell.js"></script>
+<button class="proto-switch glass-light" onclick="document.body.classList.toggle('ativo-vermelho');this.textContent=document.body.classList.contains('ativo-vermelho')?'ativo: vermelho':'ativo: vidro'">ativo: vidro</button>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>
+      (function(){
+        var itens = [
+          ['caixa.html',     'trending-down',   'Caixa',     true],
+          ['contagens.html', 'clipboard-check', 'Contagens', false],
+          ['equipa.html',    'users',           'Equipa',    false],
+          ['contactos.html', 'phone',           'Contactos', false],
+          ['#',              'menu',            'Mais',      false]
+        ];
+        document.getElementById('giocoNav').innerHTML = itens.map(function(i){
+          var onclick = i[0] === '#' ? 'event.stopImmediatePropagation();giocoToggleMenu();return false;' : 'return false;';
+          return '<a class="nav-row' + (i[3] ? ' active' : '') + '" href="' + i[0] + '" onclick="' + onclick + '">'
+               + giocoIcon(i[1], {size:18}) + '<span>' + i[2] + '</span></a>';
+        }).join('');
+      })();
+    </script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-overlay" id="navOverlay"></div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-down"/></svg>GIOCO · <b>Caixa</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Movimentos de dinheiro físico</p>
+
+<main>
+  <div class="summary-row">
+    <div class="summary-card">
+      <p class="summary-label">Saldo hoje</p>
+      <p class="summary-value">0,00 €</p>
+    </div>
+    <div class="summary-card pending-active">
+      <p class="summary-label">Por acertar</p>
+      <p class="summary-value">4</p>
+      <p class="summary-sub">42,80 € envolvidos</p>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <p class="form-title">Registar movimento</p>
+    <form onsubmit="return false;">
+      <div class="tipo-toggle">
+        <button type="button" class="tipo-btn saida active">− Saída</button>
+        <button type="button" class="tipo-btn entrada">+ Entrada</button>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="valorInput">Valor (€)</label>
+        <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" value="10">
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="motivoSelect">Motivo</label>
+        <select id="motivoSelect">
+          <option selected>Compra</option>
+          <option>Pagamento a fornecedor</option>
+          <option>Depósito bancário</option>
+          <option>Outro</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="motivoDetalheInput">O quê?</label>
+        <input type="text" id="motivoDetalheInput" placeholder="ex: rúcula Pingo Doce">
+      </div>
+    </form>
+  </div>
+</main>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
