@@ -76,6 +76,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
 | `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU e **reconciliação bancária** (Set/2026): cada pagamento marcado como pago (linha de `paymentRequests` concluída ou ocorrência em `pagamentosConcluidos`) leva um selo com o estado face aos débitos de `contasBancarias/{abanca,revolut}/movimentos` — ✓ Confirmado · ⏳ Aguarda banco · ⚠ Sem movimento · ? Ambíguo · — Sem data — no separador Concluídos, no detalhe do calendário e na secção "Reconciliação bancária" (contador + cinco listas expansíveis: Ligar nos ambíguos e na pesquisa alargada dos sem movimento / sem data, Desligar com confirmação nos confirmados). A lógica é toda do `gioco-reconciliacao.js`; a página só liga os dados em memória e desenha. Lê os movimentos das duas contas só em leitura; a única escrita nova é em `reconciliacaoBancaria/`. Secção **Receitas** (05/09/2026): tabela dia × meio (Cartão débito ↔ INTERCARD, Outro/TPA ↔ FECHO TPA) com faturado / crédito / Δ / selo (o selo "≈ Aproximado" é azul, tokens `--rec-aprox*` locais), filtros mês/estado, contador "N dias por confirmar", detalhe por célula (movimento ligado + Desligar, candidatos + Ligar, pesquisa alargada só em créditos) e "Créditos sem venda"; lê `vendasDiario/` só em leitura. Regras no nó `reconciliacaoBancaria` | Só Manel |
 | `tarefas.html` | Tarefas, prazos e fixados do dia | Só Manel |
+| `calendario.html` | Agenda pessoal (Set/2026): vistas Mês / Semana / Dia, eventos manuais no nó `eventos/` (criar, editar, anular por flag — nunca `remove()`). Modal é o `giocoModal` do shell. Preparada para fontes futuras: o render nunca toca no Firebase, recebe uma lista normalizada `{id, titulo, data, diaInteiro, horaInicio, horaFim, categoria, notas, origem, editavel}`; hoje só existe a fonte `manual` (`editavel:true`). Atalhos ← → T M S D N; vista persistida em `localStorage 'calendario.vista'`. Sem integração com outros nós nesta fase | Só Manel |
 | `conta-bancaria.html` | Movimentos e saldo de uma conta (`?conta={slug}`) | Só Manel |
 | `mrn-dashboard.html` | Dashboard privado: contas bancárias, vendas, pagamentos e compromissos, tarefas, pedidos da loja espelhados, depósitos bancários e reconciliação, central de notificações, armazenamento, e placeholders (Calendário Outlook, Instagram, Google Reviews) | Só Manel |
 
@@ -122,6 +123,22 @@ ferias                — períodos de férias por pessoa
 fechados              — loja encerrada por data: { diaTodo, turnos:{t1,t3,t2} }
 notificacoes          — central de notificações (lida: bool, tipo, criadoEm)
 tasks                 — tarefas do dashboard
+eventos               — agenda pessoal (calendario.html, o ÚNICO que escreve aqui;
+                         o mrn-dashboard.html só conta os de hoje). eventos/{pushId} =
+                         { titulo (trim, máx 120), data 'AAAA-MM-DD', diaInteiro (bool),
+                         horaInicio 'HH:MM' e horaFim 'HH:MM' (AUSENTES se diaInteiro;
+                         horaFim > horaInicio), categoria ∈ pessoal | trabalho | reuniao |
+                         loja | prazo | outro, notas? (máx 2000, ausente se vazio),
+                         origem ('manual'; no futuro 'outlook', 'tesouraria', 'tarefas'…),
+                         criadoEm, atualizadoEm (ms), anulado (bool), anuladoEm? (ms) }.
+                         ESCRITAS: criar = push().set() com o objeto completo — o ÚNICO
+                         set() no nó do evento, e só na criação; editar = um set() por
+                         campo alterado em eventos/{id}/{campo} + eventos/{id}/atualizadoEm,
+                         e remove() SÓ nas folhas horaInicio/horaFim/notas quando deixam
+                         de existir; anular = dois set() (anulado:true, anuladoEm).
+                         NUNCA set()/update() no nó pai depois de criado, NUNCA remove()
+                         do evento. Leitura: on('value') do nó completo, anulado:true
+                         ignorado na renderização. Sem restauro nesta fase
 preparacoes           — fichas técnicas de preparações internas (molhos, pestos…);
                          custo/kg = soma dos ingredientes ÷ rendimento, ou
                          custoManualPorUnidade quando custoManual=true
@@ -513,6 +530,8 @@ mecânica e é obrigatório antes de qualquer push que toque em páginas):
 7. **Tema.** Claro/escuro funcional via toggle do shell; qualquer cor local tem
    par `[data-theme="dark"]` quando o token não resolve sozinho.
 8. **Ícones.** Sprite local do `gioco-shell.js` (`<use href="#i-…">`), zero CDN.
+   O sprite tem 37 símbolos (Set/2026: entraram `chevron-left`, `calendar` e
+   `clock` para o calendario.html). A lista vive em `GIOCO_ICON_NAMES`.
    Zero emoji pictográfico (📋💶🏦…) como ícone de UI — exceções: os emblemas
    de categoria dentro de `.cat-chip .circle` (conteúdo, não ícone) e o export
    PNG de turnos da equipa.html (artwork de marca, não UI). Glifos geométricos
@@ -578,7 +597,7 @@ semântica é o que interessa, não o nome:
 | `--red` | superfície vermelha e **títulos** — igual nos dois temas, decisão do Manel |
 | `--red-ink` | vermelho **em texto** secundário: clareia no escuro (o `--red` dá lá 3,35:1) |
 | `--on-red` | texto **por cima** de vermelho: branco fixo. Nunca `--white` aqui |
-| `--lime` `--mustard` `--blush` `--navy` | superfícies de selo (continuam claras no escuro) |
+| `--lime` `--mustard` `--blush` `--navy` `--sky` | superfícies de selo (continuam claras no escuro). `--sky` (#CFE2F3 / #5A8FC4 no escuro) entrou em Set/2026 para a 6.ª categoria do calendário |
 | `--green` `--amber` (+ `-bg`) | cores de **estado** em texto e rebordo |
 | `--muted` `--line` | texto secundário e riscas |
 

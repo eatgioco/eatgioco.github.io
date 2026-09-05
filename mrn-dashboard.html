@@ -1913,12 +1913,13 @@
       <span class="status-badge status-badge-warning vendas-oculto" id="cardVendasBadge">Em configuração</span>
     </a>
 
-    <div class="card glass-light card-compact card-calendario" id="cardCalendario">
-      <div class="card-icon">📅</div>
+    <!-- Calendário pessoal (calendario.html). Só leitura aqui: conta os
+         eventos de hoje em eventos/ que não estão anulados. -->
+    <a class="card glass-light card-compact card-calendario" id="cardCalendario" href="calendario.html">
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-calendar"/></svg></div>
       <h3 class="card-title">Calendário</h3>
-      <p class="card-subtitle">Outlook — em breve</p>
-      <span class="status-badge status-badge-warning">Em configuração</span>
-    </div>
+      <p class="card-subtitle" id="cardCalendarioSub">—</p>
+    </a>
 
     <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
       <div class="card-icon">📸</div>
@@ -2183,10 +2184,6 @@
 <script>
 window.addEventListener('load', function () {
 
-  document.getElementById('cardCalendario').addEventListener('click', function () {
-    alert('Integração Outlook a caminho');
-  });
-
   var firebaseConfig = {
     apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
     authDomain: "gioco-fornecedores.firebaseapp.com",
@@ -2266,6 +2263,23 @@ window.addEventListener('load', function () {
   var db = firebase.database();
   var paymentRequestsRef = db.ref('paymentRequests');
   var tasksRef = db.ref('tasks');
+
+  // Cartão Calendário: eventos de hoje (eventos/, sem os anulados). Só leitura.
+  (function () {
+    var sub = document.getElementById('cardCalendarioSub');
+    if (!sub) return;
+    db.ref('eventos').on('value', function (snapshot) {
+      var val = snapshot.val() || {};
+      var d = new Date();
+      var hoje = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+      var n = 0;
+      Object.keys(val).forEach(function (id) {
+        var ev = val[id];
+        if (ev && ev.anulado !== true && ev.data === hoje) n++;
+      });
+      sub.textContent = n === 0 ? 'hoje: sem eventos' : 'hoje: ' + n + (n === 1 ? ' evento' : ' eventos');
+    });
+  })();
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
