@@ -85,12 +85,13 @@
     margin-top:48px;
   }
 
-  /* Cinco cartões desde que as Contas Bancárias entraram nesta linha.
-     minmax(0,…) e não 1fr: com 1fr a coluna nunca desce abaixo do
-     min-content do cartão e a linha rebentava os 1200px. */
+  /* Seis cartões desde que o Centro de Controlo entrou (Set/2026): três
+     colunas em duas linhas, em vez de seis colunas de 180px onde as linhas
+     de estado do A/C não cabiam. minmax(0,…) e não 1fr: com 1fr a coluna
+     nunca desce abaixo do min-content do cartão e a linha rebentava os 1200px. */
   .grid-quick{
     display:grid;
-    grid-template-columns:repeat(5, minmax(0, 1fr));
+    grid-template-columns:repeat(3, minmax(0, 1fr));
     gap:16px;
   }
 
@@ -294,6 +295,41 @@
     background:var(--mustard);
     color:#141414;
   }
+
+  /* ---------- Cartão Centro de Controlo (Vista Rápida) ----------
+     Só leitura: espelha lojas/sb154/ac/estado e liga para a página do
+     centro de controlo. O ícone é o sprite do shell e não um emoji. */
+  .card-cc{ position:relative; }
+  .card-cc .card-icon .icon{ width:22px;height:22px;color:var(--red); }
+  .cc-badge{
+    position:absolute;top:14px;right:14px;
+    min-width:22px;height:22px;padding:0 7px;
+    border-radius:100px;
+    background:var(--red);color:var(--on-red);
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;font-weight:700;line-height:22px;text-align:center;
+  }
+  .cc-linhas{ margin:12px 0 0;padding:0;list-style:none; }
+  .cc-linha{
+    display:flex;justify-content:space-between;gap:10px;
+    font-family:'Inter',sans-serif;font-size:12.5px;line-height:1.35;
+    color:var(--ink);
+    padding:4px 0;border-top:1px solid var(--line);
+  }
+  .cc-linha:first-child{ border-top:0;padding-top:0; }
+  .cc-linha-label{ color:var(--muted);flex:0 0 auto; }
+  .cc-linha-valor{ text-align:right; }
+  .cc-linha .num{ font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums; }
+  .cc-linha.neutro .cc-linha-valor{ color:var(--muted); }
+  .cc-linha.alerta .cc-linha-valor{ color:var(--red-ink);font-weight:700; }
+  .cc-linha.alerta .cc-linha-label{ color:var(--red-ink); }
+  .cc-alertas{
+    margin:10px 0 0;padding:0;list-style:none;
+    font-family:'Inter',sans-serif;font-size:12px;line-height:1.4;
+    color:var(--red-ink);
+  }
+  .cc-alertas li::before{ content:'⚠ '; }
+  .cc-alertas[hidden]{ display:none; }
 
   /* Cartão Vendas (Vista Rápida) — números do mês mais recente importado */
   .vendas-metrics{
@@ -1835,6 +1871,25 @@
       <div class="contas-lista" id="cardContasLista"></div>
       <p class="pay-card-hint" id="cardContasHint" style="display:none;">→ Ver movimentos</p>
     </div>
+
+    <!-- Centro de Controlo: cartão de ESTADO, só leitura. Espelha
+         lojas/sb154/ac/estado (escrito pelo serviço ac-bridge no PC do POS)
+         e liga para a centro-de-controlo.html, onde vivem os controlos.
+         Nada aqui escreve no Firebase. Sonos: lojas/sb154/sonos/estado ainda
+         não existe — a linha fica "Em breve" até o nó aparecer. -->
+    <a class="card glass-light card-compact card-cc" id="cardCentroControlo" href="centro-de-controlo.html?loja=sb154">
+      <span class="cc-badge" id="ccBadge" hidden>0</span>
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-store"/></svg></div>
+      <h3 class="card-title">Centro de Controlo</h3>
+      <p class="card-subtitle" id="ccSub">A carregar…</p>
+      <ul class="cc-linhas">
+        <li class="cc-linha" id="ccLinhaAc"><span class="cc-linha-label">A/C</span><span class="cc-linha-valor" id="ccAc">—</span></li>
+        <li class="cc-linha" id="ccLinhaPc"><span class="cc-linha-label">PC da loja</span><span class="cc-linha-valor" id="ccPc">—</span></li>
+        <li class="cc-linha neutro" id="ccLinhaSonos"><span class="cc-linha-label">Sonos</span><span class="cc-linha-valor" id="ccSonos">Em breve</span></li>
+        <li class="cc-linha" id="ccLinhaCam"><span class="cc-linha-label">Câmaras</span><span class="cc-linha-valor">Ver câmaras →</span></li>
+      </ul>
+      <ul class="cc-alertas" id="ccAlertas" hidden></ul>
+    </a>
 
     <a class="card glass-light card-compact card-vendas" id="cardVendas" href="vendas.html">
       <div class="card-icon">📊</div>
@@ -4636,6 +4691,153 @@ window.addEventListener('load', function () {
   }
 
   carregarCartaoVendas();
+
+  // ===== Cartão Centro de Controlo (só leitura) =====
+  // Nomes dos campos = os que o serviço ac-bridge escreve em
+  // lojas/sb154/ac/estado (ver CLAUDE.md e centro-de-controlo.html):
+  // ligado, modo, tempAlvo, tempAmbiente, alertaFiltro, atualizadoEm.
+  // Regras iguais às da centro-de-controlo.html: o PC da loja conta como
+  // online enquanto atualizadoEm tiver menos de 2 min (SEM_RESPOSTA_MS).
+  (function () {
+    var CC_SEM_RESPOSTA_MS = 2 * 60 * 1000;
+    var HORARIO_LOJA = [12, 21];   // A/C ligado antes das 12h ou a partir das 21h = alerta
+    var CC_MODOS = { cool: 'Frio', heat: 'Calor', auto: 'Auto', dry: 'Desumidificar', fan: 'Ventilação' };
+
+    var acEstado = null;
+    var acCarregado = false;
+    var sonosEstado = null;
+
+    var el = {
+      badge: document.getElementById('ccBadge'),
+      sub: document.getElementById('ccSub'),
+      linhaAc: document.getElementById('ccLinhaAc'),
+      ac: document.getElementById('ccAc'),
+      linhaPc: document.getElementById('ccLinhaPc'),
+      pc: document.getElementById('ccPc'),
+      linhaSonos: document.getElementById('ccLinhaSonos'),
+      sonos: document.getElementById('ccSonos'),
+      alertas: document.getElementById('ccAlertas')
+    };
+    if (!el.badge) return;
+
+    function ccEsc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function ccTemp(v) {
+      var n = Number(v);
+      return isFinite(n) ? '<span class="num">' + Math.round(n) + '°</span>' : '<span class="num">—</span>';
+    }
+    function idadeMs() {
+      if (!acEstado || !acEstado.atualizadoEm) return Infinity;
+      var t = Date.parse(acEstado.atualizadoEm);
+      return isNaN(t) ? Infinity : Math.max(0, Date.now() - t);
+    }
+    function haQuanto(ms) {
+      if (!isFinite(ms)) return null;
+      var m = Math.floor(ms / 60000);
+      if (m < 60) return '<span class="num">' + m + '</span> min';
+      var h = Math.floor(m / 60);
+      if (h < 48) return '<span class="num">' + h + '</span> h';
+      return '<span class="num">' + Math.floor(h / 24) + '</span> d';
+    }
+    function horaLisboa() {
+      try {
+        return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Lisbon', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+      } catch (e) { return new Date().getHours(); }
+    }
+
+    function renderCC() {
+      var alertas = [];
+      var online = acCarregado && !!acEstado && idadeMs() < CC_SEM_RESPOSTA_MS;
+      var ligado = !!(acEstado && acEstado.ligado);
+
+      // Linha A/C
+      var htmlAc;
+      if (!acEstado) {
+        htmlAc = acCarregado ? 'Sem dados' : '—';
+      } else if (!ligado) {
+        htmlAc = 'Desligado · sala ' + ccTemp(acEstado.tempAmbiente);
+      } else {
+        var modo = CC_MODOS[acEstado.modo] || (acEstado.modo ? ccEsc(acEstado.modo) : '');
+        htmlAc = 'Ligado' + (modo ? ' · ' + modo : '') +
+          ' · alvo ' + ccTemp(acEstado.tempAlvo) + ' · sala ' + ccTemp(acEstado.tempAmbiente);
+      }
+      var acAlerta = false;
+      if (ligado && online) {
+        var h = horaLisboa();
+        if (h < HORARIO_LOJA[0] || h >= HORARIO_LOJA[1]) {
+          alertas.push('A/C ligado fora do horário da loja');
+          acAlerta = true;
+        }
+      }
+      if (acEstado && acEstado.alertaFiltro) {
+        alertas.push('A/C: limpar filtro');
+        acAlerta = true;
+      }
+      el.ac.innerHTML = htmlAc;
+      el.linhaAc.classList.toggle('alerta', acAlerta);
+
+      // Linha PC da loja
+      var ha = haQuanto(idadeMs());
+      if (online) {
+        el.pc.innerHTML = 'Online' + (ha ? ' · há ' + ha : '');
+      } else {
+        el.pc.innerHTML = 'Offline' + (ha ? ' · há ' + ha : (acCarregado ? ' · sem dados' : ''));
+        if (acCarregado) alertas.push('PC da loja offline' + (ha ? ' há ' + ha.replace(/<[^>]+>/g, '') : ''));
+      }
+      el.linhaPc.classList.toggle('alerta', acCarregado && !online);
+
+      // Linha Sonos — o nó lojas/sb154/sonos/estado ainda não existe; quando
+      // existir, os nomes dos campos são a confirmar (faixa/volume abaixo
+      // são um palpite e ficam só como guia).
+      if (sonosEstado) {
+        var faixa = sonosEstado.faixa || sonosEstado.titulo || sonosEstado.track || '';
+        var vol = sonosEstado.volume;
+        el.sonos.innerHTML = (faixa ? ccEsc(faixa) : (sonosEstado.aTocar === false ? 'Parado' : 'A tocar')) +
+          (vol != null ? ' · vol <span class="num">' + ccEsc(vol) + '</span>' : '');
+        el.linhaSonos.classList.remove('neutro');
+        // Preparado, por ligar quando o nó existir:
+        // if (sonosEstado.aTocar === false && horaLisboa() >= HORARIO_LOJA[0] && horaLisboa() < HORARIO_LOJA[1]) {
+        //   alertas.push('Sonos parado em horário de abertura');
+        //   el.linhaSonos.classList.add('alerta');
+        // }
+      } else {
+        el.sonos.textContent = 'Em breve';
+        el.linhaSonos.classList.add('neutro');
+      }
+
+      // Badge + lista de alertas
+      if (alertas.length) {
+        el.badge.textContent = String(alertas.length);
+        el.badge.hidden = false;
+        el.alertas.innerHTML = alertas.map(function (a) { return '<li>' + ccEsc(a) + '</li>'; }).join('');
+        el.alertas.hidden = false;
+        el.sub.textContent = alertas.length === 1 ? '1 alerta' : alertas.length + ' alertas';
+      } else {
+        el.badge.hidden = true;
+        el.alertas.hidden = true;
+        el.alertas.innerHTML = '';
+        el.sub.textContent = acCarregado ? (acEstado ? 'Loja SB154 · tudo normal' : 'Loja SB154 · sem dados') : 'A carregar…';
+      }
+    }
+
+    db.ref('lojas/sb154/ac/estado').on('value', function (snap) {
+      acEstado = snap.val() || null;
+      acCarregado = true;
+      renderCC();
+    }, function () { acCarregado = true; renderCC(); });
+
+    db.ref('lojas/sb154/sonos/estado').on('value', function (snap) {
+      sonosEstado = snap.val() || null;
+      renderCC();
+    }, function () { /* sem permissão ou sem nó: fica "Em breve" */ });
+
+    // Online/Offline e o alerta de horário dependem do relógio, não só dos
+    // dados: recalcular a cada 30 s mesmo sem nada chegar do Firebase.
+    setInterval(renderCC, 30 * 1000);
+  })();
 
   }); // fim de autenticarEContinuar
 });
