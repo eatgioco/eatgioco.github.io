@@ -12,12 +12,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#FFEDDA">
 <meta name="apple-mobile-web-app-title" content="GIOCO Centro">
-<meta name="viewport" content="width=1200">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Centro de controlo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
 
@@ -34,7 +34,13 @@
      de três colunas, o mostrador do ar condicionado, o bloco de vídeo e os
      esqueletos dos cartões que ainda não têm fonte de dados.
 
-     Página desktop-only (viewport width=1200): sem @media queries.
+     Viewport device-width + opt-in shell-mobile (Set/2026): a página é usada
+     ao telemóvel para ver as câmaras e mandar no A/C. Continua SEM @media
+     queries próprias — os únicos vivem no gioco-shell.css. A reorganização
+     em coluna única fica no bloco `body.shell-touch` no fim deste <style>,
+     classe que o gioco-shell.js põe no body quando há shell-mobile e não há
+     hover (nunca pela largura). Sem ela (rato), nada daquilo aplica e o
+     layout de três colunas fica exatamente como sempre.
      ====================================================================== */
 
   body{ -webkit-font-smoothing:antialiased; }
@@ -291,7 +297,7 @@
   .ac-vent button:hover{ border-color:var(--ink); }
   .ac-vent button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
   .ac-vent button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
-  .ac-vent-custom{ font-family:'Space Mono',monospace; font-size:11.5px; color:var(--ink); padding:0 4px; }
+  .ac-vent-custom{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink); padding:0 4px; }
   .ac-vent-custom:empty{ display:none; }
 
   /* "Mais opções": discreto, abre o giocoModal do shell. */
@@ -359,7 +365,7 @@
   .acp-slider{ display:flex; align-items:center; gap:12px; }
   .acp-slider input[type=range]{ flex:1; accent-color:var(--red); margin:0; }
   .acp-slider input[type=range]:disabled{ opacity:.5; }
-  .acp-slider output{ font-family:'Space Mono',monospace; font-size:14px; min-width:3ch; text-align:right; }
+  .acp-slider output{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:14px; min-width:3ch; text-align:right; }
   .acp-nota{ margin:8px 0 0; font-size:11.5px; color:var(--muted); }
   .acp-toggle{ display:flex; align-items:center; gap:12px; padding:9px 0; }
   .acp-toggle + .acp-toggle{ border-top:1px solid var(--line); }
@@ -367,7 +373,7 @@
   .acp-toggle .txt b{ display:block; font-size:12.5px; font-weight:600; }
   .acp-toggle .txt span{ font-size:11.5px; color:var(--muted); }
   .acp-kv{ display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:12.5px; }
-  .acp-kv span:last-child{ font-family:'Space Mono',monospace; font-size:12px; text-align:right; }
+  .acp-kv span:last-child{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:12px; text-align:right; }
   .acp-kv .status{ font-family:'Inter',sans-serif; }
 
   /* ======================================================================
@@ -631,7 +637,7 @@
     font-variant-numeric:tabular-nums;
   }
   .cc-valor b{
-    font-family:'Space Mono', monospace;
+    font-family:'Inter',sans-serif;
     font-size:18px; font-weight:700;
     color:var(--ink);
     white-space:nowrap;
@@ -741,9 +747,83 @@
     font-size:11.5px;
     color:var(--muted);
   }
+
+  /* ======================================================================
+     TELEMÓVEL — coluna única (Set/2026).
+
+     Tudo aqui é prefixado por body.shell-touch, classe que o gioco-shell.js
+     põe no body quando a página é shell-mobile E não há hover (matchMedia
+     '(hover: none)'). Não há @media nesta página: no computador da loja, com
+     rato, nada disto aplica e a grelha de três colunas fica como sempre.
+
+     As colunas e a fila passam a display:contents para que TODOS os cartões
+     sejam filhos diretos da grelha e possam ser ordenados com `order`.
+     Critério da ordem: primeiro os cartões já ligados a dados (câmara, A/C,
+     vendas hoje, consumo), no fim os que ainda estão em placeholder "Em
+     breve" (HACCP, equipa, entradas, mensagens). Ao ligar um cartão novo,
+     subir a sua `order`.
+     ====================================================================== */
+  body.shell-touch .cc-grid{
+    grid-template-columns:1fr;
+    gap:14px;
+    align-items:start;
+  }
+  body.shell-touch .cc-col,
+  body.shell-touch .cc-fila{ display:contents; }
+  /* Os cartões saem das colunas: garantir largura total e nada a sair pelo lado. */
+  body.shell-touch .cc-grid > *,
+  body.shell-touch .cc-card,
+  body.shell-touch .cam{ min-width:0; max-width:100%; }
+  /* Ordem dos cartões (ligados primeiro, placeholders no fim). */
+  body.shell-touch #cam{ order:1; }
+  body.shell-touch #acCard{ order:2; }
+  body.shell-touch .vh-card{ order:3; }
+  body.shell-touch #consumoCard{ order:4; }
+  body.shell-touch #haccpCard{ order:5; }
+  body.shell-touch #equipaCard{ order:6; }
+  body.shell-touch #entradasCard{ order:7; }
+  body.shell-touch #chatCard{ order:8; }
+  /* O padding de 16px da fila (.cc-fila .cc-card) era para a coluna estreita
+     do desktop; ao telemóvel os cartões têm a largura toda e voltam ao padding
+     normal do .card. A coluna flex mantém-se (o .cc-nota fica no fundo). */
+  body.shell-touch .cc-fila .cc-card{ padding:20px; }
+
+  /* Câmara: largura total, 16:9 já vem do .cam. Separadores com alvo ≥ 40px. */
+  body.shell-touch .cam{ width:100%; }
+  body.shell-touch .cam-tab{ min-height:40px; padding:8px 18px; }
+  body.shell-touch .cam-tabs{ padding:12px 14px; }
+  body.shell-touch .cam-topo{ padding:12px 14px; }
+
+  /* A/C: alvos de toque ≥ 40px. O dial mantém touch-action:none. */
+  body.shell-touch .ac-passo{ width:44px; height:44px; }
+  body.shell-touch .ac-modo-chip{ min-height:42px; }
+  body.shell-touch .ac-vent{ gap:6px; }
+  body.shell-touch .ac-vent button{ min-height:40px; padding:8px 12px; font-size:11.5px; }
+  body.shell-touch .ac-mais{ min-height:40px; padding:8px 14px; }
+  body.shell-touch .cc-switch{ width:44px; height:24px; }
+  body.shell-touch .cc-switch::after{ width:18px; height:18px; }
+  body.shell-touch .cc-switch.on::after{ left:23px; }
+  /* O dropdown é position:fixed com a largura do chip (JS); nunca mais largo
+     do que o ecrã menos as margens. */
+  body.shell-touch .ac-dd{ max-width:calc(100vw - 16px); }
+  body.shell-touch .ac-dd button{ min-height:42px; }
+  /* Modal do shell: já é min(560px,100%) e overflow:auto; só afinar a folga
+     do overlay para caber em 375px sem sair pelo lado. */
+  body.shell-touch .gioco-modal-overlay{ padding:12px; }
+  body.shell-touch .gioco-modal{ padding:18px 16px 20px; }
+  body.shell-touch .acp-slider input[type=range]{ min-height:40px; }
+
+  /* Chat: deixa de ser painel de altura completa; lista com scroll interno. */
+  body.shell-touch .chat{ min-height:0; }
+  body.shell-touch .chat-lista{ max-height:55vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+  /* Rodapé (separadores de loja): o shell já dá padding-bottom ao .page em
+     shell-mobile para a barra do fundo; aqui só a folga própria e o wrap. */
+  body.shell-touch .cc-rodape{ flex-wrap:wrap; margin-top:18px; }
+  body.shell-touch .loja-tab{ min-height:40px; }
 </style>
 </head>
-<body>
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 
 <div class="shell">
@@ -765,12 +845,13 @@
       </div>
     </div>
   </div>
+  <div class="nav-overlay" id="navOverlay"></div>
 
   <div class="main">
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-scan"/></svg>GIOCO · <b>Centro de controlo</b></h1>
@@ -857,7 +938,7 @@
           </div>
 
           <!-- 2. TEMPERATURAS HACCP -->
-          <div class="cc-card card glass-light">
+          <div class="cc-card card glass-light" id="haccpCard">
             <div class="cc-head">
               <svg class="icon" width="15" height="15"><use href="#i-clipboard-check"/></svg>
               <h3>Temperaturas HACCP</h3>
@@ -890,7 +971,7 @@
           </div>
 
           <!-- 3. EQUIPA EM TURNO -->
-          <div class="cc-card card glass-light">
+          <div class="cc-card card glass-light" id="equipaCard">
             <div class="cc-head">
               <svg class="icon" width="15" height="15"><use href="#i-users"/></svg>
               <h3>Equipa em turno</h3>
@@ -982,7 +1063,7 @@
             </div>
 
             <!-- 5. FOOTFALL -->
-            <div class="cc-card card glass-light">
+            <div class="cc-card card glass-light" id="entradasCard">
               <div class="cc-head">
                 <svg class="icon" width="15" height="15"><use href="#i-users"/></svg>
                 <h3>Footfall</h3>
@@ -1001,7 +1082,7 @@
             <!-- 6. CONSUMO ELÉTRICO — € por mês a partir dos débitos bancários
                  (ver o módulo `consumo` em baixo). Sem kWh: isso fica para um
                  futuro nó consumoEnergia/{AAAA-MM}. -->
-            <div class="cc-card card glass-light">
+            <div class="cc-card card glass-light" id="consumoCard">
               <div class="cc-head">
                 <svg class="icon" width="15" height="15"><use href="#i-bar-chart-2"/></svg>
                 <h3>Consumo</h3>
@@ -1028,7 +1109,7 @@
              COLUNA DIREITA — chat de equipa
              ============================================================ -->
         <div class="cc-col">
-          <div class="cc-card chat card glass-light">
+          <div class="cc-card chat card glass-light" id="chatCard">
             <div class="cc-head">
               <svg class="icon" width="15" height="15"><use href="#i-message-square"/></svg>
               <h3>Mensagens da equipa</h3>

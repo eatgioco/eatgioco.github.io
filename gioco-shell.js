@@ -359,6 +359,34 @@
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
+  /* ---------- CLASSE shell-touch NO BODY ----------
+     Companheira do bloco @media (hover: none) do gioco-shell.css, e como ele
+     OPT-IN: sem <body class="shell-mobile"> não faz nada (nem sequer no
+     telemóvel). Com a classe, e quando o dispositivo não tem hover, põe
+     body.shell-touch — e é com esse prefixo que uma página reorganiza o seu
+     layout (ex.: a grelha de três colunas do centro de controlo em coluna
+     única) sem escrever @media próprios, que o CLAUDE.md proíbe fora do shell.
+
+     O critério é o hover, NUNCA a largura — o mesmo do @media do CSS. Um iPad
+     com rato ligado/desligado muda de estado a quente, por isso volta a
+     correr no 'change' do matchMedia. */
+  function atualizarShellTouch(){
+    try {
+      if (!document.body) return;
+      document.body.classList.toggle('shell-touch', ehToque());
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+  function initShellTouch(){
+    try {
+      atualizarShellTouch();
+      var mq = window.matchMedia && window.matchMedia('(hover: none)');
+      if (mq){
+        if (mq.addEventListener) mq.addEventListener('change', atualizarShellTouch);
+        else if (mq.addListener) mq.addListener(atualizarShellTouch);
+      }
+    } catch (e) { /* nunca travar o resto do script */ }
+  }
+
 
   /* ---------- MODAL (giocoModal) ----------
      Componente único do shell para painéis sobrepostos (ex.: opções do A/C
@@ -435,6 +463,7 @@
     initSidebar();
     initTheme();
     initMenuToque();
+    initShellTouch();
   }
 
   injectSprite(); // o mais cedo possível, para os <use> do markup resolverem
