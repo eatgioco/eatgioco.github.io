@@ -80,7 +80,10 @@
    movimento ligado não se reutiliza" aplica-se entre itens de receita.
 
    ESTADOS: confirmado (há entrada) · aproximado (entrada automática com
-   diferença, só receitas) · aguarda (0 candidatos, dentro da janela)
+   diferença, só receitas) · semDados (só receitas: dia anterior ao primeiro
+   booking_date em memória, primeiroDiaBanco(); sem proposta, sem escrita,
+   sem acções; uma entrada antiga desse dia sem ligação fica como está) ·
+   aguarda (0 candidatos, dentro da janela)
    · semMovimento (0 candidatos, janela já passou) · ambiguo (2+ candidatos,
    ou 1 candidato disputado / com valor estimado / fora da tolerância)
    · semData (sem âncora: linha sem concluidoEm — só ligação manual).
@@ -221,6 +224,21 @@ function giocoReconciliacaoEngine(deps){
   // Todos os créditos das duas contas (receitas; pesquisa manual de receitas).
   function movimentosCredito(filtroRegex){
     return movimentos('CRDT', filtroRegex);
+  }
+
+  // Primeiro booking_date presente em qualquer conta (DBIT ou CRDT), calculado
+  // dos movimentos em memória — nunca fixo. null sem movimentos.
+  function primeiroDiaBanco(){
+    var min = null;
+    var contas = __MOVS();
+    Object.keys(contas).forEach(function(conta){
+      var movs = contas[conta] || {};
+      Object.keys(movs).forEach(function(key){
+        var dia = movs[key] && diaBanco(movs[key].booking_date);
+        if (dia && (min === null || dia < min)) min = dia;
+      });
+    });
+    return min;
   }
 
   function movimentoPorId(conta, key){
@@ -400,7 +418,7 @@ function giocoReconciliacaoEngine(deps){
   // movimentos. Cada item traz ancora, janela, cents, estimado e,
   // opcionalmente, filtro / tolerancia / modo ('unico'|'soma') /
   // toleranciaAproxCents / toleranciaAproxPct / aguardaDias.
-  function reconciliar(itens, movs, hoje){
+  function reconciliar(itens, movs, hoje, primeiroDiaBanco){
     var rec = __REC();
     var usados = movimentosUsados();
 
@@ -432,6 +450,9 @@ function giocoReconciliacaoEngine(deps){
         return;
       }
       if (!it.ancora){ it.estado = 'semData'; return; }
+      // Dia anterior ao primeiro movimento bancário em memória: não há com
+      // que reconciliar. Sem proposta, sem escrita, sem acções na UI.
+      if (primeiroDiaBanco && it.ancora < primeiroDiaBanco){ it.estado = 'semDados'; it.candidatos = []; return; }
 
       if (it.modo === 'soma'){
         // Regra B: candidato = soma de todos os créditos livres da família
@@ -538,8 +559,8 @@ function giocoReconciliacaoEngine(deps){
   function calcularReceitas(){
     var movs = movimentosCredito();
     var itens = receitasDiarias();
-    var r = reconciliar(itens, movs, hojeISO());
-    var g = agruparPorEstado(itens, ['confirmado', 'aproximado', 'aguarda', 'semMovimento', 'ambiguo']);
+    var r = reconciliar(itens, movs, hojeISO(), primeiroDiaBanco());
+    var g = agruparPorEstado(itens, ['confirmado', 'aproximado', 'aguarda', 'semMovimento', 'ambiguo', 'semDados']);
 
     var porDia = {};
     itens.forEach(function(it){
@@ -715,7 +736,7 @@ function giocoReconciliacaoEngine(deps){
     centimos: centimos, diaLocal: diaLocal, diasEntre: diasEntre,
     chavePedido: chavePedido, chaveFixo: chaveFixo, chaveVenda: chaveVenda, parseChaveConcluido: parseChaveConcluido,
     movimentos: movimentos, movimentosDebito: movimentosDebito, movimentosCredito: movimentosCredito,
-    movimentoPorId: movimentoPorId,
+    movimentoPorId: movimentoPorId, primeiroDiaBanco: primeiroDiaBanco,
     movimentosUsados: movimentosUsados, entradaLigada: entradaLigada, excluidosDe: excluidosDe,
     chavesDaEntrada: chavesDaEntrada,
     pagamentosConcluidos: pagamentosConcluidos, receitasDiarias: receitasDiarias,

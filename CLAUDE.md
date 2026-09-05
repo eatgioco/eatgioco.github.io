@@ -335,9 +335,9 @@ reconciliacaoBancaria — ligação pagamento pago ↔ movimento bancário real 
                          diferenca); 2+ → ambiguo; 0 e hoje ≤ dia+5 → aguarda; 0 e
                          hoje > dia+5 → semMovimento. Regra B (OU ↔ /^FECHO TPA/i — NUNCA
                          /TPA/i, apanha compras "TPA-UBR…"): modo soma = todos os créditos
-                         FECHO TPA livres com booking_date = dia (o fecho chega à noite do
-                         próprio dia; NOTA: o teste de 1,25 de 27/08 tem descritivo
-                         "FECHO TPA:GIOCO®" e por isso entra na soma); |Δ| ≤ 0,10 →
+                         FECHO TPA livres com booking_date = dia, sem valor mínimo (o
+                         fecho chega à noite do próprio dia; o crédito de teste de 1,25
+                         de 27/08 entra na soma — decisão definitiva); |Δ| ≤ 0,10 →
                          confirmado; |Δ| ≤ TOLERANCIA_OU_PCT (5 %, PROVISÓRIA — rever após 4
                          semanas de dados OU; constante no topo do módulo) → aproximado;
                          acima → ambiguo (só manual, botão "Ligar a soma"); sem fecho e
@@ -346,7 +346,14 @@ reconciliacaoBancaria — ligação pagamento pago ↔ movimento bancário real 
                          e os CRDT das receitas nunca colidem). Desligar = o mesmo PATCH
                          (ligado:false + excluidos/{key} por cada chave, campos da
                          ligação a null), nunca remove(). A pesquisa manual das receitas
-                         mostra só CRDT (sem filtro de família). A página lê vendasDiario/
+                         mostra só CRDT (sem filtro de família). Estado semDados (só
+                         receitas): dia anterior ao primeiro booking_date presente em
+                         qualquer conta em memória (RE.primeiroDiaBanco(), calculado —
+                         nunca fixo; hoje 31/05/2026 na Revolut, 01/06 na ABANCA) — selo
+                         cinzento "Sem dados bancários", sem acções, não escreve entrada
+                         e não conta no "N dias por confirmar"; as entradas venda: de
+                         Maio escritas antes disto ficam como estão (nunca apagar) e a UI
+                         mostra semDados por cima. A página lê vendasDiario/
                          inteiro só em leitura; a secção tem filtros de mês/estado, contador
                          "N dias por confirmar" (aguarda + semMovimento + ambiguo, todo o
                          histórico) e a sub-lista "Créditos sem venda" (INTERCARD / FECHO

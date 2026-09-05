@@ -1648,6 +1648,7 @@
   .rec-badge.semMovimento{ background:var(--rec-red-bg); color:var(--red-ink); border-color:var(--red-ink); }
   .rec-badge.ambiguo{ background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
   .rec-badge.semData{ background:transparent; color:var(--muted); border-color:var(--muted); border-style:dashed; }
+  .rec-badge.semDados{ background:var(--dough); color:var(--muted); border-color:var(--line); }
 
   .rec-contador{
     display:flex;
@@ -1943,6 +1944,7 @@
           <option value="aguarda">Aguardam o banco</option>
           <option value="semMovimento">Sem movimento</option>
           <option value="ambiguo">Ambíguos</option>
+          <option value="semDados">Sem dados bancários</option>
         </select></label>
       </div>
       <div class="rec-contador" id="recReceitasResumo">—</div>
@@ -3112,7 +3114,8 @@ window.addEventListener('load', function () {
     aguarda:      { rotulo: '⏳ Aguarda banco',  titulo: 'Aguardam o banco' },
     semMovimento: { rotulo: '⚠ Sem movimento',  titulo: 'Sem movimento' },
     ambiguo:      { rotulo: '? Ambíguo',        titulo: 'Ambíguos' },
-    semData:      { rotulo: '— Sem data',       titulo: 'Sem data de pagamento' }
+    semData:      { rotulo: '— Sem data',       titulo: 'Sem data de pagamento' },
+    semDados:     { rotulo: 'Sem dados bancários', titulo: 'Sem dados bancários' }
   };
   var REC_POR_CONFIRMAR = { aguarda: true, semMovimento: true, ambiguo: true };
   var REC_ORDEM = ['semMovimento', 'ambiguo', 'semData', 'aguarda', 'confirmado'];
@@ -3351,6 +3354,8 @@ window.addEventListener('load', function () {
       }
     } else if (it.estado === 'aguarda'){
       h += '<p class="rec-vazio">Ainda sem crédito ' + escapeHtml(it.familia) + ' no banco — ' + janela + '.</p>';
+    } else if (it.estado === 'semDados'){
+      h += '<p class="rec-vazio">Dia anterior ao primeiro movimento bancário disponível (' + fmtDiaISO(RE.primeiroDiaBanco()) + '). Não há com que reconciliar.</p>';
     }
     if (it.estado === 'semMovimento' || it.estado === 'ambiguo' || it.estado === 'aguarda'){
       var lista = RE.pesquisaManual(it, it.dia);
@@ -3429,6 +3434,7 @@ window.addEventListener('load', function () {
       '<span><span class="num">' + c.aguarda + '</span> aguardam</span>' +
       '<span><span class="num">' + c.semMovimento + '</span> sem movimento</span>' +
       '<span><span class="num">' + c.ambiguo + '</span> ambíguos</span>' +
+      (c.semDados ? '<span><span class="num">' + c.semDados + '</span> sem dados bancários</span>' : '') +
       '<span class="rec-cand-conta">itens dia × meio, todo o histórico</span>';
 
     function passaFiltro(it){
