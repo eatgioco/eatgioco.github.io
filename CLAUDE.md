@@ -68,13 +68,13 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `gioco-custos.js` | Motor partilhado de custo/food cost (`GiocoCustos`): `custoIngrediente` (precoUltimaCompra ÷ compra.fator), `custoPreparacao`, `custoReceita` (→ custo, avisos[], foodCost %), `foodCost`, `converterFator`. Extraído do receitas.html em Set/2026 sem alterar um cêntimo; receitas.html e gestao.html usam-no — nunca reimplementar por página | — |
 | `gioco-consumo.js` | Motor partilhado: explosão da ficha técnica (produto → receita → preparações recursivas → ingredientes, com as preparações de custo fixo só em euros) e consumo teórico a partir de `vendasDiario`. Factory `giocoConsumoEngine({getReceitas, getPreparacoes, getVendasDiario, getMapa})`, no molde do `gioco-compromissos.js`. Usado pelo `foodcost.html` (variância) e pela aba "Encomenda sugerida" da `compras.html` (procura e consumo desde a contagem) | — |
 | `gioco-faturas.js` | Módulo partilhado de **leitura e arquivo de faturas** (`GiocoFaturas`), SÓ leitura — não escreve em lado nenhum. Extraído da `leitura-faturas.html` em Set/2026 sem alterar comportamento: constantes do Azure Document Intelligence (endpoint, chave F0 — risco aceite, ver comentário —, versão, modelo), `ler(file)` → `{fornecedorTexto, montante, referencia, data, prazoPagamento, linhas}`, `analyzeInvoice`, `fieldText/fieldDateIso/fieldAmount/extrairLinhas`, `fileToBase64/fileToDataUrl/compressImageDataUrl`, `prepararArquivoFatura(file)` (imagem comprimida a 1600 px JPEG 0.8, PDF tal e qual) e `abrirArquivoFatura(dataUrl)`, `normalizeNome` e `findMatchingSupplier(vendorName, allSuppliers)`. Cada página decide onde grava: `leitura-faturas.html` → `faturasProcessadas`/`faturasArquivo`; `caixa.html` → dentro do movimento. Nunca reimplementar por página | — |
-| `gioco-reconciliacao.js` | Motor partilhado de **reconciliação bancária** (`giocoReconciliacaoEngine({getPaymentRequests, getPagamentosConcluidos, getMovimentos, getReconciliacao, compromissos: CE, ref})`, no molde do `gioco-compromissos.js`). `pagamentosConcluidos()` achata linhas pagas + ocorrências de compromissos; `calcular()` → `{itens, porEstado, contadores, autoNovas}`; `pesquisaManual(item)` (±30 dias, 90–110 % do valor); `ligar(chave, mov, 'auto'|'manual')`, `aplicarAutomaticas(res)` e `desligar(chave)` — as únicas escritas, sempre `update()` no caminho `reconciliacaoBancaria/{chave}` (desligar marca `ligado:false` + `excluidos/`, nunca `remove()`). Regra de match e estados documentados no cabeçalho do ficheiro e no nó abaixo. Usado só pela `tesouraria.html`; nunca reimplementar por página | — |
+| `gioco-reconciliacao.js` | Motor partilhado de **reconciliação bancária** (`giocoReconciliacaoEngine({getPaymentRequests, getPagamentosConcluidos, getMovimentos, getReconciliacao, compromissos: CE, ref})`, no molde do `gioco-compromissos.js`). `pagamentosConcluidos()` achata linhas pagas + ocorrências de compromissos; `calcular()` → `{itens, porEstado, contadores, autoNovas}`; `pesquisaManual(item)` (±30 dias, 90–110 % do valor); `ligar(chave, mov, 'auto'|'manual')`, `aplicarAutomaticas(res)` e `desligar(chave)` — as únicas escritas, sempre `update()` no caminho `reconciliacaoBancaria/{chave}` (desligar marca `ligado:false` + `excluidos/`, nunca `remove()`). Generalizado em 05/09/2026: `movimentos(indicador, filtroRegex, excluirRegex)` (`movimentosDebito()` = DBIT sem INTERNA, `movimentosCredito()`), núcleo `reconciliar(itens, movs, hoje)` com janela/tolerâncias/modo (`unico`|`soma`)/filtro por item, estado `aproximado`, e `calcularReceitas()` sobre `getVendasDiario` (regras A/B no nó). Para receitas `ligar(chave, mov|[movs], metodo, item, estado)`. `calcular()` dos pagamentos ficou com resultado idêntico (testado antes/depois com os dados reais). Regra de match e estados documentados no cabeçalho do ficheiro e no nó abaixo. Usado só pela `tesouraria.html`; nunca reimplementar por página | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
 | `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência | — |
 | `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
 | `gioco-charts.js` | `GiocoChart.*` — funções que desenham barras/colunas/linha/donut em HTML/SVG | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
-| `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU e **reconciliação bancária** (Set/2026): cada pagamento marcado como pago (linha de `paymentRequests` concluída ou ocorrência em `pagamentosConcluidos`) leva um selo com o estado face aos débitos de `contasBancarias/{abanca,revolut}/movimentos` — ✓ Confirmado · ⏳ Aguarda banco · ⚠ Sem movimento · ? Ambíguo · — Sem data — no separador Concluídos, no detalhe do calendário e na secção "Reconciliação bancária" (contador + cinco listas expansíveis: Ligar nos ambíguos e na pesquisa alargada dos sem movimento / sem data, Desligar com confirmação nos confirmados). A lógica é toda do `gioco-reconciliacao.js`; a página só liga os dados em memória e desenha. Lê os movimentos das duas contas só em leitura; a única escrita nova é em `reconciliacaoBancaria/` | Só Manel |
+| `tesouraria.html` | Compromissos fixos, calendário de saídas, TSU e **reconciliação bancária** (Set/2026): cada pagamento marcado como pago (linha de `paymentRequests` concluída ou ocorrência em `pagamentosConcluidos`) leva um selo com o estado face aos débitos de `contasBancarias/{abanca,revolut}/movimentos` — ✓ Confirmado · ⏳ Aguarda banco · ⚠ Sem movimento · ? Ambíguo · — Sem data — no separador Concluídos, no detalhe do calendário e na secção "Reconciliação bancária" (contador + cinco listas expansíveis: Ligar nos ambíguos e na pesquisa alargada dos sem movimento / sem data, Desligar com confirmação nos confirmados). A lógica é toda do `gioco-reconciliacao.js`; a página só liga os dados em memória e desenha. Lê os movimentos das duas contas só em leitura; a única escrita nova é em `reconciliacaoBancaria/`. Secção **Receitas** (05/09/2026): tabela dia × meio (Cartão débito ↔ INTERCARD, Outro/TPA ↔ FECHO TPA) com faturado / crédito / Δ / selo (o selo "≈ Aproximado" é azul, tokens `--rec-aprox*` locais), filtros mês/estado, contador "N dias por confirmar", detalhe por célula (movimento ligado + Desligar, candidatos + Ligar, pesquisa alargada só em créditos) e "Créditos sem venda"; lê `vendasDiario/` só em leitura. Regras no nó `reconciliacaoBancaria` | Só Manel |
 | `tarefas.html` | Tarefas, prazos e fixados do dia | Só Manel |
 | `conta-bancaria.html` | Movimentos e saldo de uma conta (`?conta={slug}`) | Só Manel |
 | `mrn-dashboard.html` | Dashboard privado: contas bancárias, vendas, pagamentos e compromissos, tarefas, pedidos da loja espelhados, depósitos bancários e reconciliação, central de notificações, armazenamento, e placeholders (Calendário Outlook, Instagram, Google Reviews) | Só Manel |
@@ -302,7 +302,39 @@ reconciliacaoBancaria — ligação pagamento pago ↔ movimento bancário real 
                          1 candidato, liga-o — é coerente); a pesquisa manual mostra-os na
                          mesma, marcados "excluído antes", e ligar à mão a um excluído é
                          permitido (o mesmo update tira a chave de excluidos/). Os
-                         movimentos bancários e os pagamentos de origem nunca são alterados
+                         movimentos bancários e os pagamentos de origem nunca são alterados.
+                         RECEITAS (05/09/2026, secção "Receitas" da tesouraria.html, mesmo
+                         motor — calcularReceitas()): um item por dia e meio de pagamento de
+                         vendasDiario/{AAAA-MM}/{dia}/porPagamento com bruto > 0, chaves
+                         venda:{AAAA-MM-DD}~CD e venda:{AAAA-MM-DD}~OU, no MESMO nó. Campos:
+                         conta, movimentoKey (+ movimentoKeys[] quando a regra B soma vários
+                         fechos), dataMovimento, valorVenda, valorMovimento, diferenca
+                         (= movimento − venda), estado ('confirmado'|'aproximado'), metodo,
+                         ligado, em. Candidatos = CRDT de qualquer conta (hoje tudo ABANCA).
+                         Regra A (CD ↔ /INTERCARD/i na remittance_information): exacto com
+                         |Δ| ≤ 0,10 € e booking_date ∈ [dia, dia+5], 1 candidato não
+                         disputado → confirmado; senão 1 único crédito INTERCARD livre na
+                         janela com |Δ| ≤ 40 € → aproximado (ligado automaticamente, com
+                         diferenca); 2+ → ambiguo; 0 e hoje ≤ dia+5 → aguarda; 0 e
+                         hoje > dia+5 → semMovimento. Regra B (OU ↔ /^FECHO TPA/i — NUNCA
+                         /TPA/i, apanha compras "TPA-UBR…"): modo soma = todos os créditos
+                         FECHO TPA livres com booking_date = dia (o fecho chega à noite do
+                         próprio dia; NOTA: o teste de 1,25 de 27/08 tem descritivo
+                         "FECHO TPA:GIOCO®" e por isso entra na soma); |Δ| ≤ 0,10 →
+                         confirmado; |Δ| ≤ TOLERANCIA_OU_PCT (5 %, PROVISÓRIA — rever após 4
+                         semanas de dados OU; constante no topo do módulo) → aproximado;
+                         acima → ambiguo (só manual, botão "Ligar a soma"); sem fecho e
+                         hoje ≤ dia+1 → aguarda, senão semMovimento. Um movimento ligado
+                         nunca se reutiliza entre itens de receita (os DBIT dos pagamentos
+                         e os CRDT das receitas nunca colidem). Desligar = o mesmo PATCH
+                         (ligado:false + excluidos/{key} por cada chave, campos da
+                         ligação a null), nunca remove(). A pesquisa manual das receitas
+                         mostra só CRDT (sem filtro de família). A página lê vendasDiario/
+                         inteiro só em leitura; a secção tem filtros de mês/estado, contador
+                         "N dias por confirmar" (aguarda + semMovimento + ambiguo, todo o
+                         histórico) e a sub-lista "Créditos sem venda" (INTERCARD / FECHO
+                         TPA livres fora da janela de qualquer dia; só listar). Sem cartão
+                         no mrn-dashboard.html
 plAjustes             — ajustes manuais do P&L (resultados.html, o ÚNICO que
                          escreve aqui): plAjustes/{AAAA-MM}/exclusoes/{idEstavel}
                          = { origem, motivo?, excluidoEm }. idEstavel identifica
@@ -494,8 +526,8 @@ mecânica e é obrigatório antes de qualquer push que toque em páginas):
 
 Fora do âmbito (lista de exceções do script): `abanca-callback.html`,
 `privacidade.html`, `termos.html` (páginas de suporte, design próprio),
-`_referencia-fase0.html` (arquivo histórico) e `estilo.html` (montra — nav à
-mão de propósito).
+`_referencia-fase0.html` (arquivo histórico), `estilo.html` (montra — nav à
+mão de propósito) e `prototipo-barra-mobile.html` (protótipo descartável, sem shell).
 
 ### Design system (`gioco-shell.css` / `gioco-shell.js`)
 

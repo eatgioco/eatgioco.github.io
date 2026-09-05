@@ -1718,6 +1718,67 @@
   .rec-acoes{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .btn-small.rec-desligar{ border-color:var(--red-ink); color:var(--red-ink); }
   .rec-vazio{ font-size:12.5px; color:var(--muted); padding:6px 0; }
+
+  /* ---------- Receitas (POS ↔ créditos do terminal) ----------
+     Mesmo selo dos pagamentos; "aproximado" tem cor própria (azul), que o
+     shell não dá como estado — token local com par escuro. */
+  :root{ --rec-aprox:#1F4E9C; --rec-aprox-bg:#E3ECFA; }
+  [data-theme="dark"]{ --rec-aprox:#8FB4F2; --rec-aprox-bg:rgba(143,180,242,0.14); }
+  .rec-badge.aproximado{ background:var(--rec-aprox-bg); color:var(--rec-aprox); border-color:var(--rec-aprox); }
+
+  .rec-sum-contador{
+    font-size:11px;
+    letter-spacing:0.5px;
+    color:var(--red-ink);
+    margin-left:8px;
+  }
+  .rec-filtros{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 16px;
+    align-items:flex-end;
+    margin:0 0 14px;
+  }
+  .rec-filtros label{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--muted);
+    min-width:140px;
+    flex:0 1 200px;
+  }
+  .rec-filtros select{ width:100%; padding:8px 10px; font-size:13px; }
+  .rec-tabela-wrap{ overflow-x:auto; }
+  .rec-tabela{ min-width:760px; }
+  .rec-tabela th.rec-grupo-th{
+    text-align:center;
+    border-left:1px solid var(--line);
+    color:var(--ink);
+    letter-spacing:1px;
+  }
+  .rec-tabela th.rec-sep, .rec-tabela td.rec-sep{ border-left:1px solid var(--line); }
+  .rec-tabela td.rec-cel{ cursor:pointer; }
+  .rec-tabela tr.rec-dia:hover td.rec-cel{ background:var(--dough); }
+  .rec-tabela td.rec-cel-vazia{ color:var(--muted); text-align:center; }
+  .rec-tabela .rec-delta{ color:var(--muted); }
+  .rec-tabela .rec-delta.rec-delta-nz{ color:var(--amber); }
+  .rec-tabela td.rec-badge-td{ white-space:nowrap; }
+  .rec-tabela td.rec-badge-td .rec-caret{ color:var(--red); margin-left:6px; }
+  .rec-corpo{ padding:10px 12px 12px; background:var(--dough); font-size:13px; color:var(--ink); }
+  .rec-corpo .rec-corpo-titulo{ font-weight:700; margin:0 0 4px; }
+  .rec-orfaos-titulo{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    margin:22px 0 8px;
+  }
 </style>
 </head>
 <body class="shell-mobile">
@@ -1865,6 +1926,29 @@
       <div class="rec-contador" id="recContador">—</div>
       <p class="rec-nota">Cada pagamento marcado como pago é cruzado com os débitos das duas contas (valor exacto, até 7 dias depois; débitos directos à volta do dia esperado). Só liga sozinho quando há um único movimento possível. Desligar é sempre manual.</p>
       <div id="recListas"><p class="tes-empty">A carregar movimentos bancários…</p></div>
+    </div>
+  </details>
+
+  <details class="tes-details" id="tesReceitasDetails">
+    <summary>Receitas <span class="rec-sum-contador" id="recReceitasContador"></span></summary>
+    <div class="tes-details-body">
+      <p class="rec-nota">Cada dia de vendas do POS é cruzado, por meio de pagamento, com os créditos do terminal na ABANCA: Cartão débito ↔ INTERCARD (valor exacto até 5 dias depois; senão o único crédito próximo, até 40 €, fica <em>aproximado</em>) e Outro/TPA ↔ FECHO TPA (soma dos fechos do próprio dia; até 5 % de diferença fica <em>aproximado</em>). Tocar numa célula mostra o movimento ligado ou os candidatos. Desligar é sempre manual.</p>
+      <div class="rec-filtros">
+        <label>Mês<select id="recReceitasMes"></select></label>
+        <label>Estado<select id="recReceitasEstado">
+          <option value="todos">Todos</option>
+          <option value="porConfirmar">Por confirmar</option>
+          <option value="confirmado">Confirmados</option>
+          <option value="aproximado">Aproximados</option>
+          <option value="aguarda">Aguardam o banco</option>
+          <option value="semMovimento">Sem movimento</option>
+          <option value="ambiguo">Ambíguos</option>
+        </select></label>
+      </div>
+      <div class="rec-contador" id="recReceitasResumo">—</div>
+      <div id="recReceitasTabela"><p class="tes-empty">A carregar vendas…</p></div>
+      <p class="rec-orfaos-titulo">Créditos sem venda</p>
+      <div id="recReceitasOrfaos"><p class="rec-vazio">—</p></div>
     </div>
   </details>
 
@@ -2161,6 +2245,10 @@ window.addEventListener('load', function () {
   var movsAbancaRef = db.ref('contasBancarias/abanca/movimentos');
   var movsRevolutRef = db.ref('contasBancarias/revolut/movimentos');
   var reconciliacaoRef = db.ref('reconciliacaoBancaria');
+  // Receitas: vendasDiario/ entra só em LEITURA (escrito pelo importador
+  // do vendas.html); a reconciliação de receitas escreve nas chaves
+  // venda:{dia}~CD / venda:{dia}~OU do mesmo reconciliacaoBancaria/.
+  var vendasDiarioRef = db.ref('vendasDiario');
 
   var loadingEl = document.getElementById('paymentsLoading');
   var summaryEl = document.getElementById('paymentsSummary');
@@ -2186,8 +2274,12 @@ window.addEventListener('load', function () {
   var movsAbanca = {};        // contasBancarias/abanca/movimentos
   var movsRevolut = {};       // contasBancarias/revolut/movimentos
   var allReconciliacao = {};  // reconciliacaoBancaria/
-  var reconCarregado = { abanca: false, revolut: false, rec: false, pedidos: false };
+  var allVendasDiario = {};   // vendasDiario/ (só porPagamento é usado)
+  var reconCarregado = { abanca: false, revolut: false, rec: false, pedidos: false, vendas: false };
   var reconAberto = null;     // chave do item expandido na secção
+  var receitaAberta = null;   // chave venda:{dia}~{meio} expandida na tabela de receitas
+  var recMesFiltro = null;    // AAAA-MM escolhido no filtro das receitas (null = ainda sem default)
+  var recEstadoFiltro = 'todos';
 
   function escapeHtml(str) {
     if (!str) return "";
@@ -3006,19 +3098,23 @@ window.addEventListener('load', function () {
     getPagamentosConcluidos: function(){ return allPagamentosConcluidos; },
     getMovimentos:           function(){ return { abanca: movsAbanca, revolut: movsRevolut }; },
     getReconciliacao:        function(){ return allReconciliacao; },
+    getVendasDiario:         function(){ return allVendasDiario; },
     compromissos:            CE,
     ref:                     reconciliacaoRef
   });
 
   var reconResultado = null;   // último RE.calcular()
+  var receitasResultado = null; // último RE.calcularReceitas()
 
   var REC_ESTADOS = {
     confirmado:   { rotulo: '✓ Confirmado',     titulo: 'Confirmados' },
+    aproximado:   { rotulo: '≈ Aproximado',     titulo: 'Aproximados' },
     aguarda:      { rotulo: '⏳ Aguarda banco',  titulo: 'Aguardam o banco' },
     semMovimento: { rotulo: '⚠ Sem movimento',  titulo: 'Sem movimento' },
     ambiguo:      { rotulo: '? Ambíguo',        titulo: 'Ambíguos' },
     semData:      { rotulo: '— Sem data',       titulo: 'Sem data de pagamento' }
   };
+  var REC_POR_CONFIRMAR = { aguarda: true, semMovimento: true, ambiguo: true };
   var REC_ORDEM = ['semMovimento', 'ambiguo', 'semData', 'aguarda', 'confirmado'];
 
   // Chave de reconciliação de uma linha plana (itensDoMes / linhasCombinadas).
@@ -3038,9 +3134,18 @@ window.addEventListener('load', function () {
     if (reconTudoCarregado() && reconResultado.autoNovas.length){
       RE.aplicarAutomaticas(reconResultado); // o listener redesenha no fim
     }
+    // Receitas: mesma regra, e ainda com as vendas em memória. Se os
+    // pagamentos estiverem a escrever, o motor ignora esta chamada e o
+    // listener de reconciliacaoBancaria volta cá no fim.
+    receitasResultado = RE.calcularReceitas();
+    if (reconTudoCarregado() && reconCarregado.vendas && receitasResultado.autoNovas.length){
+      RE.aplicarAutomaticas(receitasResultado);
+    }
   }
 
+  // Item de reconciliação por chave: pagamentos ou receitas (venda:…).
   function itemReconciliacao(chave){
+    if (/^venda:/.test(chave)) return receitasResultado ? RE.itemPorChave(receitasResultado, chave) : null;
     return reconResultado ? RE.itemPorChave(reconResultado, chave) : null;
   }
 
@@ -3204,6 +3309,184 @@ window.addEventListener('load', function () {
     }).join('');
   }
 
+  /* ---------- Receitas: POS ↔ créditos do terminal ---------- */
+
+  function fmtDelta(cents){
+    if (cents === null || cents === undefined) return '—';
+    var v = Math.abs(cents) / 100;
+    return (cents < 0 ? '−' : '+') + v.toFixed(2) + '€';
+  }
+
+  // Meses presentes em vendasDiario, mais recente primeiro.
+  function mesesReceitas(){
+    return Object.keys(allVendasDiario).filter(function(m){ return /^\d{4}-\d{2}$/.test(m); }).sort().reverse();
+  }
+
+  function rotuloMes(m){
+    var p = m.split('-');
+    return MESES_PT[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  }
+
+  // Detalhe de uma célula (dia × meio): movimento(s) ligado(s) com Desligar,
+  // candidatos com Ligar, ou a pesquisa alargada só em créditos.
+  function corpoReceita(it){
+    var h = '<div class="rec-corpo">';
+    h += '<p class="rec-corpo-titulo">' + escapeHtml(RE.MEIOS_RECEITA[it.meio].rotulo) + ' · ' + fmtDiaISO(it.dia) +
+         ' · faturado <span class="num">' + formatEuro(it.cents / 100) + '</span> (' + it.docs + ' docs) ' + reconBadge(it.chave) + '</p>';
+    var janela = it.janela.depois ? 'janela ' + fmtDiaISO(it.dia) + ' a ' + fmtDiaISO(addDiasISO(it.dia, it.janela.depois)) : 'no próprio dia';
+
+    if (it.estado === 'confirmado' || it.estado === 'aproximado'){
+      var lig = it.ligacao;
+      h += '<p class="rec-cands-titulo">Movimento' + (it.movimentos.length > 1 ? 's' : '') + ' ligado' + (it.movimentos.length > 1 ? 's' : '') +
+           ' (' + (lig.metodo === 'auto' ? 'automático' : 'manual') + ')' +
+           (lig.diferenca ? ' · diferença <span class="num">' + fmtDelta(Math.round(lig.diferenca * 100)) + '</span>' : '') + '</p>';
+      h += it.movimentos.length ? it.movimentos.map(function(m){ return htmlMovimento(m, it.chave, false, null); }).join('')
+                                : '<p class="rec-vazio">' + escapeHtml(nomeConta(lig.conta)) + ' ' + escapeHtml(lig.movimentoKey) + ' — já não está na sincronização.</p>';
+      h += '<div class="rec-acoes"><button type="button" class="btn-small rec-desligar" data-rec-desligar="' + escapeHtml(it.chave) + '">Desligar</button></div>';
+    } else if (it.estado === 'ambiguo'){
+      h += '<p class="rec-cands-titulo">Candidatos (' + janela + ')' + (it.motivoAmbiguo ? ' · ' + escapeHtml(it.motivoAmbiguo) : '') + '</p>';
+      h += it.candidatos.map(function(m){ return htmlMovimento(m, it.chave, true, it); }).join('');
+      if (it.modo === 'soma' && it.candidatos.length > 1){
+        h += '<div class="rec-acoes"><button type="button" class="btn-small" data-rec-ligar-soma="' + escapeHtml(it.chave) + '">Ligar a soma (' + formatEuro(it.somaCents / 100) + ')</button></div>';
+      }
+    } else if (it.estado === 'aguarda'){
+      h += '<p class="rec-vazio">Ainda sem crédito ' + escapeHtml(it.familia) + ' no banco — ' + janela + '.</p>';
+    }
+    if (it.estado === 'semMovimento' || it.estado === 'ambiguo' || it.estado === 'aguarda'){
+      var lista = RE.pesquisaManual(it, it.dia);
+      h += '<p class="rec-cands-titulo">Pesquisa alargada · créditos · ±' + RE.JANELA_MANUAL_DIAS + ' dias · 90–110 % do valor</p>';
+      h += lista.length ? lista.map(function(m){ return htmlMovimento(m, it.chave, true, it); }).join('')
+                        : '<p class="rec-vazio">Nenhum crédito livre nessa janela.</p>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function celulasReceita(it){
+    if (!it){
+      return '<td class="rec-sep rec-cel-vazia">—</td><td class="rec-cel-vazia">—</td><td class="rec-cel-vazia">—</td><td class="rec-cel-vazia">—</td>';
+    }
+    var credito = null, delta = null;
+    if (it.ligacao){
+      credito = Math.round(it.ligacao.valorMovimento * 100);
+      delta = Math.round((it.ligacao.diferenca || 0) * 100);
+    } else if (it.modo === 'soma' && it.candidatos.length){
+      credito = it.somaCents; delta = it.diferencaCents;
+    } else if (it.candidatos.length === 1){
+      credito = it.candidatos[0].cents; delta = credito - it.cents;
+    }
+    var aberta = receitaAberta === it.chave;
+    function td(cls, conteudo){
+      return '<td class="rec-cel ' + cls + '" data-venda="' + escapeHtml(it.chave) + '">' + conteudo + '</td>';
+    }
+    return td('rec-sep num', formatEuro(it.cents / 100)) +
+      td('num', credito === null ? '—' : formatEuro(credito / 100)) +
+      td('num rec-delta' + (delta ? ' rec-delta-nz' : ''), fmtDelta(delta)) +
+      td('rec-badge-td', reconBadge(it.chave) + '<span class="rec-caret">' + (aberta ? '▾' : '▸') + '</span>');
+  }
+
+  function renderReceitasSeccao(){
+    var contadorEl = document.getElementById('recReceitasContador');
+    var resumoEl = document.getElementById('recReceitasResumo');
+    var tabelaEl = document.getElementById('recReceitasTabela');
+    var orfaosEl = document.getElementById('recReceitasOrfaos');
+    var mesSel = document.getElementById('recReceitasMes');
+    if (!tabelaEl || !receitasResultado) return;
+
+    var rv = receitasResultado;
+    // "N dias por confirmar" = dias com pelo menos um meio em aguarda /
+    // sem movimento / ambíguo, em todo o histórico (não só no mês).
+    var diasPorConfirmar = Object.keys(rv.porDia).filter(function(d){
+      var r = rv.porDia[d];
+      return (r.CD && REC_POR_CONFIRMAR[r.CD.estado]) || (r.OU && REC_POR_CONFIRMAR[r.OU.estado]);
+    }).length;
+    contadorEl.textContent = diasPorConfirmar ? diasPorConfirmar + ' dia' + (diasPorConfirmar === 1 ? '' : 's') + ' por confirmar' : '';
+
+    if (!reconTudoCarregado() || !reconCarregado.vendas){
+      tabelaEl.innerHTML = '<p class="tes-empty">A carregar vendas e movimentos bancários…</p>';
+      return;
+    }
+
+    var meses = mesesReceitas();
+    if (!meses.length){
+      resumoEl.textContent = '—';
+      tabelaEl.innerHTML = '<p class="tes-empty">Ainda não há vendas importadas.</p>';
+      orfaosEl.innerHTML = '<p class="rec-vazio">—</p>';
+      return;
+    }
+    if (!recMesFiltro || meses.indexOf(recMesFiltro) === -1){
+      var corrente = anoAtivo + '-' + pad2(mesAtivo);
+      recMesFiltro = meses.indexOf(corrente) !== -1 ? corrente : meses[0];
+    }
+    mesSel.innerHTML = meses.map(function(m){
+      return '<option value="' + m + '"' + (m === recMesFiltro ? ' selected' : '') + '>' + escapeHtml(rotuloMes(m)) + '</option>';
+    }).join('');
+
+    var c = rv.contadores;
+    resumoEl.innerHTML =
+      '<span><span class="num">' + c.confirmado + '</span> confirmados</span>' +
+      '<span><span class="num">' + c.aproximado + '</span> aproximados</span>' +
+      '<span><span class="num">' + c.aguarda + '</span> aguardam</span>' +
+      '<span><span class="num">' + c.semMovimento + '</span> sem movimento</span>' +
+      '<span><span class="num">' + c.ambiguo + '</span> ambíguos</span>' +
+      '<span class="rec-cand-conta">itens dia × meio, todo o histórico</span>';
+
+    function passaFiltro(it){
+      if (!it) return false;
+      if (recEstadoFiltro === 'todos') return true;
+      if (recEstadoFiltro === 'porConfirmar') return !!REC_POR_CONFIRMAR[it.estado];
+      return it.estado === recEstadoFiltro;
+    }
+    var dias = Object.keys(rv.porDia).filter(function(d){
+      if (d.slice(0, 7) !== recMesFiltro) return false;
+      var r = rv.porDia[d];
+      return passaFiltro(r.CD) || passaFiltro(r.OU);
+    }).sort().reverse();
+
+    if (!dias.length){
+      tabelaEl.innerHTML = '<p class="tes-empty">Nenhum dia neste filtro.</p>';
+    } else {
+      var h = '<div class="rec-tabela-wrap"><table class="tes-table rec-tabela"><thead>' +
+        '<tr><th></th><th class="rec-grupo-th" colspan="4">Cartão débito · INTERCARD</th><th class="rec-grupo-th" colspan="4">Outro / TPA · FECHO TPA</th></tr>' +
+        '<tr><th>Dia</th>' +
+        '<th class="rec-sep" style="text-align:right;">Faturado</th><th style="text-align:right;">Crédito</th><th style="text-align:right;">Δ</th><th>Estado</th>' +
+        '<th class="rec-sep" style="text-align:right;">Faturado</th><th style="text-align:right;">Crédito</th><th style="text-align:right;">Δ</th><th>Estado</th>' +
+        '</tr></thead><tbody>';
+      dias.forEach(function(d){
+        var r = rv.porDia[d];
+        h += '<tr class="rec-dia"><td class="mono"><strong>' + fmtDiaISO(d) + '</strong></td>' + celulasReceita(r.CD) + celulasReceita(r.OU) + '</tr>';
+        var aberto = (r.CD && receitaAberta === r.CD.chave) ? r.CD : ((r.OU && receitaAberta === r.OU.chave) ? r.OU : null);
+        if (aberto) h += '<tr class="tes-linha-detalhe"><td colspan="9">' + corpoReceita(aberto) + '</td></tr>';
+      });
+      tabelaEl.innerHTML = h + '</tbody></table></div>';
+    }
+
+    orfaosEl.innerHTML = rv.orfaos.length
+      ? rv.orfaos.map(function(m){
+          return '<div class="rec-cand">' +
+            '<span class="rec-cand-data num">' + fmtDiaISO(m.dia) + '</span>' +
+            '<span class="rec-cand-desc">' + escapeHtml(m.desc) + '</span>' +
+            '<span class="rec-cand-conta">' + escapeHtml(m.familia) + ' · ' + escapeHtml(nomeConta(m.conta)) + '</span>' +
+            '<span class="rec-cand-valor num">' + formatEuro(m.valor) + '</span></div>';
+        }).join('')
+      : '<p class="rec-vazio">Nenhum crédito ' + 'INTERCARD / FECHO TPA fora da janela de um dia de vendas.</p>';
+  }
+
+  document.getElementById('recReceitasTabela').addEventListener('click', function(e){
+    if (e.target.closest('button')) return;
+    var cel = e.target.closest('[data-venda]');
+    if (!cel) return;
+    var chave = cel.getAttribute('data-venda');
+    receitaAberta = (receitaAberta === chave) ? null : chave;
+    renderReceitasSeccao();
+  });
+  document.getElementById('recReceitasMes').addEventListener('change', function(e){
+    recMesFiltro = e.target.value; receitaAberta = null; renderReceitasSeccao();
+  });
+  document.getElementById('recReceitasEstado').addEventListener('change', function(e){
+    recEstadoFiltro = e.target.value; receitaAberta = null; renderReceitasSeccao();
+  });
+
   // Redesenha tudo o que mostra selos: calendário, pendentes, separador
   // Concluídos e a secção.
   function renderReconciliacaoTudo(){
@@ -3228,9 +3511,26 @@ window.addEventListener('load', function () {
       var chave = ligar.getAttribute('data-rec-ligar');
       var mov = RE.movimentoPorId(ligar.getAttribute('data-rec-conta'), ligar.getAttribute('data-rec-key'));
       if (!mov){ alert('Movimento já não está disponível.'); return; }
+      // Receitas precisam do item (valor faturado → diferença registada);
+      // pagamentos mantêm a chamada de sempre.
+      var itemVenda = /^venda:/.test(chave) ? itemReconciliacao(chave) : null;
+      if (/^venda:/.test(chave) && !itemVenda){ alert('Dia de vendas já não está disponível.'); return; }
       ligar.disabled = true;
-      RE.ligar(chave, mov, 'manual').catch(function(err){
+      (itemVenda ? RE.ligar(chave, mov, 'manual', itemVenda, 'confirmado') : RE.ligar(chave, mov, 'manual')).catch(function(err){
         ligar.disabled = false;
+        alert('Não foi possível ligar: ' + (err && err.message ? err.message : err));
+      });
+      return;
+    }
+    // Regra B fora da tolerância: ligar à mão a soma de todos os fechos do dia.
+    var ligarSoma = e.target.closest('[data-rec-ligar-soma]');
+    if (ligarSoma){
+      var chaveS = ligarSoma.getAttribute('data-rec-ligar-soma');
+      var itS = itemReconciliacao(chaveS);
+      if (!itS || !itS.candidatos.length){ alert('Candidatos já não estão disponíveis.'); return; }
+      ligarSoma.disabled = true;
+      RE.ligar(chaveS, itS.candidatos, 'manual', itS, 'confirmado').catch(function(err){
+        ligarSoma.disabled = false;
         alert('Não foi possível ligar: ' + (err && err.message ? err.message : err));
       });
       return;
@@ -3819,6 +4119,7 @@ window.addEventListener('load', function () {
     renderCompromissos();
     renderAnalise();
     renderReconciliacaoSeccao();
+    renderReceitasSeccao();
   }
 
   function mudarMes(delta){
@@ -4237,6 +4538,14 @@ window.addEventListener('load', function () {
     reconCarregado.rec = true;
     renderReconciliacaoTudo();
   });
+
+  // Vendas diárias (só leitura): alimentam a reconciliação de receitas.
+  // Sem o nó (ou erro) a secção fica vazia e o resto da página continua.
+  vendasDiarioRef.on('value', function(snapshot){
+    allVendasDiario = snapshot.val() || {};
+    reconCarregado.vendas = true;
+    renderReconciliacaoTudo();
+  }, function(){ reconCarregado.vendas = true; renderReconciliacaoTudo(); });
 
   renderTesouraria();
   }); // fim de autenticarEContinuar
