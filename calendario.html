@@ -20,12 +20,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="gioco-eventos.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
+<script src="gioco-eventos.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -61,8 +63,6 @@
   .btn:hover{ border-color:var(--red); }
   .btn:active{ transform:scale(0.97); }
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
-  .btn-perigo{ border-color:var(--red); color:var(--red-ink); }
-  .btn-perigo:hover{ background:var(--red); color:var(--on-red); }
   .btn-add .icon{ width:14px; height:14px; }
 
   /* Toggle da camada de pagamentos: pílula com círculo --blush. */
@@ -108,6 +108,8 @@
   }
   .ev-chip:hover{ filter:brightness(0.94); }
   .ev-chip .num{ font-weight:500; margin-right:3px; }
+  /* Evento nascido de um pedido da loja (ligacao.tipo 'lojaPedido'): ícone store antes do título. */
+  .ev-chip .icon, .ev-bloco .icon, .dia-item-t .icon{ width:14px; height:14px; vertical-align:-2px; margin-right:4px; }
   /* Chip de pagamento (fonte 'pagamentos'): --blush + texto fixo; pago = ✓ e esbatido. */
   .ev-chip.pag{ background:var(--blush); color:#141414; }
   .ev-chip.pag .num{ margin:0 0 0 4px; opacity:.85; }
@@ -204,34 +206,7 @@
   .pag-detalhe .pag-notas{ white-space:pre-line; line-height:1.45; }
   a.btn-add{ text-decoration:none; }
 
-  /* ---------- Formulário do modal (padrão da pagamentos.html, copiado) ---------- */
-  .cal-form{ display:flex; flex-direction:column; gap:14px; color:var(--ink); }
-  .field{ display:flex; flex-direction:column; gap:6px; }
-  .field-label{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-  .cal-form input, .cal-form select, .cal-form textarea{
-    font-family:'Inter',sans-serif; font-size:13.5px; padding:10px 12px;
-    border:1px solid var(--line); border-radius:10px;
-    background:var(--white); color:var(--ink); width:100%;
-    transition:border-color .15s ease;
-  }
-  .cal-form input:focus, .cal-form select:focus, .cal-form textarea:focus{ outline:none; border-color:var(--red); }
-  .cal-form input::placeholder, .cal-form textarea::placeholder{ color:var(--muted); }
-  .cal-form textarea{ resize:none; line-height:1.45; }
-  .cal-form .erro{ display:none; font-size:11.5px; color:var(--red-ink); }
-  .cal-form .erro.on{ display:block; }
-  .cal-form input.invalido, .cal-form textarea.invalido{ border-color:var(--red); }
-  .campo-linha{ display:flex; gap:12px; }
-  .campo-linha .field{ flex:1; }
-  .check-linha{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer; }
-  .check-linha input{ width:16px; height:16px; margin:0; accent-color:var(--red); cursor:pointer; }
-  .swatches{ display:flex; gap:10px; flex-wrap:wrap; }
-  .swatch{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; padding:2px; cursor:pointer; color:var(--ink); font-family:'Inter',sans-serif; font-size:10.5px; border-radius:8px; }
-  .swatch i{ width:22px; height:22px; border-radius:50%; display:block; box-shadow:0 0 0 2px transparent; transition:box-shadow .12s ease; }
-  .swatch[aria-checked="true"] i{ box-shadow:0 0 0 2px var(--white), 0 0 0 4px var(--ink); }
-  .swatch:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
-  .modal-actions{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; }
-  .modal-actions-right{ display:flex; gap:10px; margin-left:auto; }
-  .modal-actions .pergunta{ font-size:13px; font-weight:600; color:var(--ink); }
+  /* O formulário do modal de evento vive em gioco-eventos.css (.ev-*). */
 </style>
 </head>
 
@@ -416,18 +391,12 @@
      dia — sem ramos "if origem" espalhados pelo render. Ver CLAUDE.md.
      ===================================================================== */
 
-  var CATEGORIAS = [
-    { id: 'pessoal',  label: 'Pessoal',  cor: 'var(--lime)',    texto: '#141414' },
-    { id: 'trabalho', label: 'Trabalho', cor: 'var(--navy)',    texto: '#FFFFFF' },
-    { id: 'reuniao',  label: 'Reunião',  cor: 'var(--mustard)', texto: '#141414' },
-    { id: 'loja',     label: 'Loja',     cor: 'var(--red)',     texto: 'var(--on-red)' },
-    { id: 'prazo',    label: 'Prazo',    cor: 'var(--blush)',   texto: '#141414' },
-    { id: 'outro',    label: 'Outro',    cor: 'var(--sky)',     texto: '#141414' }
-  ];
-  function categoria(id) {
-    for (var i = 0; i < CATEGORIAS.length; i++) if (CATEGORIAS[i].id === id) return CATEGORIAS[i];
-    return CATEGORIAS[CATEGORIAS.length - 1];
-  }
+  // Motor partilhado dos eventos (gioco-eventos.js): categorias, normalização,
+  // formulário do modal e as únicas escritas em eventos/. Nomes destruturados
+  // para os call sites ficarem iguais.
+  var EV = giocoEventosEngine({ eventosRef: eventosRef, giocoModal: giocoModal });
+  var CATEGORIAS = EV.CATEGORIAS, categoria = EV.categoria, el = EV.el;
+  var pad2 = EV.pad2, isoValida = EV.isoValida, horaValida = EV.horaValida, minutos = EV.minutos, deMinutos = EV.deMinutos;
 
   /* ---------- Helpers partilhados com a tesouraria (iguais lá) ---------- */
   var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -470,7 +439,6 @@
   var MAX_CHIPS_MES = 3;
 
   /* ---------- Datas: funções puras ---------- */
-  function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function toISODate(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function parseISO(iso) {
     var p = String(iso).split('-');
@@ -503,14 +471,6 @@
     for (var i = 0; i < 42; i++) out.push(addDays(ini, i));
     return out;
   }
-  function isoValida(iso) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return false;
-    var d = parseISO(iso);
-    return toISODate(d) === iso;
-  }
-  function horaValida(h) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(h || ''); }
-  function minutos(h) { var p = h.split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); }
-  function deMinutos(m) { m = Math.max(0, Math.min(23 * 60 + 59, m)); return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }
 
   var fmtMesLongo = new Intl.DateTimeFormat('pt-PT', { month: 'long' });
   var fmtMesCurto = new Intl.DateTimeFormat('pt-PT', { month: 'short' });
@@ -580,23 +540,7 @@
   }
 
   /* ---------- Normalização e índice ---------- */
-  function normalizarManual(id, v) {
-    if (!v || v.anulado === true) return null;
-    if (!isoValida(v.data) || !v.titulo) return null;
-    var diaInteiro = !!v.diaInteiro;
-    return {
-      id: id,
-      titulo: String(v.titulo),
-      data: v.data,
-      diaInteiro: diaInteiro,
-      horaInicio: !diaInteiro && horaValida(v.horaInicio) ? v.horaInicio : null,
-      horaFim: !diaInteiro && horaValida(v.horaFim) ? v.horaFim : null,
-      categoria: categoria(v.categoria).id,
-      notas: v.notas ? String(v.notas) : '',
-      origem: v.origem || 'manual',
-      editavel: true
-    };
-  }
+  var normalizarManual = EV.normalizar;   // preserva origem e ligacao; anulado → null
   /* ---------- Fonte 'pagamentos' (só leitura) ----------
      mesesVisiveis: [{ano, mes}] — os compromissos geram-se por mês, só para
      os meses que a vista mostra (nunca para o ano). Pedidos: uma entrada
@@ -720,9 +664,12 @@
     var c = categoria(ev.categoria);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
     return '<button type="button" class="ev-chip" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
-      hora + escapeHtml(ev.titulo) + '</button>';
+      hora + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</button>';
   }
   var chipHtml = chipDe;
+  // Evento ligado a um pedido da loja: ícone store (14px) antes do título, sem categoria nova.
+  function ehPedidoLoja(ev) { return !!(ev && ev.ligacao && ev.ligacao.tipo === 'lojaPedido'); }
+  function iconeLigacao(ev) { return ehPedidoLoja(ev) ? '<svg class="icon" width="14" height="14"><use href="#i-store"/></svg>' : ''; }
 
   function renderMes() {
     var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
@@ -795,7 +742,7 @@
     var largura = 100 / it.ncols, left = largura * it.col;
     var horas = it.ev.horaInicio + (it.ev.horaFim ? '–' + it.ev.horaFim : '');
     return '<button type="button" class="ev-bloco" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
-      '<b>' + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
+      '<b>' + iconeLigacao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
   }
 
   function horaColHtml() {
@@ -888,7 +835,7 @@
         var c = categoria(ev.categoria);
         var horas = ev.diaInteiro ? 'Dia inteiro' : (ev.horaInicio || '') + (ev.horaFim ? '–' + ev.horaFim : '');
         lista += '<button type="button" class="dia-item" data-id="' + escapeHtml(ev.id) + '"><i style="background:' + c.cor + '"></i><div style="min-width:0;flex:1">' +
-          '<div class="dia-item-t">' + escapeHtml(ev.titulo) + '</div>' +
+          '<div class="dia-item-t">' + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</div>' +
           '<div class="dia-item-h num">' + escapeHtml(horas) + ' · ' + c.label + '</div>' +
           (ev.notas ? '<div class="dia-item-n">' + escapeHtml(ev.notas) + '</div>' : '') +
           '</div></button>';
@@ -998,142 +945,6 @@
     else if (k === 'n' || k === 'N') { e.preventDefault(); abrirNovo({ data: (estado.vista === 'mes' && estado.diaSelecionado) || estado.dataRef }); }
   });
 
-  /* ---------- Modal: formulário ---------- */
-  function el(tag, attrs, filhos) {
-    var n = document.createElement(tag);
-    if (attrs) Object.keys(attrs).forEach(function (k) {
-      if (k === 'text') n.textContent = attrs[k];
-      else if (k === 'html') n.innerHTML = attrs[k];
-      else n.setAttribute(k, attrs[k]);
-    });
-    (filhos || []).forEach(function (f) { if (f) n.appendChild(f); });
-    return n;
-  }
-
-  function construirFormulario(inicial, modoEdicao) {
-    var form = el('form', { 'class': 'cal-form', novalidate: 'novalidate' });
-
-    var inTitulo = el('input', { type: 'text', id: 'evTitulo', maxlength: '120', placeholder: 'Título do evento', autocomplete: 'off' });
-    inTitulo.value = inicial.titulo || '';
-    var erroTitulo = el('div', { 'class': 'erro' });
-    form.appendChild(el('div', { 'class': 'field' }, [el('label', { 'class': 'field-label', 'for': 'evTitulo', text: 'Título' }), inTitulo, erroTitulo]));
-
-    var inData = el('input', { type: 'date', id: 'evData' });
-    inData.value = inicial.data || '';
-    var erroData = el('div', { 'class': 'erro' });
-    form.appendChild(el('div', { 'class': 'field' }, [el('label', { 'class': 'field-label', 'for': 'evData', text: 'Data' }), inData, erroData]));
-
-    var inDiaInteiro = el('input', { type: 'checkbox', id: 'evDiaInteiro' });
-    inDiaInteiro.checked = !!inicial.diaInteiro;
-    form.appendChild(el('label', { 'class': 'check-linha', 'for': 'evDiaInteiro' }, [inDiaInteiro, el('span', { text: 'Dia inteiro' })]));
-
-    var inInicio = el('input', { type: 'time', id: 'evInicio', step: '900' });
-    var inFim = el('input', { type: 'time', id: 'evFim', step: '900' });
-    inInicio.value = inicial.horaInicio || '';
-    inFim.value = inicial.horaFim || '';
-    var erroHoras = el('div', { 'class': 'erro' });
-    var linhaHoras = el('div', {}, [
-      el('div', { 'class': 'campo-linha' }, [
-        el('div', { 'class': 'field' }, [el('label', { 'class': 'field-label', 'for': 'evInicio', text: 'Início' }), inInicio]),
-        el('div', { 'class': 'field' }, [el('label', { 'class': 'field-label', 'for': 'evFim', text: 'Fim' }), inFim])
-      ]),
-      erroHoras
-    ]);
-    form.appendChild(linhaHoras);
-    function sincronizarHoras() { linhaHoras.style.display = inDiaInteiro.checked ? 'none' : ''; }
-    inDiaInteiro.addEventListener('change', sincronizarHoras);
-    sincronizarHoras();
-    inInicio.addEventListener('change', function () {
-      if (horaValida(inInicio.value) && (!horaValida(inFim.value) || minutos(inFim.value) <= minutos(inInicio.value))) {
-        inFim.value = deMinutos(minutos(inInicio.value) + 60);
-      }
-    });
-
-    var catAtual = categoria(inicial.categoria).id;
-    var grupo = el('div', { 'class': 'swatches', role: 'radiogroup', 'aria-label': 'Categoria' });
-    CATEGORIAS.forEach(function (c, idx) {
-      var b = el('button', { type: 'button', 'class': 'swatch', role: 'radio', 'data-cat': c.id, 'aria-checked': c.id === catAtual ? 'true' : 'false', tabindex: c.id === catAtual ? '0' : '-1' },
-        [el('i', { style: 'background:' + c.cor }), el('span', { text: c.label })]);
-      grupo.appendChild(b);
-    });
-    function escolherCat(id, focar) {
-      catAtual = id;
-      var bs = grupo.querySelectorAll('.swatch');
-      for (var i = 0; i < bs.length; i++) {
-        var on = bs[i].getAttribute('data-cat') === id;
-        bs[i].setAttribute('aria-checked', on ? 'true' : 'false');
-        bs[i].setAttribute('tabindex', on ? '0' : '-1');
-        if (on && focar) bs[i].focus();
-      }
-    }
-    grupo.addEventListener('click', function (e) {
-      var b = e.target.closest('.swatch');
-      if (b) escolherCat(b.getAttribute('data-cat'), false);
-    });
-    grupo.addEventListener('keydown', function (e) {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      e.preventDefault();
-      var i = CATEGORIAS.map(function (c) { return c.id; }).indexOf(catAtual);
-      var n = (i + (e.key === 'ArrowRight' ? 1 : CATEGORIAS.length - 1)) % CATEGORIAS.length;
-      escolherCat(CATEGORIAS[n].id, true);
-    });
-    form.appendChild(el('div', { 'class': 'field' }, [el('div', { 'class': 'field-label', text: 'Categoria' }), grupo]));
-
-    var inNotas = el('textarea', { id: 'evNotas', rows: '3', maxlength: '2000', placeholder: 'Notas (opcional)' });
-    inNotas.value = inicial.notas || '';
-    function crescer() {
-      inNotas.style.height = 'auto';
-      var linha = 19.5, max = linha * 10 + 22;
-      inNotas.style.height = Math.min(max, inNotas.scrollHeight) + 'px';
-    }
-    inNotas.addEventListener('input', crescer);
-    form.appendChild(el('div', { 'class': 'field' }, [el('label', { 'class': 'field-label', 'for': 'evNotas', text: 'Notas' }), inNotas]));
-
-    var btnGuardar = el('button', { type: 'submit', 'class': 'btn-add', text: 'Guardar' });
-    var btnCancelar = el('button', { type: 'button', 'class': 'btn', text: 'Cancelar' });
-    var direita = el('div', { 'class': 'modal-actions-right' }, [btnCancelar, btnGuardar]);
-    var acoes = el('div', { 'class': 'modal-actions' });
-    var btnAnular = null;
-    if (modoEdicao) {
-      btnAnular = el('button', { type: 'button', 'class': 'btn btn-perigo', text: 'Anular evento' });
-      acoes.appendChild(btnAnular);
-    }
-    acoes.appendChild(direita);
-    form.appendChild(acoes);
-
-    btnCancelar.addEventListener('click', function () { giocoModal.close(); });
-
-    function mostrarErro(elErro, input, msg) {
-      elErro.textContent = msg; elErro.classList.add('on');
-      if (input) input.classList.add('invalido');
-    }
-    function limparErros() {
-      [erroTitulo, erroData, erroHoras].forEach(function (x) { x.textContent = ''; x.classList.remove('on'); });
-      [inTitulo, inData, inInicio, inFim].forEach(function (x) { x.classList.remove('invalido'); });
-    }
-
-    function lerFormulario() {
-      limparErros();
-      var ok = true;
-      var titulo = inTitulo.value.trim().slice(0, 120);
-      if (!titulo) { mostrarErro(erroTitulo, inTitulo, 'O título é obrigatório.'); ok = false; }
-      var data = inData.value;
-      if (!isoValida(data)) { mostrarErro(erroData, inData, 'Indica uma data válida.'); ok = false; }
-      var diaInteiro = inDiaInteiro.checked;
-      var horaInicio = null, horaFim = null;
-      if (!diaInteiro) {
-        if (horaValida(inInicio.value)) horaInicio = inInicio.value;
-        if (horaValida(inFim.value)) horaFim = inFim.value;
-        if (horaFim && !horaInicio) { mostrarErro(erroHoras, inInicio, 'Indica a hora de início.'); ok = false; }
-        else if (horaInicio && horaFim && minutos(horaFim) <= minutos(horaInicio)) { mostrarErro(erroHoras, inFim, 'O fim tem de ser depois do início.'); ok = false; }
-      }
-      if (!ok) return null;
-      return { titulo: titulo, data: data, diaInteiro: diaInteiro, horaInicio: horaInicio, horaFim: horaFim, categoria: catAtual, notas: inNotas.value.trim().slice(0, 2000) };
-    }
-
-    return { form: form, inTitulo: inTitulo, inNotas: inNotas, crescer: crescer, btnGuardar: btnGuardar, btnAnular: btnAnular, acoes: acoes, lerFormulario: lerFormulario };
-  }
-
   /* ---------- Detalhe só de leitura de um pagamento (fonte 'pagamentos') ---------- */
   function abrirDetalhePagamento(item) {
     var x = item.extra || {};
@@ -1148,133 +959,74 @@
     if (item.notas) kv('Notas', el('span', { 'class': 'pag-notas', text: item.notas }));
     var href = 'tesouraria.html?dia=' + encodeURIComponent(item.data) + '&chave=' + encodeURIComponent(x.chaveTesouraria || '');
     var abrir = el('a', { 'class': 'btn-add', href: href, text: 'Abrir na Tesouraria' });
-    var fechar = el('button', { type: 'button', 'class': 'btn', text: 'Fechar' });
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
     fechar.addEventListener('click', function () { giocoModal.close(); });
-    corpo.appendChild(el('div', { 'class': 'modal-actions' }, [el('div', { 'class': 'modal-actions-right' }, [fechar, abrir])]));
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, abrir])]));
     giocoModal.open({ titulo: 'Pagamento', conteudo: corpo });
   }
 
-  var aGravar = false;
-
+  /* ---------- Modais de evento (gioco-eventos.js) ----------
+     Formulário, validação, atalhos (Enter / Ctrl+Enter) e escritas vivem no
+     motor. A página só decide a data por omissão e o bloco "Pedido da loja". */
   function abrirNovo(pre) {
     pre = pre || {};
-    var inicial = { data: pre.data || estado.dataRef, diaInteiro: !!pre.diaInteiro, categoria: 'pessoal' };
-    if (pre.horaInicio) { inicial.horaInicio = pre.horaInicio; inicial.horaFim = deMinutos(minutos(pre.horaInicio) + 60); }
-    var f = construirFormulario(inicial, false);
-    f.form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var v = f.lerFormulario();
-      if (!v) return;
-      gravarNovo(v, f);
-    });
-    ligarAtalhosForm(f);
-    giocoModal.open({ titulo: 'Novo evento', conteudo: f.form });
-    f.crescer();
-    f.inTitulo.focus();
+    EV.abrirNovo({ data: pre.data || estado.dataRef, diaInteiro: pre.diaInteiro, horaInicio: pre.horaInicio });
   }
 
   function abrirEditar(id) {
     var bruto = eventosPorId[id];
     if (!bruto) return;
-    var ev = normalizarManual(id, bruto);
-    if (!ev || !ev.editavel) return;
-    var f = construirFormulario(ev, true);
-    f.form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var v = f.lerFormulario();
-      if (!v) return;
-      gravarEdicao(id, bruto, v, f);
-    });
-    if (f.btnAnular) f.btnAnular.addEventListener('click', function () { pedirAnulacao(id, f); });
-    ligarAtalhosForm(f);
-    giocoModal.open({ titulo: 'Editar evento', conteudo: f.form });
-    f.crescer();
-    f.inTitulo.focus();
+    EV.abrirEditar(id, bruto, { antes: blocoPedidoLoja(bruto) });
   }
 
-  function ligarAtalhosForm(f) {
-    f.form.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); f.form.requestSubmit(); return; }
-      if (e.key === 'Enter' && e.target === f.inTitulo) { e.preventDefault(); f.form.requestSubmit(); }
-    });
-  }
-
-  function pedirAnulacao(id, f) {
-    var acoes = f.acoes;
-    acoes.innerHTML = '';
-    var sim = el('button', { type: 'button', 'class': 'btn-add', text: 'Sim, anular' });
-    var nao = el('button', { type: 'button', 'class': 'btn', text: 'Não' });
-    acoes.appendChild(el('span', { 'class': 'pergunta', text: 'Anular este evento?' }));
-    acoes.appendChild(el('div', { 'class': 'modal-actions-right' }, [nao, sim]));
-    nao.addEventListener('click', function () {
-      // Repor o rodapé original: reconstruir é mais simples do que guardar nós.
-      acoes.innerHTML = '';
-      var btnAnular = el('button', { type: 'button', 'class': 'btn btn-perigo', text: 'Anular evento' });
-      btnAnular.addEventListener('click', function () { pedirAnulacao(id, f); });
-      var btnCancelar = el('button', { type: 'button', 'class': 'btn', text: 'Cancelar' });
-      btnCancelar.addEventListener('click', function () { giocoModal.close(); });
-      acoes.appendChild(btnAnular);
-      acoes.appendChild(el('div', { 'class': 'modal-actions-right' }, [btnCancelar, f.btnGuardar]));
-    });
-    sim.addEventListener('click', function () {
-      if (aGravar) return;
-      aGravar = true; sim.disabled = true;
-      var agora = Date.now();
-      // Anular = flag. NUNCA remove() do evento.
-      Promise.all([
-        eventosRef.child(id).child('anulado').set(true),
-        eventosRef.child(id).child('anuladoEm').set(agora)
-      ]).then(function () { aGravar = false; giocoModal.close(); })
-        .catch(function (err) { aGravar = false; sim.disabled = false; console.error(err); });
-    });
-    sim.focus();
-  }
-
-  /* ---------- Escritas em eventos/ ---------- */
-  function gravarNovo(v, f) {
-    if (aGravar) return;
-    aGravar = true; f.btnGuardar.disabled = true;
-    var agora = Date.now();
-    var obj = {
-      titulo: v.titulo, data: v.data, diaInteiro: v.diaInteiro,
-      categoria: v.categoria, origem: 'manual',
-      criadoEm: agora, atualizadoEm: agora, anulado: false
-    };
-    if (!v.diaInteiro && v.horaInicio) obj.horaInicio = v.horaInicio;
-    if (!v.diaInteiro && v.horaFim) obj.horaFim = v.horaFim;
-    if (v.notas) obj.notas = v.notas;
-    // Único set() no nó do evento: só na criação (nó novo).
-    eventosRef.push().set(obj)
-      .then(function () { aGravar = false; giocoModal.close(); })
-      .catch(function (err) { aGravar = false; f.btnGuardar.disabled = false; console.error(err); });
-  }
-
-  function gravarEdicao(id, bruto, v, f) {
-    if (aGravar) return;
-    aGravar = true; f.btnGuardar.disabled = true;
-    var ref = eventosRef.child(id);
-    var escritas = [];
-    // Um set() por campo alterado; remove() só nos campos-folha que deixam de existir.
-    function campo(nome, novo) {
-      var antigo = bruto[nome] == null ? null : bruto[nome];
-      if (novo == null || novo === '') {
-        if (antigo != null) escritas.push(ref.child(nome).remove());
-      } else if (antigo !== novo) {
-        escritas.push(ref.child(nome).set(novo));
+  // Bloco só de leitura por cima do formulário quando o evento nasceu de um
+  // pedido da loja (ligacao.tipo 'lojaPedido'). Lê lojaPedidos/{id} com um
+  // once('value') ao abrir — só leitura; se o pedido já não existir, diz.
+  function blocoPedidoLoja(bruto) {
+    var lig = bruto && bruto.ligacao;
+    if (!lig || lig.tipo !== 'lojaPedido' || !lig.id) return null;
+    var corpo = el('div', { 'class': 'ev-ligacao' }, [
+      el('div', { 'class': 'ev-ligacao-t', html: '<svg class="icon" width="14" height="14"><use href="#i-store"/></svg><span>Pedido da loja</span>' }),
+      el('p', { text: 'A carregar…' })
+    ]);
+    db.ref('lojaPedidos').child(String(lig.id)).once('value').then(function (snap) {
+      var p = snap.val();
+      var texto = corpo.querySelector('p');
+      if (!p) { texto.textContent = 'Pedido apagado na loja'; }
+      else {
+        var desc = String(p.descricao || '').replace(/\s+/g, ' ').trim();
+        if (desc.length > 200) desc = desc.slice(0, 200).trim() + '…';
+        texto.textContent = desc;
+        var meta = [p.pessoa, p.zona && p.zona !== '—' ? p.zona : ''].filter(Boolean).join(' · ');
+        if (meta) corpo.insertBefore(el('p', { text: meta }), texto.nextSibling);
       }
-    }
-    campo('titulo', v.titulo);
-    campo('data', v.data);
-    if (!!bruto.diaInteiro !== v.diaInteiro) escritas.push(ref.child('diaInteiro').set(v.diaInteiro));
-    campo('categoria', v.categoria);
-    campo('notas', v.notas);
-    campo('horaInicio', v.diaInteiro ? null : v.horaInicio);
-    campo('horaFim', v.diaInteiro ? null : v.horaFim);
-    if (escritas.length) escritas.push(ref.child('atualizadoEm').set(Date.now()));
-    Promise.all(escritas)
-      .then(function () { aGravar = false; giocoModal.close(); })
-      .catch(function (err) { aGravar = false; f.btnGuardar.disabled = false; console.error(err); });
+      corpo.appendChild(el('a', { href: 'mrn-dashboard.html#cardPedidos', text: 'Ver no dashboard →' }));
+    }).catch(function (err) {
+      corpo.querySelector('p').textContent = 'Não foi possível ler o pedido.';
+      console.error(err);
+    });
+    return corpo;
   }
+
+  /* ---------- Deep-link (mesmo padrão da tesouraria.html) ----------
+     ?dia=AAAA-MM-DD → vista Mês nesse mês com o painel do dia aberto;
+     ?evento=ID → abre o modal de edição no primeiro snapshot de eventos/ em
+     que o id existe e não está anulado (uma só vez; inválido ou anulado é
+     ignorado). Sem parâmetros nada muda. Só leitura. */
+  var deepEvento = null;
+  (function () {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var dia = qs.get('dia');
+      if (dia && isoValida(dia)) {
+        estado.vista = 'mes';
+        estado.dataRef = dia;
+        estado.diaSelecionado = dia;
+      }
+      var ev = qs.get('evento');
+      if (ev && /^[A-Za-z0-9_-]+$/.test(ev)) deepEvento = ev;
+    } catch (e) { /* URL estranho: comportamento por omissão */ }
+  })();
 
   /* ---------- Ligação ao Firebase (só atualiza estado e chama render) ---------- */
   eventosRef.on('value', function (snapshot) {
@@ -1289,6 +1041,10 @@
     estado.carregado = true;
     indexarEventos();
     render();
+    if (deepEvento && val[deepEvento]) {
+      var alvo = deepEvento; deepEvento = null;
+      if (val[alvo].anulado !== true) abrirEditar(alvo);
+    }
   });
 
   // Os cinco nós da fonte 'pagamentos' — só leitura. Um flag por nó; até

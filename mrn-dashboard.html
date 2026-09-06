@@ -20,6 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="gioco-eventos.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -962,6 +963,24 @@
     padding:7px 10px;
   }
 
+  /* Agendar no calendário (Set/2026): botão outline com ícone; depois de
+     agendado, chip .status.ok como link para o calendário + "Reagendar". */
+  .btn-agendar{ display:inline-flex; align-items:center; gap:6px; }
+  .btn-agendar .icon{ width:13px; height:13px; }
+  .pedido-agendado{
+    display:inline-flex; align-items:center; gap:5px; align-self:center;
+    text-decoration:none; white-space:nowrap;
+  }
+  .pedido-agendado .icon{ width:12px; height:12px; }
+  .pedido-agendado:hover{ text-decoration:underline; }
+  .pedido-reagendar{
+    background:none; border:none; padding:0; cursor:pointer; align-self:center;
+    font-family:'Inter',sans-serif; font-size:11px; color:var(--muted);
+    border-bottom:1px dotted var(--muted);
+  }
+  .pedido-reagendar:hover{ color:var(--red-ink); border-bottom-color:var(--red-ink); }
+  .pedido-agendar-erro{ width:100%; font-size:11.5px; color:var(--red-ink); margin-top:2px; }
+
   .link-view-loja{
     display:inline-block;
     margin-top:14px;
@@ -1769,6 +1788,7 @@
 <body>
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-eventos.js"></script>
 
 <div class="shell">
 
@@ -2264,22 +2284,30 @@ window.addEventListener('load', function () {
   var paymentRequestsRef = db.ref('paymentRequests');
   var tasksRef = db.ref('tasks');
 
-  // Cartão Calendário: eventos de hoje (eventos/, sem os anulados). Só leitura.
-  (function () {
+  // eventos/: o cartão Calendário conta os de hoje (sem os anulados) e o
+  // cartão Pedidos da loja precisa do nó em memória para saber se o eventoId
+  // de um pedido ainda está ativo ("Agendado" é derivado, reage a anulações).
+  // O motor gioco-eventos.js é a única forma de escrever aqui a partir desta página.
+  var eventosRef = db.ref('eventos');
+  var eventosPorId = {};
+  var eventosCarregados = false;
+  var EV = giocoEventosEngine({ eventosRef: eventosRef, giocoModal: window.giocoModal });
+  eventosRef.on('value', function (snapshot) {
+    eventosPorId = snapshot.val() || {};
+    eventosCarregados = true;
     var sub = document.getElementById('cardCalendarioSub');
-    if (!sub) return;
-    db.ref('eventos').on('value', function (snapshot) {
-      var val = snapshot.val() || {};
+    if (sub) {
       var d = new Date();
       var hoje = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
       var n = 0;
-      Object.keys(val).forEach(function (id) {
-        var ev = val[id];
+      Object.keys(eventosPorId).forEach(function (id) {
+        var ev = eventosPorId[id];
         if (ev && ev.anulado !== true && ev.data === hoje) n++;
       });
       sub.textContent = n === 0 ? 'hoje: sem eventos' : 'hoje: ' + n + (n === 1 ? ' evento' : ' eventos');
-    });
-  })();
+    }
+    if (pedidosCarregados) renderPedidosDash();
+  });
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
@@ -3447,14 +3475,104 @@ window.addEventListener('load', function () {
     html += '    </select>';
     html += '    <input type="text" class="pedido-resposta-input" placeholder="resposta" value="' + escapeHtml(p.resposta || '') + '">';
     html += '    <button type="button" class="btn-small btn-guardar-pedido">Guardar</button>';
+    html += agendarHtml(p, estado);
     html += '  </div>';
     html += '</div>';
     return html;
   }
 
+  /* ---------- Agendar no calendário ----------
+     Liga pedido ↔ evento: eventos/{id} nasce com origem 'lojaPedido' e
+     ligacao {tipo:'lojaPedido', id}; o pedido recebe eventoId + agendadoEm
+     (dois set() por campo — as únicas escritas novas em lojaPedidos, e só
+     daqui). "Agendado" NUNCA é um valor de estado: deriva-se de eventoId
+     apontar para um evento existente e não anulado, por isso anular o
+     evento no calendário faz o botão voltar sem escrever nada no pedido. */
+  var agendarErros = {};          // pedidoId → true quando o evento ficou criado mas o pedido não ficou ligado
+  var agendarModalAberto = false; // um modal de cada vez; o botão fica desativado enquanto está aberto
+
+  function eventoAtivoDoPedido(p){
+    if (!p || !p.eventoId) return null;
+    var ev = eventosPorId[p.eventoId];
+    return ev && ev.anulado !== true ? ev : null;
+  }
+
+  function agendarHtml(p, estado){
+    var ev = eventoAtivoDoPedido(p);
+    var html = '';
+    if (ev){
+      var quando = '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ev.data || '')) quando = ev.data.slice(8, 10) + '/' + ev.data.slice(5, 7);
+      if (!ev.diaInteiro && ev.horaInicio) quando += ' ' + ev.horaInicio;
+      var href = 'calendario.html?dia=' + encodeURIComponent(ev.data || '') + '&evento=' + encodeURIComponent(p.eventoId);
+      html += '    <a class="status ok pedido-agendado" href="' + href + '" title="Abrir no calendário">' +
+        '<svg class="icon" width="12" height="12"><use href="#i-calendar"/></svg>Agendado ' + escapeHtml(quando.trim()) + '</a>';
+      if (estado !== 'feito' && estado !== 'não avançar'){
+        html += '    <button type="button" class="pedido-reagendar" title="Criar outro evento para este pedido (o atual não é anulado)">Reagendar</button>';
+      }
+    } else if (estado !== 'feito' && estado !== 'não avançar'){
+      html += '    <button type="button" class="btn-small btn-agendar"' + (agendarModalAberto ? ' disabled' : '') + '>' +
+        '<svg class="icon" width="13" height="13"><use href="#i-calendar"/></svg>Agendar</button>';
+    }
+    if (agendarErros[p.id]){
+      html += '    <div class="pedido-agendar-erro">Evento criado mas o pedido não ficou ligado — tenta Agendar de novo</div>';
+    }
+    return html;
+  }
+
+  // Título: descrição truncada a 80 sem cortar palavra.
+  function truncaPalavra(str, max){
+    var s = String(str || '').replace(/\s+/g, ' ').trim();
+    if (s.length <= max) return s;
+    var corte = s.slice(0, max);
+    var i = corte.lastIndexOf(' ');
+    if (i > max / 2) corte = corte.slice(0, i);
+    return corte.trim() + '…';
+  }
+
+  function agendarPedido(p, reagendar){
+    if (agendarModalAberto) return;
+    if (!reagendar && eventoAtivoDoPedido(p)) return;
+    var meta = 'Pedido da loja · ' + (p.pessoa || '') +
+      (p.zona && p.zona !== '—' ? ' · ' + p.zona : '') +
+      (p.prioridade ? ' · Prioridade ' + p.prioridade : '');
+    var pre = {
+      titulo: truncaPalavra(p.descricao, 80),
+      data: '',
+      diaInteiro: true,
+      categoria: 'loja',
+      notas: meta + '\n\n' + String(p.descricao || '')
+    };
+    var extra = { origem: 'lojaPedido', ligacao: { tipo: 'lojaPedido', id: p.id } };
+    agendarModalAberto = true;
+    renderPedidosDash();
+    EV.abrirNovo(pre, {
+      extra: extra,
+      onGravado: function (eventoId){
+        delete agendarErros[p.id];
+        Promise.all([
+          pedidosRef.child(p.id).child('eventoId').set(eventoId),
+          pedidosRef.child(p.id).child('agendadoEm').set(Date.now())
+        ]).catch(function (err){
+          console.error('Evento ' + eventoId + ' criado, mas lojaPedidos/' + p.id + ' não ficou ligado:', err);
+          agendarErros[p.id] = true;
+          renderPedidosDash();
+        });
+      },
+      onFechado: function (){
+        agendarModalAberto = false;
+        renderPedidosDash();
+      }
+    });
+  }
+
   function attachPedidoHandlers(p){
     var card = pedidosListEl.querySelector('.pedido-ticket[data-id="' + p.id + '"]');
     if (!card) return;
+    var btnAgendar = card.querySelector('.btn-agendar');
+    if (btnAgendar) btnAgendar.addEventListener('click', function(){ agendarPedido(p, false); });
+    var btnReagendar = card.querySelector('.pedido-reagendar');
+    if (btnReagendar) btnReagendar.addEventListener('click', function(){ agendarPedido(p, true); });
     var btn = card.querySelector('.btn-guardar-pedido');
     btn.addEventListener('click', function(){
       var novoEstado = card.querySelector('.pedido-estado-select').value;

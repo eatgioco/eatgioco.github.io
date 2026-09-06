@@ -1,0 +1,56 @@
+/* ==========================================================================
+   GIOCO OS — gioco-eventos.css
+   Formulário do modal de evento (gioco-eventos.js), extraído da
+   calendario.html em Set/2026 com prefixo .ev- para não colidir com as
+   classes locais das páginas (.field, .modal-actions…). Só tokens do shell;
+   nada é redeclarado do gioco-shell.css. Carregar depois do gioco-shell.css.
+   ========================================================================== */
+.ev-form{ display:flex; flex-direction:column; gap:14px; color:var(--ink); }
+.ev-field{ display:flex; flex-direction:column; gap:6px; }
+.ev-field-label{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.ev-form input, .ev-form select, .ev-form textarea{
+  font-family:'Inter',sans-serif; font-size:13.5px; padding:10px 12px;
+  border:1px solid var(--line); border-radius:10px;
+  background:var(--white); color:var(--ink); width:100%;
+  transition:border-color .15s ease;
+}
+.ev-form input:focus, .ev-form select:focus, .ev-form textarea:focus{ outline:none; border-color:var(--red); }
+.ev-form input::placeholder, .ev-form textarea::placeholder{ color:var(--muted); }
+.ev-form textarea{ resize:none; line-height:1.45; }
+.ev-form .ev-erro{ display:none; font-size:11.5px; color:var(--red-ink); }
+.ev-form .ev-erro.on{ display:block; }
+.ev-form input.ev-invalido, .ev-form textarea.ev-invalido{ border-color:var(--red); }
+.ev-campo-linha{ display:flex; gap:12px; }
+.ev-campo-linha .ev-field{ flex:1; }
+.ev-check-linha{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer; }
+.ev-check-linha input{ width:16px; height:16px; margin:0; accent-color:var(--red); cursor:pointer; }
+.ev-swatches{ display:flex; gap:10px; flex-wrap:wrap; }
+.ev-swatch{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; padding:2px; cursor:pointer; color:var(--ink); font-family:'Inter',sans-serif; font-size:10.5px; border-radius:8px; }
+.ev-swatch i{ width:22px; height:22px; border-radius:50%; display:block; box-shadow:0 0 0 2px transparent; transition:box-shadow .12s ease; }
+.ev-swatch[aria-checked="true"] i{ box-shadow:0 0 0 2px var(--white), 0 0 0 4px var(--ink); }
+.ev-swatch:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
+.ev-actions{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; }
+.ev-actions-right{ display:flex; gap:10px; margin-left:auto; }
+.ev-actions .ev-pergunta{ font-size:13px; font-weight:600; color:var(--ink); }
+
+/* Botão outline (o antigo .btn local da calendario.html — não é classe do shell). */
+.ev-btn-outline{
+  font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+  background:var(--white); color:var(--ink);
+  border:1.5px solid var(--line); border-radius:100px;
+  padding:9px 18px; cursor:pointer;
+  transition:border-color .15s ease, transform .1s ease, background .15s ease, color .15s ease;
+}
+.ev-btn-outline:hover{ border-color:var(--red); }
+.ev-btn-outline:active{ transform:scale(0.97); }
+.ev-btn-outline:disabled{ opacity:.45; cursor:not-allowed; }
+.ev-btn-perigo{ border-color:var(--red); color:var(--red-ink); }
+.ev-btn-perigo:hover{ background:var(--red); color:var(--on-red); }
+
+/* Bloco só de leitura por cima do formulário (ex.: "Pedido da loja" no calendário). */
+.ev-ligacao{ font-size:11.5px; color:var(--muted); line-height:1.45; margin:0 0 14px; padding:0 0 12px; border-bottom:1px solid var(--line); }
+.ev-ligacao-t{ display:flex; align-items:center; gap:6px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10.5px; margin-bottom:6px; }
+.ev-ligacao-t .icon{ width:14px; height:14px; }
+.ev-ligacao p{ margin:0 0 4px; white-space:pre-line; }
+.ev-ligacao a{ color:var(--red-ink); text-decoration:none; font-weight:600; }
+.ev-ligacao a:hover{ text-decoration:underline; }
