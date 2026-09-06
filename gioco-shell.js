@@ -15,7 +15,9 @@
 (function () {
   'use strict';
 
-  /* ---------- Sprite: filtro liquidDistort + 37 símbolos ----------
+  /* ---------- Sprite: filtro liquidDistort + 44 símbolos ----------
+     (Set/2026, cartão Música do centro-de-controlo.html: music, play, pause,
+     skip-back, skip-forward, volume-2 e volume-x, traço Feather — eram 37.)
      (Set/2026, calendario.html: chevron-left, calendar e clock, traço
      Feather — eram 34.)
      (O i-phone entrou em Set/2026 para os Contactos, traço Feather.)
@@ -68,6 +70,13 @@
     '<symbol id="i-chevron-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>',
     '<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>',
     '<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>',
+    '<symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>',
+    '<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>',
+    '<symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>',
+    '<symbol id="i-skip-back" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></symbol>',
+    '<symbol id="i-skip-forward" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></symbol>',
+    '<symbol id="i-volume-2" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>',
+    '<symbol id="i-volume-x" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -83,7 +92,9 @@
     // Set/2026, para o A/C do centro de controlo e o modal do shell (traço Feather):
     'droplet', 'flame', 'refresh-cw', 'sliders', 'snowflake', 'wind', 'x',
     // Set/2026, calendario.html (traço Feather):
-    'chevron-left', 'calendar', 'clock'
+    'chevron-left', 'calendar', 'clock',
+    // Set/2026, cartão Música do centro de controlo (traço Feather):
+    'music', 'play', 'pause', 'skip-back', 'skip-forward', 'volume-2', 'volume-x'
   ];
 
   function injectSprite() {

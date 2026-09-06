@@ -377,6 +377,98 @@
   .acp-kv .status{ font-family:'Inter',sans-serif; }
 
   /* ======================================================================
+     1b. MÚSICA — cartão vivo, logo a seguir ao A/C.
+     Estado real em lojas/{loja}/sonos/estado (escrito pelo gioco-sonos-bridge
+     no PC do POS); comandos em lojas/{loja}/sonos/comandos. Mesmo padrão de
+     feedback do A/C (pendente → executado/falhou). Só tokens do shell.
+     ====================================================================== */
+  .mu-alerta{
+    display:flex; align-items:center; gap:8px;
+    margin:0 0 12px; padding:9px 11px;
+    border-radius:10px;
+    background:var(--blush); color:var(--navy);
+    font-size:12.5px; font-weight:700; line-height:1.35;
+  }
+  /* A superfície --blush continua clara no escuro: texto fixo, como .status.high. */
+  [data-theme="dark"] .mu-alerta{ color:#3d0810; }
+  .mu-alerta .icon{ flex-shrink:0; }
+  .mu-alerta[hidden]{ display:none; }
+  .mu-faixa{ min-width:0; }
+  .mu-titulo{
+    font-size:15px; font-weight:700; line-height:1.3;
+    color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .mu-artista{
+    margin-top:2px;
+    font-size:12.5px; color:var(--muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .mu-fonte-linha{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .mu-fonte-linha .status.ref{ background:var(--dough); border:1px solid var(--line); color:var(--ink); }
+  .mu-transporte{ font-size:11.5px; color:var(--muted); }
+  .cc-card.mu-neutro .mu-titulo,
+  .cc-card.mu-neutro .mu-artista{ color:var(--muted); }
+
+  .mu-volume{
+    display:flex; align-items:center; gap:10px;
+    margin-top:14px; padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+  .mu-volume input[type=range]{ flex:1; accent-color:var(--red); margin:0; min-width:0; }
+  .mu-volume input[type=range]:disabled{ opacity:.5; }
+  .mu-volume .num{ min-width:2.4ch; text-align:right; font-size:13px; font-weight:700; color:var(--ink); }
+  .mu-volume .num.pendente{ opacity:.45; }
+  .mu-ico-btn{
+    width:34px; height:34px; border-radius:50%;
+    border:1px solid var(--line); background:var(--white); color:var(--ink);
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; flex-shrink:0; padding:0;
+  }
+  .mu-ico-btn:hover{ border-color:var(--ink); }
+  .mu-ico-btn:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .mu-ico-btn.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .mu-transp{ display:flex; justify-content:center; gap:10px; margin-top:12px; }
+  .mu-transp .mu-ico-btn.principal{ width:44px; height:44px; background:var(--red); color:var(--on-red); border-color:var(--red); }
+  .mu-transp .mu-ico-btn.principal:disabled{ background:var(--line); border-color:var(--line); color:var(--muted); }
+
+  .mu-favs{ margin-top:12px; }
+  .mu-favs-toggle{
+    display:flex; align-items:center; gap:6px; width:100%;
+    margin:0; padding:6px 0;
+    border:none; background:transparent; color:var(--muted);
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    cursor:pointer; text-align:left;
+  }
+  .mu-favs-toggle:hover{ color:var(--ink); }
+  .mu-favs-toggle .sp{ flex:1; }
+  .mu-favs-toggle .icon{ transition:transform .15s; }
+  .mu-favs-toggle[aria-expanded="true"] .icon.seta{ transform:rotate(180deg); }
+  .mu-favs-lista{ display:flex; flex-direction:column; gap:5px; padding-top:4px; }
+  .mu-favs-lista[hidden]{ display:none; }
+  .mu-fav{
+    display:flex; align-items:center; gap:8px;
+    padding:7px 10px;
+    border:1px solid var(--line); border-radius:10px;
+    background:var(--white); color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    text-align:left; cursor:pointer;
+  }
+  .mu-fav:hover{ border-color:var(--ink); }
+  .mu-fav:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .mu-fav.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .mu-fav .t{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mu-fav .tipo{ font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .mu-fav.active .tipo{ color:var(--white); opacity:.75; }
+  .mu-favs-vazio{ font-size:11.5px; color:var(--muted); padding:4px 0 0; }
+  .mu-aviso{
+    margin:10px 0 0; min-height:0;
+    font-size:11.5px; line-height:1.4;
+    color:var(--red-ink); text-align:center;
+  }
+  .mu-aviso:empty{ display:none; }
+
+  /* ======================================================================
      2. TEMPERATURAS HACCP
      ====================================================================== */
   .haccp-linha{
@@ -759,7 +851,7 @@
      As colunas e a fila passam a display:contents para que TODOS os cartões
      sejam filhos diretos da grelha e possam ser ordenados com `order`.
      Critério da ordem: primeiro os cartões já ligados a dados (câmara, A/C,
-     vendas hoje, consumo), no fim os que ainda estão em placeholder "Em
+     música, vendas hoje, consumo), no fim os que ainda estão em placeholder "Em
      breve" (HACCP, equipa, entradas, mensagens). Ao ligar um cartão novo,
      subir a sua `order`.
      ====================================================================== */
@@ -777,12 +869,13 @@
   /* Ordem dos cartões (ligados primeiro, placeholders no fim). */
   body.shell-touch #cam{ order:1; }
   body.shell-touch #acCard{ order:2; }
-  body.shell-touch .vh-card{ order:3; }
-  body.shell-touch #consumoCard{ order:4; }
-  body.shell-touch #haccpCard{ order:5; }
-  body.shell-touch #equipaCard{ order:6; }
-  body.shell-touch #entradasCard{ order:7; }
-  body.shell-touch #chatCard{ order:8; }
+  body.shell-touch #musicaCard{ order:3; }
+  body.shell-touch .vh-card{ order:4; }
+  body.shell-touch #consumoCard{ order:5; }
+  body.shell-touch #haccpCard{ order:6; }
+  body.shell-touch #equipaCard{ order:7; }
+  body.shell-touch #entradasCard{ order:8; }
+  body.shell-touch #chatCard{ order:9; }
   /* O padding de 16px da fila (.cc-fila .cc-card) era para a coluna estreita
      do desktop; ao telemóvel os cartões têm a largura toda e voltam ao padding
      normal do .card. A coluna flex mantém-se (o .cc-nota fica no fundo). */
@@ -800,6 +893,12 @@
   body.shell-touch .ac-vent{ gap:6px; }
   body.shell-touch .ac-vent button{ min-height:40px; padding:8px 12px; font-size:11.5px; }
   body.shell-touch .ac-mais{ min-height:40px; padding:8px 14px; }
+  /* Música: alvos de toque ≥ 40px; o slider ganha altura. */
+  body.shell-touch .mu-ico-btn{ width:42px; height:42px; }
+  body.shell-touch .mu-transp .mu-ico-btn.principal{ width:50px; height:50px; }
+  body.shell-touch .mu-volume input[type=range]{ min-height:40px; }
+  body.shell-touch .mu-favs-toggle{ min-height:40px; }
+  body.shell-touch .mu-fav{ min-height:42px; }
   body.shell-touch .cc-switch{ width:44px; height:24px; }
   body.shell-touch .cc-switch::after{ width:18px; height:18px; }
   body.shell-touch .cc-switch.on::after{ left:23px; }
@@ -935,6 +1034,64 @@
 
             <p class="ac-aviso" id="acAviso"></p>
             <p class="cc-nota" id="acNota">À espera do serviço da loja…</p>
+          </div>
+
+          <!-- 1b. MÚSICA — cartão vivo. Estado em lojas/{loja}/sonos/estado,
+               comandos em lojas/{loja}/sonos/comandos (ver montarMusica() em baixo).
+               A fonte é AirPlay do telemóvel da loja: o cartão monitoriza e
+               ajusta à distância; os favoritos ficam para o Spotify Connect. -->
+          <div class="cc-card card glass-light mu-neutro" id="musicaCard">
+            <div class="cc-head">
+              <svg class="icon" width="15" height="15"><use href="#i-music"/></svg>
+              <h3>Música</h3>
+              <div class="sp"></div>
+              <span class="status ref" id="muSelo">A ligar…</span>
+            </div>
+
+            <div class="mu-alerta" id="muAlerta" hidden>
+              <svg class="icon" width="15" height="15"><use href="#i-volume-x"/></svg>
+              <span id="muAlertaTxt">Sem música a tocar</span>
+            </div>
+
+            <div class="mu-faixa">
+              <div class="mu-titulo" id="muTitulo">Sem dados</div>
+              <div class="mu-artista" id="muArtista">—</div>
+              <div class="mu-fonte-linha">
+                <span class="status ref" id="muFonte">Sem música</span>
+                <span class="mu-transporte" id="muTransporte"></span>
+              </div>
+            </div>
+
+            <div class="mu-volume">
+              <button class="mu-ico-btn" type="button" id="muMute" disabled title="Silenciar" aria-label="Silenciar" aria-pressed="false">
+                <svg class="icon" width="15" height="15"><use id="muMuteIco" href="#i-volume-2"/></svg>
+              </button>
+              <input type="range" id="muVolume" min="0" max="60" step="1" value="0" disabled aria-label="Volume">
+              <span class="num" id="muVolumeNum">—</span>
+            </div>
+
+            <div class="mu-transp">
+              <button class="mu-ico-btn" type="button" id="muAnterior" disabled title="Anterior" aria-label="Anterior">
+                <svg class="icon" width="15" height="15"><use href="#i-skip-back"/></svg>
+              </button>
+              <button class="mu-ico-btn principal" type="button" id="muPlay" disabled title="Play / pause" aria-label="Play / pause">
+                <svg class="icon" width="18" height="18"><use id="muPlayIco" href="#i-play"/></svg>
+              </button>
+              <button class="mu-ico-btn" type="button" id="muProximo" disabled title="Seguinte" aria-label="Seguinte">
+                <svg class="icon" width="15" height="15"><use href="#i-skip-forward"/></svg>
+              </button>
+            </div>
+
+            <div class="mu-favs">
+              <button class="mu-favs-toggle" type="button" id="muFavsToggle" aria-expanded="false" aria-controls="muFavsLista">
+                <span class="sp" id="muFavsTit">Favoritos</span>
+                <svg class="icon seta" width="13" height="13"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="mu-favs-lista" id="muFavsLista" hidden></div>
+            </div>
+
+            <p class="mu-aviso" id="muAviso"></p>
+            <p class="cc-nota" id="muNota">À espera do serviço da loja…</p>
           </div>
 
           <!-- 2. TEMPERATURAS HACCP -->
@@ -1826,6 +1983,318 @@ window.addEventListener('load', function () {
   }
 
   // ===================================================================
+  // MÚSICA — cartão vivo (Sonos da loja).
+  //
+  // O browser NUNCA fala com as Sonos: lê lojas/{loja}/sonos/estado (escrito
+  // pelo serviço gioco-sonos-bridge no PC da loja, a cada 3 s se algo mudou)
+  // e pede alterações com push() em lojas/{loja}/sonos/comandos. O serviço
+  // marca cada comando 'executado' ou 'falhou'; os comandos nunca se apagam.
+  // Ver servicos/sonos/README.md.
+  //
+  // Mesmo padrão de feedback do A/C: um comando de cada vez; enquanto há um
+  // pendente os controlos ficam desactivados e o valor pedido aparece em
+  // estilo "pendente" até o estado o reflectir, o serviço o marcar, ou
+  // passarem 15 s.
+  // ===================================================================
+  function montarMusica(db, lojaId) {
+    var card = document.getElementById('musicaCard');
+    if (!card) return;
+
+    function $(id) { return document.getElementById(id); }
+    var el = {
+      selo: $('muSelo'), alerta: $('muAlerta'), alertaTxt: $('muAlertaTxt'),
+      titulo: $('muTitulo'), artista: $('muArtista'), fonte: $('muFonte'), transporte: $('muTransporte'),
+      mute: $('muMute'), muteIco: $('muMuteIco'), volume: $('muVolume'), volumeNum: $('muVolumeNum'),
+      anterior: $('muAnterior'), play: $('muPlay'), playIco: $('muPlayIco'), proximo: $('muProximo'),
+      favsToggle: $('muFavsToggle'), favsTit: $('muFavsTit'), favsLista: $('muFavsLista'),
+      aviso: $('muAviso'), nota: $('muNota')
+    };
+
+    var VOLUME_MAX = 60;                       // teto igual ao do serviço (SONOS_BRIDGE_VOLUME_MAX)
+    var SEM_RESPOSTA_MS = 10 * 60 * 1000;      // serviço calado há mais de 10 min
+    var CONFIRMACAO_MS = 15 * 1000;            // espera máxima por um comando
+    var HORARIO_LOJA = { inicio: 12, fim: 23 }; // [12h, 23h[ hora de Lisboa
+    var FONTES = { airplay: 'AirPlay', spotify: 'Spotify', radio: 'Rádio', fila: 'Fila', nada: 'Sem música' };
+
+    var estado = null;      // último lojas/{loja}/sonos/estado
+    var favoritos = [];     // [{i, titulo, tipo, uri}] de lojas/{loja}/sonos/favoritos
+    var pend = null;        // comando em curso: { tipo, valor, ref, cb, timer }
+    var aArrastar = false;  // slider em arrasto: não sobrepor o valor do estado
+    var avisoTimer = null;
+
+    el.volume.max = VOLUME_MAX;
+
+    // ---- utilitários -------------------------------------------------
+
+    function idadeMs() {
+      if (!estado || !estado.atualizadoEm) return Infinity;
+      var t = Date.parse(estado.atualizadoEm);
+      return isNaN(t) ? Infinity : Date.now() - t;
+    }
+    function haQuanto(ms) {
+      if (!isFinite(ms)) return '—';
+      var s = Math.max(0, Math.round(ms / 1000));
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + ' min';
+      return Math.floor(m / 60) + ' h';
+    }
+    function vivo() { return !!estado && !estado.erro && idadeMs() < SEM_RESPOSTA_MS; }
+    function podeControlar() { return vivo() && !pend; }
+    function setSelo(texto, classe) {
+      el.selo.textContent = texto;
+      el.selo.className = 'status ' + classe;
+    }
+    function mostrarAviso(texto) {
+      el.aviso.textContent = texto;
+      clearTimeout(avisoTimer);
+      avisoTimer = setTimeout(function () { el.aviso.textContent = ''; }, 5000);
+    }
+    function horaLisboa() {
+      try {
+        var h = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Lisbon', hour: 'numeric', hour12: false }).format(new Date());
+        return parseInt(h, 10) % 24;
+      } catch (e) { return new Date().getHours(); }
+    }
+    function emHorarioLoja() {
+      var h = horaLisboa();
+      return h >= HORARIO_LOJA.inicio && h < HORARIO_LOJA.fim;
+    }
+    function aTocar() { return !!estado && estado.transporte === 'PLAYING'; }
+
+    // Valores "efectivos": o pedido sobrepõe-se ao estado enquanto pendente.
+    function volumeEfectivo() {
+      if (pend && pend.tipo === 'volume') return pend.valor;
+      return estado ? estado.volume : null;
+    }
+    function muteEfectivo() {
+      if (pend && pend.tipo === 'mute') return !!pend.valor;
+      return !!(estado && estado.mute);
+    }
+    function tocarEfectivo() {
+      if (pend && pend.tipo === 'play') return true;
+      if (pend && pend.tipo === 'pause') return false;
+      return aTocar();
+    }
+
+    // ---- render ------------------------------------------------------
+
+    function renderFavoritos() {
+      var on = vivo();
+      el.favsTit.textContent = 'Favoritos' + (favoritos.length ? ' (' + favoritos.length + ')' : '');
+      el.favsLista.innerHTML = '';
+      if (!favoritos.length) {
+        var p = document.createElement('div');
+        p.className = 'mu-favs-vazio';
+        p.textContent = 'Sem favoritos';
+        el.favsLista.appendChild(p);
+        return;
+      }
+      var atual = estado && estado.favoritoAtual != null ? Number(estado.favoritoAtual) : -1;
+      favoritos.forEach(function (f) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mu-fav' + (f.i === atual && aTocar() ? ' active' : '');
+        b.disabled = !on || !!pend;
+        b.setAttribute('data-i', f.i);
+        var t = document.createElement('span'); t.className = 't'; t.textContent = f.titulo || ('Favorito ' + (f.i + 1));
+        var k = document.createElement('span'); k.className = 'tipo'; k.textContent = FONTES[f.tipo] || f.tipo || '';
+        b.appendChild(t); b.appendChild(k);
+        el.favsLista.appendChild(b);
+      });
+    }
+
+    function render() {
+      var ms = idadeMs();
+      var on = vivo();
+      card.classList.toggle('mu-neutro', !on);
+
+      // Cabeçalho: estado da ligação ao POS.
+      if (!estado) setSelo('Sem dados', 'ref');
+      else if (!on) setSelo('Sem ligação ao POS', 'ref');
+      else setSelo('Ligado', 'ok');
+
+      // Alerta central: sem música em horário de loja.
+      var alertar = on && emHorarioLoja() && !aTocar();
+      el.alerta.hidden = !alertar;
+      if (alertar) {
+        var desde = estado.paradoDesde ? Date.parse(estado.paradoDesde) : NaN;
+        var ha = isNaN(desde) ? null : Date.now() - desde;
+        el.alertaTxt.textContent = 'Sem música a tocar' + (ha != null ? ' há ' + haQuanto(ha) : '');
+      }
+
+      // Faixa e fonte.
+      var faixa = (on && estado.faixa) || null;
+      var fonte = on ? (estado.fonte || 'nada') : 'nada';
+      el.titulo.textContent = faixa && faixa.titulo ? faixa.titulo : (on ? (fonte === 'nada' ? 'Sem música' : 'Sem título') : (estado ? 'Sem resposta' : 'Sem dados'));
+      el.artista.textContent = faixa && faixa.artista ? faixa.artista + (faixa.album ? ' · ' + faixa.album : '') : '—';
+      el.fonte.textContent = FONTES[fonte] || fonte;
+      el.fonte.className = 'status ' + (on && fonte !== 'nada' ? 'ok' : 'ref');
+      var tr = on ? estado.transporte : null;
+      el.transporte.textContent = !on ? '' : (tr === 'PLAYING' ? 'A tocar' : tr === 'PAUSED' ? 'Em pausa' : tr === 'TRANSITIONING' ? 'A mudar…' : 'Parado');
+
+      // Volume e mute.
+      var v = volumeEfectivo();
+      if (!aArrastar) {
+        el.volume.value = (v == null || isNaN(v)) ? 0 : Math.min(VOLUME_MAX, Math.max(0, Number(v)));
+        el.volumeNum.textContent = (on && v != null) ? String(v) : '—';
+      }
+      el.volumeNum.classList.toggle('pendente', !!(pend && pend.tipo === 'volume'));
+      el.volume.disabled = !on || !!pend;
+      var m = muteEfectivo();
+      el.mute.classList.toggle('active', on && m);
+      el.mute.setAttribute('aria-pressed', on && m ? 'true' : 'false');
+      el.mute.title = m ? 'Repor som' : 'Silenciar';
+      el.muteIco.setAttribute('href', on && m ? '#i-volume-x' : '#i-volume-2');
+      el.mute.disabled = !on || !!pend;
+
+      // Transporte.
+      var tocar = tocarEfectivo();
+      el.playIco.setAttribute('href', on && tocar ? '#i-pause' : '#i-play');
+      el.play.title = tocar ? 'Pausa' : 'Play';
+      el.play.disabled = !on || !!pend;
+      el.anterior.disabled = el.proximo.disabled = !on || !!pend;
+      var dicaAirplay = on && fonte === 'airplay' ? ' — pode não responder em AirPlay' : '';
+      el.anterior.title = 'Anterior' + dicaAirplay;
+      el.proximo.title = 'Seguinte' + dicaAirplay;
+
+      renderFavoritos();
+
+      el.nota.textContent = !estado ? 'À espera do serviço da loja…'
+        : 'Atualizado há ' + haQuanto(ms) + (estado.erro ? ' · ' + estado.erro : '');
+    }
+
+    // ---- comandos ----------------------------------------------------
+
+    function estadoReflete() {
+      if (!pend || !estado) return false;
+      var t = pend.tipo, v = pend.valor;
+      if (t === 'volume') return Number(estado.volume) === Number(v);
+      if (t === 'mute') return !!estado.mute === !!v;
+      if (t === 'play') return estado.transporte === 'PLAYING';
+      if (t === 'pause') return estado.transporte === 'PAUSED' || estado.transporte === 'STOPPED';
+      return false;   // proximo / anterior / tocarFavorito: só pela marca do serviço
+    }
+
+    function terminarPendente() {
+      if (!pend) return;
+      clearTimeout(pend.timer);
+      if (pend.ref && pend.cb) pend.ref.off('value', pend.cb);
+      pend = null;
+      render();
+    }
+
+    function enviar(tipo, valor) {
+      if (pend || !estado) return;
+      var ref = db.ref('lojas/' + lojaId + '/sonos/comandos').push();
+      pend = { tipo: tipo, valor: valor, ref: ref, cb: null, timer: null };
+
+      // Um registo novo: set() num nó filho acabado de criar, nunca no pai.
+      ref.set({
+        tipo: tipo,
+        valor: valor,
+        pedidoEm: new Date().toISOString(),
+        origem: 'centro-de-controlo',
+        estado: 'pendente'
+      }).catch(function (erro) {
+        console.error('Falha a escrever o comando:', erro);
+        mostrarAviso('Não foi possível enviar o comando.');
+        terminarPendente();
+      });
+
+      pend.cb = function (snap) {
+        var c = snap.val();
+        if (!c || c.estado === 'pendente') return;
+        if (c.estado === 'falhou') mostrarAviso('A loja não executou: ' + (c.erro || 'erro desconhecido'));
+        terminarPendente();
+      };
+      ref.on('value', pend.cb);
+
+      pend.timer = setTimeout(function () {
+        mostrarAviso('Sem confirmação da loja');
+        terminarPendente();
+      }, CONFIRMACAO_MS);
+
+      render();
+    }
+
+    // Slider: o número acompanha o arrasto, o comando só sai ao largar.
+    el.volume.addEventListener('input', function () {
+      aArrastar = true;
+      el.volumeNum.textContent = el.volume.value;
+    });
+    el.volume.addEventListener('change', function () {
+      aArrastar = false;
+      var v = Math.min(VOLUME_MAX, Math.max(0, parseInt(el.volume.value, 10) || 0));
+      if (!podeControlar() || Number(estado.volume) === v) { render(); return; }
+      enviar('volume', v);
+    });
+    el.mute.addEventListener('click', function () {
+      if (!podeControlar()) return;
+      enviar('mute', !estado.mute);
+    });
+    el.play.addEventListener('click', function () {
+      if (!podeControlar()) return;
+      enviar(aTocar() ? 'pause' : 'play', true);
+    });
+    el.anterior.addEventListener('click', function () {
+      if (!podeControlar()) return;
+      enviar('anterior', true);
+    });
+    el.proximo.addEventListener('click', function () {
+      if (!podeControlar()) return;
+      enviar('proximo', true);
+    });
+
+    el.favsToggle.addEventListener('click', function () {
+      var aberto = el.favsToggle.getAttribute('aria-expanded') === 'true';
+      el.favsToggle.setAttribute('aria-expanded', aberto ? 'false' : 'true');
+      el.favsLista.hidden = aberto;
+    });
+    el.favsLista.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-i]');
+      if (!b || b.disabled || !podeControlar()) return;
+      if (estado.fonte === 'airplay' && aTocar() &&
+          !window.confirm('Vai cortar a música que está a vir do telemóvel. Continuar?')) return;
+      enviar('tocarFavorito', parseInt(b.getAttribute('data-i'), 10));
+    });
+
+    // ---- ligação ao estado -----------------------------------------
+
+    db.ref('lojas/' + lojaId + '/sonos/estado').on('value', function (snap) {
+      estado = snap.val();
+      if (estadoReflete()) terminarPendente();
+      else render();
+    }, function (erro) {
+      console.error('Falha a ler lojas/' + lojaId + '/sonos/estado:', erro);
+      estado = null;
+      render();
+    });
+
+    db.ref('lojas/' + lojaId + '/sonos/favoritos').on('value', function (snap) {
+      var v = snap.val();
+      favoritos = [];
+      if (Array.isArray(v)) {
+        v.forEach(function (f, i) { if (f) favoritos.push({ i: i, titulo: f.titulo, tipo: f.tipo, uri: f.uri }); });
+      } else if (v && typeof v === 'object') {
+        Object.keys(v).forEach(function (k) {
+          var f = v[k]; if (!f) return;
+          favoritos.push({ i: parseInt(k, 10), titulo: f.titulo, tipo: f.tipo, uri: f.uri });
+        });
+        favoritos.sort(function (a, b) { return a.i - b.i; });
+      }
+      render();
+    }, function (erro) {
+      console.error('Falha a ler lojas/' + lojaId + '/sonos/favoritos:', erro);
+    });
+
+    // "atualizado há X", o limite dos 10 min e o "há X min" do alerta
+    // recalculam-se no cliente.
+    setInterval(render, 10000);
+    render();
+  }
+
+  // ===================================================================
   // CONSUMO ELÉTRICO — € por mês a partir dos débitos bancários.
   //
   // Não existe kWh no Firebase. A fonte real é contasBancarias/{abanca,
@@ -2299,6 +2768,7 @@ window.addEventListener('load', function () {
     vendasHoje.carregar(db);
 
     montarAC(db, lojaId);
+    montarMusica(db, lojaId);
 
     var camEl       = document.getElementById('cam');
     var camTabsEl   = document.getElementById('camTabs');

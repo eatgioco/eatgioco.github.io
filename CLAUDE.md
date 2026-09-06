@@ -36,7 +36,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   `caixa.html` (desde Set/2026: fotografar o talão no Devolver Troco),
   `loja-sao-bento.html` (desde 1 Set/2026: no computador da loja, que tem rato,
   nada muda — o critério é o hover) e `centro-de-controlo.html` (desde Set/2026:
-  câmaras e controlo do A/C a partir do telemóvel).
+  câmaras, controlo do A/C e música a partir do telemóvel).
   **Classe `shell-touch`.** O `gioco-shell.js` (`initShellTouch`) põe
   `body.shell-touch` quando o body tem `shell-mobile` E `matchMedia('(hover: none)')`
   casa; caso contrário tira-a. Corre no arranque do shell e volta a correr no
@@ -56,7 +56,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico. Layout (Set/2026): resumo no topo ("Saldo hoje" e "Por acertar" — o Manel usa estes textos como indicador, não mudar) → **ferramenta de caixa** em duas colunas (registo à esquerda; "Por devolver troco" à direita, com TODOS os movimentos `aberto` sem filtro de data, ordem cronológica, e o único sítio onde vive o botão "↩ Devolver Troco") → **listagem completa** a toda a largura (filtros Hoje/7 dias/Mês/Tudo + motivos, mais "Sem fatura (declarado)" e "Troco não conferiu"; os `aberto` aparecem com badge "Por acertar" mas sem botão). Em saídas Compra / Pagamento a fornecedor o registo pergunta "Vai haver troco?" (obrigatório): Não → fechado logo (`temTroco:false`, `estado:'acertado'`, `valorDevolvido:0`); Sim → `aberto` até ao Devolver Troco, que exige fatura carregada (lida via `gioco-faturas.js`, foto arquivada em `caixaFaturasArquivo/{id}`) OU a declaração "Declaro que não tenho fatura deste movimento", e depois o valor devolvido (pré-preenchido com `valor − fatura.montante`; diferença > 0,05 € só avisa). Depósito bancário e Outro fecham na criação (`semAcerto`), sem pergunta. Usada ao telemóvel para fotografar o talão: viewport `device-width` + opt-in `shell-mobile`. Escreve só `push()` em `caixaMovimentos` e `update()` por caminho em `caixaMovimentos/{id}` — nunca remove | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
-| `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder. **Telemóvel** (Set/2026): viewport `device-width` + opt-in `shell-mobile`; com `body.shell-touch` (sem hover) a `.cc-grid` passa a coluna única, `.cc-col`/`.cc-fila` a `display:contents`, e os cartões ordenam-se por `order`: 1 Câmara `#cam` · 2 A/C `#acCard` · 3 Vendas hoje `.vh-card` · 4 Consumo `#consumoCard` · 5 HACCP `#haccpCard` · 6 Equipa `#equipaCard` · 7 Entradas `#entradasCard` · 8 Mensagens `#chatCard`. Critério: ligados a dados primeiro, placeholders "Em breve" no fim — ao ligar um cartão novo, subir a sua `order`. Com rato nada disto aplica | Equipa |
+| `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, cartão **Música** (Sonos via `lojas/sb154/sonos`, ver secção "Loja SB154 — música"), e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder. **Telemóvel** (Set/2026): viewport `device-width` + opt-in `shell-mobile`; com `body.shell-touch` (sem hover) a `.cc-grid` passa a coluna única, `.cc-col`/`.cc-fila` a `display:contents`, e os cartões ordenam-se por `order`: 1 Câmara `#cam` · 2 A/C `#acCard` · 3 Música `#musicaCard` · 4 Vendas hoje `.vh-card` · 5 Consumo `#consumoCard` · 6 HACCP `#haccpCard` · 7 Equipa `#equipaCard` · 8 Entradas `#entradasCard` · 9 Mensagens `#chatCard`. Critério: ligados a dados primeiro, placeholders "Em breve" no fim — ao ligar um cartão novo, subir a sua `order`. Com rato nada disto aplica | Equipa |
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
@@ -494,6 +494,66 @@ lojas/sb154/ac/comandos/{pushId}   — escrito pela centro-de-controlo.html com 
   `lojas/$loja/ac/comandos` (hoje o serviço apanha o 400 e filtra localmente) e token do
   serviço na variável de ambiente `FIREBASE_AUTH` da tarefa.
 
+### Loja SB154 — música / Sonos (`lojas/sb154/sonos`)
+
+Duas Sonos Era 100 SL em **par estéreo** = uma única zona "SB154". A coordenadora
+é `RINCON_74CA60A613FE01400` (192.168.1.70); o canal `RINCON_74CA60A0886A01400`
+(192.168.1.69) é invisível — só aparece com `include_invisible=True` — e nunca é
+comandado. Volume, mute, transporte e faixa são propriedades da **zona**, lidas e
+escritas sempre na coordenadora (`group.coordinator`, resolvida em runtime se a
+coordenação trocar). As escritas propagam em assíncrono: **`sleep(0.5)`** antes de
+qualquer leitura de confirmação. Latências LAN < 25 ms.
+
+Tal como o A/C, quem fala com as colunas é um serviço Python no PC do POS
+(`servicos/sonos/sonos_bridge.py`, biblioteca `soco` 0.31.2, tarefa agendada
+`gioco-sonos-bridge`, SYSTEM, ao arranque, log `C:\gioco\sonos\sonos_bridge.log`).
+Sem segredos nem ficheiro de chave (UPnP na LAN). Config por env
+`SONOS_BRIDGE_*` (UID, IP de recurso, `VOLUME_MAX`, LOJA, LOG).
+
+```
+lojas/sb154/sonos/estado            — escrito SÓ pelo serviço (PATCH raso a cada 3 s se mudou,
+                                      heartbeat 5 min): ligado, transporte (PLAYING|PAUSED|STOPPED|
+                                      TRANSITIONING), volume, mute, fonte (airplay|spotify|radio|
+                                      fila|nada — derivada do URI da faixa), faixa {titulo, artista,
+                                      album, posicao, duracao} (null sem música; a posição não conta
+                                      como mudança), favoritoAtual?, tocaDesde / paradoDesde (ISO:
+                                      última passagem para / saída de PLAYING, recuperadas do nó ao
+                                      reiniciar), atualizadoEm (ISO), fonteDados 'sb154', erro?.
+                                      SEM URL de capa (é IP da LAN, não carrega fora da loja).
+lojas/sb154/sonos/favoritos/{n}     — espelho de get_sonos_favorites (titulo, tipo, uri, meta), PUT
+                                      no nó favoritos no arranque e a cada 10 min. Hoje vazio.
+lojas/sb154/sonos/unidades/{uid}    — inventário (ip, mac, modelo, firmware, papel coordenadora|canal,
+                                      visivel, nome), PUT no nó unidades, mesmo ritmo. Nunca acima.
+lojas/sb154/sonos/comandos/{pushId} — escrito pela centro-de-controlo.html com push().set():
+                                      tipo (volume 0–60 | mute bool | play | pause | proximo |
+                                      anterior | tocarFavorito índice-ou-uri), valor, pedidoEm,
+                                      origem 'centro-de-controlo', estado (pendente|executado|falhou);
+                                      o serviço acrescenta executadoEm e erro? folha a folha, estado
+                                      por último. NUNCA apagar; > 10 min ficam 'falhou'/'expirado'.
+```
+
+- **Teto de volume 60** (`SONOS_BRIDGE_VOLUME_MAX`, default 60; acima é `falhou` com erro
+  explícito) — o slider do cartão vai de 0 a 60, o mesmo teto. Depois de cada comando o
+  serviço relê o estado de imediato (Event, como no A/C).
+- **Decisão (Set/2026): a fonte é AirPlay do telemóvel da loja** e o volume do dia a dia
+  gere-se nos botões físicos do telemóvel. O cartão "Música" da `centro-de-controlo.html`
+  (a seguir ao A/C; `order:3` no telemóvel) serve para **monitorizar e ajustar à
+  distância**: selo de ligação (verde se `atualizadoEm` < 10 min, senão "Sem ligação ao
+  POS" e controlos desativados), alerta "Sem música a tocar há X min" (só em horário de
+  loja, 12h–23h de Lisboa, a partir de `paradoDesde`), faixa/artista e badge da fonte,
+  slider de volume (envia só ao largar) + mute, play/pause, anterior/seguinte (com AirPlay
+  levam o tooltip "pode não responder em AirPlay"), favoritos colapsados ("Sem favoritos"
+  quando vazio; com AirPlay a tocar pede confirmação antes de cortar a música do
+  telemóvel). Feedback pendente → executado/falhou igual ao A/C.
+- **Caminho futuro:** Spotify Connect (os favoritos já ficam espelhados e o
+  `tocarFavorito` usa `add_to_queue` + `play_from_queue` para Spotify) e um **knob USB de
+  volume** (teclas VK_VOLUME_*/VK_MEDIA_PLAY_PAUSE) no POS — o
+  `servicos/sonos/teste_teclas.py` é o teste de 2 min para saber se as teclas chegam por
+  cima do ZoneSoft em ecrã inteiro (correr à mão na sessão do utilizador, nunca SYSTEM).
+- **Pendente quando as Rules fecharem:** `".indexOn": ["estado"]` em
+  `lojas/$loja/sonos/comandos` (hoje o serviço apanha o 400 e filtra localmente) e
+  `FIREBASE_AUTH` na tarefa.
+
 ## Restrições críticas (não ignorar)
 
 1. **Repo PÚBLICO** — zero segredos no código (tokens, passwords, app secrets). IBANs já existem, risco assumido.
@@ -565,8 +625,9 @@ mecânica e é obrigatório antes de qualquer push que toque em páginas):
 7. **Tema.** Claro/escuro funcional via toggle do shell; qualquer cor local tem
    par `[data-theme="dark"]` quando o token não resolve sozinho.
 8. **Ícones.** Sprite local do `gioco-shell.js` (`<use href="#i-…">`), zero CDN.
-   O sprite tem 37 símbolos (Set/2026: entraram `chevron-left`, `calendar` e
-   `clock` para o calendario.html). A lista vive em `GIOCO_ICON_NAMES`.
+   O sprite tem 44 símbolos (Set/2026: entraram `chevron-left`, `calendar` e
+   `clock` para o calendario.html, e `music`, `play`, `pause`, `skip-back`,
+   `skip-forward`, `volume-2`, `volume-x` para o cartão Música). A lista vive em `GIOCO_ICON_NAMES`.
    Zero emoji pictográfico (📋💶🏦…) como ícone de UI — exceções: os emblemas
    de categoria dentro de `.cat-chip .circle` (conteúdo, não ícone) e o export
    PNG de turnos da equipa.html (artwork de marca, não UI). Glifos geométricos
