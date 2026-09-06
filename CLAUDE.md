@@ -56,7 +56,8 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `pagamentos.html` | Ciclo de pedidos de pagamento (numeração N/MM/AA, anulação) | Equipa |
 | `caixa.html` | Movimentos de dinheiro físico. Layout (Set/2026): resumo no topo ("Saldo hoje" e "Por acertar" — o Manel usa estes textos como indicador, não mudar) → **ferramenta de caixa** em duas colunas (registo à esquerda; "Por devolver troco" à direita, com TODOS os movimentos `aberto` sem filtro de data, ordem cronológica, e o único sítio onde vive o botão "↩ Devolver Troco") → **listagem completa** a toda a largura (filtros Hoje/7 dias/Mês/Tudo + motivos, mais "Sem fatura (declarado)" e "Troco não conferiu"; os `aberto` aparecem com badge "Por acertar" mas sem botão). Em saídas Compra / Pagamento a fornecedor o registo pergunta "Vai haver troco?" (obrigatório): Não → fechado logo (`temTroco:false`, `estado:'acertado'`, `valorDevolvido:0`); Sim → `aberto` até ao Devolver Troco, que exige fatura carregada (lida via `gioco-faturas.js`, foto arquivada em `caixaFaturasArquivo/{id}`) OU a declaração "Declaro que não tenho fatura deste movimento", e depois o valor devolvido (pré-preenchido com `valor − fatura.montante`; diferença > 0,05 € só avisa). Depósito bancário e Outro fecham na criação (`semAcerto`), sem pergunta. Usada ao telemóvel para fotografar o talão: viewport `device-width` + opt-in `shell-mobile`. Escreve só `push()` em `caixaMovimentos` e `update()` por caminho em `caixaMovimentos/{id}` — nunca remove | Equipa |
 | `loja-sao-bento.html` | Planta, checklists abertura/fecho, temperaturas HACCP, pedidos da loja | Equipa |
-| `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, cartão **Música** (Sonos via `lojas/sb154/sonos`, ver secção "Loja SB154 — música"), e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder. **Telemóvel** (Set/2026): viewport `device-width` + opt-in `shell-mobile`; com `body.shell-touch` (sem hover) a `.cc-grid` passa a coluna única, `.cc-col`/`.cc-fila` a `display:contents`, e os cartões ordenam-se por `order`: 1 Câmara `#cam` · 2 A/C `#acCard` · 3 Música `#musicaCard` · 4 Vendas hoje `.vh-card` · 5 Consumo `#consumoCard` · 6 HACCP `#haccpCard` · 7 Equipa `#equipaCard` · 8 Entradas `#entradasCard` · 9 Mensagens `#chatCard`. Critério: ligados a dados primeiro, placeholders "Em breve" no fim — ao ligar um cartão novo, subir a sua `order`. Com rato nada disto aplica | Equipa |
+| `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, cartão **Música** (Sonos via `lojas/sb154/sonos`, no padrão do A/C desde Set/2026 —
+essencial no cartão, resto no `giocoModal`; ver secção "Loja SB154 — música"), e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder. **Telemóvel** (Set/2026): viewport `device-width` + opt-in `shell-mobile`; com `body.shell-touch` (sem hover) a `.cc-grid` passa a coluna única, `.cc-col`/`.cc-fila` a `display:contents`, e os cartões ordenam-se por `order`: 1 Câmara `#cam` · 2 A/C `#acCard` · 3 Música `#musicaCard` · 4 Vendas hoje `.vh-card` · 5 Consumo `#consumoCard` · 6 HACCP `#haccpCard` · 7 Equipa `#equipaCard` · 8 Entradas `#entradasCard` · 9 Mensagens `#chatCard`. Critério: ligados a dados primeiro, placeholders "Em breve" no fim — ao ligar um cartão novo, subir a sua `order`. Com rato nada disto aplica | Equipa |
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
 | `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
@@ -516,17 +517,64 @@ lojas/sb154/sonos/estado            — escrito SÓ pelo serviço (PATCH raso a 
                                       TRANSITIONING), volume, mute, fonte (airplay|spotify|radio|
                                       fila|nada — derivada do URI da faixa), faixa {titulo, artista,
                                       album, posicao, duracao} (null sem música; a posição não conta
-                                      como mudança), favoritoAtual?, tocaDesde / paradoDesde (ISO:
+                                      como mudança).
+                                      botoesBloqueados (inverso de buttons_enabled), luzEstado,
+                                      sleepTimerRestante (segundos ou null), eq {graves, agudos, loudness},
+                                      modo {aleatorio, repetir, crossfade}, filaTamanho, filaPosicao
+                                      (1-based) — TODOS opcionais: um firmware que não exponha um deles
+                                      deixa-o a null em vez de fazer falhar a leitura da zona; o essencial
+                                      (transporte, faixa, volume, mute) é que não tem rede de segurança,
+                                      porque aí uma falha É falha de ligação.
+                                      favoritoAtual?, tocaDesde / paradoDesde (ISO:
                                       última passagem para / saída de PLAYING, recuperadas do nó ao
                                       reiniciar), atualizadoEm (ISO), fonteDados 'sb154', erro?.
                                       SEM URL de capa (é IP da LAN, não carrega fora da loja).
-lojas/sb154/sonos/favoritos/{n}     — espelho de get_sonos_favorites (titulo, tipo, uri, meta), PUT
-                                      no nó favoritos no arranque e a cada 10 min. Hoje vazio.
+lojas/sb154/sonos/favoritos/{n}     — espelho de get_sonos_favorites (titulo, tipo, tocavel, uri, meta),
+                                      PUT no nó favoritos no arranque e a cada 10 min. O tipo é a taxonomia
+                                      dos FAVORITOS — radio | playlist | album | outro — e NUNCA 'nada'/'sem
+                                      música', que é da outra taxonomia (a fonte a tocar). Decide-se pela
+                                      classe DIDL do item e só depois pelo URI. Os "Sonos Radio" de fábrica
+                                      não têm recurso nem referência utilizáveis pelo soco: ficam
+                                      tipo:'radio' e tocavel:false, e a página desactiva-os em vez de
+                                      oferecer um botão que ia falhar.
+lojas/sb154/sonos/fila/{n}          — titulo, artista, posicao (posição REAL na fila, 1-based — é o valor
+                                      que o comando saltarPara aceita). Até 30 itens A PARTIR da faixa a
+                                      tocar (o item 0 é a actual). PUT no nó fila a cada 30 s e logo a
+                                      seguir a mudança de faixa / saltarPara / tocarFavorito / proximo /
+                                      anterior. Em AirPlay costuma vir vazia (a fila vive no telemóvel):
+                                      escreve-se null, nunca conteúdo inventado.
+lojas/sb154/sonos/config/predefinicoes — { abertura, normal, cheio }, níveis de volume 0–60 que o cartão
+                                      oferece como atalhos. O serviço LÊ; só cria o nó UMA vez com
+                                      25/38/50 se não existir, e nunca mais escreve lá (é configuração do
+                                      utilizador — mudar à mão no Firebase). A página também só lê: o
+                                      caminho para mudar o volume continua a ser o comando 'volume', as
+                                      predefinições são só valores que a página envia. Sem o nó, a linha
+                                      de atalhos desaparece do cartão.
+lojas/sb154/sonos/diario/{AAAA-MM-DD} — acumulador do dia, PATCH raso do serviço uma vez por minuto com os
+                                      totais ABSOLUTOS (nunca incrementos — um PATCH repetido ou perdido
+                                      não estraga a conta): minutosATocar, minutosParado,
+                                      minutosParadoHorarioLoja (12h–23h locais, a mesma janela do alerta do
+                                      cartão), maiorPausa (minutos, com a pausa em curso incluída),
+                                      nrPausas, volumeMedio (ponderado pelo tempo a tocar) e volumeMax,
+                                      fontes {airplay, spotify, radio, fila} em minutos (só contam enquanto
+                                      TOCA: parado, o URI da última faixa continua lá e inflaria a fonte
+                                      anterior), atualizadoEm. Ao arrancar e à meia-noite o serviço lê o nó
+                                      do dia e continua de onde estava — reiniciar não põe o dia a zero.
+                                      Saltos > 30 s (serviço parado, PC suspenso) não são contados. Nenhuma
+                                      página lê isto ainda.
 lojas/sb154/sonos/unidades/{uid}    — inventário (ip, mac, modelo, firmware, papel coordenadora|canal,
                                       visivel, nome), PUT no nó unidades, mesmo ritmo. Nunca acima.
 lojas/sb154/sonos/comandos/{pushId} — escrito pela centro-de-controlo.html com push().set():
                                       tipo (volume 0–60 | mute bool | play | pause | proximo |
-                                      anterior | tocarFavorito índice-ou-uri), valor, pedidoEm,
+                                      anterior | tocarFavorito índice-ou-uri | bloquearBotoes bool —
+                                      o nó estado guarda o INVERSO de buttons_enabled | luzEstado bool |
+                                      sleepTimer segundos, 0 cancela | eqGraves -10..10 | eqAgudos -10..10 |
+                                      eqLoudness bool | aleatorio bool | repetir bool | crossfade bool |
+                                      saltarPara posição 1-based na fila). O aleatorio e o repetir são as
+                                      duas dimensões do MESMO play_mode: cada comando muda só a sua e
+                                      preserva a outra; mexer no repetir colapsa um REPEAT_ONE em
+                                      REPEAT_ALL (repetir uma faixa só não tem interruptor e não se
+                                      inventa um estado intermédio). valor, pedidoEm,
                                       origem 'centro-de-controlo', estado (pendente|executado|falhou);
                                       o serviço acrescenta executadoEm e erro? folha a folha, estado
                                       por último. NUNCA apagar; > 10 min ficam 'falhou'/'expirado'.
@@ -538,21 +586,36 @@ lojas/sb154/sonos/comandos/{pushId} — escrito pela centro-de-controlo.html com
 - **Decisão (Set/2026): a fonte é AirPlay do telemóvel da loja** e o volume do dia a dia
   gere-se nos botões físicos do telemóvel. O cartão "Música" da `centro-de-controlo.html`
   (a seguir ao A/C; `order:3` no telemóvel) serve para **monitorizar e ajustar à
-  distância**: selo de ligação (verde se `atualizadoEm` < 10 min, senão "Sem ligação ao
+  distância**. Desde Set/2026 está no **padrão do cartão A/C**: no cartão só o que se olha
+  e se mexe ao balcão, o resto no painel "Mais opções".
+  **No cartão:** selo de ligação (verde se `atualizadoEm` < 10 min, senão "Sem ligação ao
   POS" e controlos desativados), alerta "Sem música a tocar há X min" (só em horário de
   loja, 12h–23h de Lisboa, a partir de `paradoDesde`), faixa/artista e badge da fonte,
-  slider de volume (envia só ao largar) + mute, play/pause, anterior/seguinte (com AirPlay
-  levam o tooltip "pode não responder em AirPlay"), favoritos colapsados ("Sem favoritos"
-  quando vazio; com AirPlay a tocar pede confirmação antes de cortar a música do
-  telemóvel). Feedback pendente → executado/falhou igual ao A/C.
+  slider de volume (envia só ao largar) + mute, os atalhos de volume de
+  `config/predefinicoes` (linha escondida quando o nó não existe), play/pause,
+  anterior/seguinte (com AirPlay levam o tooltip "pode não responder em AirPlay") e o botão
+  **Mais opções**.
+  **No painel** (o `giocoModal` do shell, com as MESMAS classes `.acp-*`, `.ac-mais` e
+  `.ac-vent`/`.mu-pres` do A/C — componentes partilhados, nunca reimplementados por
+  cartão): "A seguir" (a fila, tocar num item envia `saltarPara`), Favoritos (desactivados
+  quando `tocavel:false`), Reprodução (aleatório / repetir / transição suave), Som (graves,
+  agudos, loudness), Temporizador (15/30/60/90 min e Desligar) e Aparelho (botões
+  bloqueados, luz de estado, fila, última leitura). Uma linha cujo campo o estado não
+  expõe fica escondida, e uma secção só de interruptores desaparece inteira se nenhum
+  deles existir — igual ao painel do A/C.
+  Com AirPlay a tocar, saltar na fila ou tocar um favorito pede confirmação antes de
+  cortar a música do telemóvel. Feedback pendente → executado/falhou igual ao A/C (o
+  `sleepTimer` só se confirma a cancelar: ligado, o valor conta para trás e nunca voltaria
+  a bater certo com o pedido).
 - **Caminho futuro:** Spotify Connect (os favoritos já ficam espelhados e o
   `tocarFavorito` usa `add_to_queue` + `play_from_queue` para Spotify) e um **knob USB de
   volume** (teclas VK_VOLUME_*/VK_MEDIA_PLAY_PAUSE) no POS — o
   `servicos/sonos/teste_teclas.py` é o teste de 2 min para saber se as teclas chegam por
   cima do ZoneSoft em ecrã inteiro (correr à mão na sessão do utilizador, nunca SYSTEM).
 - **Pendente quando as Rules fecharem:** `".indexOn": ["estado"]` em
-  `lojas/$loja/sonos/comandos` (hoje o serviço apanha o 400 e filtra localmente) e
-  `FIREBASE_AUTH` na tarefa.
+  `lojas/$loja/sonos/comandos` (hoje o serviço apanha o 400 e filtra localmente),
+  `FIREBASE_AUTH` na tarefa, e fechar `lojas/$loja/sonos/{fila,diario}` à escrita de
+  qualquer cliente que não o serviço (a página só os lê).
 
 ## Restrições críticas (não ignorar)
 

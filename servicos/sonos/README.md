@@ -33,9 +33,43 @@ espelhados para uma futura passagem a Spotify Connect.
   fonteDados 'sb154', erro?`. PATCH raso a cada 3 s se algo mudou (a posição da
   faixa não conta como mudança), ou de 5 em 5 min como heartbeat. Sem URL de
   capa de propósito: é um IP da LAN que o browser fora da loja não carrega.
-- `lojas/sb154/sonos/favoritos/{n}` — `titulo, tipo (radio|spotify|fila), uri,
-  meta`, pela ordem da app Sonos. PUT no nó `favoritos` no arranque e a cada
-  10 min (node apagado se não houver favoritos — a página mostra "Sem favoritos").
+  Desde Set/2026 leva também `botoesBloqueados` (o inverso de `buttons_enabled`),
+  `luzEstado`, `sleepTimerRestante` (segundos ou null), `eq {graves, agudos,
+  loudness}`, `modo {aleatorio, repetir, crossfade}`, `filaTamanho` e
+  `filaPosicao` (1-based). **Todos estes são opcionais**: um firmware que não
+  exponha um deles deixa-o a `null` em vez de fazer falhar a leitura da zona —
+  o essencial (transporte, faixa, volume, mute) é que não tem rede de segurança,
+  porque aí uma falha É falha de ligação.
+- `lojas/sb154/sonos/favoritos/{n}` — `titulo, tipo (radio|playlist|album|outro),
+  tocavel (bool), uri, meta`, pela ordem da app Sonos. PUT no nó `favoritos` no
+  arranque e a cada 10 min (nó apagado se não houver favoritos — a página mostra
+  "Sem favoritos"). O `tipo` é a taxonomia dos FAVORITOS, não a das fontes a
+  tocar: um favorito nunca é `nada`/"sem música". Os "Sonos Radio" de fábrica
+  vêm sem recurso nem referência utilizáveis pelo `soco` — ficam `radio` com
+  `tocavel:false` e a página mostra-os desactivados em vez de oferecer um botão
+  que ia falhar.
+- `lojas/sb154/sonos/fila/{n}` — `titulo, artista, posicao` (posição REAL na
+  fila, 1-based, que é o valor que o comando `saltarPara` aceita). Até
+  `FILA_MAX` (30) itens **a partir da faixa a tocar**. PUT no nó `fila` a cada
+  30 s e logo a seguir a uma mudança de faixa ou a um `saltarPara` /
+  `tocarFavorito` / `proximo` / `anterior`. Em AirPlay a fila costuma vir vazia
+  (vive no telemóvel) — escreve-se `null`, nunca conteúdo inventado.
+- `lojas/sb154/sonos/config/predefinicoes` — `{abertura, normal, cheio}`, níveis
+  de volume 0–60 que a página oferece como atalhos. O serviço **lê**; só o cria
+  uma vez com `25/38/50` se o nó não existir, e nunca mais escreve lá (é
+  configuração do utilizador). O caminho para mudar o volume continua a ser o
+  comando `volume` — as predefinições são só valores que a página envia.
+- `lojas/sb154/sonos/diario/{AAAA-MM-DD}` — acumulador do dia, PATCH raso uma
+  vez por minuto com os totais **absolutos** (nunca incrementos, para um PATCH
+  repetido ou perdido não estragar a conta): `minutosATocar, minutosParado,
+  minutosParadoHorarioLoja` (12h–23h locais, a mesma janela do alerta do
+  cartão), `maiorPausa` (minutos, com a pausa em curso incluída), `nrPausas`,
+  `volumeMedio` (ponderado pelo tempo a tocar) e `volumeMax`, `fontes
+  {airplay, spotify, radio, fila}` em minutos (só contam enquanto toca: parada,
+  o URI da última faixa continua lá e inflaria a fonte anterior), e
+  `atualizadoEm`. Ao arrancar e à meia-noite o serviço lê o nó do dia e continua
+  de onde ele estava — um reinício não põe o dia a zero. Um salto maior que
+  `DT_MAX` (30 s: serviço parado, PC suspenso) não é contado.
 - `lojas/sb154/sonos/unidades/{uid}` — `ip, mac, modelo, firmware, papel
   (coordenadora|canal), visivel, nome`. PUT no nó `unidades`, mesmo ritmo.
 - `lojas/sb154/sonos/comandos/{pushId}` — `tipo, valor, pedidoEm, origem, estado
@@ -43,7 +77,16 @@ espelhados para uma futura passagem a Spotify Connect.
   `SONOS_BRIDGE_VOLUME_MAX`, default 60 — acima é `falhou` com erro explícito),
   `mute` (bool), `play`, `pause`, `proximo`, `anterior`, `tocarFavorito` (índice
   da lista ou uri; Spotify vai por `add_to_queue` + `play_from_queue` quando o
-  `play_uri` recusa). Consultados a cada 3 s; nunca apagados, só marcados folha a
+  `play_uri` recusa; um favorito com `tocavel:false` é recusado com erro
+  explícito), `bloquearBotoes` (bool — o nó guarda o inverso de
+  `buttons_enabled`), `luzEstado` (bool), `sleepTimer` (segundos, `0` cancela),
+  `eqGraves` / `eqAgudos` (-10..10), `eqLoudness` (bool), `aleatorio` (bool),
+  `repetir` (bool), `crossfade` (bool) e `saltarPara` (posição 1-based na fila →
+  `play_from_queue`). O `aleatorio` e o `repetir` são as duas dimensões do mesmo
+  `play_mode`: cada comando muda só a sua e preserva a outra; mexer no `repetir`
+  colapsa um `REPEAT_ONE` em `REPEAT_ALL` (repetir uma só faixa não tem
+  interruptor no cartão e não se inventa um estado intermédio).
+  Consultados a cada 3 s; nunca apagados, só marcados folha a
   folha (executadoEm, erro?, estado por último). Comandos com mais de 10 min são
   `falhou` / `expirado`. Depois de cada comando o estado é relido de imediato.
 
@@ -93,6 +136,8 @@ capturar o teclado em exclusivo e o knob não serve.
 
 ## Pendente quando as Rules fecharem
 
+- Fechar `lojas/$loja/sonos/diario` e `lojas/$loja/sonos/fila` à escrita de
+  qualquer cliente que não o serviço (a página só os lê).
 - Adicionar `".indexOn": ["estado"]` em `lojas/$loja/sonos/comandos` — até lá o
   serviço detecta o 400 do `orderBy="estado"` e filtra localmente os últimos 50.
 - Passar um token ao serviço na variável de ambiente `FIREBASE_AUTH` (vai em

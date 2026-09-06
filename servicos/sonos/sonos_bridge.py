@@ -20,10 +20,22 @@ Ciclo:
     executa por ordem de pedidoEm e marca 'executado' / 'falhou';
   - no arranque e a cada 10 min espelha os favoritos Sonos em
     lojas/{loja}/sonos/favoritos e o inventário das unidades em
-    lojas/{loja}/sonos/unidades (PUT em cada um destes nós, nunca acima).
+    lojas/{loja}/sonos/unidades (PUT em cada um destes nós, nunca acima);
+  - a cada 30 s (e logo a seguir a uma mudança de faixa) espelha a fila em
+    lojas/{loja}/sonos/fila — até FILA_MAX itens a partir da posição actual
+    (PUT no nó fila). Em AirPlay a fila pode vir vazia ou ser a do telemóvel:
+    escreve-se o que o soco devolver, sem inventar nada;
+  - a cada 60 s faz PATCH raso do acumulador do dia em
+    lojas/{loja}/sonos/diario/{AAAA-MM-DD} (totais absolutos, ver Diario);
+  - no arranque lê lojas/{loja}/sonos/config/predefinicoes (níveis de volume
+    da página) e, SÓ se o nó não existir, cria-o uma vez com os defaults —
+    nunca mais escreve lá.
 
 Tipos de comando: volume (0–SONOS_BRIDGE_VOLUME_MAX), mute (bool), play,
-pause, proximo, anterior, tocarFavorito (índice da lista favoritos ou uri).
+pause, proximo, anterior, tocarFavorito (índice da lista favoritos ou uri),
+bloquearBotoes (bool), luzEstado (bool), sleepTimer (segundos, 0 = cancelar),
+eqGraves (-10..10), eqAgudos (-10..10), eqLoudness (bool), aleatorio (bool),
+repetir (bool), crossfade (bool), saltarPara (posição 1-based na fila).
 
 Variáveis de ambiente (todas opcionais):
   SONOS_BRIDGE_UID         UID da coordenadora (default o da SB154)
@@ -64,17 +76,29 @@ FIREBASE_AUTH = os.environ.get("FIREBASE_AUTH", "").strip()
 INTERVALO_ESTADO = 3         # s entre leituras da zona
 INTERVALO_COMANDOS = 3       # s entre consultas de comandos pendentes
 INTERVALO_INVENTARIO = 600   # s entre espelhos de favoritos/unidades
+INTERVALO_FILA = 30          # s entre espelhos da fila (ou logo após mudar de faixa)
+INTERVALO_DIARIO = 60        # s entre PATCH do acumulador do dia
+FILA_MAX = 30                # itens da fila espelhados a partir da posição actual
 HEARTBEAT = 5 * 60           # s: escreve o estado mesmo sem alterações
 COMANDO_VALIDADE = 10 * 60   # s: comandos mais velhos que isto expiram
 FALHAS_PARA_ALERTA = 3       # leituras falhadas seguidas até marcar erro
 PROPAGACAO = 0.5             # s: as escritas na zona propagam em assíncrono
 TRANSPORTES = ("PLAYING", "PAUSED_PLAYBACK", "STOPPED", "TRANSITIONING")
+DT_MAX = 30                  # s: salto maior que isto não conta no diário (PC suspenso)
+HORA_LOJA = (12, 23)         # [12h, 23h[ hora local do POS — igual ao cartão
+EQ_MIN, EQ_MAX = -10, 10     # graves/agudos aceites pela Sonos
+# Níveis de volume que a página oferece. Semeados UMA vez em config/predefinicoes:
+# a partir daí mandam os valores do Firebase e o serviço nunca mais escreve lá.
+PREDEFINICOES = {"abertura": 25, "normal": 38, "cheio": 50}
 
 BASE_PATH = f"lojas/{LOJA}/sonos"
 ESTADO_PATH = f"{BASE_PATH}/estado"
 COMANDOS_PATH = f"{BASE_PATH}/comandos"
 FAVORITOS_PATH = f"{BASE_PATH}/favoritos"
 UNIDADES_PATH = f"{BASE_PATH}/unidades"
+FILA_PATH = f"{BASE_PATH}/fila"
+DIARIO_PATH = f"{BASE_PATH}/diario"
+PREDEFINICOES_PATH = f"{BASE_PATH}/config/predefinicoes"
 
 # ---------------------------------------------------------------- log
 
@@ -204,6 +228,27 @@ def _limpo(v):
     return None if s in ("", "NOT_IMPLEMENTED") else s
 
 
+def _talvez(fn, default=None):
+    """Lê uma propriedade OPCIONAL da zona. Se o firmware não a expuser (ou a
+    chamada UPnP falhar), vale `default` em vez de deitar abaixo a leitura
+    toda — o essencial (transporte, faixa, volume, mute) fica sem rede de
+    segurança de propósito: aí a falha É falha de ligação."""
+    try:
+        return fn()
+    except Exception:
+        return default
+
+
+def _inteiro(valor, minimo, maximo, nome):
+    try:
+        v = int(valor)
+    except (TypeError, ValueError):
+        raise ValueError(f"{nome} inválido: {valor!r}")
+    if v < minimo or v > maximo:
+        raise ValueError(f"{nome} fora de {minimo}–{maximo}")
+    return v
+
+
 def ler_zona(coord: SoCo) -> dict:
     """Lê o estado completo da zona pela coordenadora. Levanta em falha de
     ligação."""
@@ -232,7 +277,53 @@ def ler_zona(coord: SoCo) -> dict:
     }
     if fonte == "nada":
         estado["faixa"] = None
+
+    # Extras (Set/2026). Todos opcionais: um firmware que não exponha um deles
+    # deixa-o a null em vez de fazer falhar a leitura da zona.
+    botoes = _talvez(lambda: bool(coord.buttons_enabled))
+    estado["botoesBloqueados"] = None if botoes is None else (not botoes)
+    estado["luzEstado"] = _talvez(lambda: bool(coord.status_light))
+    st = _talvez(lambda: coord.get_sleep_timer())
+    estado["sleepTimerRestante"] = None if st in (None, "") else int(st)
+    estado["eq"] = {
+        "graves": _talvez(lambda: int(coord.bass)),
+        "agudos": _talvez(lambda: int(coord.treble)),
+        "loudness": _talvez(lambda: bool(coord.loudness)),
+    }
+    estado["modo"] = ler_modo(coord)
+    pos = _limpo(faixa.get("playlist_position"))
+    try:
+        estado["filaPosicao"] = int(pos) if pos else None
+    except (TypeError, ValueError):
+        estado["filaPosicao"] = None
+    estado["filaTamanho"] = _talvez(lambda: int(coord.queue_size))
     return estado
+
+
+def ler_modo(coord: SoCo) -> dict:
+    """{aleatorio, repetir, crossfade}. O aleatório e a repetição são as duas
+    dimensões do play_mode; usa-se as propriedades do soco quando existem e
+    lê-se o play_mode em bruto quando não. REPEAT_ONE conta como repetir."""
+    modo = str(_talvez(lambda: coord.play_mode, "NORMAL") or "NORMAL").upper()
+    aleatorio = _talvez(lambda: bool(coord.shuffle))
+    if aleatorio is None:
+        aleatorio = "SHUFFLE" in modo
+    rep = _talvez(lambda: coord.repeat, "__sem__")
+    repetir = ("REPEAT" in modo) if rep == "__sem__" else bool(rep)
+    return {"aleatorio": bool(aleatorio), "repetir": bool(repetir),
+            "crossfade": _talvez(lambda: bool(coord.cross_fade))}
+
+
+def definir_modo(coord: SoCo, aleatorio=None, repetir=None):
+    """Muda SÓ a dimensão pedida do play_mode, preservando a outra. Mexer no
+    'repetir' colapsa um REPEAT_ONE em REPEAT_ALL — repetir uma só faixa não
+    tem interruptor no cartão e não se inventa um estado intermédio."""
+    atual = ler_modo(coord)
+    a = atual["aleatorio"] if aleatorio is None else bool(aleatorio)
+    r = atual["repetir"] if repetir is None else bool(repetir)
+    coord.play_mode = ("SHUFFLE" if (a and r) else
+                       "SHUFFLE_NOREPEAT" if a else
+                       "REPEAT_ALL" if r else "NORMAL")
 
 
 def _fav_uri(fav):
@@ -252,6 +343,35 @@ def _fav_uri(fav):
     return None
 
 
+URIS_RADIO = ("x-sonosapi-stream:", "x-sonosapi-radio:", "x-rincon-mp3radio:",
+              "aac:", "hls-radio:", "x-sonosapi-hls:")
+
+
+def tipo_do_favorito(uri, classe) -> str:
+    """radio | playlist | album | outro — a taxonomia dos FAVORITOS, que não é
+    a das fontes a tocar: um favorito nunca é 'nada'/'sem música'. Decide pela
+    classe DIDL do item apontado (fiável) e só depois pelo URI."""
+    c = str(classe or "").lower()
+    u = str(uri or "").lower()
+    if "audiobroadcast" in c or u.startswith(URIS_RADIO):
+        return "radio"
+    if "playlistcontainer" in c or "#playlist" in u:
+        return "playlist"
+    if "musicalbum" in c or ".album" in c or "#album" in u:
+        return "album"
+    if not c and u.startswith(("http:", "https:")):
+        return "radio"
+    return "outro"
+
+
+def _classe_favorito(fav, ref):
+    for obj in (ref, fav):
+        c = getattr(obj, "item_class", None) if obj is not None else None
+        if c:
+            return str(c)
+    return ""
+
+
 def ler_favoritos(coord: SoCo) -> list:
     """[{titulo, tipo, uri, meta}] pela ordem da app Sonos. Guarda-se o
     objecto DIDL em memória (não no Firebase) para tocar depois."""
@@ -264,18 +384,40 @@ def ler_favoritos(coord: SoCo) -> list:
         if isinstance(f, dict):
             uri = f.get("uri")
             itens.append({"titulo": f.get("title"), "uri": uri, "meta": f.get("meta"),
-                          "tipo": fonte_do_uri(uri, ""), "_obj": None})
+                          "tipo": tipo_do_favorito(uri, ""), "tocavel": bool(uri), "_obj": None})
             continue
         uri = _fav_uri(f)
         ref = getattr(f, "reference", None)
         meta = getattr(f, "resource_meta_data", None)
-        classe = getattr(ref, "item_class", "") if ref is not None else getattr(f, "item_class", "")
-        tipo = fonte_do_uri(uri, "")
-        if tipo == "fila" and "audioBroadcast" in str(classe):
-            tipo = "radio"
+        # Os "Sonos Radio" de fábrica aparecem nos favoritos sem recurso nem
+        # referência utilizáveis: ficam tipo 'radio' e tocavel=false — a página
+        # mostra-os desactivados em vez de oferecer um botão que ia falhar.
         itens.append({"titulo": getattr(f, "title", None), "uri": uri, "meta": meta,
-                      "tipo": tipo, "_obj": f})
+                      "tipo": tipo_do_favorito(uri, _classe_favorito(f, ref)),
+                      "tocavel": bool(uri) or ref is not None, "_obj": f})
     return itens
+
+
+def ler_fila(coord: SoCo, posicao_atual, maximo: int = FILA_MAX) -> dict:
+    """{'0': {titulo, artista, posicao}} — até `maximo` itens da fila a partir
+    da faixa a tocar. `posicao` é a posição REAL na fila (1-based, como a
+    Sonos a conta) e é o valor que o comando saltarPara aceita.
+
+    Em AirPlay a fila costuma vir vazia (a fila vive no telemóvel): devolve-se
+    {} e o nó fica a null. Nunca se inventa conteúdo."""
+    try:
+        inicio = max(0, int(posicao_atual) - 1)
+    except (TypeError, ValueError):
+        inicio = 0
+    itens = coord.get_queue(start=inicio, max_items=maximo)
+    out = {}
+    for n, it in enumerate(itens or []):
+        out[str(n)] = {
+            "titulo": _limpo(getattr(it, "title", None)),
+            "artista": _limpo(getattr(it, "creator", None) or getattr(it, "artist", None)),
+            "posicao": inicio + n + 1,
+        }
+    return out
 
 
 def ler_unidades(coord: SoCo) -> dict:
@@ -307,10 +449,12 @@ def tocar_favorito(coord: SoCo, fav: dict):
     obj = fav.get("_obj")
     uri = fav.get("uri")
     meta = fav.get("meta") or ""
+    if not fav.get("tocavel", True):
+        raise ValueError("favorito sem URI utilizável (rádio Sonos de fábrica)")
     if not uri:
         raise ValueError("favorito sem uri")
     erro_uri = None
-    if fav.get("tipo") != "spotify":
+    if "spotify" not in str(uri).lower():
         try:
             coord.play_uri(uri, meta=meta, title=fav.get("titulo") or "")
             return
@@ -323,6 +467,140 @@ def tocar_favorito(coord: SoCo, fav: dict):
     coord.clear_queue()
     coord.add_to_queue(item)
     coord.play_from_queue(0)
+
+
+# ---------------------------------------------------------------- diário
+
+class Diario:
+    """Acumulador do dia em lojas/{loja}/sonos/diario/{AAAA-MM-DD}.
+
+    Soma segundos a cada leitura do estado (3 em 3 s) e faz PATCH raso uma vez
+    por minuto com os totais ABSOLUTOS do dia — nunca incrementos, para um
+    PATCH repetido ou perdido não estragar a conta. Ao arrancar (e à
+    meia-noite) lê o nó do dia e continua de onde ele estava, para um
+    reinício do serviço não pôr o dia a zero.
+
+    Um salto maior que DT_MAX (serviço parado, PC suspenso, rede em baixo) não
+    é contado: o tempo em que não sabemos o que se passou não é tempo a tocar
+    nem tempo parado.
+
+    O horário de loja é HORA_LOJA em hora LOCAL do POS (que está em Lisboa),
+    a mesma janela que o cartão usa para o alerta "sem música".
+    """
+
+    FONTES = ("airplay", "spotify", "radio", "fila")
+
+    def __init__(self):
+        self.dia = None
+        self.z = None
+        self.fechados = []      # [(dia, dados)] de dias já fechados por escrever
+
+    @staticmethod
+    def _zero():
+        return {"tocar": 0.0, "parado": 0.0, "paradoLoja": 0.0,
+                "pausas": 0, "maiorPausa": 0.0, "pausaAtual": 0.0,
+                "volSoma": 0.0, "volMax": None,
+                "fontes": {k: 0.0 for k in Diario.FONTES}, "tocava": None}
+
+    def _abrir(self, dia: str):
+        z = self._zero()
+        try:
+            antigo = fb_get(f"{DIARIO_PATH}/{dia}") or {}
+        except Exception as e:
+            log.warning("não li o diário de %s (recomeça a zero): %s", dia, e)
+            antigo = {}
+        if isinstance(antigo, dict) and antigo:
+            def m(k):
+                try:
+                    return max(0.0, float(antigo.get(k) or 0)) * 60.0
+                except (TypeError, ValueError):
+                    return 0.0
+            z["tocar"] = m("minutosATocar")
+            z["parado"] = m("minutosParado")
+            z["paradoLoja"] = m("minutosParadoHorarioLoja")
+            z["maiorPausa"] = m("maiorPausa")
+            try:
+                z["pausas"] = int(antigo.get("nrPausas") or 0)
+            except (TypeError, ValueError):
+                z["pausas"] = 0
+            vmed = antigo.get("volumeMedio")
+            if isinstance(vmed, (int, float)):
+                z["volSoma"] = float(vmed) * z["tocar"]
+            vmax = antigo.get("volumeMax")
+            if isinstance(vmax, (int, float)):
+                z["volMax"] = int(vmax)
+            fontes = antigo.get("fontes")
+            if isinstance(fontes, dict):
+                for k in Diario.FONTES:
+                    try:
+                        z["fontes"][k] = max(0.0, float(fontes.get(k) or 0)) * 60.0
+                    except (TypeError, ValueError):
+                        pass
+            log.info("diário de %s recuperado (%.1f min a tocar)", dia, z["tocar"] / 60)
+        self.z = z
+        self.dia = dia
+
+    def tick(self, dt: float, estado: dict):
+        """Conta `dt` segundos com o estado lido agora."""
+        hoje = datetime.now().astimezone().strftime("%Y-%m-%d")
+        if hoje != self.dia:
+            if self.dia is not None and self.z is not None:
+                self.fechados.append((self.dia, self.dados(self.z)))
+            self._abrir(hoje)
+        if dt <= 0 or dt > DT_MAX:
+            return
+        z = self.z
+        toca = bool(estado) and estado.get("transporte") == "PLAYING"
+        if z["tocava"] is True and not toca:
+            z["pausas"] += 1
+        elif z["tocava"] is False and toca:
+            z["maiorPausa"] = max(z["maiorPausa"], z["pausaAtual"])
+            z["pausaAtual"] = 0.0
+        z["tocava"] = toca
+
+        if toca:
+            z["tocar"] += dt
+            v = estado.get("volume")
+            if isinstance(v, (int, float)):
+                z["volSoma"] += float(v) * dt
+                z["volMax"] = int(v) if z["volMax"] is None else max(z["volMax"], int(v))
+            # A fonte só conta enquanto toca: parada, o URI da última faixa
+            # continua lá e inflaria a fonte anterior.
+            f = estado.get("fonte")
+            if f in z["fontes"]:
+                z["fontes"][f] += dt
+        else:
+            z["parado"] += dt
+            z["pausaAtual"] += dt
+            if HORA_LOJA[0] <= datetime.now().astimezone().hour < HORA_LOJA[1]:
+                z["paradoLoja"] += dt
+
+    def dados(self, z=None) -> dict:
+        z = z or self.z
+        tocar = z["tocar"]
+        return {
+            "minutosATocar": round(tocar / 60, 1),
+            "minutosParado": round(z["parado"] / 60, 1),
+            "minutosParadoHorarioLoja": round(z["paradoLoja"] / 60, 1),
+            # A pausa em curso conta: senão o número só saltava quando a música
+            # voltasse, que é precisamente quando deixa de interessar.
+            "maiorPausa": round(max(z["maiorPausa"], z["pausaAtual"]) / 60, 1),
+            "nrPausas": int(z["pausas"]),
+            "volumeMedio": round(z["volSoma"] / tocar) if tocar >= 1 else None,
+            "volumeMax": z["volMax"],
+            "fontes": {k: round(v / 60, 1) for k, v in z["fontes"].items()},
+            "atualizadoEm": agora_iso(),
+        }
+
+    def gravar(self):
+        """PATCH raso do dia corrente (e de qualquer dia fechado à espera)."""
+        while self.fechados:
+            dia, dados = self.fechados[0]
+            fb_patch_folhas(f"{DIARIO_PATH}/{dia}", dados)
+            log.info("diário de %s fechado: %.1f min a tocar", dia, dados["minutosATocar"])
+            self.fechados.pop(0)
+        if self.dia and self.z:
+            fb_patch_folhas(f"{DIARIO_PATH}/{self.dia}", self.dados())
 
 
 # ---------------------------------------------------------------- Bridge
@@ -340,6 +618,10 @@ class Bridge:
         self.toca_desde = None       # ISO: última passagem para PLAYING
         self.parado_desde = None     # ISO: última saída de PLAYING
         self.transporte_anterior = None
+        self.fila_ja = asyncio.Event()   # pedir espelho da fila fora do ciclo
+        self.faixa_anterior = None       # (uri, titulo) para detectar mudança
+        self.diario = Diario()
+        self.ultimo_tick = None          # datetime da última contagem do diário
 
     # ---- ligação ---------------------------------------------------------
 
@@ -387,6 +669,20 @@ class Bridge:
             return
 
         self.falhas = 0
+        agora_tick = datetime.now(timezone.utc)
+        if self.ultimo_tick is not None:
+            self.diario.tick((agora_tick - self.ultimo_tick).total_seconds(), estado)
+        else:
+            self.diario.tick(0, estado)   # abre o dia sem contar tempo nenhum
+        self.ultimo_tick = agora_tick
+
+        # Mudou a faixa? A fila a seguir também mudou — espelha-se já, sem
+        # esperar pelos 30 s do ciclo.
+        faixa_agora = ((estado.get("faixa") or {}).get("titulo"), estado.get("filaPosicao"))
+        if self.faixa_anterior is not None and faixa_agora != self.faixa_anterior:
+            self.fila_ja.set()
+        self.faixa_anterior = faixa_agora
+
         self._marcas_de_tempo(estado["transporte"])
         estado["tocaDesde"] = self.toca_desde
         estado["paradoDesde"] = self.parado_desde
@@ -448,6 +744,40 @@ class Bridge:
             log.info("inventário: %d favorito(s), %d unidade(s)", len(favs), len(unidades))
         except Exception as e:
             log.error("PUT do inventário falhou: %s", e)
+
+    async def espelhar_fila(self):
+        """PUT do nó fila com o que a Sonos devolver a partir da faixa actual.
+        Fila vazia (o caso normal em AirPlay) escreve null, não um nó vazio."""
+        try:
+            await self.garantir_coord()
+            pos = (self.ultimo_estado or {}).get("filaPosicao") or 1
+            fila = await asyncio.to_thread(ler_fila, self.coord, pos)
+        except Exception as e:
+            log.warning("leitura da fila falhou: %s", e)
+            return
+        try:
+            fb_put(FILA_PATH, fila if fila else None)
+        except Exception as e:
+            log.error("PUT da fila falhou: %s", e)
+
+    def semear_predefinicoes(self):
+        """Lê config/predefinicoes. Se o nó não existir cria-o UMA vez com os
+        defaults; a partir daí mandam os valores do Firebase e o serviço nunca
+        mais escreve lá (as predefinições são do utilizador, não do serviço)."""
+        try:
+            atual = fb_get(PREDEFINICOES_PATH)
+        except Exception as e:
+            log.warning("não li as predefinições de volume: %s", e)
+            return
+        if isinstance(atual, dict) and atual:
+            log.info("predefinições de volume: %s", json.dumps(atual, ensure_ascii=False))
+            return
+        try:
+            fb_put(PREDEFINICOES_PATH, dict(PREDEFINICOES))
+            log.info("predefinições de volume criadas (%s) — nunca mais escritas pelo serviço",
+                     json.dumps(PREDEFINICOES))
+        except Exception as e:
+            log.error("PUT das predefinições falhou: %s", e)
 
     # ---- comandos -------------------------------------------------------
 
@@ -515,6 +845,28 @@ class Bridge:
             if fav is None:
                 raise ValueError(f"favorito desconhecido: {valor!r}")
             tocar_favorito(c, fav)
+        elif tipo == "bloquearBotoes":
+            c.buttons_enabled = not como_bool(valor)   # o nó guarda o inverso
+        elif tipo == "luzEstado":
+            c.status_light = como_bool(valor)
+        elif tipo == "sleepTimer":
+            seg = _inteiro(valor, 0, 24 * 3600, "sleepTimer")
+            c.set_sleep_timer(seg if seg > 0 else None)   # 0 = cancelar
+        elif tipo == "eqGraves":
+            c.bass = _inteiro(valor, EQ_MIN, EQ_MAX, "graves")
+        elif tipo == "eqAgudos":
+            c.treble = _inteiro(valor, EQ_MIN, EQ_MAX, "agudos")
+        elif tipo == "eqLoudness":
+            c.loudness = como_bool(valor)
+        elif tipo == "aleatorio":
+            definir_modo(c, aleatorio=como_bool(valor))
+        elif tipo == "repetir":
+            definir_modo(c, repetir=como_bool(valor))
+        elif tipo == "crossfade":
+            c.cross_fade = como_bool(valor)
+        elif tipo == "saltarPara":
+            # Posição 1-based, como a Sonos a conta e como o nó fila a escreve.
+            c.play_from_queue(_inteiro(valor, 1, 10000, "posição na fila") - 1)
         else:
             raise ValueError(f"tipo desconhecido: {tipo}")
         time.sleep(PROPAGACAO)   # as escritas na zona propagam em assíncrono
@@ -547,6 +899,8 @@ class Bridge:
                 log.error("não consegui marcar o comando %s: %s", cid, e2)
         finally:
             self.ler_ja.set()
+            if tipo in ("saltarPara", "tocarFavorito", "proximo", "anterior"):
+                self.fila_ja.set()
 
     # ---- loops ----------------------------------------------------------
 
@@ -574,6 +928,25 @@ class Bridge:
             await asyncio.sleep(INTERVALO_INVENTARIO)   # o primeiro espelho é feito no run()
             await self.espelhar_inventario()
 
+    async def loop_fila(self):
+        while True:
+            self.fila_ja.clear()
+            await self.espelhar_fila()
+            try:
+                await asyncio.wait_for(self.fila_ja.wait(), timeout=INTERVALO_FILA)
+            except asyncio.TimeoutError:
+                pass
+
+    async def loop_diario(self):
+        while True:
+            await asyncio.sleep(INTERVALO_DIARIO)
+            # Directo (como o PATCH do estado), não em to_thread: gravar() lê
+            # os mesmos contadores que o tick escreve, e no loop não há corrida.
+            try:
+                self.diario.gravar()
+            except Exception as e:
+                log.error("PATCH do diário falhou: %s", e)
+
     async def run(self):
         log.info("gioco-sonos-bridge a arrancar — loja %s, coordenadora %s, teto de volume %d, auth REST %s",
                  LOJA, UID_COORD, VOLUME_MAX, "sim" if FIREBASE_AUTH else "não")
@@ -586,8 +959,10 @@ class Bridge:
             self.transporte_anterior = antigo.get("transporte")
         except Exception as e:
             log.warning("não li o estado anterior: %s", e)
+        self.semear_predefinicoes()
         await self.espelhar_inventario()   # favoritos em memória antes de aceitar comandos
-        await asyncio.gather(self.loop_estado(), self.loop_comandos(), self.loop_inventario())
+        await asyncio.gather(self.loop_estado(), self.loop_comandos(), self.loop_inventario(),
+                             self.loop_fila(), self.loop_diario())
 
 
 async def _run_limitado(segundos: float):

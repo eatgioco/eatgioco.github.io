@@ -280,27 +280,35 @@
   .ac-dd button:hover{ background:var(--dough); }
   .ac-dd button.active{ background:var(--ink); color:var(--white); }
 
-  /* Ventilação: presets em linha; 'custom' não realça nenhum e mostra o valor. */
-  .ac-vent{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-top:12px; }
+  /* Presets em linha. Nasceu na ventilação do A/C e é hoje o componente de
+     "chips de atalho" partilhado: usam-no também as predefinições de volume do
+     cartão Música (.mu-pres) e os atalhos do temporizador no painel dele.
+     Alterar aqui muda os três — de propósito. */
+  .ac-vent, .mu-pres{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-top:12px; }
+  /* O display:flex acima ganha ao [hidden] da folha do browser: sem isto,
+     esconder a linha das predefinições não a escondia. */
+  .ac-vent[hidden], .mu-pres[hidden]{ display:none; }
   .ac-vent-label{
     width:100%;
     font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
     color:var(--muted);
   }
-  .ac-vent button{
+  .ac-vent button, .mu-pres button{
     border:1px solid var(--line); border-radius:100px;
     background:transparent; color:var(--ink);
     padding:5px 9px;
     font-family:'Inter',sans-serif; font-size:10.5px; font-weight:600;
     cursor:pointer;
   }
-  .ac-vent button:hover{ border-color:var(--ink); }
-  .ac-vent button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
-  .ac-vent button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .ac-vent button:hover, .mu-pres button:hover{ border-color:var(--ink); }
+  .ac-vent button:disabled, .mu-pres button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
+  .ac-vent button.active, .mu-pres button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
   .ac-vent-custom{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink); padding:0 4px; }
   .ac-vent-custom:empty{ display:none; }
 
-  /* "Mais opções": discreto, abre o giocoModal do shell. */
+  /* "Mais opções": discreto, abre o giocoModal do shell. Partilhado pelos
+     dois cartões com painel (A/C e Música) — a classe mantém o prefixo .ac-
+     porque nasceu aqui; o cartão Música usa-a tal e qual, não a duplica. */
   .ac-mais{
     display:flex; align-items:center; gap:6px;
     margin:12px auto 0; padding:6px 10px;
@@ -341,8 +349,12 @@
   }
   .ac-aviso:empty{ display:none; }
 
-  /* Painel de opções — conteúdo do giocoModal (o contentor é do shell). */
+  /* Painel de opções — conteúdo do giocoModal (o contentor é do shell).
+     Partilhado pelo painel do A/C e pelo da Música: secções, títulos,
+     sliders, toggles e linhas chave/valor são os mesmos componentes nos
+     dois. Nada aqui é específico do A/C. */
   .acp-sec{ padding:14px 0; border-top:1px solid var(--line); }
+  .acp-sec[hidden]{ display:none; }
   .acp-sec:first-child{ border-top:none; padding-top:0; }
   .acp-titulo{
     margin:0 0 10px;
@@ -363,11 +375,18 @@
   .acp-modos button.active{ background:var(--ink); color:var(--white); border-color:var(--ink); }
   .acp-modos button:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
   .acp-slider{ display:flex; align-items:center; gap:12px; }
-  .acp-slider input[type=range]{ flex:1; accent-color:var(--red); margin:0; }
+  .acp-slider input[type=range]{ flex:1; accent-color:var(--red); margin:0; min-width:0; }
+  /* Etiqueta à esquerda do slider (graves/agudos do painel da Música). O painel
+     do A/C não tem nenhuma; largura fixa para os dois sliders alinharem. */
+  .acp-eq-lbl{ font-size:12px; color:var(--muted); min-width:6ch; flex-shrink:0; }
   .acp-slider input[type=range]:disabled{ opacity:.5; }
   .acp-slider output{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:14px; min-width:3ch; text-align:right; }
   .acp-nota{ margin:8px 0 0; font-size:11.5px; color:var(--muted); }
   .acp-toggle{ display:flex; align-items:center; gap:12px; padding:9px 0; }
+  /* O display:flex ganha ao [hidden] do browser: sem isto, uma linha que o
+     estado não expõe (o `display` no A/C, o `modo`/`eq` na Música) continuava
+     visível com o interruptor sempre a off. */
+  .acp-toggle[hidden]{ display:none; }
   .acp-toggle + .acp-toggle{ border-top:1px solid var(--line); }
   .acp-toggle .txt{ flex:1; min-width:0; }
   .acp-toggle .txt b{ display:block; font-size:12.5px; font-weight:600; }
@@ -432,27 +451,17 @@
   .mu-transp .mu-ico-btn.principal{ width:44px; height:44px; background:var(--red); color:var(--on-red); border-color:var(--red); }
   .mu-transp .mu-ico-btn.principal:disabled{ background:var(--line); border-color:var(--line); color:var(--muted); }
 
-  .mu-favs{ margin-top:12px; }
-  .mu-favs-toggle{
-    display:flex; align-items:center; gap:6px; width:100%;
-    margin:0; padding:6px 0;
-    border:none; background:transparent; color:var(--muted);
-    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
-    cursor:pointer; text-align:left;
-  }
-  .mu-favs-toggle:hover{ color:var(--ink); }
-  .mu-favs-toggle .sp{ flex:1; }
-  .mu-favs-toggle .icon{ transition:transform .15s; }
-  .mu-favs-toggle[aria-expanded="true"] .icon.seta{ transform:rotate(180deg); }
-  .mu-favs-lista{ display:flex; flex-direction:column; gap:5px; padding-top:4px; }
-  .mu-favs-lista[hidden]{ display:none; }
+  /* Listas do PAINEL de opções (fila e favoritos). Saíram do cartão em
+     Set/2026: no dia a dia a fonte é AirPlay e nem a fila nem os favoritos
+     são usados ao balcão — o cartão fica com o essencial, como o do A/C. */
+  .mu-lista{ display:flex; flex-direction:column; gap:5px; }
   .mu-fav{
     display:flex; align-items:center; gap:8px;
     padding:7px 10px;
     border:1px solid var(--line); border-radius:10px;
     background:var(--white); color:var(--ink);
     font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
-    text-align:left; cursor:pointer;
+    text-align:left; cursor:pointer; width:100%;
   }
   .mu-fav:hover{ border-color:var(--ink); }
   .mu-fav:disabled{ opacity:.5; cursor:not-allowed; border-color:var(--line); }
@@ -460,6 +469,15 @@
   .mu-fav .t{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mu-fav .tipo{ font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
   .mu-fav.active .tipo{ color:var(--white); opacity:.75; }
+  /* Posição na fila: número tabular à esquerda, largura fixa para a lista
+     não dançar entre 1 e 30. */
+  .mu-fav .pos{
+    font-variant-numeric:tabular-nums; font-size:11px; font-weight:700;
+    color:var(--muted); min-width:2.2ch; text-align:right; flex-shrink:0;
+  }
+  .mu-fav.active .pos{ color:var(--white); opacity:.75; }
+  .mu-fav .sub{ font-size:11px; font-weight:500; color:var(--muted); }
+  .mu-fav.active .sub{ color:var(--white); opacity:.75; }
   .mu-favs-vazio{ font-size:11.5px; color:var(--muted); padding:4px 0 0; }
   .mu-aviso{
     margin:10px 0 0; min-height:0;
@@ -897,7 +915,7 @@
   body.shell-touch .mu-ico-btn{ width:42px; height:42px; }
   body.shell-touch .mu-transp .mu-ico-btn.principal{ width:50px; height:50px; }
   body.shell-touch .mu-volume input[type=range]{ min-height:40px; }
-  body.shell-touch .mu-favs-toggle{ min-height:40px; }
+  body.shell-touch .mu-pres button{ min-height:40px; padding:8px 12px; font-size:11.5px; }
   body.shell-touch .mu-fav{ min-height:42px; }
   body.shell-touch .cc-switch{ width:44px; height:24px; }
   body.shell-touch .cc-switch::after{ width:18px; height:18px; }
@@ -1039,7 +1057,12 @@
           <!-- 1b. MÚSICA — cartão vivo. Estado em lojas/{loja}/sonos/estado,
                comandos em lojas/{loja}/sonos/comandos (ver montarMusica() em baixo).
                A fonte é AirPlay do telemóvel da loja: o cartão monitoriza e
-               ajusta à distância; os favoritos ficam para o Spotify Connect. -->
+               ajusta à distância; os favoritos ficam para o Spotify Connect.
+               Mesmo desenho do A/C (Set/2026): no cartão só o essencial — o que
+               se olha e se mexe ao balcão (faixa, volume, transporte) — e o
+               resto (fila, favoritos, EQ, modo, temporizador, aparelho) no
+               painel "Mais opções", que é o giocoModal do shell com as mesmas
+               classes .acp-* do painel do A/C. -->
           <div class="cc-card card glass-light mu-neutro" id="musicaCard">
             <div class="cc-head">
               <svg class="icon" width="15" height="15"><use href="#i-music"/></svg>
@@ -1070,6 +1093,10 @@
               <span class="num" id="muVolumeNum">—</span>
             </div>
 
+            <!-- Predefinições de lojas/{loja}/sonos/config/predefinicoes.
+                 São só valores: o caminho continua a ser o comando 'volume'. -->
+            <div class="mu-pres" id="muPres"></div>
+
             <div class="mu-transp">
               <button class="mu-ico-btn" type="button" id="muAnterior" disabled title="Anterior" aria-label="Anterior">
                 <svg class="icon" width="15" height="15"><use href="#i-skip-back"/></svg>
@@ -1082,13 +1109,10 @@
               </button>
             </div>
 
-            <div class="mu-favs">
-              <button class="mu-favs-toggle" type="button" id="muFavsToggle" aria-expanded="false" aria-controls="muFavsLista">
-                <span class="sp" id="muFavsTit">Favoritos</span>
-                <svg class="icon seta" width="13" height="13"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="mu-favs-lista" id="muFavsLista" hidden></div>
-            </div>
+            <!-- Mesmo botão e mesmo painel do A/C (.ac-mais + giocoModal). -->
+            <button class="ac-mais" type="button" id="muOpcoes" disabled>
+              <svg class="icon" width="13" height="13"><use href="#i-sliders"/></svg>Mais opções
+            </button>
 
             <p class="mu-aviso" id="muAviso"></p>
             <p class="cc-nota" id="muNota">À espera do serviço da loja…</p>
@@ -2005,22 +2029,42 @@ window.addEventListener('load', function () {
       selo: $('muSelo'), alerta: $('muAlerta'), alertaTxt: $('muAlertaTxt'),
       titulo: $('muTitulo'), artista: $('muArtista'), fonte: $('muFonte'), transporte: $('muTransporte'),
       mute: $('muMute'), muteIco: $('muMuteIco'), volume: $('muVolume'), volumeNum: $('muVolumeNum'),
+      pres: $('muPres'),
       anterior: $('muAnterior'), play: $('muPlay'), playIco: $('muPlayIco'), proximo: $('muProximo'),
-      favsToggle: $('muFavsToggle'), favsTit: $('muFavsTit'), favsLista: $('muFavsLista'),
-      aviso: $('muAviso'), nota: $('muNota')
+      opcoes: $('muOpcoes'), aviso: $('muAviso'), nota: $('muNota')
     };
 
     var VOLUME_MAX = 60;                       // teto igual ao do serviço (SONOS_BRIDGE_VOLUME_MAX)
     var SEM_RESPOSTA_MS = 10 * 60 * 1000;      // serviço calado há mais de 10 min
     var CONFIRMACAO_MS = 15 * 1000;            // espera máxima por um comando
     var HORARIO_LOJA = { inicio: 12, fim: 23 }; // [12h, 23h[ hora de Lisboa
+    var EQ_MIN = -10, EQ_MAX = 10;             // limites de graves/agudos aceites pelo serviço
     var FONTES = { airplay: 'AirPlay', spotify: 'Spotify', radio: 'Rádio', fila: 'Fila', nada: 'Sem música' };
+    // Taxonomia dos FAVORITOS — não é a das fontes: um favorito nunca é "sem música".
+    var TIPOS_FAV = { radio: 'Rádio', playlist: 'Playlist', album: 'Álbum', outro: 'Outro' };
+    // Ordem fixa das predefinições de volume (os valores vêm do Firebase).
+    var PREDEF = [{ id: 'abertura', nome: 'Abertura' }, { id: 'normal', nome: 'Normal' }, { id: 'cheio', nome: 'Cheio' }];
+    var SLEEP = [15, 30, 60, 90];              // atalhos do temporizador, em minutos
+    // [id do slider, campo em estado.eq, tipo de comando]
+    var EQ_CAMPOS = [['mupGraves', 'graves', 'eqGraves'], ['mupAgudos', 'agudos', 'eqAgudos']];
+    // Interruptores do painel. `sec` diz em que secção cada um entra.
+    var FLAGS = [
+      { cmd: 'aleatorio', sec: 'repro', nome: 'Aleatório', desc: 'Ordem baralhada da fila.' },
+      { cmd: 'repetir', sec: 'repro', nome: 'Repetir', desc: 'Volta ao início quando a fila acaba.' },
+      { cmd: 'crossfade', sec: 'repro', nome: 'Transição suave', desc: 'Sobrepõe o fim de uma faixa ao início da seguinte.' },
+      { cmd: 'eqLoudness', sec: 'som', nome: 'Loudness', desc: 'Realça graves e agudos em volume baixo.' },
+      { cmd: 'bloquearBotoes', sec: 'aparelho', nome: 'Botões bloqueados', desc: 'Desactiva os botões físicos das colunas.' },
+      { cmd: 'luzEstado', sec: 'aparelho', nome: 'Luz de estado', desc: 'LED branco na frente da coluna.' }
+    ];
 
     var estado = null;      // último lojas/{loja}/sonos/estado
-    var favoritos = [];     // [{i, titulo, tipo, uri}] de lojas/{loja}/sonos/favoritos
+    var favoritos = [];     // [{i, titulo, tipo, tocavel, uri}] de lojas/{loja}/sonos/favoritos
+    var fila = [];          // [{titulo, artista, posicao}] de lojas/{loja}/sonos/fila
+    var predefinicoes = null;  // {abertura, normal, cheio} de .../config/predefinicoes
     var pend = null;        // comando em curso: { tipo, valor, ref, cb, timer }
     var aArrastar = false;  // slider em arrasto: não sobrepor o valor do estado
     var avisoTimer = null;
+    var painel = null;      // { body } do giocoModal enquanto está aberto
 
     el.volume.max = VOLUME_MAX;
 
@@ -2076,31 +2120,59 @@ window.addEventListener('load', function () {
       if (pend && pend.tipo === 'pause') return false;
       return aTocar();
     }
+    // Cada flag vive num sítio diferente do estado; null = o serviço não a
+    // expôs (firmware sem a capacidade) e a linha nem aparece no painel.
+    function flagEfectiva(cmd) {
+      if (pend && pend.tipo === cmd) return !!pend.valor;
+      if (!estado) return null;
+      var v;
+      if (cmd === 'eqLoudness') v = estado.eq ? estado.eq.loudness : null;
+      else if (cmd === 'bloquearBotoes') v = estado.botoesBloqueados;
+      else if (cmd === 'luzEstado') v = estado.luzEstado;
+      else v = estado.modo ? estado.modo[cmd] : null;   // aleatorio | repetir | crossfade
+      return typeof v === 'boolean' ? v : null;
+    }
+    function eqEfectivo(campo, cmd) {
+      if (pend && pend.tipo === cmd) return Number(pend.valor);
+      var v = estado && estado.eq ? estado.eq[campo] : null;
+      return typeof v === 'number' ? v : null;
+    }
+    function sleepEfectivo() {
+      if (pend && pend.tipo === 'sleepTimer') return Number(pend.valor) || null;
+      var v = estado ? estado.sleepTimerRestante : null;
+      return typeof v === 'number' && v > 0 ? v : null;
+    }
 
     // ---- render ------------------------------------------------------
 
-    function renderFavoritos() {
-      var on = vivo();
-      el.favsTit.textContent = 'Favoritos' + (favoritos.length ? ' (' + favoritos.length + ')' : '');
-      el.favsLista.innerHTML = '';
-      if (!favoritos.length) {
-        var p = document.createElement('div');
-        p.className = 'mu-favs-vazio';
-        p.textContent = 'Sem favoritos';
-        el.favsLista.appendChild(p);
-        return;
+    // Predefinições de volume no cartão: atalhos de um toque para os níveis
+    // que a loja usa. Os valores vêm do Firebase; sem o nó, a linha desaparece
+    // em vez de mostrar números inventados.
+    function renderPres() {
+      if (!predefinicoes) { el.pres.hidden = true; el.pres.innerHTML = ''; return; }
+      el.pres.hidden = false;
+      var livre = podeControlar();
+      var actual = volumeEfectivo();
+      if (el.pres.childElementCount !== PREDEF.length) {
+        el.pres.innerHTML = '';
+        PREDEF.forEach(function (pr) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute('data-pres', pr.id);
+          el.pres.appendChild(b);
+        });
       }
-      var atual = estado && estado.favoritoAtual != null ? Number(estado.favoritoAtual) : -1;
-      favoritos.forEach(function (f) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'mu-fav' + (f.i === atual && aTocar() ? ' active' : '');
-        b.disabled = !on || !!pend;
-        b.setAttribute('data-i', f.i);
-        var t = document.createElement('span'); t.className = 't'; t.textContent = f.titulo || ('Favorito ' + (f.i + 1));
-        var k = document.createElement('span'); k.className = 'tipo'; k.textContent = FONTES[f.tipo] || f.tipo || '';
-        b.appendChild(t); b.appendChild(k);
-        el.favsLista.appendChild(b);
+      PREDEF.forEach(function (pr, i) {
+        var b = el.pres.children[i];
+        var v = predefinicoes[pr.id];
+        var tem = typeof v === 'number';
+        b.hidden = !tem;
+        if (!tem) return;
+        b.textContent = pr.nome + ' ' + v;
+        b.setAttribute('data-vol', String(v));
+        b.title = 'Pôr o volume a ' + v;
+        b.classList.toggle('active', actual != null && Number(actual) === Number(v));
+        b.disabled = !livre;
       });
     }
 
@@ -2158,10 +2230,15 @@ window.addEventListener('load', function () {
       el.anterior.title = 'Anterior' + dicaAirplay;
       el.proximo.title = 'Seguinte' + dicaAirplay;
 
-      renderFavoritos();
+      renderPres();
+      // O painel abre mesmo sem ligação (mostra o que se sabe e o aviso), tal
+      // como o do A/C; só não abre sem estado nenhum.
+      el.opcoes.disabled = !estado;
 
       el.nota.textContent = !estado ? 'À espera do serviço da loja…'
         : 'Atualizado há ' + haQuanto(ms) + (estado.erro ? ' · ' + estado.erro : '');
+
+      if (painel) renderPainel();
     }
 
     // ---- comandos ----------------------------------------------------
@@ -2173,6 +2250,16 @@ window.addEventListener('load', function () {
       if (t === 'mute') return !!estado.mute === !!v;
       if (t === 'play') return estado.transporte === 'PLAYING';
       if (t === 'pause') return estado.transporte === 'PAUSED' || estado.transporte === 'STOPPED';
+      if (t === 'aleatorio' || t === 'repetir' || t === 'crossfade') return !!(estado.modo && estado.modo[t] === !!v);
+      if (t === 'eqGraves') return !!estado.eq && Number(estado.eq.graves) === Number(v);
+      if (t === 'eqAgudos') return !!estado.eq && Number(estado.eq.agudos) === Number(v);
+      if (t === 'eqLoudness') return !!estado.eq && estado.eq.loudness === !!v;
+      if (t === 'bloquearBotoes') return estado.botoesBloqueados === !!v;
+      if (t === 'luzEstado') return estado.luzEstado === !!v;
+      // Cancelar o temporizador confirma-se; ligá-lo não, porque o valor
+      // começa logo a descontar e nunca bate certo com o que foi pedido.
+      if (t === 'sleepTimer') return Number(v) === 0 ? !estado.sleepTimerRestante : false;
+      if (t === 'saltarPara') return Number(estado.filaPosicao) === Number(v);
       return false;   // proximo / anterior / tocarFavorito: só pela marca do serviço
     }
 
@@ -2246,18 +2333,242 @@ window.addEventListener('load', function () {
       enviar('proximo', true);
     });
 
-    el.favsToggle.addEventListener('click', function () {
-      var aberto = el.favsToggle.getAttribute('aria-expanded') === 'true';
-      el.favsToggle.setAttribute('aria-expanded', aberto ? 'false' : 'true');
-      el.favsLista.hidden = aberto;
-    });
-    el.favsLista.addEventListener('click', function (ev) {
-      var b = ev.target.closest('button[data-i]');
+    el.pres.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-vol]');
       if (!b || b.disabled || !podeControlar()) return;
-      if (estado.fonte === 'airplay' && aTocar() &&
-          !window.confirm('Vai cortar a música que está a vir do telemóvel. Continuar?')) return;
-      enviar('tocarFavorito', parseInt(b.getAttribute('data-i'), 10));
+      var v = Math.min(VOLUME_MAX, Math.max(0, parseInt(b.getAttribute('data-vol'), 10) || 0));
+      if (Number(estado.volume) === v) return;
+      enviar('volume', v);
     });
+
+    // ---- painel de opções (giocoModal do shell) ----------------------
+    //
+    // Mesmo componente e mesmo desenho do painel do A/C: as classes .acp-*
+    // são partilhadas pelos dois e o contentor é o giocoModal do shell.
+    // Aqui vive tudo o que não é do dia a dia ao balcão — fila, favoritos,
+    // modo de reprodução, EQ, temporizador e o aparelho.
+
+    // Cortar a música que vem do telemóvel é destrutivo: pergunta-se sempre.
+    function confirmaCorte() {
+      return !(estado && estado.fonte === 'airplay' && aTocar()) ||
+             window.confirm('Vai cortar a música que está a vir do telemóvel. Continuar?');
+    }
+
+    el.opcoes.addEventListener('click', function () {
+      if (!estado || !window.giocoModal) return;
+      abrirPainel();
+    });
+
+    function abrirPainel() {
+      var body = document.createElement('div');
+      var h = '';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">A seguir</p>' +
+           '<div class="mu-lista" id="mupFila"></div>' +
+           '<p class="acp-nota" id="mupFilaNota"></p></div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Favoritos</p>' +
+           '<div class="mu-lista" id="mupFavs"></div>' +
+           '<p class="acp-nota" id="mupFavsNota"></p></div>';
+
+      // Secção só de interruptores: se o serviço não expuser nenhum deles, a
+      // secção inteira desaparece em vez de ficar um título sozinho.
+      h += '<div class="acp-sec" id="mupSecRepro"><p class="acp-titulo">Reprodução</p>' + linhasFlag('repro') + '</div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Som</p>' +
+           '<div class="acp-slider"><span class="acp-eq-lbl">Graves</span>' +
+           '<input type="range" id="mupGraves" min="' + EQ_MIN + '" max="' + EQ_MAX + '" step="1">' +
+           '<output id="mupGravesOut">—</output></div>' +
+           '<div class="acp-slider"><span class="acp-eq-lbl">Agudos</span>' +
+           '<input type="range" id="mupAgudos" min="' + EQ_MIN + '" max="' + EQ_MAX + '" step="1">' +
+           '<output id="mupAgudosOut">—</output></div>' +
+           linhasFlag('som') + '</div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Temporizador</p><div class="mu-pres" id="mupSleep">';
+      for (var t = 0; t < SLEEP.length; t++) {
+        h += '<button type="button" data-sleep="' + (SLEEP[t] * 60) + '">' + SLEEP[t] + ' min</button>';
+      }
+      h += '<button type="button" data-sleep="0">Desligar</button></div>' +
+           '<p class="acp-nota" id="mupSleepNota"></p></div>';
+
+      h += '<div class="acp-sec"><p class="acp-titulo">Aparelho</p>' + linhasFlag('aparelho') +
+           '<div class="acp-kv"><span>Volume máximo</span><span>' + VOLUME_MAX + '</span></div>' +
+           '<div class="acp-kv"><span>Fila</span><span id="mupFilaKv">—</span></div>' +
+           '<div class="acp-kv"><span>Última leitura</span><span id="mupLeitura">—</span></div>' +
+           '<p class="acp-nota" id="mupAviso"></p></div>';
+
+      body.innerHTML = h;
+      painel = { body: body };
+
+      body.addEventListener('click', function (ev) {
+        var b = ev.target.closest('button');
+        if (!b || b.disabled || !podeControlar()) return;
+        if (b.hasAttribute('data-flag')) {
+          enviar(b.getAttribute('data-flag'), !flagEfectiva(b.getAttribute('data-flag')));
+        } else if (b.hasAttribute('data-sleep')) {
+          enviar('sleepTimer', parseInt(b.getAttribute('data-sleep'), 10) || 0);
+        } else if (b.hasAttribute('data-pos')) {
+          if (!confirmaCorte()) return;
+          enviar('saltarPara', parseInt(b.getAttribute('data-pos'), 10));
+        } else if (b.hasAttribute('data-fav')) {
+          if (!confirmaCorte()) return;
+          enviar('tocarFavorito', parseInt(b.getAttribute('data-fav'), 10));
+        }
+      });
+
+      // change, não input: o comando só sai ao largar (como o slider do cartão).
+      EQ_CAMPOS.forEach(function (par) {
+        var sl = body.querySelector('#' + par[0]);
+        var out = body.querySelector('#' + par[0] + 'Out');
+        sl.addEventListener('input', function () { out.textContent = fmtEq(sl.value); });
+        sl.addEventListener('change', function () {
+          if (!podeControlar()) { renderPainel(); return; }
+          var v = Math.min(EQ_MAX, Math.max(EQ_MIN, Math.round(Number(sl.value))));
+          if (eqEfectivo(par[1], par[2]) === v) { renderPainel(); return; }
+          enviar(par[2], v);
+        });
+      });
+
+      window.giocoModal.open({
+        titulo: 'Música — opções',
+        conteudo: body,
+        onClose: function () { painel = null; }
+      });
+      renderPainel();
+    }
+
+    function linhasFlag(sec) {
+      var h = '';
+      FLAGS.forEach(function (f) {
+        if (f.sec !== sec) return;
+        h += '<div class="acp-toggle" data-flag-row="' + f.cmd + '">' +
+             '<div class="txt"><b>' + escapar(f.nome) + '</b><span>' + escapar(f.desc) + '</span></div>' +
+             '<button type="button" class="cc-switch" data-flag="' + f.cmd + '" aria-label="' + escapar(f.nome) + '"></button>' +
+             '</div>';
+      });
+      return h;
+    }
+
+    function fmtEq(v) {
+      var n = Number(v);
+      return isNaN(n) ? '—' : (n > 0 ? '+' + n : String(n));
+    }
+    function fmtMin(seg) {
+      var m = Math.max(1, Math.round(Number(seg) / 60));
+      if (m < 60) return m + ' min';
+      var r = m % 60;
+      return Math.floor(m / 60) + 'h' + (r ? (r < 10 ? '0' + r : String(r)) : '');
+    }
+
+    // Botão de lista do painel (fila e favoritos): mesma anatomia nos dois.
+    function botaoLista(attr, valor, principal, secundario, marca) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mu-fav';
+      b.setAttribute(attr, valor);
+      if (marca != null) {
+        var p = document.createElement('span'); p.className = 'pos'; p.textContent = marca;
+        b.appendChild(p);
+      }
+      var t = document.createElement('span'); t.className = 't'; t.textContent = principal;
+      b.appendChild(t);
+      if (secundario) {
+        var k = document.createElement('span'); k.className = 'tipo'; k.textContent = secundario;
+        b.appendChild(k);
+      }
+      return b;
+    }
+
+    function renderPainel() {
+      if (!painel) return;
+      var b = painel.body;
+      var on = vivo();
+      var livre = podeControlar();
+      var actual = estado && typeof estado.filaPosicao === 'number' ? estado.filaPosicao : null;
+
+      // ---- fila. O nó começa na faixa a tocar: o primeiro item é o actual.
+      var lista = b.querySelector('#mupFila');
+      lista.innerHTML = '';
+      fila.forEach(function (it) {
+        var eActual = actual != null && Number(it.posicao) === actual;
+        var bt = botaoLista('data-pos', String(it.posicao),
+                            it.titulo || 'Sem título', it.artista || '', String(it.posicao));
+        if (eActual) { bt.classList.add('active'); bt.removeAttribute('data-pos'); }
+        bt.disabled = !livre || eActual;
+        lista.appendChild(bt);
+      });
+      b.querySelector('#mupFilaNota').textContent = fila.length
+        ? 'Toca num item para saltar para lá.'
+        : (on && estado.fonte === 'airplay'
+            ? 'Em AirPlay a fila vive no telemóvel — a Sonos não a expõe.'
+            : 'Sem fila na Sonos.');
+
+      // ---- favoritos
+      var lf = b.querySelector('#mupFavs');
+      lf.innerHTML = '';
+      favoritos.forEach(function (f) {
+        var eAtual = estado && estado.favoritoAtual != null && Number(estado.favoritoAtual) === f.i && aTocar();
+        var bt = botaoLista('data-fav', String(f.i),
+                            f.titulo || ('Favorito ' + (f.i + 1)),
+                            TIPOS_FAV[f.tipo] || TIPOS_FAV.outro, null);
+        if (eAtual) bt.classList.add('active');
+        // tocavel:false = rádio Sonos de fábrica sem URI utilizável pelo soco:
+        // o botão fica desactivado em vez de enviar um comando que ia falhar.
+        if (f.tocavel === false) {
+          bt.removeAttribute('data-fav');
+          bt.title = 'Este favorito não é comandável a partir daqui.';
+        }
+        bt.disabled = !livre || f.tocavel === false;
+        lf.appendChild(bt);
+      });
+      b.querySelector('#mupFavsNota').textContent = !favoritos.length ? 'Sem favoritos.'
+        : (on && estado.fonte === 'airplay' ? 'Tocar um favorito corta o AirPlay do telemóvel.' : '');
+
+      // ---- interruptores (reprodução, som, aparelho)
+      FLAGS.forEach(function (f) {
+        var sw = b.querySelector('button[data-flag="' + f.cmd + '"]');
+        var row = b.querySelector('[data-flag-row="' + f.cmd + '"]');
+        var val = flagEfectiva(f.cmd);
+        // Sem o campo no estado a linha nem aparece — igual ao painel do A/C.
+        if (row) row.hidden = !on || val === null;
+        if (!sw) return;
+        sw.classList.toggle('on', val === true);
+        sw.disabled = !livre;
+      });
+
+      var repro = b.querySelector('#mupSecRepro');
+      repro.hidden = !FLAGS.some(function (f) { return f.sec === 'repro' && flagEfectiva(f.cmd) !== null; }) || !on;
+
+      // ---- EQ
+      EQ_CAMPOS.forEach(function (par) {
+        var sl = b.querySelector('#' + par[0]);
+        var out = b.querySelector('#' + par[0] + 'Out');
+        var v = eqEfectivo(par[1], par[2]);
+        if (v != null) { sl.value = String(v); out.textContent = fmtEq(v); }
+        else { out.textContent = '—'; }
+        sl.disabled = !livre || v == null;
+      });
+
+      // ---- temporizador. Os atalhos nunca ficam 'active': o valor conta para
+      // trás e nunca voltaria a bater certo com o que foi pedido.
+      var seg = sleepEfectivo();
+      var sleeps = b.querySelectorAll('button[data-sleep]');
+      for (var i = 0; i < sleeps.length; i++) {
+        var alvo = parseInt(sleeps[i].getAttribute('data-sleep'), 10);
+        sleeps[i].disabled = !livre || (alvo === 0 && !seg);
+      }
+      b.querySelector('#mupSleepNota').textContent = !on ? ''
+        : (seg ? 'A música pára daqui a ' + fmtMin(seg) + '.' : 'Sem temporizador.');
+
+      // ---- aparelho
+      var tam = estado && typeof estado.filaTamanho === 'number' ? estado.filaTamanho : null;
+      b.querySelector('#mupFilaKv').textContent = (!on || tam == null) ? '—'
+        : (actual != null ? actual + ' de ' + tam : tam + ' faixas');
+      var t = estado && estado.atualizadoEm ? new Date(estado.atualizadoEm) : null;
+      b.querySelector('#mupLeitura').textContent = (t && !isNaN(t)) ? t.toLocaleString('pt-PT') : '—';
+      b.querySelector('#mupAviso').textContent = on ? (estado.erro || '')
+        : 'Serviço da loja sem resposta — controlos desactivados.';
+    }
 
     // ---- ligação ao estado -----------------------------------------
 
@@ -2271,21 +2582,49 @@ window.addEventListener('load', function () {
       render();
     });
 
-    db.ref('lojas/' + lojaId + '/sonos/favoritos').on('value', function (snap) {
-      var v = snap.val();
-      favoritos = [];
+    // O serviço escreve estes nós com índices numéricos ('0','1',…): o Firebase
+    // devolve-os como array quando são densos e como objecto quando não são.
+    function porIndice(v, mapear) {
+      var out = [];
       if (Array.isArray(v)) {
-        v.forEach(function (f, i) { if (f) favoritos.push({ i: i, titulo: f.titulo, tipo: f.tipo, uri: f.uri }); });
+        v.forEach(function (x, i) { if (x) out.push(mapear(x, i)); });
       } else if (v && typeof v === 'object') {
         Object.keys(v).forEach(function (k) {
-          var f = v[k]; if (!f) return;
-          favoritos.push({ i: parseInt(k, 10), titulo: f.titulo, tipo: f.tipo, uri: f.uri });
+          if (v[k]) out.push(mapear(v[k], parseInt(k, 10)));
         });
-        favoritos.sort(function (a, b) { return a.i - b.i; });
+        out.sort(function (a, b) { return a.i - b.i; });
       }
+      return out;
+    }
+
+    db.ref('lojas/' + lojaId + '/sonos/favoritos').on('value', function (snap) {
+      favoritos = porIndice(snap.val(), function (f, i) {
+        return { i: i, titulo: f.titulo, tipo: f.tipo, tocavel: f.tocavel, uri: f.uri };
+      });
       render();
     }, function (erro) {
       console.error('Falha a ler lojas/' + lojaId + '/sonos/favoritos:', erro);
+    });
+
+    // Fila: escrita pelo serviço a partir da faixa a tocar (até 30 itens). Em
+    // AirPlay costuma vir vazia — o painel diz porquê em vez de ficar em branco.
+    db.ref('lojas/' + lojaId + '/sonos/fila').on('value', function (snap) {
+      fila = porIndice(snap.val(), function (f, i) {
+        return { i: i, titulo: f.titulo, artista: f.artista, posicao: f.posicao };
+      });
+      render();
+    }, function (erro) {
+      console.error('Falha a ler lojas/' + lojaId + '/sonos/fila:', erro);
+    });
+
+    // Predefinições de volume. A página só LÊ: quem as semeia é o serviço (uma
+    // vez) e quem as muda é o Manel no Firebase. Sem o nó, a linha desaparece.
+    db.ref('lojas/' + lojaId + '/sonos/config/predefinicoes').on('value', function (snap) {
+      var v = snap.val();
+      predefinicoes = (v && typeof v === 'object') ? v : null;
+      render();
+    }, function (erro) {
+      console.error('Falha a ler lojas/' + lojaId + '/sonos/config/predefinicoes:', erro);
     });
 
     // "atualizado há X", o limite dos 10 min e o "há X min" do alerta
