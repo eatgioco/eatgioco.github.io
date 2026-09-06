@@ -94,6 +94,9 @@
   /* ---------- Vista ---------- */
   .cal-vista{ padding:16px; color:var(--ink); }
   .cal-vista:hover{ transform:none; }
+  /* Na vista Mês o painel do dia é sticky: o overflow:hidden do .glass-light
+     prendia-o ao cartão, por isso aqui fica visível (o ::before já tem raio). */
+  .cal-vista.vista-mes{ overflow:visible; }
 
   /* Chip de evento (mês e faixa dia-inteiro da semana). Cores de texto fixas
      por categoria (como .status.* do shell), nunca var(--ink). */
@@ -121,6 +124,13 @@
     transition:border-color .15s ease;
   }
   .mes-cel:hover{ border-color:var(--ink); }
+  /* Dia selecionado (painel aberto): anel de 2px por dentro, sem tocar na pílula de hoje. */
+  .mes-cel.sel{ box-shadow:inset 0 0 0 2px var(--ink); }
+  [data-theme="dark"] .mes-cel.sel{ box-shadow:inset 0 0 0 2px var(--dough); }
+  /* Grelha + painel de detalhe lado a lado (mesmo padrão da padroes.html). */
+  .mes-layout{ display:flex; gap:16px; align-items:flex-start; }
+  .mes-grelha-wrap{ flex:1; min-width:640px; }
+  .mes-layout .dia-painel{ width:auto; min-width:300px; max-width:360px; flex:0 1 360px; position:sticky; top:16px; }
   .mes-cel.fds{ background:var(--dough); }
   .mes-cel.fora{ opacity:.4; }
   .mes-num{ align-self:flex-start; font-size:11.5px; font-weight:600; color:var(--muted); padding:1px 6px; border-radius:100px; line-height:16px; cursor:pointer; user-select:none; }
@@ -158,7 +168,12 @@
   .dia-grelha{ flex:1; min-width:0; }
   .dia-painel{ min-width:300px; width:300px; flex-shrink:0; padding:16px; color:var(--ink); }
   .dia-painel:hover{ transform:none; }
-  .dia-painel h3{ margin:0 0 12px; font-family:'Inter',sans-serif; font-size:14.5px; font-weight:700; color:var(--ink); }
+  .dia-painel-cab{ display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+  .dia-painel-cab h3{ flex:1; min-width:0; margin:0; font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dia-painel-cab .icon-btn{ width:32px; height:32px; padding:0; flex-shrink:0; font:inherit; }
+  .dia-rodape{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+  .dia-abrir{ font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); background:none; border:none; padding:0; cursor:pointer; }
+  .dia-abrir:hover{ color:var(--red-ink); }
   .dia-item{ display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%; text-align:left; color:var(--ink); font-family:'Inter',sans-serif; }
   .dia-item:last-child{ border-bottom:none; }
   .dia-item:hover .dia-item-t{ color:var(--red-ink); }
@@ -534,6 +549,7 @@
   var estado = {
     vista: VISTAS.indexOf(vistaGuardada) >= 0 ? vistaGuardada : 'mes',
     dataRef: hojeISO(),
+    diaSelecionado: null, // vista Mês: dia com o painel de detalhe aberto ("AAAA-MM-DD" | null)
     eventos: [],          // lista normalizada (todas as fontes)
     carregado: false
   };
@@ -685,6 +701,7 @@
     semData.textContent = nSem + ' sem data';
     var botoes = document.querySelectorAll('#segVista button');
     for (var i = 0; i < botoes.length; i++) botoes[i].classList.toggle('active', botoes[i].getAttribute('data-vista') === estado.vista);
+    vistaEl.classList.toggle('vista-mes', estado.vista === 'mes');
     if (estado.vista === 'mes') renderMes();
     else if (estado.vista === 'semana') renderGrelhaHoraria(semanaDe(estado.dataRef));
     else renderDia();
@@ -708,7 +725,10 @@
   function renderMes() {
     var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
     var dias = monthGrid(parseInt(anoDe(ref), 10), mes);
-    var html = '<div class="mes-cab">';
+    // A seleção sobrevive à mudança de mês só enquanto o dia continuar na grelha.
+    if (estado.diaSelecionado && dias.indexOf(estado.diaSelecionado) < 0) estado.diaSelecionado = null;
+    var sel = estado.diaSelecionado;
+    var html = '<div class="mes-layout"><div class="mes-grelha-wrap"><div class="mes-cab">';
     DIAS_CURTOS.forEach(function (d) { html += '<div>' + d + '</div>'; });
     html += '</div><div class="mes-grelha">';
     dias.forEach(function (iso, i) {
@@ -716,6 +736,7 @@
       if (i % 7 >= 5) cls += ' fds';
       if (mesDe(iso) !== mes) cls += ' fora';
       if (iso === hoje) cls += ' hoje';
+      if (iso === sel) cls += ' sel';
       var evs = eventosDoDia(iso);
       html += '<div class="' + cls + '" data-dia="' + iso + '">';
       html += '<span class="mes-num num" data-dia-num="' + iso + '">' + diaDe(iso) + '</span>';
@@ -724,9 +745,13 @@
       if (evs.length > visiveis) html += '<button type="button" class="mes-mais" data-mais="' + iso + '">+' + (evs.length - visiveis) + ' mais</button>';
       html += '</div>';
     });
+    html += '</div></div>';
+    if (sel) html += renderPainelDia(sel, { fechar: true, abrirDia: true });
     html += '</div>';
     vistaEl.innerHTML = html;
   }
+  function selecionarDia(iso) { estado.diaSelecionado = iso; render(); }
+  function fecharPainelDia() { if (estado.diaSelecionado) { estado.diaSelecionado = null; render(); } }
 
   /* Colunas por clusters de sobreposição: eventos que se tocam no tempo
      partilham a largura em partes iguais. */
@@ -845,14 +870,17 @@
     return h;
   }
 
-  function renderDia() {
-    var iso = estado.dataRef;
+  /* Painel "Neste dia" — o mesmo nas vistas Mês (lateral, com ×) e Dia.
+     opts.fechar → botão × (só faz sentido no Mês); opts.abrirDia → link para a vista Dia. */
+  function tituloDia(iso) { return diaSemanaLongo(iso) + ', ' + diaDe(iso) + ' ' + mesCurto(iso); }
+  function renderPainelDia(iso, opts) {
+    opts = opts || {};
     var todos = eventosDoDia(iso);
     var evs = todos.filter(function (ev) { return !ehPagamento(ev); });
     var pags = todos.filter(ehPagamento);
     var lista = '';
     if (!evs.length) {
-      lista = '<p class="dia-vazio">Sem eventos. Clica na grelha ou em Novo evento.</p>';
+      lista = '<p class="dia-vazio">Sem eventos neste dia.</p>';
     } else {
       evs.forEach(function (ev) {
         var c = categoria(ev.categoria);
@@ -864,8 +892,30 @@
           '</div></button>';
       });
     }
+    var cab = '<div class="dia-painel-cab"><h3>' + escapeHtml(tituloDia(iso)) + '</h3>' +
+      (opts.fechar ? '<button type="button" class="icon-btn" data-acao="fechar" title="Fechar (Esc)" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>' : '') +
+      '</div>';
+    var rodape = '<div class="dia-rodape">' +
+      '<button type="button" class="btn-add" data-acao="novo" data-dia="' + iso + '"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Novo evento</button>' +
+      (opts.abrirDia ? '<button type="button" class="dia-abrir" data-acao="abrir-dia" data-dia="' + iso + '">Abrir vista Dia →</button>' : '') +
+      '</div>';
+    return '<div class="panel glass-light dia-painel">' + cab + lista + seccaoPagamentosHtml(pags) + rodape + '</div>';
+  }
+
+  // Novo evento a partir do painel: se for hoje, começa na próxima hora cheia.
+  function novoNoDia(iso) {
+    var pre = { data: iso };
+    if (iso === hojeISO()) {
+      var h = Math.min(23, new Date().getHours() + 1);
+      pre.horaInicio = pad2(h) + ':00';
+    }
+    abrirNovo(pre);
+  }
+
+  function renderDia() {
+    var iso = estado.dataRef;
     vistaEl.innerHTML = '<div class="dia-layout"><div class="dia-grelha">' + grelhaHorariaHtml([iso]) + '</div>' +
-      '<div class="card glass-light dia-painel"><h3>Neste dia</h3>' + lista + seccaoPagamentosHtml(pags) + '</div></div>';
+      renderPainelDia(iso, {}) + '</div>';
     scrollInicial([iso]);
     ligarScroll();
   }
@@ -885,8 +935,18 @@
       else abrirEditar(chip.getAttribute('data-id'));
       return;
     }
+    var acao = e.target.closest('[data-acao]');
+    if (acao) {
+      e.stopPropagation();
+      var a = acao.getAttribute('data-acao'), d = acao.getAttribute('data-dia');
+      if (a === 'fechar') fecharPainelDia();
+      else if (a === 'novo') novoNoDia(d);
+      else if (a === 'abrir-dia') { estado.dataRef = d; setVista('dia'); render(); }
+      return;
+    }
+    // "+N mais" seleciona o dia e abre o painel lateral.
     var mais = e.target.closest('[data-mais]');
-    if (mais) { e.stopPropagation(); estado.dataRef = mais.getAttribute('data-mais'); setVista('dia'); render(); return; }
+    if (mais) { e.stopPropagation(); selecionarDia(mais.getAttribute('data-mais')); return; }
     var cel = e.target.closest('.hora-cel');
     if (cel) {
       var col = cel.closest('.dia-col');
@@ -895,8 +955,10 @@
     }
     var di = e.target.closest('[data-dia-inteiro]');
     if (di) { abrirNovo({ data: di.getAttribute('data-dia-inteiro'), diaInteiro: true }); return; }
+    // Clique vazio na célula (ou no número) seleciona o dia; clicar no já
+    // selecionado não fecha. Criar evento passa a ser pelo painel ou pelo N.
     var mesCel = e.target.closest('.mes-cel');
-    if (mesCel) { abrirNovo({ data: mesCel.getAttribute('data-dia') }); }
+    if (mesCel) { selecionarDia(mesCel.getAttribute('data-dia')); }
   });
   vistaEl.addEventListener('dblclick', function (e) {
     var num = e.target.closest('[data-dia-num]');
@@ -919,14 +981,16 @@
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var k = e.key;
-    if (k === 'ArrowLeft') { e.preventDefault(); navegar(-1); }
+    if (k === 'Escape') { if (estado.vista === 'mes' && estado.diaSelecionado) { e.preventDefault(); fecharPainelDia(); } }
+    else if (k === 'ArrowLeft') { e.preventDefault(); navegar(-1); }
     else if (k === 'ArrowRight') { e.preventDefault(); navegar(1); }
     else if (k === 't' || k === 'T') { e.preventDefault(); setDataRef(hojeISO()); }
     else if (k === 'm' || k === 'M') { e.preventDefault(); setVista('mes'); }
     else if (k === 's' || k === 'S') { e.preventDefault(); setVista('semana'); }
     else if (k === 'd' || k === 'D') { e.preventDefault(); setVista('dia'); }
     // preventDefault: sem isto o "n" era escrito no título acabado de focar.
-    else if (k === 'n' || k === 'N') { e.preventDefault(); abrirNovo({ data: estado.dataRef }); }
+    // Com um dia selecionado na vista Mês, o N cria nesse dia.
+    else if (k === 'n' || k === 'N') { e.preventDefault(); abrirNovo({ data: (estado.vista === 'mes' && estado.diaSelecionado) || estado.dataRef }); }
   });
 
   /* ---------- Modal: formulário ---------- */
