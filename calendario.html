@@ -131,6 +131,8 @@
   .mes-layout{ display:flex; gap:16px; align-items:flex-start; }
   .mes-grelha-wrap{ flex:1; min-width:640px; }
   .mes-layout .dia-painel{ width:auto; min-width:300px; max-width:360px; flex:0 1 360px; position:sticky; top:16px; }
+  /* Na vista Mês, clicar em qualquer zona livre do painel abre a vista Dia. */
+  .dia-painel[data-abrir-dia]{ cursor:pointer; }
   .mes-cel.fds{ background:var(--dough); }
   .mes-cel.fora{ opacity:.4; }
   .mes-num{ align-self:flex-start; font-size:11.5px; font-weight:600; color:var(--muted); padding:1px 6px; border-radius:100px; line-height:16px; cursor:pointer; user-select:none; }
@@ -899,7 +901,7 @@
       '<button type="button" class="btn-add" data-acao="novo" data-dia="' + iso + '"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Novo evento</button>' +
       (opts.abrirDia ? '<button type="button" class="dia-abrir" data-acao="abrir-dia" data-dia="' + iso + '">Abrir vista Dia →</button>' : '') +
       '</div>';
-    return '<div class="panel glass-light dia-painel">' + cab + lista + seccaoPagamentosHtml(pags) + rodape + '</div>';
+    return '<div class="panel glass-light dia-painel"' + (opts.abrirDia ? ' data-abrir-dia="' + iso + '" title="Abrir vista Dia"' : '') + '>' + cab + lista + seccaoPagamentosHtml(pags) + rodape + '</div>';
   }
 
   // Novo evento a partir do painel: se for hoje, começa na próxima hora cheia.
@@ -944,6 +946,9 @@
       else if (a === 'abrir-dia') { estado.dataRef = d; setVista('dia'); render(); }
       return;
     }
+    // Zona livre do painel (fora de chips, botões e ×): abre a vista Dia.
+    var painel = e.target.closest('.dia-painel[data-abrir-dia]');
+    if (painel) { e.stopPropagation(); estado.dataRef = painel.getAttribute('data-abrir-dia'); setVista('dia'); render(); return; }
     // "+N mais" seleciona o dia e abre o painel lateral.
     var mais = e.target.closest('[data-mais]');
     if (mais) { e.stopPropagation(); selecionarDia(mais.getAttribute('data-mais')); return; }
