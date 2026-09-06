@@ -24,6 +24,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="gioco-compromissos.js"></script>
+<script src="gioco-pagamentos.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -63,6 +65,20 @@
   .btn-perigo:hover{ background:var(--red); color:var(--on-red); }
   .btn-add .icon{ width:14px; height:14px; }
 
+  /* Toggle da camada de pagamentos: pílula com círculo --blush. */
+  .camada-btn{
+    display:inline-flex; align-items:center; gap:7px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+    background:var(--white); color:var(--ink); border:1.5px solid var(--line); border-radius:100px;
+    padding:7px 14px 7px 9px; cursor:pointer; transition:border-color .15s ease, opacity .15s ease;
+  }
+  .camada-btn i{ width:12px; height:12px; border-radius:50%; background:var(--blush); display:inline-block; }
+  .camada-btn:hover{ border-color:var(--red); }
+  .camada-btn[aria-pressed="false"]{ opacity:.55; }
+  .camada-btn[aria-pressed="false"] i{ background:transparent; box-shadow:inset 0 0 0 2px var(--blush); }
+  .sem-data{ font-size:11.5px; color:var(--muted); text-decoration:none; border-bottom:1px dotted var(--muted); }
+  .sem-data:hover{ color:var(--red-ink); border-bottom-color:var(--red-ink); }
+
   .seg{ display:inline-flex; border:1.5px solid var(--line); border-radius:100px; padding:3px; background:var(--white); }
   .seg button{
     font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
@@ -89,6 +105,10 @@
   }
   .ev-chip:hover{ filter:brightness(0.94); }
   .ev-chip .num{ font-weight:500; margin-right:3px; }
+  /* Chip de pagamento (fonte 'pagamentos'): --blush + texto fixo; pago = ✓ e esbatido. */
+  .ev-chip.pag{ background:var(--blush); color:#141414; }
+  .ev-chip.pag .num{ margin:0 0 0 4px; opacity:.85; }
+  .ev-chip.pago{ opacity:.55; }
 
   /* ---------- Mês ---------- */
   .mes-cab{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; margin-bottom:6px; }
@@ -147,6 +167,25 @@
   .dia-item-h{ font-size:11.5px; color:var(--muted); margin-top:2px; }
   .dia-item-n{ font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; }
   .dia-vazio{ font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .dia-sec{ margin:16px 0 6px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .dia-pag{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer; background:none; border-left:none; border-right:none; border-top:none; width:100%; text-align:left; color:var(--ink); font-family:'Inter',sans-serif; }
+  .dia-pag:last-of-type{ border-bottom:none; }
+  .dia-pag i{ width:4px; border-radius:2px; flex-shrink:0; align-self:stretch; background:var(--blush); min-height:28px; }
+  .dia-pag .dia-pag-t{ flex:1; min-width:0; font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dia-pag:hover .dia-pag-t{ color:var(--red-ink); }
+  .dia-pag .dia-pag-v{ font-size:12.5px; font-weight:600; }
+  .dia-pag.pago .dia-pag-t, .dia-pag.pago .dia-pag-v{ opacity:.6; }
+  .dia-pag-total{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-top:8px; }
+  .dia-pag-total b{ color:var(--ink); }
+
+  /* Detalhe só de leitura de um pagamento (giocoModal). */
+  .pag-detalhe{ color:var(--ink); font-size:13px; }
+  .pag-detalhe .pag-titulo{ font-size:15px; font-weight:700; margin:0 0 6px; }
+  .pag-detalhe .pag-valor{ font-size:28px; font-weight:700; margin:0 0 10px; }
+  .pag-detalhe .pag-kv{ display:flex; gap:10px; padding:6px 0; border-top:1px solid var(--line); }
+  .pag-detalhe .pag-kv span:first-child{ width:90px; flex-shrink:0; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; padding-top:2px; }
+  .pag-detalhe .pag-notas{ white-space:pre-line; line-height:1.45; }
+  a.btn-add{ text-decoration:none; }
 
   /* ---------- Formulário do modal (padrão da pagamentos.html, copiado) ---------- */
   .cal-form{ display:flex; flex-direction:column; gap:14px; color:var(--ink); }
@@ -237,6 +276,8 @@
         </div>
         <div class="cal-titulo" id="calTitulo">—</div>
         <div class="cal-dir">
+          <button type="button" class="camada-btn" id="camadaPag" aria-pressed="true" title="Mostrar ou esconder os pagamentos (só leitura)"><i></i>Pagamentos</button>
+          <a class="sem-data" id="semData" href="tesouraria.html" hidden title="Linhas de pedidos sem prazo — ver na Tesouraria"></a>
           <div class="seg" id="segVista" role="group" aria-label="Vista">
             <button type="button" data-vista="mes" title="Mês (M)">Mês</button>
             <button type="button" data-vista="semana" title="Semana (S)">Semana</button>
@@ -332,16 +373,30 @@
   autenticarEContinuar(function () {
   var db = firebase.database();
   var eventosRef = db.ref('eventos');
+  // Fonte 'pagamentos' (SÓ LEITURA): os cinco nós que a tesouraria.html usa.
+  // Os valores dos salários e da TSU dependem de recibos/pessoas. Nenhum
+  // destes nós é escrito por esta página.
+  var paymentRequestsRef = db.ref('paymentRequests');
+  var compromissosRef = db.ref('compromissosFixos');
+  var pagamentosConcluidosRef = db.ref('pagamentosConcluidos');
+  var recibosRef = db.ref('recibos');
+  var pessoasRef = db.ref('pessoas');
+  var allPaymentRequests = {}, allCompromissos = {}, allPagamentosConcluidos = {}, allRecibos = {}, allPessoas = {};
+  var carregado = { payreq: false, comp: false, concl: false, recibos: false, pessoas: false };
+  function pagamentosCarregados(){ return carregado.payreq && carregado.comp && carregado.concl && carregado.recibos && carregado.pessoas; }
 
   /* =====================================================================
-     ARQUITETURA — preparada para fontes futuras.
-     O render NUNCA toca no Firebase. Trabalha só com uma lista de eventos
+     ARQUITETURA — fontes.
+     O render NUNCA toca no Firebase. Trabalha só com uma lista de itens
      NORMALIZADOS: {id, titulo, data, diaInteiro, horaInicio, horaFim,
-     categoria, notas, origem, editavel}. Hoje a única fonte é 'manual'
-     (o nó eventos/, editavel:true). Para ligar outra fonte (Outlook,
-     tesouraria, tarefas…) basta produzir mais itens nesta forma —
-     tipicamente editavel:false — e juntá-los em estado.eventos antes de
-     indexarEventos(). Ver CLAUDE.md, nó eventos/.
+     categoria, notas, origem, editavel, extra?}. Fontes hoje:
+       'manual'     — o nó eventos/ (editavel:true), em estado.eventos;
+       'pagamentos' — fontePagamentos(), só leitura (editavel:false), a
+                      partir do gioco-pagamentos.js sobre os cinco nós da
+                      tesouraria; entra na lista quando a camada está ligada.
+     listaParaRender() junta as fontes; indexarEventos() indexa por dia.
+     A diferença visual vive só em chipDe(item) / blocoDe(item) / painel do
+     dia — sem ramos "if origem" espalhados pelo render. Ver CLAUDE.md.
      ===================================================================== */
 
   var CATEGORIAS = [
@@ -356,6 +411,40 @@
     for (var i = 0; i < CATEGORIAS.length; i++) if (CATEGORIAS[i].id === id) return CATEGORIAS[i];
     return CATEGORIAS[CATEGORIAS.length - 1];
   }
+
+  /* ---------- Helpers partilhados com a tesouraria (iguais lá) ---------- */
+  var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function formatDateDDMMYYYY(d) {
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+  function parseMontante(m){
+    var n = parseFloat(String(m == null ? '' : m).replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  }
+  function ordenaPorPrazo(lista){
+    lista.sort(function(a, b){
+      if (!a.prazoDate && !b.prazoDate) return 0;
+      if (!a.prazoDate) return 1;
+      if (!b.prazoDate) return -1;
+      return a.prazoDate - b.prazoDate;
+    });
+    return lista;
+  }
+  var fmtEuro = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });
+  function formatEuro(n) { return fmtEuro.format(Number(n) || 0); }
+
+  var CE = giocoCompromissosEngine({
+    getCompromissos: function(){ return allCompromissos; },
+    getRecibos:      function(){ return allRecibos; },
+    getPessoas:      function(){ return allPessoas; },
+    formatEuro: formatEuro, parseMontante: parseMontante, MESES_PT: MESES_PT
+  });
+  var PG = giocoPagamentosEngine({
+    getPaymentRequests:      function(){ return allPaymentRequests; },
+    getPagamentosConcluidos: function(){ return allPagamentosConcluidos; },
+    compromissos:            CE,
+    parseMontante: parseMontante, formatDateDDMMYYYY: formatDateDDMMYYYY, ordenaPorPrazo: ordenaPorPrazo
+  });
 
   var HORA_INICIO_GRELHA = 7;   // 07:00
   var HORA_FIM_GRELHA = 24;     // 24:00
@@ -450,6 +539,14 @@
   };
   var eventosPorDia = new Map();
   var eventosPorId = {};   // só a fonte manual (nó bruto), para o modal de edição
+  var itensPorId = {};     // todos os itens normalizados da última lista (todas as fontes)
+  var camadaPag = true;
+  try { camadaPag = localStorage.getItem('calendario.camada.pagamentos') !== '0'; } catch (e) {}
+  function setCamadaPag(on) {
+    camadaPag = !!on;
+    try { localStorage.setItem('calendario.camada.pagamentos', camadaPag ? '1' : '0'); } catch (e) {}
+    render();
+  }
 
   function setVista(v) {
     if (VISTAS.indexOf(v) < 0 || v === estado.vista) return;
@@ -482,15 +579,89 @@
       editavel: true
     };
   }
+  /* ---------- Fonte 'pagamentos' (só leitura) ----------
+     mesesVisiveis: [{ano, mes}] — os compromissos geram-se por mês, só para
+     os meses que a vista mostra (nunca para o ano). Pedidos: uma entrada
+     POR LINHA, só as que têm prazo; as sem prazo contam-se à parte. */
+  function fontePagamentos(mesesVisiveis) {
+    var out = [];
+    if (!pagamentosCarregados()) return out;
+    PG.linhasPaymentRequestsTodas().forEach(function (l) {
+      if (!l.prazoDate) return;
+      out.push({
+        id: 'pag:payreq:' + l.ticketId + '~' + l.lineIdx,
+        titulo: l.fornecedor,
+        data: toISODate(l.prazoDate),
+        diaInteiro: true, horaInicio: null, horaFim: null,
+        categoria: 'prazo',
+        notas: 'Pedido #' + l.ticketNumero + (l.referencia ? ' · Ref. ' + l.referencia : ''),
+        origem: 'pagamentos', editavel: false,
+        extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'pedido', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate }
+      });
+    });
+    mesesVisiveis.forEach(function (am) {
+      PG.linhasCompromissosDoMes(am.ano, am.mes).forEach(function (l) {
+        var rotulo = CE.rotuloEstado(l.estado);
+        out.push({
+          id: 'pag:fixo:' + l.compromissoId + '_' + PG.periodoCompromisso(l.prazoDate),
+          titulo: l.fornecedor,
+          data: toISODate(l.prazoDate),
+          diaInteiro: true, horaInicio: null, horaFim: null,
+          categoria: 'prazo',
+          notas: rotulo + (l.nota ? (rotulo ? ' — ' : '') + l.nota : ''),
+          origem: 'pagamentos', editavel: false,
+          extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'compromisso', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate }
+        });
+      });
+    });
+    return out;
+  }
+  function linhasSemData() {
+    if (!pagamentosCarregados()) return 0;
+    return PG.linhasPaymentRequestsTodas().filter(function (l) { return !l.prazoDate; }).length;
+  }
+  function ehPagamento(item) { return item.origem === 'pagamentos'; }
+
+  // Datas que a vista atual mostra → meses distintos, para a fonte de pagamentos.
+  function mesesVisiveis() {
+    var datas;
+    if (estado.vista === 'mes') datas = monthGrid(parseInt(anoDe(estado.dataRef), 10), mesDe(estado.dataRef));
+    else if (estado.vista === 'semana') datas = semanaDe(estado.dataRef);
+    else datas = [estado.dataRef];
+    var vistos = {}, out = [];
+    datas.forEach(function (iso) {
+      var k = iso.slice(0, 7);
+      if (!vistos[k]) { vistos[k] = true; out.push({ ano: parseInt(anoDe(iso), 10), mes: mesDe(iso) }); }
+    });
+    return out;
+  }
+
+  // A lista que o render recebe: eventos manuais + (se a camada estiver
+  // ligada) pagamentos dos meses visíveis. Aceita duplicados pedido/
+  // compromisso, a mesma decisão da tesouraria.
+  function listaParaRender() {
+    var lista = estado.eventos.slice();
+    if (camadaPag) lista = lista.concat(fontePagamentos(mesesVisiveis()));
+    return lista;
+  }
+
+  // Ordem dentro do dia: eventos de dia inteiro, depois pagamentos, depois os com hora.
+  function grupoOrdem(ev) {
+    if (ehPagamento(ev)) return 1;
+    return ev.diaInteiro ? 0 : 2;
+  }
   function compararEventos(a, b) {
-    if (a.diaInteiro !== b.diaInteiro) return a.diaInteiro ? -1 : 1;
+    var ga = grupoOrdem(a), gb = grupoOrdem(b);
+    if (ga !== gb) return ga - gb;
     var ha = a.horaInicio || '', hb = b.horaInicio || '';
     if (ha !== hb) return ha < hb ? -1 : 1;
     return a.titulo.localeCompare(b.titulo, 'pt');
   }
   function indexarEventos() {
     eventosPorDia = new Map();
-    estado.eventos.forEach(function (ev) {
+    itensPorId = {};
+    listaParaRender().forEach(function (ev) {
+      itensPorId[ev.id] = ev;
       if (!eventosPorDia.has(ev.data)) eventosPorDia.set(ev.data, []);
       eventosPorDia.get(ev.data).push(ev);
     });
@@ -504,7 +675,14 @@
   var ultimoScrollChave = null;
 
   function render() {
+    indexarEventos();   // a lista depende da vista (meses visíveis) e da camada
     tituloEl.textContent = tituloPeriodo(estado.vista, estado.dataRef);
+    var btnCamada = document.getElementById('camadaPag');
+    btnCamada.setAttribute('aria-pressed', camadaPag ? 'true' : 'false');
+    var semData = document.getElementById('semData');
+    var nSem = linhasSemData();
+    semData.hidden = nSem === 0;
+    semData.textContent = nSem + ' sem data';
     var botoes = document.querySelectorAll('#segVista button');
     for (var i = 0; i < botoes.length; i++) botoes[i].classList.toggle('active', botoes[i].getAttribute('data-vista') === estado.vista);
     if (estado.vista === 'mes') renderMes();
@@ -512,12 +690,20 @@
     else renderDia();
   }
 
-  function chipHtml(ev) {
+  /* chipDe(item): o único sítio onde um chip sabe de que fonte vem. */
+  function chipDe(ev) {
+    if (ehPagamento(ev)) {
+      var pago = ev.extra.estado === 'pago';
+      var titulo = ev.titulo + ' · ' + formatEuro(ev.extra.valor);
+      return '<button type="button" class="ev-chip pag' + (pago ? ' pago' : '') + '" data-id="' + escapeHtml(ev.id) + '" title="' + escapeHtml(titulo) + '">' +
+        (pago ? '✓ ' : '') + escapeHtml(ev.titulo) + ' ·<span class="num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span></button>';
+    }
     var c = categoria(ev.categoria);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
     return '<button type="button" class="ev-chip" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
       hora + escapeHtml(ev.titulo) + '</button>';
   }
+  var chipHtml = chipDe;
 
   function renderMes() {
     var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
@@ -571,7 +757,8 @@
     return itens;
   }
 
-  function blocoHtml(it) {
+  /* blocoDe(item): bloco na grelha horária (só itens com hora; os pagamentos são de dia inteiro). */
+  function blocoDe(it) {
     var c = categoria(it.ev.categoria);
     var base = HORA_INICIO_GRELHA * 60;
     var top = Math.max(0, (it.ini - base) / 60 * PX_HORA);
@@ -597,7 +784,7 @@
     for (var h = HORA_INICIO_GRELHA; h < HORA_FIM_GRELHA; h++) {
       html += '<div class="hora-cel" data-hora="' + pad2(h) + ':00" style="top:' + ((h - HORA_INICIO_GRELHA) * PX_HORA) + 'px"></div>';
     }
-    layoutColunas(eventosDoDia(iso)).forEach(function (it) { html += blocoHtml(it); });
+    layoutColunas(eventosDoDia(iso)).forEach(function (it) { html += blocoDe(it); });
     return html + '</div>';
   }
 
@@ -643,9 +830,26 @@
     if (sc) sc.addEventListener('scroll', function () { ultimoScrollTop = sc.scrollTop; });
   }
 
+  function seccaoPagamentosHtml(pags) {
+    if (!pags.length) return '';
+    var pendente = 0, h = '<div class="dia-sec">Pagamentos</div>';
+    pags.forEach(function (ev) {
+      var pago = ev.extra.estado === 'pago';
+      if (!pago) pendente += ev.extra.valor;
+      h += '<button type="button" class="dia-pag' + (pago ? ' pago' : '') + '" data-id="' + escapeHtml(ev.id) + '"><i></i>' +
+        '<span class="dia-pag-t">' + escapeHtml(ev.titulo) + '</span>' +
+        '<span class="dia-pag-v num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span>' +
+        '<span class="status ' + (pago ? 'ok' : 'warn') + '">' + (pago ? 'Pago' : 'Pendente') + '</span></button>';
+    });
+    h += '<div class="dia-pag-total"><span>Pendente no dia</span><b class="num">' + escapeHtml(formatEuro(pendente)) + '</b></div>';
+    return h;
+  }
+
   function renderDia() {
     var iso = estado.dataRef;
-    var evs = eventosDoDia(iso);
+    var todos = eventosDoDia(iso);
+    var evs = todos.filter(function (ev) { return !ehPagamento(ev); });
+    var pags = todos.filter(ehPagamento);
     var lista = '';
     if (!evs.length) {
       lista = '<p class="dia-vazio">Sem eventos. Clica na grelha ou em Novo evento.</p>';
@@ -661,7 +865,7 @@
       });
     }
     vistaEl.innerHTML = '<div class="dia-layout"><div class="dia-grelha">' + grelhaHorariaHtml([iso]) + '</div>' +
-      '<div class="card glass-light dia-painel"><h3>Neste dia</h3>' + lista + '</div></div>';
+      '<div class="card glass-light dia-painel"><h3>Neste dia</h3>' + lista + seccaoPagamentosHtml(pags) + '</div></div>';
     scrollInicial([iso]);
     ligarScroll();
   }
@@ -669,12 +873,18 @@
   /* ---------- Legenda ---------- */
   document.getElementById('calLegenda').innerHTML = CATEGORIAS.map(function (c) {
     return '<span><i style="background:' + c.cor + '"></i>' + c.label + '</span>';
-  }).join('');
+  }).join('') + '<span><i style="background:var(--blush)"></i>Pagamentos (Tesouraria, só leitura)</span>';
 
   /* ---------- Interação nas vistas ---------- */
   vistaEl.addEventListener('click', function (e) {
     var chip = e.target.closest('[data-id]');
-    if (chip) { e.stopPropagation(); abrirEditar(chip.getAttribute('data-id')); return; }
+    if (chip) {
+      e.stopPropagation();
+      var item = itensPorId[chip.getAttribute('data-id')];
+      if (item && !item.editavel) abrirDetalhePagamento(item);
+      else abrirEditar(chip.getAttribute('data-id'));
+      return;
+    }
     var mais = e.target.closest('[data-mais]');
     if (mais) { e.stopPropagation(); estado.dataRef = mais.getAttribute('data-mais'); setVista('dia'); render(); return; }
     var cel = e.target.closest('.hora-cel');
@@ -697,6 +907,7 @@
   document.getElementById('btnSeguinte').addEventListener('click', function () { navegar(1); });
   document.getElementById('btnHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
   document.getElementById('btnNovo').addEventListener('click', function () { abrirNovo({ data: estado.dataRef }); });
+  document.getElementById('camadaPag').addEventListener('click', function () { setCamadaPag(!camadaPag); });
   document.getElementById('segVista').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-vista]');
     if (b) setVista(b.getAttribute('data-vista'));
@@ -854,6 +1065,26 @@
     return { form: form, inTitulo: inTitulo, inNotas: inNotas, crescer: crescer, btnGuardar: btnGuardar, btnAnular: btnAnular, acoes: acoes, lerFormulario: lerFormulario };
   }
 
+  /* ---------- Detalhe só de leitura de um pagamento (fonte 'pagamentos') ---------- */
+  function abrirDetalhePagamento(item) {
+    var x = item.extra || {};
+    var pago = x.estado === 'pago';
+    var corpo = el('div', { 'class': 'pag-detalhe' });
+    corpo.appendChild(el('p', { 'class': 'pag-titulo', text: item.titulo }));
+    corpo.appendChild(el('p', { 'class': 'pag-valor num', text: formatEuro(x.valor) }));
+    function kv(k, v) { corpo.appendChild(el('div', { 'class': 'pag-kv' }, [el('span', { text: k }), v])); }
+    kv('Estado', el('span', { 'class': 'status ' + (pago ? 'ok' : 'warn'), text: pago ? 'Pago' : 'Pendente' }));
+    kv('Tipo', el('span', { text: x.tipo === 'pedido' ? item.notas.split(' · ')[0] : 'Compromisso fixo' }));
+    kv('Data', el('span', { 'class': 'num', text: diaSemanaLongo(item.data) + ', ' + diaDe(item.data) + ' ' + mesCurto(item.data) + ' ' + anoDe(item.data) }));
+    if (item.notas) kv('Notas', el('span', { 'class': 'pag-notas', text: item.notas }));
+    var href = 'tesouraria.html?dia=' + encodeURIComponent(item.data) + '&chave=' + encodeURIComponent(x.chaveTesouraria || '');
+    var abrir = el('a', { 'class': 'btn-add', href: href, text: 'Abrir na Tesouraria' });
+    var fechar = el('button', { type: 'button', 'class': 'btn', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    corpo.appendChild(el('div', { 'class': 'modal-actions' }, [el('div', { 'class': 'modal-actions-right' }, [fechar, abrir])]));
+    giocoModal.open({ titulo: 'Pagamento', conteudo: corpo });
+  }
+
   var aGravar = false;
 
   function abrirNovo(pre) {
@@ -990,6 +1221,14 @@
     indexarEventos();
     render();
   });
+
+  // Os cinco nós da fonte 'pagamentos' — só leitura. Um flag por nó; até
+  // chegarem todos a página funciona só com eventos.
+  paymentRequestsRef.on('value', function (s) { allPaymentRequests = s.val() || {}; carregado.payreq = true; render(); });
+  compromissosRef.on('value', function (s) { allCompromissos = s.val() || {}; carregado.comp = true; render(); });
+  pagamentosConcluidosRef.on('value', function (s) { allPagamentosConcluidos = s.val() || {}; carregado.concl = true; render(); });
+  recibosRef.on('value', function (s) { allRecibos = s.val() || {}; carregado.recibos = true; render(); });
+  pessoasRef.on('value', function (s) { allPessoas = s.val() || {}; carregado.pessoas = true; render(); });
 
   render();
   }); // fim de autenticarEContinuar

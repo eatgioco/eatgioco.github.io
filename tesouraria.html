@@ -1786,6 +1786,7 @@
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-reconciliacao.js"></script>
+<script src="gioco-pagamentos.js"></script>
 
 <div class="shell">
 
@@ -2341,17 +2342,6 @@ window.addEventListener('load', function () {
     });
   }
 
-  // Estado de uma linha, igual ao de pagamentos.html (páginas standalone, sem
-  // módulos partilhados). Pedidos criados antes do estado por linha não têm
-  // `status` nas linhas: quando o pedido inteiro está concluído ou anulado,
-  // todas as linhas herdam esse estado. Só num pedido pendente é que cada
-  // linha decide por si (campo ausente = pendente).
-  function lineStatus(p, l) {
-    var status = p.status || 'pendente';
-    if (status !== 'pendente') return status;
-    return (l && l.status === 'concluido') ? 'concluido' : 'pendente';
-  }
-
   function countLinhasConcluidas(p) {
     return (p.lines || []).filter(function (l) {
       return lineStatus(p, l) === 'concluido';
@@ -2654,14 +2644,6 @@ window.addEventListener('load', function () {
   var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var DOW_PT = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
 
-  function ddmmyyyyToDate(str){
-    if (!str) return null;
-    var parts = String(str).split('/');
-    if (parts.length !== 3) return null;
-    var d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-    return isNaN(d.getTime()) ? null : d;
-  }
-
   function hojeMeiaNoite(){
     var d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -2683,85 +2665,10 @@ window.addEventListener('load', function () {
     return lista;
   }
 
-  // Desdobra TODOS os pedidos (pendentes e já pagos, exceto anulados) num
-  // array plano de linhas individuais, ordenado por prazo ascendente.
-  // 'pago' distingue o estado de cada linha; 'dia' é o dia-do-mês do prazo,
-  // para agrupar no calendário. Base comum para a lista de "todos os
-  // prazos" (só pendentes, via linhasPendentes) e para o calendário de
-  // Tesouraria (pendentes + pagos, via itensDoMes).
-  function linhasPaymentRequestsTodas(){
-    var out = [];
-    Object.keys(allPaymentRequests).forEach(function(id){
-      var p = allPaymentRequests[id];
-      if ((p.status || 'pendente') === 'anulado') return;
-      (p.lines || []).forEach(function(l, idx){
-        var prazoDate = ddmmyyyyToDate(l.prazo);
-        out.push({
-          tipo: 'pedido',
-          ticketId: id,
-          lineIdx: idx,
-          ticketNumero: p.numeroReferencia || '',
-          origem: p.origem || 'fornecedor',
-          fornecedor: l.fornecedor || 'Sem descrição',
-          montante: parseMontante(l.montante),
-          prazo: l.prazo || '',
-          prazoDate: prazoDate,
-          dia: prazoDate ? prazoDate.getDate() : null,
-          referencia: l.referencia || '',
-          iban: l.iban || '',
-          pago: lineStatus(p, l) === 'concluido'
-        });
-      });
-    });
-    return ordenaPorPrazo(out);
-  }
-
   // Só as linhas ainda por pagar — usada pelo cartão de Pagamentos e pela
   // lista "todos os prazos".
   function linhasPendentes(){
     return linhasPaymentRequestsTodas().filter(function(l){ return !l.pago; });
-  }
-
-  // Identifica o período mensal de uma ocorrência de compromisso, no mesmo
-  // formato já usado por chaveLinha ("ano-mes", mes 1-indexado).
-  function periodoCompromisso(d){
-    return d.getFullYear() + '-' + (d.getMonth() + 1);
-  }
-
-  function compromissoPago(compromissoId, prazoDate){
-    return !!allPagamentosConcluidos[compromissoId + '_' + periodoCompromisso(prazoDate)];
-  }
-
-  // Achata as ocorrências de compromissos fixos ativos de um mês, no mesmo
-  // formato de linha usado pelos pedidos, para poderem aparecer misturadas
-  // na mesma lista. Inclui pagas e pendentes — 'pago' distingue o estado;
-  // quem só quer pendentes filtra depois (ver linhasCompromissosFixos).
-  function linhasCompromissosDoMes(ano, mes){
-    var out = [];
-    ocorrenciasCompromissos(ano, mes).forEach(function(o){
-      var d = new Date(ano, mes - 1, o.dia);
-      d.setHours(0, 0, 0, 0);
-      var c = compromissoPorId(o.id) || {};
-      out.push({
-        tipo: 'fixo',
-        tipoCusto: tipoDe(c),
-        compromissoId: o.id,
-        fornecedor: o.nome,
-        montante: o.montante,
-        estado: o.estado,
-        nota: o.nota,
-        derivaDe: o.derivaDe,
-        prazo: formatDateDDMMYYYY(d),
-        prazoDate: d,
-        dia: o.dia,
-        categoria: c.categoria || 'Outros',
-        referencia: '',
-        metodoPagamento: c.metodoPagamento || 'iban',
-        iban: c.iban || '',
-        pago: compromissoPago(o.id, d)
-      });
-    });
-    return out;
   }
 
   // Ocorrências pendentes do mês corrente e do seguinte (horizonte
@@ -2807,17 +2714,6 @@ window.addEventListener('load', function () {
       btnEl.classList.add('copy-icon-error');
       setTimeout(function(){ btnEl.classList.remove('copy-icon-error'); }, 1500);
     });
-  }
-
-  // Identifica uma linha de forma estável entre re-renders (o pedido pode
-  // ser regravado pelo Firebase a qualquer momento). Uma ocorrência de
-  // compromisso fixo é identificada pelo id do compromisso + o mês da
-  // ocorrência, já que o mesmo compromisso gera uma linha por mês.
-  function chaveLinha(l){
-    if (l.tipo === 'fixo'){
-      return 'fixo|' + l.compromissoId + '|' + periodoCompromisso(l.prazoDate);
-    }
-    return l.ticketId + '|' + l.lineIdx;
   }
 
   // itensTesourariaAtual guarda o resultado do último itensDoMes() — inclui
@@ -3105,6 +3001,25 @@ window.addEventListener('load', function () {
     ref:                     reconciliacaoRef
   });
 
+  /* ---------- Itens planos de pagamentos (gioco-pagamentos.js) ----------
+     lineStatus, ddmmyyyyToDate, linhasPaymentRequestsTodas, periodoCompromisso,
+     compromissoPago, linhasCompromissosDoMes, itensDoMes, chaveLinha e
+     chaveReconciliacao viviam aqui; foram extraídas verbatim para o módulo
+     (a calendario.html usa-as também). Nomes destruturados para os call
+     sites não mudarem. */
+  var PG = giocoPagamentosEngine({
+    getPaymentRequests:      function(){ return allPaymentRequests; },
+    getPagamentosConcluidos: function(){ return allPagamentosConcluidos; },
+    compromissos:            CE,
+    reconciliacao:           RE,
+    parseMontante: parseMontante, formatDateDDMMYYYY: formatDateDDMMYYYY, ordenaPorPrazo: ordenaPorPrazo
+  });
+  var lineStatus = PG.lineStatus, ddmmyyyyToDate = PG.ddmmyyyyToDate,
+      periodoCompromisso = PG.periodoCompromisso, compromissoPago = PG.compromissoPago,
+      linhasPaymentRequestsTodas = PG.linhasPaymentRequestsTodas,
+      linhasCompromissosDoMes = PG.linhasCompromissosDoMes, itensDoMes = PG.itensDoMes,
+      chaveLinha = PG.chaveLinha, chaveReconciliacao = PG.chaveReconciliacao;
+
   var reconResultado = null;   // último RE.calcular()
   var receitasResultado = null; // último RE.calcularReceitas()
 
@@ -3119,12 +3034,6 @@ window.addEventListener('load', function () {
   };
   var REC_POR_CONFIRMAR = { aguarda: true, semMovimento: true, ambiguo: true };
   var REC_ORDEM = ['semMovimento', 'ambiguo', 'semData', 'aguarda', 'confirmado'];
-
-  // Chave de reconciliação de uma linha plana (itensDoMes / linhasCombinadas).
-  function chaveReconciliacao(l){
-    if (l.tipo === 'fixo') return RE.chaveFixo(l.compromissoId + '_' + periodoCompromisso(l.prazoDate));
-    return RE.chavePedido(l.ticketId, l.lineIdx);
-  }
 
   function reconTudoCarregado(){
     return reconCarregado.abanca && reconCarregado.revolut && reconCarregado.rec && reconCarregado.pedidos;
@@ -3556,26 +3465,6 @@ window.addEventListener('load', function () {
   });
 
 
-  // Pedidos (pendentes + pagos) e compromissos fixos (pendentes + pagos)
-  // do mês, ordenados por dia. Alimenta o calendário (heatmap e lista de
-  // dia) — ao contrário de linhasCombinadas(), não exclui os já pagos: o
-  // calendário reflete tudo o que se passa nesse dia, não só o que falta.
-  function itensDoMes(ano, mes){
-    var out = [];
-
-    linhasPaymentRequestsTodas().forEach(function(l){
-      if (!l.prazoDate) return;
-      if (l.prazoDate.getFullYear() !== ano) return;
-      if (l.prazoDate.getMonth() + 1 !== mes) return;
-      out.push(l);
-    });
-
-    out = out.concat(linhasCompromissosDoMes(ano, mes));
-
-    out.sort(function(a, b){ return a.dia - b.dia; });
-    return out;
-  }
-
   function semanaDoDia(dia){
     return Math.min(Math.floor((dia - 1) / 7), 4);
   }
@@ -3700,6 +3589,27 @@ window.addEventListener('load', function () {
   // Estado próprio, independente de cartaoLinhaAberta/tesLinhaAberta: são
   // vistas diferentes e podem estar abertas em simultâneo.
   var tesDiaLinhaAberta = null;
+
+  /* ---------- Deep-link (Set/2026): ?dia=AAAA-MM-DD[&chave=<chaveLinha>] ----------
+     Usado pela calendario.html ("Abrir na Tesouraria"). Só define estado:
+     mês/ano/dia ativos e a linha a abrir no detalhe do dia. Cada snapshot do
+     Firebase volta a chamar renderTesouraria(), por isso o dia e o bloco
+     aparecem assim que os dados chegam; uma chave que não exista fica
+     simplesmente sem bloco aberto. Sem parâmetros nada muda. Nunca escreve. */
+  (function(){
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var dia = qs.get('dia');
+      if (dia && /^\d{4}-\d{2}-\d{2}$/.test(dia)){
+        var a = parseInt(dia.slice(0, 4), 10), m = parseInt(dia.slice(5, 7), 10), d = parseInt(dia.slice(8, 10), 10);
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31){
+          anoAtivo = a; mesAtivo = m; diaSelecionado = d;
+          var chave = qs.get('chave');
+          if (chave) tesDiaLinhaAberta = chave;
+        }
+      }
+    } catch (e) { /* URL estranho: comportamento por omissão */ }
+  })();
 
   // Lista de todos os itens (pendentes e já pagos) do dia selecionado,
   // reaproveitando blocoDetalhePagamento — os pagos mostram só ✓ Pago, sem
