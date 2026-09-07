@@ -1848,6 +1848,20 @@
     font-variant-numeric:tabular-nums;
   }
 
+  /* Badge discreto "Caixa" / "Cofre" — de onde saiu o dinheiro do depósito. */
+  .dep-origem{
+    display:inline-block;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+    padding:2px 7px;
+    border-radius:100px;
+    background:var(--dough);
+    color:var(--muted);
+    border:1px solid var(--line);
+  }
+
   select{
     font-family:'Inter', sans-serif;
     font-size:13.5px;
@@ -2211,6 +2225,14 @@
       <div class="tes-bigtotal" id="depSaldoBanco">—</div>
       <p class="tes-bigtotal-sub" id="depSaldoBancoSub">Sem dados do banco ainda.</p>
     </div>
+  </div>
+
+  <!-- Saldo do cofre — informativo, não entra no total de pendentes nem no
+       cartão: o dinheiro ainda não saiu para o banco. -->
+  <div class="tes-block glass-light" id="depCofreBloco">
+    <p class="tes-block-title">No cofre</p>
+    <div class="tes-bigtotal" id="depCofreValor">0.00€</div>
+    <p class="tes-bigtotal-sub" id="depCofreSub">A carregar…</p>
   </div>
 
   <!-- Devoluções que voltaram à caixa sem se saber de que levantamento vieram
@@ -3826,6 +3848,9 @@ window.addEventListener('load', function () {
   // Refs extra, carregadas só para alimentar notificações (sem UI própria
   // no dashboard, que já vive em caixa.html / loja-sao-bento.html / equipa.html).
   var caixaRef = db.ref('caixaMovimentos');
+  // Segundo local de dinheiro físico. Um depósito bancário pode ter origem
+  // em qualquer um dos dois nós — ver refDoMovimento() mais abaixo.
+  var cofreRefDash = db.ref('cofreMovimentos');
   // Contas bancárias: escritas de fora pelo eb_sync.py (Enable Banking → RTDB).
   // Um único listener no nó pai — o cartão "Contas Bancárias" descobre as
   // contas que existirem (o Revolut entra sem alterar código) e a
@@ -3839,6 +3864,7 @@ window.addEventListener('load', function () {
   var pessoasNotifRef = db.ref('pessoas');
 
   var allCaixaMovs = {};
+  var allCofreMovs = {};
   var allContas = {};        // contasBancarias/ inteiro, tal como está no RTDB
   var contaSaldo = null;     // saldo da conta usada na reconciliação
   var allContaMovs = {};     // movimentos dessa mesma conta
@@ -3848,6 +3874,7 @@ window.addEventListener('load', function () {
   var allPessoasNotif = {};
 
   var caixaCarregada = false;
+  var cofreCarregada = false;
   var contasCarregadas = false;
   var contaMovsCarregados = false;
   var tempsCarregadas = false;
@@ -4272,6 +4299,14 @@ window.addEventListener('load', function () {
     reconciliarDepositos();
   });
 
+  cofreRefDash.on('value', function(snapshot){
+    allCofreMovs = snapshot.val() || {};
+    cofreCarregada = true;
+    renderCofreDashboard();
+    renderDepositosCard();
+    reconciliarDepositos();
+  });
+
   contasRef.on('value', function(snapshot){
     allContas = snapshot.val() || {};
     contasCarregadas = true;
@@ -4331,10 +4366,28 @@ window.addEventListener('load', function () {
     return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
   }
 
+  // Um depósito bancário pode ter origem em caixaMovimentos OU
+  // cofreMovimentos — cada item sabe o seu nó de origem (m.origem) e
+  // refDoMovimento() devolve a ref certa para qualquer escrita subsequente.
+  // QUALQUER código futuro que trate de depósitos tem de olhar para os dois nós.
   function listaMovimentosDeposito(){
-    return Object.keys(allCaixaMovs)
-      .map(function(id){ return Object.assign({ id: id }, allCaixaMovs[id]); })
+    var caixaList = Object.keys(allCaixaMovs)
+      .map(function(id){ return Object.assign({ id: id, origem: 'caixa' }, allCaixaMovs[id]); })
       .filter(function(m){ return m.tipo === 'saida' && normalizarTexto(m.motivo) === MOTIVO_DEPOSITO_BANCARIO_NORM; });
+    var cofreList = Object.keys(allCofreMovs)
+      .map(function(id){ return Object.assign({ id: id, origem: 'cofre' }, allCofreMovs[id]); })
+      .filter(function(m){ return m.tipo === 'saida' && normalizarTexto(m.motivo) === MOTIVO_DEPOSITO_BANCARIO_NORM; });
+    return caixaList.concat(cofreList);
+  }
+
+  function refDoMovimento(item){
+    return item.origem === 'cofre' ? cofreRefDash : caixaRef;
+  }
+
+  function origemLabelHtml(m){
+    return m.origem === 'cofre'
+      ? '<span class="dep-origem">Cofre</span>'
+      : '<span class="dep-origem">Caixa</span>';
   }
 
   /* Parte do dinheiro levantado para depositar pode voltar à caixa: cada
@@ -4380,9 +4433,13 @@ window.addEventListener('load', function () {
   }
 
   function devolucoesPorAlocar(){
-    return Object.keys(allCaixaMovs)
-      .map(function(id){ return Object.assign({ id: id }, allCaixaMovs[id]); })
-      .filter(function(m){ return isDevolucaoDeposito(m) && !m.depositoOrigemId; })
+    var caixaList = Object.keys(allCaixaMovs)
+      .map(function(id){ return Object.assign({ id: id, origem: 'caixa' }, allCaixaMovs[id]); })
+      .filter(function(m){ return isDevolucaoDeposito(m) && !m.depositoOrigemId; });
+    var cofreList = Object.keys(allCofreMovs)
+      .map(function(id){ return Object.assign({ id: id, origem: 'cofre' }, allCofreMovs[id]); })
+      .filter(function(m){ return isDevolucaoDeposito(m) && !m.depositoOrigemId; });
+    return caixaList.concat(cofreList)
       .sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
   }
 
@@ -4404,8 +4461,30 @@ window.addEventListener('load', function () {
            ' − ' + formatEuro(dev) + ' devolvidos</span>';
   }
 
+  // Saldo cumulativo do cofre — informativo, não entra no total de
+  // pendentes nem no cartão de Depósitos (o dinheiro ainda não saiu para o
+  // banco). Ver CLAUDE.md, nó cofreMovimentos.
+  function renderCofreDashboard(){
+    var valorEl = document.getElementById('depCofreValor');
+    var subEl = document.getElementById('depCofreSub');
+    if (!valorEl || !subEl) return;
+    if (!cofreCarregada){ subEl.textContent = 'A carregar…'; return; }
+
+    var saldo = 0;
+    var ultimoIso = null;
+    Object.keys(allCofreMovs).forEach(function(id){
+      var m = allCofreMovs[id];
+      saldo += (m.tipo === 'entrada' ? 1 : -1) * (parseFloat(m.valor) || 0);
+      if (!ultimoIso || new Date(m.dataHora) > new Date(ultimoIso)) ultimoIso = m.dataHora;
+    });
+    saldo = Math.round(saldo * 100) / 100;
+
+    valorEl.textContent = formatEuro(saldo);
+    subEl.textContent = ultimoIso ? 'Último movimento: ' + formatDataCurta(ultimoIso) : 'Sem movimentos ainda.';
+  }
+
   function renderDepositosCard(){
-    if (!caixaCarregada) return;
+    if (!caixaCarregada || !cofreCarregada) return;
 
     var pendentes = depositosPendentes();
     var total = totalLiquido(pendentes);
@@ -4446,12 +4525,13 @@ window.addEventListener('load', function () {
       pendentesEl.innerHTML = '<p class="tes-empty">Sem levantamentos por depositar ✓</p>';
     } else {
       pendentesEl.innerHTML = '<table class="tes-table"><thead><tr>' +
-        '<th>Data</th><th>Pessoa</th><th style="text-align:right;">Valor</th><th></th>' +
+        '<th>Data</th><th>Pessoa</th><th>Origem</th><th style="text-align:right;">Valor</th><th></th>' +
         '</tr></thead><tbody>' +
         pendentes.map(function(m){
           return '<tr>' +
             '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
             '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
+            '<td>' + origemLabelHtml(m) + '</td>' +
             '<td class="num">' + formatEuro(liquidoDeposito(m)) + subLinhaDevolvido(m) + '</td>' +
             '<td><button type="button" class="btn-small btn-marcar-depositado" data-id="' +
               escapeHtml(m.id) + '">✓ Marcar como depositado</button> ' +
@@ -4460,7 +4540,7 @@ window.addEventListener('load', function () {
             '</tr>';
         }).join('') +
         '</tbody><tfoot><tr>' +
-        '<td colspan="2" class="mono"><strong>Total pendente</strong></td>' +
+        '<td colspan="3" class="mono"><strong>Total pendente</strong></td>' +
         '<td class="num">' + formatEuro(total) + '</td><td></td>' +
         '</tr></tfoot></table>';
     }
@@ -4470,12 +4550,13 @@ window.addEventListener('load', function () {
       historicoEl.innerHTML = '<p class="tes-empty">Ainda sem depósitos confirmados.</p>';
     } else {
       historicoEl.innerHTML = '<table class="tes-table"><thead><tr>' +
-        '<th>Levantamento</th><th>Pessoa</th><th style="text-align:right;">Valor</th><th>Depositado em</th>' +
+        '<th>Levantamento</th><th>Pessoa</th><th>Origem</th><th style="text-align:right;">Valor</th><th>Depositado em</th>' +
         '</tr></thead><tbody>' +
         historico.map(function(m){
           return '<tr>' +
             '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
             '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
+            '<td>' + origemLabelHtml(m) + '</td>' +
             '<td class="num">' + formatEuro(liquidoDeposito(m)) + subLinhaDevolvido(m) + '</td>' +
             '<td class="mono">' + (liquidoDeposito(m) <= 0.005
               ? 'Devolvido integralmente'
@@ -4503,6 +4584,7 @@ window.addEventListener('load', function () {
         '<span class="mono">' + formatDataCurta(m.dataHora) + '</span>' +
         '<span class="dep-alocar-valor">' + formatEuro(parseFloat(m.valor) || 0) + '</span>' +
         '<span>' + escapeHtml(m.pessoa || '—') + '</span>' +
+        origemLabelHtml(m) +
         (detalhe ? '<span class="dep-alocar-detalhe">' + escapeHtml(detalhe) + '</span>' : '') +
         '<span class="dep-alocar-acao"><button type="button" class="btn-small btn-alocar" data-id="' +
           escapeHtml(m.id) + '">Alocar a um levantamento</button></span>' +
@@ -4665,12 +4747,17 @@ window.addEventListener('load', function () {
   }
 
   function reconciliarDepositos(){
-    if (!caixaCarregada || !contaMovsCarregados || reconciliacaoAEscrever) return;
+    if (!caixaCarregada || !cofreCarregada || !contaMovsCarregados || reconciliacaoAEscrever) return;
 
     // Créditos já atribuídos noutra corrida — não podem servir outra vez.
+    // Um depósito pode ter origem em qualquer um dos dois nós.
     var usados = {};
     Object.keys(allCaixaMovs).forEach(function(id){
       var m = allCaixaMovs[id];
+      if (m && m.movimentoContaRef) usados[m.movimentoContaRef] = true;
+    });
+    Object.keys(allCofreMovs).forEach(function(id){
+      var m = allCofreMovs[id];
       if (m && m.movimentoContaRef) usados[m.movimentoContaRef] = true;
     });
 
@@ -4700,9 +4787,13 @@ window.addEventListener('load', function () {
   function escreverReconciliacoes(novos){
     reconciliacaoAEscrever = true;
     var agora = new Date().toISOString();
-    var updates = {};
+    // Cada movimento escreve no SEU nó — nunca assumir caixaRef, um
+    // levantamento pendente pode ter origem em cofreMovimentos.
+    var updatesCaixa = {};
+    var updatesCofre = {};
 
     novos.forEach(function(n){
+      var updates = (n.mov.origem === 'cofre') ? updatesCofre : updatesCaixa;
       updates[n.id + '/depositado'] = true;
       updates[n.id + '/reconciliadoAutomaticamente'] = true;
       updates[n.id + '/reconciliadoEm'] = agora;
@@ -4713,13 +4804,17 @@ window.addEventListener('load', function () {
       updates[n.id + '/depositadoEm'] = n.credito.dia + 'T12:00:00';
     });
 
-    caixaRef.update(updates).then(function(){
+    var escritas = [];
+    if (Object.keys(updatesCaixa).length) escritas.push(caixaRef.update(updatesCaixa));
+    if (Object.keys(updatesCofre).length) escritas.push(cofreRefDash.update(updatesCofre));
+
+    Promise.all(escritas).then(function(){
       reconciliacaoAEscrever = false;
       reconciliadosNestaSessao = reconciliadosNestaSessao.concat(novos);
       renderReconciliados();
-      // O listener de caixaRef reage à escrita e volta a chamar
-      // reconciliarDepositos(); estes já vão com depositado=true, por isso
-      // saem do conjunto de pendentes e não há segunda passagem.
+      // Os listeners de caixaRef/cofreRefDash reagem à escrita e voltam a
+      // chamar reconciliarDepositos(); estes já vão com depositado=true, por
+      // isso saem do conjunto de pendentes e não há segunda passagem.
     }).catch(function(err){
       reconciliacaoAEscrever = false;
       document.getElementById('depReconEstado').innerHTML =
@@ -4801,15 +4896,15 @@ window.addEventListener('load', function () {
     var btnDep = e.target.closest('.btn-marcar-depositado');
     if (btnDep){
       var idDep = btnDep.getAttribute('data-id');
-      var movDep = allCaixaMovs[idDep];
-      if (movDep) abrirModalMarcarDepositado(movDep, idDep);
+      var movDep = depositosPendentes().filter(function(m){ return m.id === idDep; })[0];
+      if (movDep) abrirModalMarcarDepositado(movDep);
       return;
     }
     var btnDev = e.target.closest('.btn-devolver-caixa');
     if (btnDev){
       var idDev = btnDev.getAttribute('data-id');
-      var movDev = allCaixaMovs[idDev];
-      if (movDev) abrirModalDevolucao(movDev, idDev);
+      var movDev = depositosPendentes().filter(function(m){ return m.id === idDev; })[0];
+      if (movDev) abrirModalDevolucao(movDev);
     }
   });
 
@@ -4817,31 +4912,33 @@ window.addEventListener('load', function () {
   // da página, não confirm() nativo.
   var depositadoModalOverlay = document.getElementById('depositadoModalOverlay');
   var depositadoContexto = document.getElementById('depositadoContexto');
-  var depositadoIdAtual = null;
+  var depositadoItemAtual = null;
 
-  function abrirModalMarcarDepositado(mov, id){
+  function abrirModalMarcarDepositado(mov){
     depositadoContexto.textContent =
       formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' + formatEuro(parseFloat(mov.valor) || 0);
-    depositadoIdAtual = id;
+    depositadoItemAtual = mov;
     depositadoModalOverlay.classList.add('open');
   }
 
   function fecharModalMarcarDepositado(){
     depositadoModalOverlay.classList.remove('open');
-    depositadoIdAtual = null;
+    depositadoItemAtual = null;
   }
 
   document.getElementById('depositadoSim').addEventListener('click', function(){
-    var id = depositadoIdAtual;
+    var item = depositadoItemAtual;
     fecharModalMarcarDepositado();
-    if (!id) return;
+    if (!item) return;
+    // Escreve sempre no nó de origem do movimento (caixa ou cofre).
+    var ref = refDoMovimento(item).child(item.id);
     // Duas escritas de chave única cada, nunca um update() multi-chave —
     // PATCHes multi-chave já corromperam registos noutros nós deste projeto.
-    caixaRef.child(id).child('depositado').set(true).catch(function(err){
+    ref.child('depositado').set(true).catch(function(err){
       alert('Erro ao marcar como depositado: ' + err.message);
     });
     setTimeout(function(){
-      caixaRef.child(id).child('depositadoEm').set(new Date().toISOString()).catch(function(err){
+      ref.child('depositadoEm').set(new Date().toISOString()).catch(function(err){
         alert('Erro ao gravar a data do depósito: ' + err.message);
       });
     }, 150);
@@ -4865,21 +4962,21 @@ window.addEventListener('load', function () {
   var alocarListaEl = document.getElementById('alocarLista');
   var alocarErroEl = document.getElementById('alocarErro');
   var alocarSimBtn = document.getElementById('alocarSim');
-  var alocarDevolucaoId = null;
+  var alocarDevolucaoItem = null;
   var alocarEscolhidoId = null;
 
   document.getElementById('depPorAlocarLista').addEventListener('click', function(e){
     var btn = e.target.closest('.btn-alocar');
     if (!btn) return;
     var id = btn.getAttribute('data-id');
-    if (allCaixaMovs[id]) abrirModalAlocar(id);
+    var dev = devolucoesPorAlocar().filter(function(m){ return m.id === id; })[0];
+    if (dev) abrirModalAlocar(dev);
   });
 
-  function abrirModalAlocar(id){
+  function abrirModalAlocar(dev){
     alocarModalOverlay.classList.add('open');
-    var dev = allCaixaMovs[id];
     var valor = parseFloat(dev.valor) || 0;
-    alocarDevolucaoId = id;
+    alocarDevolucaoItem = dev;
     alocarEscolhidoId = null;
     alocarErroEl.textContent = '';
     alocarSimBtn.disabled = true;
@@ -4928,20 +5025,19 @@ window.addEventListener('load', function () {
 
   function fecharModalAlocar(){
     alocarModalOverlay.classList.remove('open');
-    alocarDevolucaoId = null;
+    alocarDevolucaoItem = null;
     alocarEscolhidoId = null;
   }
 
   alocarSimBtn.addEventListener('click', function(){
-    var devId = alocarDevolucaoId;
+    var dev = alocarDevolucaoItem;
     var levId = alocarEscolhidoId;
-    if (!devId || !levId) return;
-    var dev = allCaixaMovs[devId];
-    var lev = allCaixaMovs[levId];
-    if (!dev || !lev) return;
+    if (!dev || !levId) return;
+    var lev = depositosPendentes().filter(function(m){ return m.id === levId; })[0];
+    if (!lev) return;
 
     var valor = parseFloat(dev.valor) || 0;
-    var liquido = liquidoDeposito(Object.assign({ id: levId }, lev));
+    var liquido = liquidoDeposito(lev);
     // Revalidação no momento do clique: outra sessão pode ter alocado
     // entretanto e o líquido já não chegar.
     if (valor > liquido + 0.0001){
@@ -4958,7 +5054,7 @@ window.addEventListener('load', function () {
 
     var devolvidoAnterior = parseFloat(lev.devolvidoDeposito) || 0;
     var upLev = { devolvidoDeposito: Math.round((devolvidoAnterior + valor) * 100) / 100 };
-    upLev['devolucoes/' + devId] = {
+    upLev['devolucoes/' + dev.id] = {
       valor: valor,
       dataHora: dev.dataHora,
       pessoa: dev.pessoa,
@@ -4968,9 +5064,11 @@ window.addEventListener('load', function () {
     alocarSimBtn.disabled = true;
     alocarSimBtn.textContent = 'A alocar…';
 
-    caixaRef.child(devId).update({ depositoOrigemId: levId, alocadoEm: new Date().toISOString() })
+    // A devolução e o levantamento podem viver em nós diferentes — cada
+    // escrita usa o ref do seu próprio nó (refDoMovimento).
+    refDoMovimento(dev).child(dev.id).update({ depositoOrigemId: levId, alocadoEm: new Date().toISOString() })
       .then(function(){
-        return caixaRef.child(levId).update(upLev);
+        return refDoMovimento(lev).child(levId).update(upLev);
       })
       .then(function(){
         fecharModalAlocar();
@@ -5001,11 +5099,11 @@ window.addEventListener('load', function () {
   var devolucaoValorInput = document.getElementById('devolucaoValor');
   var devolucaoErroEl = document.getElementById('devolucaoErro');
   var devolucaoSimBtn = document.getElementById('devolucaoSim');
-  var devolucaoIdAtual = null;
+  var devolucaoItemAtual = null;
   var devolucaoMaximo = 0;
 
-  function abrirModalDevolucao(mov, id){
-    devolucaoIdAtual = id;
+  function abrirModalDevolucao(mov){
+    devolucaoItemAtual = mov;
     devolucaoMaximo = liquidoDeposito(mov);
     devolucaoContexto.textContent =
       formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' +
@@ -5021,7 +5119,7 @@ window.addEventListener('load', function () {
 
   function fecharModalDevolucao(){
     devolucaoModalOverlay.classList.remove('open');
-    devolucaoIdAtual = null;
+    devolucaoItemAtual = null;
   }
 
   function validarDevolucao(){
@@ -5044,10 +5142,10 @@ window.addEventListener('load', function () {
   devolucaoValorInput.addEventListener('input', validarDevolucao);
 
   devolucaoSimBtn.addEventListener('click', function(){
-    var id = devolucaoIdAtual;
+    var mov = devolucaoItemAtual;
     var valor = validarDevolucao();
-    var mov = id ? allCaixaMovs[id] : null;
-    if (!id || valor === null || !mov) return;
+    if (!mov || valor === null) return;
+    var id = mov.id;
 
     var agora = new Date().toISOString();
     var devolvidoAnterior = parseFloat(mov.devolvidoDeposito) || 0;
@@ -5069,6 +5167,9 @@ window.addEventListener('load', function () {
     devolucaoSimBtn.disabled = true;
     devolucaoSimBtn.textContent = 'A devolver…';
 
+    // "Devolver à caixa" — a entrada é sempre na caixa física, mesmo quando
+    // o levantamento de origem é do cofre; o levantamento acumula no SEU
+    // próprio nó (refDoMovimento).
     var pushRef = caixaRef.push(entrada);
     pushRef.then(function(){
       var upd = { devolvidoDeposito: Math.round((devolvidoAnterior + valor) * 100) / 100 };
@@ -5080,7 +5181,7 @@ window.addEventListener('load', function () {
       };
       // A entrada já ficou gravada — se este update falhar, avisa-se e fica
       // assim; apagá-la seria pior do que a soma ficar por atualizar.
-      return caixaRef.child(id).update(upd);
+      return refDoMovimento(mov).child(id).update(upd);
     }).then(function(){
       fecharModalDevolucao();
     }).catch(function(err){
@@ -5133,6 +5234,7 @@ window.addEventListener('load', function () {
     suppliers: 400,
     paymentRequests: 500,
     caixaMovimentos: 200,
+    cofreMovimentos: 200,
     lojaChecklistRegistos: 700,
     lojaTemperaturas: 220,
     lojaTemperaturasFotos: 8000,

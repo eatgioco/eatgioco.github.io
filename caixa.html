@@ -809,6 +809,33 @@
       <div class="empty-state">A carregar movimentos…</div>
     </div>
   </div>
+
+  <!-- COFRE: segundo local de dinheiro físico. Saldo cumulativo (nunca só do
+       dia), movimentos dos últimos 30 dias e retirada in-page. -->
+  <div class="listing-section">
+    <p class="section-title">Cofre</p>
+    <div class="summary-row">
+      <div class="summary-card">
+        <p class="summary-label">Saldo do cofre</p>
+        <p class="summary-value" id="cofreSaldoValue">0,00 €</p>
+      </div>
+    </div>
+
+    <div class="tool-grid">
+      <div class="form-card">
+        <p class="form-title">Retirar do cofre</p>
+        <button type="button" class="btn-acertar" id="btnAbrirRetirarCofre" style="margin-top:0;" onclick="toggleRetirarCofre()">↩ Retirar do cofre</button>
+        <div id="retirarCofreFormWrap"></div>
+      </div>
+
+      <div class="pending-col">
+        <p class="section-title">Movimentos do cofre (30 dias) <span class="count zero" id="cofreCountBadge">0</span></p>
+        <div class="pending-list" id="cofreList">
+          <div class="pending-empty">A carregar…</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 
     </div>
@@ -892,6 +919,7 @@
   autenticarEContinuar(function () {
   var db = firebase.database();
   var movRef = db.ref('caixaMovimentos');
+  var cofreRef = db.ref('cofreMovimentos');
   var pessoasRef = db.ref('pessoas');
   // Só leitura: serve para o findMatchingSupplier da fatura lida no Devolver Troco.
   var suppliersRef = db.ref('suppliers');
@@ -948,6 +976,7 @@
       { value: 'compra', label: 'Compra', detailLabel: 'O quê?', detailPlaceholder: 'ex: rúcula Pingo Doce', pergTroco: true },
       { value: 'pagamento', label: 'Pagamento a fornecedor', detailLabel: 'A quem?', detailPlaceholder: 'ex: fornecedor café', pergTroco: true },
       { value: 'deposito', label: 'Depósito bancário', semAcerto: true },
+      { value: 'cofre', label: 'Transferência para o cofre', semAcerto: true },
       { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo', semAcerto: true }
     ],
     entrada: [
@@ -1190,7 +1219,29 @@
     registarBtn.disabled = true;
     registarBtn.textContent = 'A registar…';
 
-    movRef.push(novoMov).then(function(){
+    // Transferência para o cofre: a saída na caixa é como qualquer outra;
+    // a seguir grava-se a entrada par no cofre com o mesmo transferenciaId
+    // (o id devolvido por este push). Se o segundo push falhar, a saída da
+    // caixa já ficou gravada — avisa-se e não se tenta desfazer nada.
+    movRef.push(novoMov).then(function(pushRef){
+      if (opcao.value !== 'cofre') return;
+      var novoId = pushRef.key;
+      var entradaCofre = {
+        dataHora: novoMov.dataHora,
+        tipo: 'entrada',
+        valor: valor,
+        motivo: 'Entrada da caixa',
+        pessoa: pessoaSelecao.pessoaNome,
+        pessoaId: pessoaSelecao.pessoaId,
+        transferenciaId: novoId,
+        notas: null
+      };
+      return cofreRef.push(entradaCofre).then(function(){
+        return movRef.child(novoId).update({ transferenciaId: novoId });
+      }).catch(function(err){
+        alert('A saída da caixa já ficou gravada, mas a entrada no cofre falhou: ' + err.message);
+      });
+    }).then(function(){
       valorInput.value = '';
       selectTipo(null);
       tipoSaidaBtn.classList.remove('active');
@@ -1700,6 +1751,251 @@
 
   carregarPessoas(function(){
     popularSelectPessoas(pessoaSelect);
+    renderCofre();
+  });
+
+  // ---------- Cofre ----------
+  // Segundo local de dinheiro físico. Saldo CUMULATIVO desde sempre (ao
+  // contrário do saldo do dia da caixa). depositado/depositadoEm/
+  // movimentoContaRef são exclusivos do mrn-dashboard — nunca lidos aqui.
+  var allCofreMovs = {};
+  var retirarCofre = null;
+
+  var RETIRAR_MOTIVO_OPTIONS = [
+    { value: 'deposito', label: 'Depósito bancário' },
+    { value: 'devolverCaixa', label: 'Devolver à caixa' },
+    { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
+  ];
+
+  function saldoCofre(){
+    var saldo = 0;
+    Object.keys(allCofreMovs).forEach(function(id){
+      var m = allCofreMovs[id];
+      saldo += (m.tipo === 'entrada' ? 1 : -1) * (parseFloat(m.valor) || 0);
+    });
+    return round2(saldo);
+  }
+
+  function pessoasOptionsHtml(selectedId){
+    var html = '';
+    pessoasAtivas.forEach(function(p){
+      html += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro"' + (selectedId === 'outro' ? ' selected' : '') + '>Outro</option>';
+    return html;
+  }
+
+  function novoRetirarCofreState(){
+    var def = pessoasAtivas.length ? pessoasAtivas[0].id : 'outro';
+    return { valor: '', motivo: 'deposito', detalhe: '', pessoaId: def, aGuardar: false };
+  }
+
+  function toggleRetirarCofre(){
+    retirarCofre = retirarCofre ? null : novoRetirarCofreState();
+    renderCofre();
+  }
+  window.toggleRetirarCofre = toggleRetirarCofre;
+
+  function podeRetirarCofre(st, saldo){
+    if (st.aGuardar) return false;
+    var valor = parseFloat(st.valor);
+    if (isNaN(valor) || valor <= 0) return false;
+    if (valor > saldo + 1e-9) return false;
+    var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
+    if (opcao && opcao.detailLabel && !st.detalhe.trim()) return false;
+    return true;
+  }
+
+  function setRetirarMotivo(v){
+    if (!retirarCofre) return;
+    retirarCofre.motivo = v;
+    retirarCofre.detalhe = '';
+    renderCofre();
+  }
+  window.setRetirarMotivo = setRetirarMotivo;
+
+  function onRetirarDetalheInput(input){
+    if (!retirarCofre) return;
+    retirarCofre.detalhe = input.value;
+    atualizarRetirarCofre();
+  }
+  window.onRetirarDetalheInput = onRetirarDetalheInput;
+
+  function onRetirarValorInput(input){
+    if (!retirarCofre) return;
+    retirarCofre.valor = input.value;
+    atualizarRetirarCofre();
+  }
+  window.onRetirarValorInput = onRetirarValorInput;
+
+  function onRetirarPessoaChange(select){
+    if (retirarCofre) retirarCofre.pessoaId = select.value;
+  }
+  window.onRetirarPessoaChange = onRetirarPessoaChange;
+
+  function atualizarRetirarCofre(){
+    if (!retirarCofre) return;
+    var saldo = saldoCofre();
+    var valor = parseFloat(retirarCofre.valor);
+    var excede = !isNaN(valor) && valor > saldo + 1e-9;
+    var msgEl = document.getElementById('retirarMaxMsg');
+    if (msgEl) msgEl.innerHTML = excede ? 'Máximo: ' + formatEUR(saldo) : '';
+    var btn = document.getElementById('btnConfirmarRetirarCofre');
+    if (btn) btn.disabled = !podeRetirarCofre(retirarCofre, saldo);
+  }
+
+  function retirarCofreFormHtml(saldo){
+    var st = retirarCofre;
+    var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
+    var valor = parseFloat(st.valor);
+    var excede = !isNaN(valor) && valor > saldo + 1e-9;
+
+    var html = '<div class="acertar-form">';
+    html += '<div class="tipo-toggle" style="grid-template-columns:repeat(3,1fr);">';
+    RETIRAR_MOTIVO_OPTIONS.forEach(function(o){
+      html += '<button type="button" class="tipo-btn troco' + (st.motivo === o.value ? ' active' : '') + '" onclick="setRetirarMotivo(\'' + o.value + '\')">' + escapeHtml(o.label) + '</button>';
+    });
+    html += '</div>';
+
+    if (opcao && opcao.detailLabel){
+      html += '<div class="field"><label class="field-label">' + escapeHtml(opcao.detailLabel) + '</label>';
+      html += '<input type="text" value="' + escapeHtml(st.detalhe) + '" placeholder="' + escapeHtml(opcao.detailPlaceholder || '') + '" oninput="onRetirarDetalheInput(this)"></div>';
+    }
+
+    html += '<div class="field"><label class="field-label">Valor (€)</label>';
+    html += '<input type="number" inputmode="decimal" step="0.01" min="0" value="' + escapeHtml(st.valor) + '" oninput="onRetirarValorInput(this)"></div>';
+
+    html += '<div class="field"><label class="field-label">Pessoa</label>';
+    html += '<select id="retirarPessoaSelect" onchange="onRetirarPessoaChange(this)">' + pessoasOptionsHtml(st.pessoaId) + '</select></div>';
+
+    html += '<p class="confere-line troco-ko" id="retirarMaxMsg">' + (excede ? 'Máximo: ' + formatEUR(saldo) : '') + '</p>';
+
+    html += '<div class="acertar-actions">';
+    html += '<button type="button" class="btn-cancelar" onclick="toggleRetirarCofre()">Cancelar</button>';
+    html += '<button type="button" class="btn-guardar" id="btnConfirmarRetirarCofre" onclick="confirmarRetirarCofre()"' + (podeRetirarCofre(st, saldo) ? '' : ' disabled') + '>' + (st.aGuardar ? 'A retirar…' : 'Confirmar') + '</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function confirmarRetirarCofre(){
+    var st = retirarCofre;
+    var saldo = saldoCofre();
+    if (!st || !podeRetirarCofre(st, saldo)) return;
+
+    var valor = round2(parseFloat(st.valor));
+    var pessoaSel = document.getElementById('retirarPessoaSelect');
+    var pessoaVal = pessoaSel ? pessoaSel.value : st.pessoaId;
+    var found = pessoasAtivas.filter(function(p){ return p.id === pessoaVal; })[0];
+    var pessoaNome = found ? found.nome : 'Outro';
+    var pessoaId = found ? found.id : null;
+    var agora = new Date().toISOString();
+
+    st.aGuardar = true;
+    renderCofre();
+
+    function falhar(err){
+      st.aGuardar = false;
+      renderCofre();
+      alert('Erro ao retirar do cofre: ' + (err && err.message ? err.message : String(err)));
+    }
+
+    if (st.motivo === 'devolverCaixa'){
+      // Duas escritas com o mesmo transferenciaId — o id devolvido pelo
+      // primeiro push (a saída do cofre).
+      var saidaCofre = {
+        dataHora: agora, tipo: 'saida', valor: valor,
+        motivo: 'Devolução para a caixa', pessoa: pessoaNome, pessoaId: pessoaId,
+        transferenciaId: null, notas: null
+      };
+      cofreRef.push(saidaCofre).then(function(pushRef){
+        var novoId = pushRef.key;
+        var entradaCaixa = {
+          dataHora: agora, tipo: 'entrada', valor: valor,
+          motivo: 'Entrada do cofre', pessoa: pessoaNome, pessoaId: pessoaId,
+          estado: 'acertado', valorDevolvido: 0, notas: null,
+          transferenciaId: novoId
+        };
+        return movRef.push(entradaCaixa).then(function(){
+          return cofreRef.child(novoId).update({ transferenciaId: novoId });
+        });
+      }).then(function(){
+        retirarCofre = null;
+        renderCofre();
+      }).catch(falhar);
+    } else {
+      var motivoTxt = (st.motivo === 'deposito') ? 'Depósito bancário' : ('Outro: ' + st.detalhe.trim());
+      var saida = {
+        dataHora: agora, tipo: 'saida', valor: valor,
+        motivo: motivoTxt, pessoa: pessoaNome, pessoaId: pessoaId,
+        transferenciaId: null, notas: null
+      };
+      cofreRef.push(saida).then(function(){
+        retirarCofre = null;
+        renderCofre();
+      }).catch(falhar);
+    }
+  }
+  window.confirmarRetirarCofre = confirmarRetirarCofre;
+
+  // Cartão minimalista de propósito: sem lógica de troco/fatura e sem NUNCA
+  // ler/mostrar depositado, depositadoEm ou movimentoContaRef (Restrição A5).
+  function cofreCardHtml(m){
+    var tipoLabel = m.tipo === 'saida' ? 'SAÍDA' : 'ENTRADA';
+    var sinal = m.tipo === 'saida' ? '−' : '+';
+    var html = '<div class="mov-row">';
+    html += '  <div class="mov-top">';
+    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + formatDataHora(m.dataHora) + '</span></div>';
+    html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
+    html += '  </div>';
+    html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
+    html += '  <div class="mov-meta"><span class="mov-pessoa">' + escapeHtml(m.pessoa) + '</span></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderCofre(){
+    var saldo = saldoCofre();
+    var saldoEl = document.getElementById('cofreSaldoValue');
+    if (saldoEl) saldoEl.textContent = formatEUR(saldo);
+
+    var wrap = document.getElementById('retirarCofreFormWrap');
+    var btn = document.getElementById('btnAbrirRetirarCofre');
+    if (wrap && btn){
+      if (retirarCofre){
+        btn.style.display = 'none';
+        wrap.innerHTML = retirarCofreFormHtml(saldo);
+      } else {
+        btn.style.display = '';
+        wrap.innerHTML = '';
+      }
+    }
+
+    var now = Date.now();
+    var ids = Object.keys(allCofreMovs).filter(function(id){
+      var t = new Date(allCofreMovs[id].dataHora).getTime();
+      return !isNaN(t) && (now - t) <= 30 * 24 * 60 * 60 * 1000;
+    });
+    ids.sort(function(a, b){ return new Date(allCofreMovs[b].dataHora) - new Date(allCofreMovs[a].dataHora); });
+
+    var countEl = document.getElementById('cofreCountBadge');
+    if (countEl){
+      countEl.textContent = ids.length;
+      countEl.classList.toggle('zero', ids.length === 0);
+    }
+
+    var listEl = document.getElementById('cofreList');
+    if (!listEl) return;
+    if (ids.length === 0){
+      listEl.innerHTML = '<div class="pending-empty">Sem movimentos nos últimos 30 dias</div>';
+      return;
+    }
+    listEl.innerHTML = ids.map(function(id){ return cofreCardHtml(allCofreMovs[id]); }).join('');
+  }
+
+  cofreRef.on('value', function(snapshot){
+    allCofreMovs = snapshot.val() || {};
+    renderCofre();
   });
   }); // fim de autenticarEContinuar
 </script>
