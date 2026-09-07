@@ -168,6 +168,158 @@
     font-weight:400;
   }
 
+  /* ---------- Cartão Posição Financeira ----------
+     Junta o que já vive noutros cartões (contas, por depositar, cofre) e a
+     caixa (gioco-caixa.js). Só leitura; não navega — mesma regra dos
+     cartões inertes. */
+  .card-pf{ cursor:default; }
+  .card-pf:hover{
+    transform:none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.03), 0 6px 20px rgba(20,20,20,0.045);
+  }
+  [data-theme="dark"] .card-pf:hover{
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 20px rgba(0,0,0,0.22);
+  }
+
+  .pf-linhas{
+    margin-top:12px;
+    border-top:1px solid var(--line);
+  }
+
+  .pf-linha{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+    color:var(--ink);
+  }
+
+  .pf-linha:last-child{ border-bottom:none; }
+
+  .pf-linha-sub{
+    padding:3px 0 3px 14px;
+    border-bottom:none;
+  }
+
+  .pf-linha-sub + .pf-linha:not(.pf-linha-sub){ border-top:1px solid var(--line); }
+
+  .pf-linha-sub .pf-nome{
+    font-weight:500;
+    text-transform:none;
+    letter-spacing:0;
+    font-size:11.5px;
+  }
+
+  .pf-linha-sub .pf-valor{ font-weight:500; }
+
+  .pf-nome{
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .pf-nota{
+    display:block;
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    font-weight:400;
+    letter-spacing:0;
+    text-transform:none;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .pf-valor{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  /* Linha sem dados: apagada, sem número — nunca um zero inventado. */
+  .pf-linha.sem-dados .pf-nome,
+  .pf-linha.sem-dados .pf-valor{
+    color:var(--muted);
+    font-weight:400;
+  }
+
+  /* A caixa fica à parte: inclui o fundo de maneio, não é dinheiro para
+     gastar. Bloco com fundo próprio e o switch "Incluir caixa no total". */
+  .pf-caixa{
+    margin-top:12px;
+    padding:10px 12px;
+    border-radius:10px;
+    background:var(--dough);
+    border:1px solid var(--line);
+  }
+
+  .pf-caixa .pf-linha{ padding:0; border-bottom:none; }
+
+  .pf-caixa-aviso{
+    margin:6px 0 0;
+    font-family:'Inter', sans-serif;
+    font-size:10.5px;
+    color:var(--muted);
+    line-height:1.35;
+  }
+
+  .pf-switch-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px solid var(--line);
+    font-family:'Inter', sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+
+  .pf-switch-row label{ cursor:pointer; }
+
+  /* Switch pequeno com tokens do shell. <button role="switch">: sem color
+     explícita o <button> herdava o preto do browser no tema escuro. */
+  .pf-switch{
+    flex:0 0 auto;
+    width:36px;
+    height:20px;
+    padding:0;
+    border-radius:100px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+    position:relative;
+    transition:background .2s ease, border-color .2s ease;
+  }
+
+  .pf-switch::after{
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--muted);
+    transition:transform .2s cubic-bezier(.4,0,.2,1), background .2s ease;
+  }
+
+  .pf-switch[aria-checked="true"]{
+    background:var(--red);
+    border-color:var(--red);
+  }
+
+  .pf-switch[aria-checked="true"]::after{
+    transform:translateX(16px);
+    background:var(--on-red);
+  }
+
+  .pf-switch:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
+
   .grid-active{
     display:grid;
     grid-template-columns:2fr 1fr;
@@ -1909,6 +2061,7 @@
 <body>
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-caixa.js"></script>
 <script src="gioco-eventos.js"></script>
 
 <div class="shell">
@@ -2011,6 +2164,30 @@
       <p class="card-subtitle" id="cardContasSub">A carregar…</p>
       <div class="contas-lista" id="cardContasLista"></div>
       <p class="pay-card-hint" id="cardContasHint" style="display:none;">→ Ver movimentos</p>
+    </div>
+
+    <!-- Posição Financeira: consolida TODO o dinheiro — contas (contasBancarias/),
+         por depositar (caixaMovimentos + cofreMovimentos, a mesma lista do cartão
+         de Depósitos), cofre (saldo cumulativo) e, à parte, a caixa
+         (caixaContagens + caixaMovimentos via gioco-caixa.js). Só leitura;
+         cada valor que não exista fica "sem dados", nunca zero. -->
+    <div class="card glass-light card-compact card-pf" id="cardPosicao">
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-wallet"/></svg></div>
+      <h3 class="card-title">Posição Financeira</h3>
+      <div class="contas-total" id="pfTotal">—</div>
+      <p class="card-subtitle" id="pfSub">A carregar…</p>
+      <div class="pf-linhas" id="pfLinhas"></div>
+      <div class="pf-caixa">
+        <div class="pf-linha" id="pfLinhaCaixa">
+          <span class="pf-nome">Caixa<span class="pf-nota" id="pfCaixaNota">A carregar…</span></span>
+          <span class="pf-valor" id="pfCaixaValor">—</span>
+        </div>
+        <p class="pf-caixa-aviso">Inclui fundo de maneio — não é dinheiro disponível para gastar.</p>
+        <div class="pf-switch-row">
+          <label for="pfSwitchCaixa">Incluir caixa no total</label>
+          <button type="button" class="pf-switch" id="pfSwitchCaixa" role="switch" aria-checked="false" aria-label="Incluir caixa no total"></button>
+        </div>
+      </div>
     </div>
 
     <!-- Centro de Controlo: cartão de ESTADO, só leitura. Espelha
@@ -3848,6 +4025,9 @@ window.addEventListener('load', function () {
   // Refs extra, carregadas só para alimentar notificações (sem UI própria
   // no dashboard, que já vive em caixa.html / loja-sao-bento.html / equipa.html).
   var caixaRef = db.ref('caixaMovimentos');
+  // Contagens físicas da caixa — só leitura, para o saldo vivo do cartão
+  // Posição Financeira (fórmula em gioco-caixa.js, a mesma da caixa.html).
+  var contagensCaixaRef = db.ref('caixaContagens');
   // Segundo local de dinheiro físico. Um depósito bancário pode ter origem
   // em qualquer um dos dois nós — ver refDoMovimento() mais abaixo.
   var cofreRefDash = db.ref('cofreMovimentos');
@@ -3865,6 +4045,7 @@ window.addEventListener('load', function () {
 
   var allCaixaMovs = {};
   var allCofreMovs = {};
+  var allCaixaContagens = {};
   var allContas = {};        // contasBancarias/ inteiro, tal como está no RTDB
   var contaSaldo = null;     // saldo da conta usada na reconciliação
   var allContaMovs = {};     // movimentos dessa mesma conta
@@ -3875,6 +4056,7 @@ window.addEventListener('load', function () {
 
   var caixaCarregada = false;
   var cofreCarregada = false;
+  var contagensCaixaCarregadas = false;
   var contasCarregadas = false;
   var contaMovsCarregados = false;
   var tempsCarregadas = false;
@@ -4296,6 +4478,7 @@ window.addEventListener('load', function () {
     caixaCarregada = true;
     agendarNotificacoes();
     renderDepositosCard();
+    renderPosicaoFinanceira();
     reconciliarDepositos();
   });
 
@@ -4304,7 +4487,16 @@ window.addEventListener('load', function () {
     cofreCarregada = true;
     renderCofreDashboard();
     renderDepositosCard();
+    renderPosicaoFinanceira();
     reconciliarDepositos();
+  });
+
+  // O nó pode não existir ainda: val() null é estado válido (sem contagem),
+  // não erro — o cartão mostra "Sem contagem registada".
+  contagensCaixaRef.on('value', function(snapshot){
+    allCaixaContagens = snapshot.val() || {};
+    contagensCaixaCarregadas = true;
+    renderPosicaoFinanceira();
   });
 
   contasRef.on('value', function(snapshot){
@@ -4320,6 +4512,7 @@ window.addEventListener('load', function () {
 
     renderSaldoBanco();
     renderCartaoContas();
+    renderPosicaoFinanceira();
     // Corre a cada carregamento da página, assim que as duas pontas
     // (caixa + banco) estiverem disponíveis — a ordem de chegada não importa.
     reconciliarDepositos();
@@ -4461,23 +4654,25 @@ window.addEventListener('load', function () {
            ' − ' + formatEuro(dev) + ' devolvidos</span>';
   }
 
-  // Saldo cumulativo do cofre — informativo, não entra no total de
-  // pendentes nem no cartão de Depósitos (o dinheiro ainda não saiu para o
-  // banco). Ver CLAUDE.md, nó cofreMovimentos.
+  // Saldo cumulativo do cofre (gioco-caixa.js) — informativo, não entra no
+  // total de pendentes nem no cartão de Depósitos (o dinheiro ainda não saiu
+  // para o banco). Ver CLAUDE.md, nó cofreMovimentos.
+  function saldoCofreDashboard(){
+    return GiocoCaixa.saldoCofre(allCofreMovs);
+  }
+
   function renderCofreDashboard(){
     var valorEl = document.getElementById('depCofreValor');
     var subEl = document.getElementById('depCofreSub');
     if (!valorEl || !subEl) return;
     if (!cofreCarregada){ subEl.textContent = 'A carregar…'; return; }
 
-    var saldo = 0;
+    var saldo = saldoCofreDashboard();
     var ultimoIso = null;
     Object.keys(allCofreMovs).forEach(function(id){
       var m = allCofreMovs[id];
-      saldo += (m.tipo === 'entrada' ? 1 : -1) * (parseFloat(m.valor) || 0);
       if (!ultimoIso || new Date(m.dataHora) > new Date(ultimoIso)) ultimoIso = m.dataHora;
     });
-    saldo = Math.round(saldo * 100) / 100;
 
     valorEl.textContent = formatEuro(saldo);
     subEl.textContent = ultimoIso ? 'Último movimento: ' + formatDataCurta(ultimoIso) : 'Sem movimentos ainda.';
@@ -4625,14 +4820,13 @@ window.addEventListener('load', function () {
     return formatDataCurta(iso) + ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
-  function renderCartaoContas(){
-    var totalEl = document.getElementById('cardContasTotal');
-    var subEl = document.getElementById('cardContasSub');
-    var listaEl = document.getElementById('cardContasLista');
-
-    if (!contasCarregadas){ subEl.textContent = 'A carregar…'; return; }
-
-    // Contas presentes no nó + as conhecidas que ainda lá não estão.
+  /* Resumo puro das contas, partilhado pelo cartão Contas Bancárias e pelo
+     cartão Posição Financeira — uma só leitura de allContas, uma só regra:
+     contas presentes no nó + as conhecidas que ainda lá não estão; só se
+     somam euros (misturar moedas num único total seria mentira).
+     → { contas:[{slug, nome, ligada, valor, currency, atualizadoEm}],
+         total, ligadas, moedaEstranha } */
+  function resumoContas(){
     var slugs = Object.keys(allContas);
     Object.keys(CONTAS_LABEL).forEach(function(s){
       if (slugs.indexOf(s) === -1) slugs.push(s);
@@ -4640,36 +4834,53 @@ window.addEventListener('load', function () {
     slugs.sort();
 
     var total = 0, ligadas = 0, moedaEstranha = false;
-    primeiraContaLigada = null;
-
-    listaEl.innerHTML = slugs.map(function(slug){
+    var contas = slugs.map(function(slug){
       var saldo = (allContas[slug] || {}).saldo;
       var valor = saldo ? parseFloat(saldo.amount) : NaN;
-
       if (!saldo || isNaN(valor)){
+        return { slug: slug, nome: nomeConta(slug), ligada: false, valor: null, currency: null, atualizadoEm: null };
+      }
+      ligadas++;
+      if (!saldo.currency || saldo.currency === 'EUR') total += valor;
+      else moedaEstranha = true;
+      return { slug: slug, nome: nomeConta(slug), ligada: true, valor: valor,
+               currency: saldo.currency || 'EUR', atualizadoEm: saldo.atualizadoEm || null };
+    });
+    return { contas: contas, total: Math.round(total * 100) / 100, ligadas: ligadas, moedaEstranha: moedaEstranha };
+  }
+
+  function renderCartaoContas(){
+    var totalEl = document.getElementById('cardContasTotal');
+    var subEl = document.getElementById('cardContasSub');
+    var listaEl = document.getElementById('cardContasLista');
+
+    if (!contasCarregadas){ subEl.textContent = 'A carregar…'; return; }
+
+    var resumo = resumoContas();
+    primeiraContaLigada = null;
+
+    listaEl.innerHTML = resumo.contas.map(function(c){
+      if (!c.ligada){
         return '<div class="conta-linha conta-linha-off">' +
-          '<span class="conta-nome">' + escapeHtml(nomeConta(slug)) +
+          '<span class="conta-nome">' + escapeHtml(c.nome) +
             '<span class="conta-sync">Não ligado</span></span>' +
           '<span class="conta-saldo">—</span></div>';
       }
 
-      ligadas++;
-      if (!primeiraContaLigada) primeiraContaLigada = slug;
-      // Só somamos euros: misturar moedas num único total seria mentira.
-      if (!saldo.currency || saldo.currency === 'EUR') total += valor;
-      else moedaEstranha = true;
+      if (!primeiraContaLigada) primeiraContaLigada = c.slug;
 
-      var quando = tempoRelativo(saldo.atualizadoEm);
+      var quando = tempoRelativo(c.atualizadoEm);
       return '<a class="conta-linha" href="conta-bancaria.html?conta=' +
-          encodeURIComponent(slug) + '" title="Última sincronização: ' +
-          escapeHtml(dataHoraCompleta(saldo.atualizadoEm)) + '">' +
-        '<span class="conta-nome">' + escapeHtml(nomeConta(slug)) +
+          encodeURIComponent(c.slug) + '" title="Última sincronização: ' +
+          escapeHtml(dataHoraCompleta(c.atualizadoEm)) + '">' +
+        '<span class="conta-nome">' + escapeHtml(c.nome) +
           '<span class="conta-sync">' +
             (quando ? 'atualizado ' + escapeHtml(quando) : 'sincronização desconhecida') +
           '</span></span>' +
-        '<span class="conta-saldo">' + formatEuro(valor) + '</span></a>';
+        '<span class="conta-saldo">' + formatEuro(c.valor) + '</span></a>';
     }).join('');
 
+    var ligadas = resumo.ligadas;
     var cartaoEl = document.getElementById('cardContas');
     cartaoEl.classList.toggle('card-contas-inerte', ligadas === 0);
     document.getElementById('cardContasHint').style.display = ligadas ? 'block' : 'none';
@@ -4679,10 +4890,144 @@ window.addEventListener('load', function () {
       subEl.textContent = 'Nenhuma conta ligada ainda.';
       return;
     }
-    totalEl.textContent = formatEuro(total);
+    totalEl.textContent = formatEuro(resumo.total);
     subEl.textContent = ligadas + (ligadas === 1 ? ' conta ligada' : ' contas ligadas') +
-      (moedaEstranha ? ' · outras moedas não somadas' : '');
+      (resumo.moedaEstranha ? ' · outras moedas não somadas' : '');
   }
+
+  /* ---------- Cartão Posição Financeira ----------
+     Total disponível = contas (EUR, sincronização recente) + por depositar
+     (líquido pendente dos DOIS nós, a mesma lista do cartão de Depósitos)
+     + cofre. A caixa fica fora por omissão (inclui o fundo de maneio); o
+     switch soma-a ao total sem a misturar nas linhas de cima. Cada parcela
+     sem dados fica assinalada e FORA da soma — nunca vale 0; o subtítulo
+     diz o que falta. Nada aqui escreve no Firebase. */
+  var pfIncluirCaixa = false;
+
+  // Uma conta bancária conta como "sem dados" quando não está ligada, não é
+  // EUR, ou a última sincronização do eb_sync.py tem mais de 48 h.
+  var PF_SYNC_MAX_MS = 48 * 60 * 60 * 1000;
+
+  function pfContaDesatualizada(c){
+    if (!c.atualizadoEm) return true;
+    var t = new Date(c.atualizadoEm).getTime();
+    return isNaN(t) || (Date.now() - t) > PF_SYNC_MAX_MS;
+  }
+
+  function pfContaValida(c){
+    return c.ligada && c.currency === 'EUR' && !pfContaDesatualizada(c);
+  }
+
+  function pfLinhaHtml(nome, valor, nota, opts){
+    opts = opts || {};
+    var semDados = valor === null || valor === undefined;
+    return '<div class="pf-linha' + (semDados ? ' sem-dados' : '') + (opts.sub ? ' pf-linha-sub' : '') + '">' +
+      '<span class="pf-nome">' + escapeHtml(nome) +
+        (nota ? '<span class="pf-nota">' + escapeHtml(nota) + '</span>' : '') +
+      '</span>' +
+      '<span class="pf-valor">' + (semDados ? 'Sem dados' : formatEuro(valor)) + '</span>' +
+    '</div>';
+  }
+
+  function renderPosicaoFinanceira(){
+    var totalEl = document.getElementById('pfTotal');
+    var subEl = document.getElementById('pfSub');
+    var linhasEl = document.getElementById('pfLinhas');
+    var caixaValorEl = document.getElementById('pfCaixaValor');
+    var caixaNotaEl = document.getElementById('pfCaixaNota');
+    var caixaLinhaEl = document.getElementById('pfLinhaCaixa');
+    if (!totalEl) return;
+
+    var emFalta = [];     // parcelas sem dados (ficam fora da soma)
+    var parcelas = 0;     // parcelas que entraram na soma
+    var total = 0;
+    var html = '';
+
+    // 1. Contas bancárias — soma + uma sub-linha por conta.
+    if (contasCarregadas){
+      var resumo = resumoContas();
+      var validas = resumo.contas.filter(pfContaValida);
+      var contasValor = validas.length
+        ? Math.round(validas.reduce(function(acc, c){ return acc + c.valor; }, 0) * 100) / 100
+        : null;
+      html += pfLinhaHtml('Contas bancárias', contasValor,
+        contasValor === null ? 'nenhuma conta com sincronização recente' : null);
+      html += resumo.contas.map(function(c){
+        var ok = pfContaValida(c);
+        var quando = ok ? tempoRelativo(c.atualizadoEm) : null;
+        var nota = !c.ligada ? 'não ligado'
+                 : c.currency !== 'EUR' ? c.currency + ' — não somado'
+                 : pfContaDesatualizada(c) ? 'sincronização antiga — fora do total'
+                 : (quando ? 'atualizado ' + quando : null);
+        if (!ok) emFalta.push(c.nome);
+        return pfLinhaHtml(c.nome, ok ? c.valor : null, nota, { sub: true });
+      }).join('');
+      if (contasValor !== null){ total += contasValor; parcelas++; }
+    } else {
+      html += pfLinhaHtml('Contas bancárias', null, 'a carregar…');
+      emFalta.push('contas');
+    }
+
+    // 2. Por depositar — a mesma lista do cartão de Depósitos (caixa + cofre).
+    if (caixaCarregada && cofreCarregada){
+      var pendentes = depositosPendentes();
+      var porDepositar = Math.round(totalLiquido(pendentes) * 100) / 100;
+      html += pfLinhaHtml('Por depositar', porDepositar,
+        pendentes.length
+          ? pendentes.length + (pendentes.length === 1 ? ' levantamento pendente' : ' levantamentos pendentes')
+          : 'nada pendente');
+      total += porDepositar; parcelas++;
+    } else {
+      html += pfLinhaHtml('Por depositar', null, 'a carregar…');
+      emFalta.push('por depositar');
+    }
+
+    // 3. Cofre — saldo cumulativo. O nó pode ainda não existir: val() null
+    // lido é "sem movimentos" (saldo 0 válido); "sem dados" é só enquanto o
+    // listener não respondeu.
+    if (cofreCarregada){
+      var cofre = saldoCofreDashboard();
+      html += pfLinhaHtml('Cofre', cofre, Object.keys(allCofreMovs).length ? null : 'sem movimentos ainda');
+      total += cofre; parcelas++;
+    } else {
+      html += pfLinhaHtml('Cofre', null, 'a carregar…');
+      emFalta.push('cofre');
+    }
+
+    linhasEl.innerHTML = html;
+
+    // 4. Caixa — à parte. null = sem contagem registada (nunca 0).
+    var caixa = null;
+    if (caixaCarregada && contagensCaixaCarregadas){
+      caixa = GiocoCaixa.saldoVivoCaixa(allCaixaContagens, allCaixaMovs);
+      var ultima = GiocoCaixa.ultimaContagem(allCaixaContagens);
+      caixaNotaEl.textContent = caixa === null
+        ? 'Sem contagem registada'
+        : 'Última contagem: ' + formatDataCurta(ultima.dataHora) +
+          (ultima.pessoa ? ' · ' + ultima.pessoa : '');
+      caixaValorEl.textContent = caixa === null ? 'Sem dados' : formatEuro(caixa);
+    } else {
+      caixaNotaEl.textContent = 'A carregar…';
+      caixaValorEl.textContent = '—';
+    }
+    caixaLinhaEl.classList.toggle('sem-dados', caixa === null);
+
+    document.getElementById('pfSwitchCaixa').setAttribute('aria-checked', pfIncluirCaixa ? 'true' : 'false');
+
+    var caixaNoTotal = pfIncluirCaixa && caixa !== null;
+    if (caixaNoTotal){ total += caixa; parcelas++; }
+    if (pfIncluirCaixa && caixa === null) emFalta.push('caixa');
+
+    total = Math.round(total * 100) / 100;
+    totalEl.textContent = parcelas ? formatEuro(total) : '—';
+    subEl.textContent = (caixaNoTotal ? 'Disponível, com caixa' : 'Disponível, sem caixa') +
+      (emFalta.length ? ' · sem dados: ' + emFalta.join(', ') : '');
+  }
+
+  document.getElementById('pfSwitchCaixa').addEventListener('click', function(){
+    pfIncluirCaixa = !pfIncluirCaixa;
+    renderPosicaoFinanceira();
+  });
 
   // Clicar no cartão abre a conta; clicar numa linha abre essa conta. As
   // linhas são <a> e não podem viver dentro de outro <a>, daí o handler no

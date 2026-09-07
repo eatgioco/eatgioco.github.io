@@ -841,6 +841,7 @@
 <body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 <script src="gioco-faturas.js"></script>
+<script src="gioco-caixa.js"></script>
 
 <div class="shell">
 
@@ -1225,39 +1226,14 @@
   var contagemState = null;
 
   // Última contagem por dataHora (o nó é push-only, sem outro índice).
+  // Fórmulas partilhadas em gioco-caixa.js (GiocoCaixa) — o dashboard usa as
+  // mesmas; aqui ficam só os wrappers sobre o estado em memória da página.
   function ultimaContagemCaixa(){
-    var ids = Object.keys(allContagens);
-    if (!ids.length) return null;
-    var melhor = null;
-    ids.forEach(function(id){
-      var c = allContagens[id];
-      if (!c || !c.dataHora) return;
-      if (!melhor || new Date(c.dataHora) > new Date(melhor.dataHora)) melhor = c;
-    });
-    return melhor;
+    return GiocoCaixa.ultimaContagem(allContagens);
   }
 
-  // Saldo vivo = total da última contagem + todos os caixaMovimentos
-  // posteriores a ela, com a MESMA lógica do renderSummary por movimento.
-  // Sem contagem nenhuma (nó vazio), devolve null — não 0.
   function saldoVivoCaixa(){
-    var contagem = ultimaContagemCaixa();
-    if (!contagem) return null;
-    var saldo = parseFloat(contagem.total) || 0;
-    var desde = new Date(contagem.dataHora).getTime();
-    Object.keys(allMovs).forEach(function(id){
-      var m = allMovs[id];
-      var t = new Date(m.dataHora).getTime();
-      if (isNaN(t) || t <= desde) return;
-      if (m.tipo === 'entrada'){
-        saldo += (parseFloat(m.valor) || 0);
-      } else if (m.estado === 'acertado'){
-        saldo -= ((parseFloat(m.valor) || 0) - (parseFloat(m.valorDevolvido) || 0));
-      } else {
-        saldo -= (parseFloat(m.valor) || 0);
-      }
-    });
-    return round2(saldo);
+    return GiocoCaixa.saldoVivoCaixa(allContagens, allMovs);
   }
 
   function formatMoedaLabel(valor){
@@ -2409,12 +2385,7 @@
   ];
 
   function saldoCofre(){
-    var saldo = 0;
-    Object.keys(allCofreMovs).forEach(function(id){
-      var m = allCofreMovs[id];
-      saldo += (m.tipo === 'entrada' ? 1 : -1) * (parseFloat(m.valor) || 0);
-    });
-    return round2(saldo);
+    return GiocoCaixa.saldoCofre(allCofreMovs);
   }
 
   function pessoasOptionsHtml(selectedId){
