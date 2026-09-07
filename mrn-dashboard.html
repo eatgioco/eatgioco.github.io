@@ -1741,6 +1741,53 @@
     color:var(--muted);
   }
 
+  /* Modal "Devolver à caixa" — devolução parcial de um levantamento. */
+  .modal-campo{
+    margin:0 0 18px;
+  }
+
+  .modal-campo label{
+    display:block;
+    font-size:11px;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .modal-campo input[type="number"]{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-variant-numeric:tabular-nums;
+    font-size:16px;
+    font-weight:700;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--white);
+    color:var(--ink);
+  }
+
+  .modal-campo input[type="number"]:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .modal-erro{
+    margin:-12px 0 16px;
+    font-size:12px;
+    color:var(--red-ink);
+    min-height:15px;
+  }
+
+  /* Sub-linha "600,00 € − 200,00 € devolvidos" debaixo do valor líquido. */
+  .dep-sub{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+
   select{
     font-family:'Inter', sans-serif;
     font-size:13.5px;
@@ -2197,6 +2244,28 @@
     <div class="modal-actions">
       <button type="button" class="btn" id="depositadoNao">Cancelar</button>
       <button type="button" class="btn-add" id="depositadoSim">✓ Marcar como depositado</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal "Devolver à caixa" — parte do dinheiro levantado para depósito
+     volta à caixa. Cria uma ENTRADA em caixaMovimentos ligada ao
+     levantamento (o mesmo que a caixa.html faz). -->
+<div class="modal-overlay" id="devolucaoModalOverlay">
+  <div class="modal modal-narrow">
+    <div class="modal-header">
+      <h2>Devolver à caixa</h2>
+      <button class="modal-close" id="devolucaoModalClose">×</button>
+    </div>
+    <p class="modal-contexto" id="devolucaoContexto"></p>
+    <div class="modal-campo">
+      <label for="devolucaoValor">Valor a devolver (€)</label>
+      <input type="number" id="devolucaoValor" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+    </div>
+    <p class="modal-erro" id="devolucaoErro"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="devolucaoNao">Cancelar</button>
+      <button type="button" class="btn-add" id="devolucaoSim" disabled>↩ Confirmar devolução</button>
     </div>
   </div>
 </div>
@@ -4182,23 +4251,46 @@ window.addEventListener('load', function () {
       .filter(function(m){ return m.tipo === 'saida' && normalizarTexto(m.motivo) === MOTIVO_DEPOSITO_BANCARIO_NORM; });
   }
 
+  /* Parte do dinheiro levantado para depositar pode voltar à caixa: cada
+     devolução é uma entrada em caixaMovimentos e o levantamento acumula em
+     devolvidoDeposito. O que interessa ao banco é o LÍQUIDO — é ele que se
+     mostra, se soma e se compara com o crédito bancário. Nada disto tem a
+     ver com valorDevolvido, que é o troco das compras. */
+  function liquidoDeposito(m){
+    return Math.round(((parseFloat(m.valor) || 0) - (parseFloat(m.devolvidoDeposito) || 0)) * 100) / 100;
+  }
+
+  function totalLiquido(lista){
+    return lista.reduce(function(acc, m){ return acc + liquidoDeposito(m); }, 0);
+  }
+
   function depositosPendentes(){
     return listaMovimentosDeposito()
-      .filter(function(m){ return !m.depositado; })
+      .filter(function(m){ return !m.depositado && liquidoDeposito(m) > 0.005; })
       .sort(function(a, b){ return new Date(a.dataHora) - new Date(b.dataHora); });
   }
 
+  // Um levantamento devolvido por inteiro já não está por depositar, mesmo
+  // sem nunca ter chegado ao banco — sai dos pendentes e vai para o histórico.
   function depositosHistorico(){
     return listaMovimentosDeposito()
-      .filter(function(m){ return !!m.depositado; })
+      .filter(function(m){ return !!m.depositado || liquidoDeposito(m) <= 0.005; })
       .sort(function(a, b){ return new Date(b.depositadoEm || b.dataHora) - new Date(a.depositadoEm || a.dataHora); });
+  }
+
+  // Sub-linha "600,00 € − 200,00 € devolvidos" debaixo do valor líquido.
+  function subLinhaDevolvido(m){
+    var dev = parseFloat(m.devolvidoDeposito) || 0;
+    if (dev <= 0.005) return '';
+    return '<span class="dep-sub">' + formatEuro(parseFloat(m.valor) || 0) +
+           ' − ' + formatEuro(dev) + ' devolvidos</span>';
   }
 
   function renderDepositosCard(){
     if (!caixaCarregada) return;
 
     var pendentes = depositosPendentes();
-    var total = pendentes.reduce(function(acc, m){ return acc + (parseFloat(m.valor) || 0); }, 0);
+    var total = totalLiquido(pendentes);
 
     document.getElementById('depositosLoading').style.display = 'none';
 
@@ -4222,7 +4314,7 @@ window.addEventListener('load', function () {
   function renderDepositosDetalhe(){
     var pendentes = depositosPendentes();
     var historico = depositosHistorico();
-    var total = pendentes.reduce(function(acc, m){ return acc + (parseFloat(m.valor) || 0); }, 0);
+    var total = totalLiquido(pendentes);
 
     document.getElementById('depDetalheTotal').textContent = formatEuro(total);
     document.getElementById('depDetalheSub').textContent = pendentes.length === 0
@@ -4240,9 +4332,11 @@ window.addEventListener('load', function () {
           return '<tr>' +
             '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
             '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
-            '<td class="num">' + formatEuro(parseFloat(m.valor) || 0) + '</td>' +
+            '<td class="num">' + formatEuro(liquidoDeposito(m)) + subLinhaDevolvido(m) + '</td>' +
             '<td><button type="button" class="btn-small btn-marcar-depositado" data-id="' +
-              escapeHtml(m.id) + '">✓ Marcar como depositado</button></td>' +
+              escapeHtml(m.id) + '">✓ Marcar como depositado</button> ' +
+              '<button type="button" class="btn-small btn-devolver-caixa" data-id="' +
+              escapeHtml(m.id) + '">↩ Devolver à caixa</button></td>' +
             '</tr>';
         }).join('') +
         '</tbody><tfoot><tr>' +
@@ -4262,8 +4356,10 @@ window.addEventListener('load', function () {
           return '<tr>' +
             '<td class="mono">' + formatDataCurta(m.dataHora) + '</td>' +
             '<td>' + escapeHtml(m.pessoa || '—') + '</td>' +
-            '<td class="num">' + formatEuro(parseFloat(m.valor) || 0) + '</td>' +
-            '<td class="mono">' + formatDataCurta(m.depositadoEm) + '</td>' +
+            '<td class="num">' + formatEuro(liquidoDeposito(m)) + subLinhaDevolvido(m) + '</td>' +
+            '<td class="mono">' + (liquidoDeposito(m) <= 0.005
+              ? 'Devolvido integralmente'
+              : formatDataCurta(m.depositadoEm)) + '</td>' +
             '</tr>';
         }).join('') +
         '</tbody></table>';
@@ -4439,7 +4535,7 @@ window.addEventListener('load', function () {
 
     depositosPendentes().forEach(function(m){
       var diaCaixa = diaLocalDe(m.dataHora);
-      var cents = centimos(m.valor);
+      var cents = centimos(liquidoDeposito(m));
       if (!diaCaixa || cents === null) return;
 
       for (var i = 0; i < creditos.length; i++){
@@ -4558,12 +4654,19 @@ window.addEventListener('load', function () {
   // Delegado uma única vez sobre o contentor — sobrevive à substituição do
   // innerHTML a cada render.
   document.getElementById('depPendentesLista').addEventListener('click', function(e){
-    var btn = e.target.closest('.btn-marcar-depositado');
-    if (!btn) return;
-    var id = btn.getAttribute('data-id');
-    var mov = allCaixaMovs[id];
-    if (!mov) return;
-    abrirModalMarcarDepositado(mov, id);
+    var btnDep = e.target.closest('.btn-marcar-depositado');
+    if (btnDep){
+      var idDep = btnDep.getAttribute('data-id');
+      var movDep = allCaixaMovs[idDep];
+      if (movDep) abrirModalMarcarDepositado(movDep, idDep);
+      return;
+    }
+    var btnDev = e.target.closest('.btn-devolver-caixa');
+    if (btnDev){
+      var idDev = btnDev.getAttribute('data-id');
+      var movDev = allCaixaMovs[idDev];
+      if (movDev) abrirModalDevolucao(movDev, idDev);
+    }
   });
 
   // Modal de confirmação — mesmo padrão do "Ficou pago?" acima: HTML normal
@@ -4606,6 +4709,112 @@ window.addEventListener('load', function () {
   });
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape' && depositadoModalOverlay.classList.contains('open')) fecharModalMarcarDepositado();
+  });
+
+  /* ---------- Modal "Devolver à caixa" ----------
+     Escreve exatamente o mesmo que a caixa.html: uma ENTRADA nova em
+     caixaMovimentos com depositoOrigemId, e depois um update() no
+     levantamento com a soma acumulada + devolucoes/{idDaEntrada}. O
+     listener de caixaRef re-renderiza sozinho. */
+  var devolucaoModalOverlay = document.getElementById('devolucaoModalOverlay');
+  var devolucaoContexto = document.getElementById('devolucaoContexto');
+  var devolucaoValorInput = document.getElementById('devolucaoValor');
+  var devolucaoErroEl = document.getElementById('devolucaoErro');
+  var devolucaoSimBtn = document.getElementById('devolucaoSim');
+  var devolucaoIdAtual = null;
+  var devolucaoMaximo = 0;
+
+  function abrirModalDevolucao(mov, id){
+    devolucaoIdAtual = id;
+    devolucaoMaximo = liquidoDeposito(mov);
+    devolucaoContexto.textContent =
+      formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' +
+      'por depositar ' + formatEuro(devolucaoMaximo);
+    devolucaoValorInput.value = '';
+    devolucaoValorInput.max = devolucaoMaximo;
+    devolucaoErroEl.textContent = '';
+    devolucaoSimBtn.disabled = true;
+    devolucaoSimBtn.textContent = '↩ Confirmar devolução';
+    devolucaoModalOverlay.classList.add('open');
+    devolucaoValorInput.focus();
+  }
+
+  function fecharModalDevolucao(){
+    devolucaoModalOverlay.classList.remove('open');
+    devolucaoIdAtual = null;
+  }
+
+  function validarDevolucao(){
+    var valor = parseFloat(devolucaoValorInput.value);
+    if (!(valor > 0)){
+      devolucaoErroEl.textContent = '';
+      devolucaoSimBtn.disabled = true;
+      return null;
+    }
+    if (valor > devolucaoMaximo + 0.0001){
+      devolucaoErroEl.textContent = 'Máximo: ' + formatEuro(devolucaoMaximo);
+      devolucaoSimBtn.disabled = true;
+      return null;
+    }
+    devolucaoErroEl.textContent = '';
+    devolucaoSimBtn.disabled = false;
+    return valor;
+  }
+
+  devolucaoValorInput.addEventListener('input', validarDevolucao);
+
+  devolucaoSimBtn.addEventListener('click', function(){
+    var id = devolucaoIdAtual;
+    var valor = validarDevolucao();
+    var mov = id ? allCaixaMovs[id] : null;
+    if (!id || valor === null || !mov) return;
+
+    var agora = new Date().toISOString();
+    var devolvidoAnterior = parseFloat(mov.devolvidoDeposito) || 0;
+    var entrada = {
+      dataHora: agora,
+      tipo: 'entrada',
+      valor: valor,
+      motivo: 'Devolução de depósito bancário',
+      pessoa: mov.pessoa,
+      pessoaId: mov.pessoaId || null,
+      estado: 'acertado',
+      valorDevolvido: 0,
+      notas: null,
+      depositoOrigemId: id
+    };
+
+    devolucaoSimBtn.disabled = true;
+    devolucaoSimBtn.textContent = 'A devolver…';
+
+    var pushRef = caixaRef.push(entrada);
+    pushRef.then(function(){
+      var upd = { devolvidoDeposito: Math.round((devolvidoAnterior + valor) * 100) / 100 };
+      upd['devolucoes/' + pushRef.key] = {
+        valor: valor,
+        dataHora: agora,
+        pessoa: entrada.pessoa,
+        pessoaId: entrada.pessoaId
+      };
+      // A entrada já ficou gravada — se este update falhar, avisa-se e fica
+      // assim; apagá-la seria pior do que a soma ficar por atualizar.
+      return caixaRef.child(id).update(upd);
+    }).then(function(){
+      fecharModalDevolucao();
+    }).catch(function(err){
+      devolucaoSimBtn.disabled = false;
+      devolucaoSimBtn.textContent = '↩ Confirmar devolução';
+      alert('Erro ao registar a devolução: ' + (err && err.message ? err.message : String(err)));
+    });
+  });
+
+  document.getElementById('devolucaoNao').addEventListener('click', fecharModalDevolucao);
+  document.getElementById('devolucaoModalClose').addEventListener('click', fecharModalDevolucao);
+  devolucaoModalOverlay.addEventListener('click', function(e){
+    if (e.target === devolucaoModalOverlay) fecharModalDevolucao();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && devolucaoModalOverlay.classList.contains('open')) fecharModalDevolucao();
   });
 
   // Secção de detalhe: vive no fim da página, escondida por defeito — ao
