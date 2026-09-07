@@ -89,7 +89,25 @@
    · semData (sem âncora: linha sem concluidoEm — só ligação manual).
 
    Não escreve em mais nó nenhum e nunca apaga nada (nem remove(), nem
-   null fora dos campos da ligação ao desligar). */
+   null fora dos campos da ligação ao desligar).
+
+   DÉBITO DIRETO — confirmação ANTES do clique (Set/2026, só tesouraria.html):
+   calcularDebitos()/aplicarDebitosAutomaticos() correm a par de calcular()/
+   aplicarAutomaticas(), mas sobre ocorrências de compromissos
+   metodoPagamento:'debito' que AINDA NÃO estão em pagamentosConcluidos —
+   um passo antes da reconciliação normal, que só vê o que já foi marcado
+   como pago. Valor fixo (sem compromissosFixos/{id}/valorVariavel): match
+   exacto de cêntimos na JANELA_DEBITO, confirma sozinho. Valor variável
+   (valorVariavel:true — Eletricidade, EPAL): sem valor para comparar, usa o
+   descritivo bancário e aprende-o em historicoDescritivos/ (array só
+   acrescentado); com padrão aprendido (3+ confirmações consistentes)
+   confirma sozinho, senão fica só como sugestão de 1 clique
+   (confirmarSugestaoDebito). Ver o comentário de cabeçalho dessa secção
+   mais abaixo para o detalhe. Escreve pagamentosConcluidos/{chave} (set,
+   {concluidoEm, auto, confirmadoManualmente?}) e, só nos de valor
+   variável, compromissosFixos/{id}/historicoDescritivos (set do array
+   completo lido de memória — a única forma de "acrescentar" um campo no
+   RTDB sem update() multi-chave). Nunca remove(). */
 
 function giocoReconciliacaoEngine(deps){
   'use strict';
@@ -315,6 +333,230 @@ function giocoReconciliacaoEngine(deps){
       }));
     });
     return out;
+  }
+
+  /* ---------- débito direto: confirmação antes do clique (Set/2026) ----------
+     calcular()/aplicarAutomaticas() só reconciliam ocorrências JÁ marcadas
+     como pagas (pagamentosConcluidos). Isto aqui corre um passo ANTES: sobre
+     as ocorrências de compromissos de débito direto que ainda NÃO estão em
+     pagamentosConcluidos, para os confirmar sozinhas quando o banco já
+     mostra o débito — só chamado a partir da tesouraria.html.
+     Dois comportamentos, decididos por compromissosFixos/{id}/valorVariavel:
+     - ausente/false (valor fixo — Mensalidade Abanca, NOS, ZoneSoft POS):
+       match exacto de cêntimos na JANELA_DEBITO; 1 candidato confirma
+       sozinho, escrevendo pagamentosConcluidos + reconciliacaoBancaria numa
+       só passagem, antes de qualquer clique.
+     - true (valor variável — Eletricidade, EPAL): sem valor para comparar,
+       usa o descritivo bancário. compromissosFixos/{id}/historicoDescritivos
+       (array só ACRESCENTADO, nunca substituído) aprende o texto real; com
+       3+ entradas cujas últimas 3 raízes normalizadas batem, um candidato
+       encontrado pelo HISTÓRICO confirma sozinho, tal como o de valor fixo.
+       Com menos de 3, ou quando o único candidato só bate pela regex de
+       arranque (fallback, sem histórico ainda, ou porque o descritivo mudou
+       e deixou de bater com o histórico aprendido), fica só como SUGESTÃO
+       de um clique (confirmarSugestaoDebito) — nunca escreve sozinho. */
+
+  var FALLBACK_DEBITO_VARIAVEL = [
+    { teste: /eletric/i, regex: /eletric|edp|ibelectra/i },
+    { teste: /epal/i,    regex: /epal/i }
+  ];
+
+  // Pura e testável isoladamente: raiz comparável de um descritivo bancário
+  // — maiúsculas, sem dígitos (datas e referências são feitas de dígitos)
+  // nem pontuação, espaços colapsados. "IBELECTRA FT202609123" e
+  // "IBELECTRA FT202608091" dão a mesma raiz "IBELECTRA FT".
+  function normalizarDescritivo(desc){
+    var s = String(desc || '').toUpperCase();
+    s = s.replace(/[0-9]/g, ' ');
+    s = s.replace(/[^A-Z ]/g, ' ');
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
+  // 'aprendendo' (< 3 confirmações, ou as últimas 3 raízes não batem entre
+  // si) ou 'aprendido' (3+, últimas 3 com a mesma raiz).
+  function estadoAprendizagemDebito(historico){
+    var lista = Array.isArray(historico) ? historico : [];
+    if (lista.length < 3) return 'aprendendo';
+    var raizes = lista.slice(-3).map(normalizarDescritivo);
+    var primeira = raizes[0];
+    return raizes.every(function(r){ return r === primeira; }) ? 'aprendido' : 'aprendendo';
+  }
+
+  function regexFallbackDebito(nome){
+    for (var i = 0; i < FALLBACK_DEBITO_VARIAVEL.length; i++){
+      if (FALLBACK_DEBITO_VARIAVEL[i].teste.test(nome || '')) return FALLBACK_DEBITO_VARIAVEL[i].regex;
+    }
+    return null;
+  }
+
+  function mesesJanelaDebito(){
+    var hoje = new Date();
+    var ano1 = hoje.getFullYear(), mes1 = hoje.getMonth() + 1;
+    var ano2 = ano1, mes2 = mes1 + 1;
+    if (mes2 > 12){ mes2 = 1; ano2++; }
+    return [{ ano: ano1, mes: mes1 }, { ano: ano2, mes: mes2 }];
+  }
+
+  // Ocorrências de compromissos de débito direto AINDA sem entrada em
+  // pagamentosConcluidos, nos meses indicados — mesma âncora (dia esperado)
+  // e mesma janela (JANELA_DEBITO) da reconciliação normal de débitos.
+  function ocorrenciasDebitoPendentes(meses){
+    var pc = __PC();
+    var out = [];
+    CE.idsCompromissos().forEach(function(id){
+      var c = CE.compromissoPorId(id);
+      if (!c || !c.ativo || c.metodoPagamento !== 'debito') return;
+      var mesesLista = CE.mesesArray(c.meses);
+      meses.forEach(function(per){
+        if (mesesLista.length && mesesLista.indexOf(per.mes) === -1) return;
+        var chaveConcluido = id + '_' + per.ano + '-' + per.mes;
+        if (pc[chaveConcluido]) return;
+        var dia = CE.resolveDia(CE.diaDaSaida(c, ''), per.ano, per.mes);
+        if (dia === null) return;
+        var cents = centimos(CE.valorOcorrencia(id, per.ano, per.mes));
+        if (!c.valorVariavel && !cents) return; // valor fixo sem valor definido: nada a comparar
+        out.push({
+          compromissoId: id, ano: per.ano, mes: per.mes,
+          chaveConcluido: chaveConcluido, chaveReconciliacao: chaveFixo(chaveConcluido),
+          nome: c.nome || id,
+          esperado: per.ano + '-' + pad2(per.mes) + '-' + pad2(dia),
+          cents: cents, valorVariavel: !!c.valorVariavel, historico: c.historicoDescritivos || []
+        });
+      });
+    });
+    return out;
+  }
+
+  // Candidatos de valor fixo: mesmos cêntimos, dentro da JANELA_DEBITO,
+  // livres (movs já vem filtrado por movimentosDebito(), sem "INTERNA").
+  function candidatosDebitoFixo(item, movs, usados){
+    return movs.filter(function(m){
+      if (usados[m.id]) return false;
+      if (m.cents !== item.cents) return false;
+      var d = diasEntre(item.esperado, m.dia);
+      return d !== null && d >= -JANELA_DEBITO.antes && d <= JANELA_DEBITO.depois;
+    });
+  }
+
+  // Candidatos de valor variável: sem exigir valor exacto. Tenta primeiro o
+  // histórico aprendido (confiança 'historico' — pode confirmar sozinho);
+  // só se não bater nenhuma raiz do histórico tenta a regex de arranque
+  // (confiança 'fallback' — nunca confirma sozinho, só sugestão).
+  function candidatosDebitoVariavel(item, movs, usados){
+    var naJanela = movs.filter(function(m){
+      if (usados[m.id]) return false;
+      var d = diasEntre(item.esperado, m.dia);
+      return d !== null && d >= -JANELA_DEBITO.antes && d <= JANELA_DEBITO.depois;
+    });
+    var raizes = (item.historico || []).map(normalizarDescritivo);
+    if (raizes.length){
+      var porHistorico = naJanela.filter(function(m){ return raizes.indexOf(normalizarDescritivo(m.desc)) !== -1; });
+      if (porHistorico.length) return { candidatos: porHistorico, confianca: 'historico' };
+    }
+    var fallback = regexFallbackDebito(item.nome);
+    var porFallback = fallback ? naJanela.filter(function(m){ return fallback.test(m.desc || ''); }) : [];
+    return { candidatos: porFallback, confianca: 'fallback' };
+  }
+
+  // Classifica as pendências de débito direto dos meses dados em dois
+  // grupos: autoConfirmar (escreve sozinho) e sugestoes (só um clique).
+  function calcularDebitos(meses){
+    var movs = movimentosDebito();
+    var usados = Object.assign({}, movimentosUsados());
+    var itens = ocorrenciasDebitoPendentes(meses || mesesJanelaDebito());
+    var autoConfirmar = [];
+    var sugestoes = [];
+    itens.forEach(function(item){
+      if (!item.valorVariavel){
+        var candsFixo = candidatosDebitoFixo(item, movs, usados);
+        if (candsFixo.length === 1){
+          autoConfirmar.push({ item: item, mov: candsFixo[0] });
+          usados[candsFixo[0].id] = item.chaveReconciliacao;
+        }
+        return;
+      }
+      var r = candidatosDebitoVariavel(item, movs, usados);
+      if (r.candidatos.length !== 1) return;
+      var mov = r.candidatos[0];
+      var confiavel = r.confianca === 'historico' && estadoAprendizagemDebito(item.historico) === 'aprendido';
+      if (confiavel){
+        autoConfirmar.push({ item: item, mov: mov });
+        usados[mov.id] = item.chaveReconciliacao;
+      } else {
+        sugestoes.push({ item: item, mov: mov });
+      }
+    });
+    return { itens: itens, autoConfirmar: autoConfirmar, sugestoes: sugestoes };
+  }
+
+  function sugestaoDebitoPara(res, compromissoId, periodo){
+    if (!res) return null;
+    for (var i = 0; i < res.sugestoes.length; i++){
+      var it = res.sugestoes[i].item;
+      if (it.compromissoId === compromissoId && (it.ano + '-' + it.mes) === periodo) return res.sugestoes[i];
+    }
+    return null;
+  }
+
+  // Acrescenta ao histórico de descritivos do compromisso — nunca substitui
+  // o array todo. Lido de memória via CE porque o RTDB não tem um "array
+  // push" atómico; só chamado para compromissos de valor variável.
+  function acrescentarHistoricoDescritivo(compromissoId, desc){
+    if (!deps.refCompromissos) return Promise.resolve();
+    var c = CE.compromissoPorId(compromissoId) || {};
+    var historico = (c.historicoDescritivos || []).concat([desc]);
+    return deps.refCompromissos.child(compromissoId).child('historicoDescritivos').set(historico);
+  }
+
+  // Escreve os dois destinos de sempre (pagamentosConcluidos +
+  // reconciliacaoBancaria) para uma ocorrência de débito direto e, só nas
+  // de valor variável, acrescenta o descritivo ao histórico de
+  // aprendizagem. auto:true marca sempre a origem; confirmadoManualmente:
+  // true só quando veio de um clique na sugestão (nunca da automática).
+  function confirmarDebito(item, mov, opts){
+    if (!deps.refPagamentos) return Promise.reject(new Error('refPagamentos em falta na configuração do motor.'));
+    opts = opts || {};
+    var patchPC = { concluidoEm: Date.parse(mov.dia + 'T12:00:00') || Date.now(), auto: true };
+    if (opts.confirmadoManualmente) patchPC.confirmadoManualmente = true;
+    var escritas = [
+      deps.refPagamentos.child(item.chaveConcluido).set(patchPC),
+      ligar(item.chaveReconciliacao, mov, 'auto')
+    ];
+    if (item.valorVariavel) escritas.push(acrescentarHistoricoDescritivo(item.compromissoId, mov.desc));
+    return Promise.all(escritas);
+  }
+
+  var aEscreverDebitos = false;
+
+  // Grava as confirmações automáticas de calcularDebitos() — chamado a par
+  // de aplicarAutomaticas(), sempre a partir de tesouraria.html. Uma
+  // segunda chamada enquanto a primeira corre é ignorada, tal como
+  // aplicarAutomaticas: o listener volta a chamar no fim.
+  function aplicarDebitosAutomaticos(res){
+    if (aEscreverDebitos || !res.autoConfirmar.length) return Promise.resolve([]);
+    aEscreverDebitos = true;
+    var feitas = [];
+    var fila = res.autoConfirmar.slice();
+    function passo(){
+      var par = fila.shift();
+      if (!par) return Promise.resolve(feitas);
+      return confirmarDebito(par.item, par.mov, {})
+        .then(function(){ feitas.push(par); })
+        .catch(function(err){ console.warn('confirmação automática de débito falhou em ' + par.item.chaveConcluido, err); })
+        .then(passo);
+    }
+    return passo().then(function(r){ aEscreverDebitos = false; return r; },
+                        function(e){ aEscreverDebitos = false; throw e; });
+  }
+
+  // Clique na sugestão de 1 clique (débito de valor variável ainda a
+  // aprender, ou cujo descritivo deixou de bater com o padrão aprendido):
+  // confirma exactamente como a automática, só que marcada
+  // confirmadoManualmente — e conta para o histórico de aprendizagem.
+  function confirmarSugestaoDebito(res, compromissoId, periodo){
+    var s = sugestaoDebitoPara(res, compromissoId, periodo);
+    if (!s) return Promise.reject(new Error('Sugestão já não é válida — os dados mudaram entretanto.'));
+    return confirmarDebito(s.item, s.mov, { confirmadoManualmente: true });
   }
 
   /* ---------- receitas (vendasDiario) ---------- */
@@ -742,6 +984,10 @@ function giocoReconciliacaoEngine(deps){
     pagamentosConcluidos: pagamentosConcluidos, receitasDiarias: receitasDiarias,
     calcular: calcular, calcularReceitas: calcularReceitas, itemPorChave: itemPorChave,
     pesquisaManual: pesquisaManual,
-    ligar: ligar, desligar: desligar, aplicarAutomaticas: aplicarAutomaticas
+    ligar: ligar, desligar: desligar, aplicarAutomaticas: aplicarAutomaticas,
+    normalizarDescritivo: normalizarDescritivo, estadoAprendizagemDebito: estadoAprendizagemDebito,
+    mesesJanelaDebito: mesesJanelaDebito, calcularDebitos: calcularDebitos,
+    sugestaoDebitoPara: sugestaoDebitoPara, aplicarDebitosAutomaticos: aplicarDebitosAutomaticos,
+    confirmarSugestaoDebito: confirmarSugestaoDebito
   };
 }

@@ -2828,7 +2828,21 @@ window.addEventListener('load', function () {
       if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
         h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
       }
-      h += '<button type="button" class="btn-small pay-detalhe-marcar" title="Marcar como pago">✓ Pago</button>';
+      // Débito direto de valor variável (Eletricidade, EPAL): com um
+      // candidato bancário ainda a aprender (ou que quebrou o padrão
+      // aprendido), a sugestão de 1 clique SUBSTITUI o botão manual — não
+      // faz sentido mostrar os dois. Sem sugestão, fica tudo como hoje.
+      var sugestaoDebito = (l.tipo === 'fixo' && l.metodoPagamento === 'debito' &&
+                             compromissoPorId(l.compromissoId) && compromissoPorId(l.compromissoId).valorVariavel)
+        ? RE.sugestaoDebitoPara(debitoResultado, l.compromissoId, periodoCompromisso(l.prazoDate))
+        : null;
+      if (sugestaoDebito){
+        h += '<span class="pay-detalhe-nota">Movimento provável: ' + formatEuro(sugestaoDebito.mov.valor) +
+             ' em ' + fmtDiaISO(sugestaoDebito.mov.dia) + '</span>';
+        h += '<button type="button" class="btn-small pay-detalhe-confirmar-debito" title="Confirmar movimento">Confirmar</button>';
+      } else {
+        h += '<button type="button" class="btn-small pay-detalhe-marcar" title="Marcar como pago">✓ Pago</button>';
+      }
     }
     h += '</div>';
     h += '</div>';
@@ -2929,6 +2943,21 @@ window.addEventListener('load', function () {
       }
       return true;
     }
+    var btnConfirmarDebito = e.target.closest('.pay-detalhe-confirmar-debito');
+    if (btnConfirmarDebito){
+      var blocoConfirmarDebito = btnConfirmarDebito.closest('.pay-detalhe');
+      var linhaConfirmarDebito = blocoConfirmarDebito && linhaPorChave(blocoConfirmarDebito.getAttribute('data-chave'));
+      if (linhaConfirmarDebito){
+        btnConfirmarDebito.disabled = true;
+        RE.confirmarSugestaoDebito(debitoResultado, linhaConfirmarDebito.compromissoId, periodoCompromisso(linhaConfirmarDebito.prazoDate))
+          .then(function(){ mostrarBlocoPago(blocoConfirmarDebito); })
+          .catch(function(err){
+            btnConfirmarDebito.disabled = false;
+            alert(err && err.message ? err.message : 'Não foi possível confirmar este movimento.');
+          });
+      }
+      return true;
+    }
     return false;
   }
 
@@ -2998,7 +3027,9 @@ window.addEventListener('load', function () {
     getReconciliacao:        function(){ return allReconciliacao; },
     getVendasDiario:         function(){ return allVendasDiario; },
     compromissos:            CE,
-    ref:                     reconciliacaoRef
+    ref:                     reconciliacaoRef,
+    refPagamentos:           pagamentosConcluidosRef,
+    refCompromissos:         compromissosRef
   });
 
   /* ---------- Itens planos de pagamentos (gioco-pagamentos.js) ----------
@@ -3022,6 +3053,7 @@ window.addEventListener('load', function () {
 
   var reconResultado = null;   // último RE.calcular()
   var receitasResultado = null; // último RE.calcularReceitas()
+  var debitoResultado = null;  // último RE.calcularDebitos()
 
   var REC_ESTADOS = {
     confirmado:   { rotulo: '✓ Confirmado',     titulo: 'Confirmados' },
@@ -3052,6 +3084,13 @@ window.addEventListener('load', function () {
     receitasResultado = RE.calcularReceitas();
     if (reconTudoCarregado() && reconCarregado.vendas && receitasResultado.autoNovas.length){
       RE.aplicarAutomaticas(receitasResultado);
+    }
+    // Débito direto: confirmação ANTES do clique (valor fixo) e aprendizagem
+    // de descritivos (valor variável) — mesma cautela de só escrever com
+    // tudo em memória; o listener de pagamentosConcluidos volta cá no fim.
+    debitoResultado = RE.calcularDebitos();
+    if (reconTudoCarregado() && debitoResultado.autoConfirmar.length){
+      RE.aplicarDebitosAutomaticos(debitoResultado);
     }
   }
 
