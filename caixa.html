@@ -602,6 +602,94 @@
     font-size:13px;
   }
 
+  /* ---------- Saldos vivos (Caixa + Cofre) ---------- */
+  .btn-acertar.destaque{
+    border-color:var(--red);
+    color:var(--red-ink);
+  }
+
+  .btn-acertar.destaque:hover{
+    background:var(--red);
+    color:var(--on-red);
+  }
+
+  /* ---------- Contar caixa (denominações) ---------- */
+  .denom-grid{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:16px;
+  }
+
+  .denom-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .denom-chip{ flex:0 0 auto; }
+
+  .denom-qtd{
+    flex:1 1 auto;
+    min-height:44px;
+    max-width:120px;
+    padding:8px 12px;
+    border:2px solid var(--line);
+    background:var(--dough);
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:16px;
+    font-weight:700;
+    color:var(--ink);
+  }
+
+  .denom-qtd:focus{ outline:none; border-color:var(--ink); }
+
+  .denom-subtotal{
+    flex:0 0 90px;
+    text-align:right;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:14px;
+    font-weight:600;
+    color:var(--muted);
+  }
+
+  .contagem-total{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 0;
+    border-top:2px solid var(--line);
+    border-bottom:2px solid var(--line);
+    margin-bottom:16px;
+  }
+
+  .contagem-total span{
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .contagem-total strong{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:26px;
+    color:var(--ink);
+  }
+
+  #contagemMotivoInput{
+    width:100%;
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--dough);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    resize:vertical;
+  }
+
+  #contagemMotivoInput:focus{ outline:none; border-color:var(--ink); }
+
   .pending-empty{
     border:1px dashed var(--line);
     background:var(--white);
@@ -710,6 +798,25 @@
       </div>
 
 <main>
+  <!-- Saldos vivos: ancorados na última contagem física confirmada (caixaContagens),
+       não no "Saldo hoje" (que reseta todos os dias). Ver saldoVivoCaixa() e
+       CLAUDE.md. -->
+  <div class="summary-row" id="saldosVivosRow">
+    <div class="summary-card" id="caixaVivaCard">
+      <p class="summary-label">Caixa</p>
+      <p class="summary-value" id="caixaVivaValue">A carregar…</p>
+      <p class="summary-sub" id="caixaVivaSub"></p>
+      <button type="button" class="btn-acertar" id="btnContarCaixa" style="margin-top:10px;" onclick="abrirContagem()">Contar caixa</button>
+    </div>
+    <div class="summary-card" id="cofreVivoCard">
+      <p class="summary-label">Cofre</p>
+      <p class="summary-value" id="cofreVivoValue">A carregar…</p>
+      <p class="summary-sub" id="cofreVivoSub"></p>
+    </div>
+  </div>
+
+  <div id="contagemPanelWrap"></div>
+
   <div class="summary-row">
     <div class="summary-card">
       <p class="summary-label">Saldo hoje</p>
@@ -920,6 +1027,7 @@
   var db = firebase.database();
   var movRef = db.ref('caixaMovimentos');
   var cofreRef = db.ref('cofreMovimentos');
+  var contagensRef = db.ref('caixaContagens');
   var pessoasRef = db.ref('pessoas');
   // Só leitura: serve para o findMatchingSupplier da fatura lida no Devolver Troco.
   var suppliersRef = db.ref('suppliers');
@@ -994,6 +1102,309 @@
   };
 
   var TOLERANCIA_TROCO = 0.05;
+
+  // ---------- Contar caixa (denominações) ----------
+  // Notas primeiro, depois moedas. Cor aproximada da nota/moeda real — só
+  // cor + valor, nunca reprodução realista (ver CLAUDE.md).
+  var DENOMINACOES = [
+    { chave: '500', valor: 500, tipo: 'nota', cor: '#8C4FA6' },
+    { chave: '200', valor: 200, tipo: 'nota', cor: '#B99A3B' },
+    { chave: '100', valor: 100, tipo: 'nota', cor: '#2F9E44' },
+    { chave: '50',  valor: 50,  tipo: 'nota', cor: '#E8862C' },
+    { chave: '20',  valor: 20,  tipo: 'nota', cor: '#3B6FC9' },
+    { chave: '10',  valor: 10,  tipo: 'nota', cor: '#C0392B' },
+    { chave: '5',   valor: 5,   tipo: 'nota', cor: '#7A7F87' },
+    { chave: '2',    valor: 2,    tipo: 'moeda', cor: '#ADB3B8' },
+    { chave: '1',    valor: 1,    tipo: 'moeda', cor: '#C9A227' },
+    { chave: '0.5',  valor: 0.5,  tipo: 'moeda', cor: '#D4AF37', chaveDb: '0,5' },
+    { chave: '0.2',  valor: 0.2,  tipo: 'moeda', cor: '#D4AF37', chaveDb: '0,2' },
+    { chave: '0.1',  valor: 0.1,  tipo: 'moeda', cor: '#D4AF37', chaveDb: '0,1' },
+    { chave: '0.05', valor: 0.05, tipo: 'moeda', cor: '#B87333', chaveDb: '0,05' },
+    { chave: '0.02', valor: 0.02, tipo: 'moeda', cor: '#B87333', chaveDb: '0,02' },
+    { chave: '0.01', valor: 0.01, tipo: 'moeda', cor: '#B87333', chaveDb: '0,01' }
+  ];
+  // O RTDB proíbe "." em chaves — chaveDb (vírgula) é usada só ao gravar em
+  // caixaContagens/denominacoes; chave (ponto) continua a identificar o
+  // input/DOM e o estado em memória.
+
+  var allContagens = {};
+  var cofreExiste = false;
+  var contagemState = null;
+
+  // Última contagem por dataHora (o nó é push-only, sem outro índice).
+  function ultimaContagemCaixa(){
+    var ids = Object.keys(allContagens);
+    if (!ids.length) return null;
+    var melhor = null;
+    ids.forEach(function(id){
+      var c = allContagens[id];
+      if (!c || !c.dataHora) return;
+      if (!melhor || new Date(c.dataHora) > new Date(melhor.dataHora)) melhor = c;
+    });
+    return melhor;
+  }
+
+  // Saldo vivo = total da última contagem + todos os caixaMovimentos
+  // posteriores a ela, com a MESMA lógica do renderSummary por movimento.
+  // Sem contagem nenhuma (nó vazio), devolve null — não 0.
+  function saldoVivoCaixa(){
+    var contagem = ultimaContagemCaixa();
+    if (!contagem) return null;
+    var saldo = parseFloat(contagem.total) || 0;
+    var desde = new Date(contagem.dataHora).getTime();
+    Object.keys(allMovs).forEach(function(id){
+      var m = allMovs[id];
+      var t = new Date(m.dataHora).getTime();
+      if (isNaN(t) || t <= desde) return;
+      if (m.tipo === 'entrada'){
+        saldo += (parseFloat(m.valor) || 0);
+      } else if (m.estado === 'acertado'){
+        saldo -= ((parseFloat(m.valor) || 0) - (parseFloat(m.valorDevolvido) || 0));
+      } else {
+        saldo -= (parseFloat(m.valor) || 0);
+      }
+    });
+    return round2(saldo);
+  }
+
+  function formatMoedaLabel(valor){
+    return valor >= 1 ? (valor + '€') : (Math.round(valor * 100) + 'c');
+  }
+
+  function denomChipSvg(d){
+    var texto = d.tipo === 'nota' ? (d.valor + '€') : formatMoedaLabel(d.valor);
+    if (d.tipo === 'nota'){
+      return '<svg class="denom-chip" viewBox="0 0 72 44" width="72" height="44" aria-hidden="true">' +
+        '<rect x="1" y="1" width="70" height="42" rx="8" fill="' + d.cor + '"/>' +
+        '<text x="36" y="27" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="14" fill="#FFFFFF">' + texto + '</text>' +
+        '</svg>';
+    }
+    return '<svg class="denom-chip" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">' +
+      '<circle cx="24" cy="24" r="22" fill="' + d.cor + '" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>' +
+      '<text x="24" y="29" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="12" fill="#141414">' + texto + '</text>' +
+      '</svg>';
+  }
+
+  function novoContagemState(){
+    var def = pessoasAtivas.length ? pessoasAtivas[0].id : 'outro';
+    var valores = {};
+    DENOMINACOES.forEach(function(d){ valores[d.chave] = ''; });
+    return { valores: valores, pessoaId: def, motivoDiferenca: '', aGuardar: false };
+  }
+
+  function abrirContagem(){
+    contagemState = novoContagemState();
+    renderContagemPanel();
+  }
+  window.abrirContagem = abrirContagem;
+
+  function fecharContagem(){
+    contagemState = null;
+    renderContagemPanel();
+  }
+  window.fecharContagem = fecharContagem;
+
+  function totalContagem(st){
+    var total = 0;
+    DENOMINACOES.forEach(function(d){
+      var q = parseInt(st.valores[d.chave], 10);
+      if (!isNaN(q) && q > 0) total += q * d.valor;
+    });
+    return round2(total);
+  }
+
+  function esperadoParaComparacao(){
+    var esperadoBruto = saldoVivoCaixa();
+    return (esperadoBruto === null) ? 0 : esperadoBruto;
+  }
+
+  function denomRowHtml(d, st){
+    var idSafe = d.chave.replace('.', '_');
+    var val = st.valores[d.chave];
+    var q = parseInt(val, 10);
+    var subtotal = (!isNaN(q) && q > 0) ? round2(q * d.valor) : 0;
+    var html = '<div class="denom-row">';
+    html += denomChipSvg(d);
+    html += '<input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" class="denom-qtd" data-chave="' + d.chave + '" value="' + escapeHtml(val) + '" placeholder="0" oninput="onContagemQtdInput(this)">';
+    html += '<span class="denom-subtotal" id="denomSub_' + idSafe + '">' + formatEUR(subtotal) + '</span>';
+    html += '</div>';
+    return html;
+  }
+
+  function contagemFormHtml(st){
+    var esperado = esperadoParaComparacao();
+    var total = totalContagem(st);
+    var diferenca = round2(total - esperado);
+    var motivoOk = (diferenca === 0) || (st.motivoDiferenca.trim().length > 0);
+
+    var notas = DENOMINACOES.filter(function(d){ return d.tipo === 'nota'; });
+    var moedas = DENOMINACOES.filter(function(d){ return d.tipo === 'moeda'; });
+
+    var html = '<div class="form-card" style="margin-top:16px;">';
+    html += '<p class="form-title">Contar caixa</p>';
+    html += '<div class="denom-grid">';
+    notas.forEach(function(d){ html += denomRowHtml(d, st); });
+    moedas.forEach(function(d){ html += denomRowHtml(d, st); });
+    html += '</div>';
+
+    html += '<div class="contagem-total"><span>Total contado</span><strong id="contagemTotalValue">' + formatEUR(total) + '</strong></div>';
+
+    html += '<div class="field"><label class="field-label" for="contagemPessoaSelect">Quem está a contar</label>';
+    html += '<select id="contagemPessoaSelect" onchange="onContagemPessoaChange(this)">' + pessoasOptionsHtml(st.pessoaId) + '</select></div>';
+
+    html += '<p class="confere-line ' + (diferenca === 0 ? 'troco-ok' : 'troco-ko') + '" id="contagemDiferencaValue">' +
+      (diferenca === 0 ? '✓ Diferença 0,00 €' : ('≠ Diferença de ' + (diferenca > 0 ? '+' : '−') + formatEUR(Math.abs(diferenca)))) + '</p>';
+
+    html += '<div class="field" id="contagemMotivoField" style="display:' + (diferenca !== 0 ? 'block' : 'none') + ';">';
+    html += '<label class="field-label" for="contagemMotivoInput">Porquê?</label>';
+    html += '<textarea id="contagemMotivoInput" rows="3" oninput="onContagemMotivoInput(this)">' + escapeHtml(st.motivoDiferenca) + '</textarea>';
+    html += '</div>';
+
+    html += '<div class="acertar-actions">';
+    html += '<button type="button" class="btn-cancelar" onclick="fecharContagem()">Cancelar</button>';
+    html += '<button type="button" class="btn-guardar" id="btnGuardarContagem" onclick="guardarContagem()"' + ((motivoOk && !st.aGuardar) ? '' : ' disabled') + '>' + (st.aGuardar ? 'A guardar…' : 'Guardar contagem') + '</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderContagemPanel(){
+    var wrap = document.getElementById('contagemPanelWrap');
+    if (!wrap) return;
+    wrap.innerHTML = contagemState ? contagemFormHtml(contagemState) : '';
+  }
+
+  // Actualizações pontuais nos elementos já existentes — nunca regenera o
+  // painel inteiro num input, senão perde-se o foco a meio de uma linha.
+  function atualizarContagemTotais(){
+    if (!contagemState) return;
+    var total = totalContagem(contagemState);
+    var esperado = esperadoParaComparacao();
+    var diferenca = round2(total - esperado);
+
+    var totalEl = document.getElementById('contagemTotalValue');
+    if (totalEl) totalEl.textContent = formatEUR(total);
+
+    var difEl = document.getElementById('contagemDiferencaValue');
+    if (difEl){
+      difEl.className = 'confere-line ' + (diferenca === 0 ? 'troco-ok' : 'troco-ko');
+      difEl.textContent = (diferenca === 0 ? '✓ Diferença 0,00 €' : ('≠ Diferença de ' + (diferenca > 0 ? '+' : '−') + formatEUR(Math.abs(diferenca))));
+    }
+
+    var motivoField = document.getElementById('contagemMotivoField');
+    if (motivoField) motivoField.style.display = (diferenca !== 0) ? 'block' : 'none';
+
+    var btn = document.getElementById('btnGuardarContagem');
+    if (btn){
+      var motivoOk = (diferenca === 0) || (contagemState.motivoDiferenca.trim().length > 0);
+      btn.disabled = !motivoOk || contagemState.aGuardar;
+    }
+  }
+
+  function onContagemQtdInput(input){
+    if (!contagemState) return;
+    var chave = input.getAttribute('data-chave');
+    contagemState.valores[chave] = input.value;
+    var d = DENOMINACOES.filter(function(x){ return x.chave === chave; })[0];
+    if (d){
+      var q = parseInt(input.value, 10);
+      var subtotal = (!isNaN(q) && q > 0) ? round2(q * d.valor) : 0;
+      var subEl = document.getElementById('denomSub_' + chave.replace('.', '_'));
+      if (subEl) subEl.textContent = formatEUR(subtotal);
+    }
+    atualizarContagemTotais();
+  }
+  window.onContagemQtdInput = onContagemQtdInput;
+
+  function onContagemPessoaChange(select){
+    if (contagemState) contagemState.pessoaId = select.value;
+  }
+  window.onContagemPessoaChange = onContagemPessoaChange;
+
+  function onContagemMotivoInput(textarea){
+    if (!contagemState) return;
+    contagemState.motivoDiferenca = textarea.value;
+    atualizarContagemTotais();
+  }
+  window.onContagemMotivoInput = onContagemMotivoInput;
+
+  function guardarContagem(){
+    var st = contagemState;
+    if (!st || st.aGuardar) return;
+    var total = totalContagem(st);
+    var esperadoBruto = saldoVivoCaixa();
+    var esperado = (esperadoBruto === null) ? 0 : esperadoBruto;
+    var diferenca = round2(total - esperado);
+    if (diferenca !== 0 && !st.motivoDiferenca.trim()) return;
+
+    var denominacoes = {};
+    DENOMINACOES.forEach(function(d){
+      var q = parseInt(st.valores[d.chave], 10);
+      denominacoes[d.chaveDb || d.chave] = (!isNaN(q) && q > 0) ? q : 0;
+    });
+
+    var found = pessoasAtivas.filter(function(p){ return p.id === st.pessoaId; })[0];
+
+    var registo = {
+      dataHora: new Date().toISOString(),
+      denominacoes: denominacoes,
+      total: total,
+      esperado: esperadoBruto,
+      diferenca: diferenca,
+      motivoDiferenca: diferenca === 0 ? null : st.motivoDiferenca.trim(),
+      pessoa: found ? found.nome : 'Outro',
+      pessoaId: found ? found.id : null,
+      notas: null
+    };
+
+    st.aGuardar = true;
+    var btn = document.getElementById('btnGuardarContagem');
+    if (btn){ btn.disabled = true; btn.textContent = 'A guardar…'; }
+
+    contagensRef.push(registo).then(function(){
+      contagemState = null;
+      renderContagemPanel();
+      renderSaldosVivos();
+    }).catch(function(err){
+      st.aGuardar = false;
+      atualizarContagemTotais();
+      var b = document.getElementById('btnGuardarContagem');
+      if (b) b.textContent = 'Guardar contagem';
+      alert('Erro ao guardar a contagem: ' + err.message);
+    });
+  }
+  window.guardarContagem = guardarContagem;
+
+  // ---------- Cards do topo: Caixa (saldo vivo) e Cofre ----------
+  function renderSaldosVivos(){
+    var contagem = ultimaContagemCaixa();
+    var valEl = document.getElementById('caixaVivaValue');
+    var subEl = document.getElementById('caixaVivaSub');
+    var btnEl = document.getElementById('btnContarCaixa');
+    if (valEl && subEl){
+      if (!contagem){
+        valEl.textContent = 'Sem contagem registada';
+        subEl.textContent = '';
+        if (btnEl){ btnEl.textContent = 'Fazer primeira contagem'; btnEl.classList.add('destaque'); }
+      } else {
+        valEl.textContent = formatEUR(saldoVivoCaixa());
+        subEl.textContent = 'Última contagem: ' + formatDataHora(contagem.dataHora) + ' · ' + (contagem.pessoa || '');
+        if (btnEl){ btnEl.textContent = 'Contar caixa'; btnEl.classList.remove('destaque'); }
+      }
+    }
+
+    var cValEl = document.getElementById('cofreVivoValue');
+    var cSubEl = document.getElementById('cofreVivoSub');
+    if (cValEl && cSubEl){
+      if (!cofreExiste){
+        cValEl.textContent = 'A aguardar módulo do cofre';
+        cSubEl.textContent = '';
+      } else {
+        cValEl.textContent = formatEUR(saldoCofre());
+        cSubEl.textContent = '';
+      }
+    }
+  }
 
   var allMovs = {};
   var activeFilter = 'hoje';
@@ -1747,6 +2158,14 @@
     renderSummary();
     renderPendentes();
     renderList();
+    renderSaldosVivos();
+    if (contagemState) atualizarContagemTotais();
+  });
+
+  contagensRef.on('value', function(snapshot){
+    allContagens = snapshot.val() || {};
+    renderSaldosVivos();
+    if (contagemState) atualizarContagemTotais();
   });
 
   carregarPessoas(function(){
@@ -1994,8 +2413,12 @@
   }
 
   cofreRef.on('value', function(snapshot){
+    // Defensivo: o nó pode ainda não existir neste Firebase (outro módulo em
+    // curso). val() null é estado válido, não erro — ver CLAUDE.md.
+    cofreExiste = snapshot.val() !== null;
     allCofreMovs = snapshot.val() || {};
     renderCofre();
+    renderSaldosVivos();
   });
   }); // fim de autenticarEContinuar
 </script>
