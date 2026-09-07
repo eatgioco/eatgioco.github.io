@@ -613,42 +613,135 @@
     color:var(--on-red);
   }
 
-  /* ---------- Contar caixa (denominações) ---------- */
-  .denom-grid{
+  /* ---------- Contar caixa (grelha tátil) ---------- */
+  .denom-toolbar{
     display:flex;
-    flex-direction:column;
-    gap:8px;
+    justify-content:flex-end;
+    margin-bottom:12px;
+  }
+
+  .btn-limpar{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    padding:8px 14px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    cursor:pointer;
+  }
+
+  .btn-limpar:hover{
+    border-color:var(--red);
+    color:var(--red-ink);
+  }
+
+  .denom-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(92px, 1fr));
+    gap:10px;
     margin-bottom:16px;
   }
 
-  .denom-row{
+  .denom-tile{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding-top:8px;
+  }
+
+  /* A área tocável: tap = +1 unidade. Os cantos (badge/menos) fazem
+     stopPropagation para não somarem também ao serem tocados. */
+  .denom-chip-wrap{
+    position:relative;
+    display:inline-flex;
+    cursor:pointer;
+    touch-action:manipulation;
+    -webkit-user-select:none;
+    user-select:none;
+    transition:transform 120ms ease;
+  }
+
+  .denom-chip-wrap.denom-pulse{
+    transform:scale(1.12);
+  }
+
+  .denom-chip{ display:block; }
+
+  .denom-badge{
+    position:absolute;
+    top:-8px;
+    right:-8px;
+    min-width:24px;
+    height:24px;
+    padding:0 6px;
+    border-radius:100px;
+    background:var(--ink);
+    color:var(--white);
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
     display:flex;
     align-items:center;
-    gap:12px;
+    justify-content:center;
+    cursor:text;
+    box-shadow:0 0 0 2px var(--dough);
+    z-index:2;
   }
 
-  .denom-chip{ flex:0 0 auto; }
+  .denom-badge.zero{
+    background:var(--caixa-thumb-bg);
+    color:var(--muted);
+  }
 
-  .denom-qtd{
-    flex:1 1 auto;
-    min-height:44px;
-    max-width:120px;
-    padding:8px 12px;
-    border:2px solid var(--line);
-    background:var(--dough);
+  .denom-badge-input{
+    position:absolute;
+    top:-10px;
+    right:-10px;
+    width:54px;
+    height:28px;
+    padding:0 4px;
+    border:2px solid var(--ink);
+    border-radius:100px;
+    background:var(--white);
+    color:var(--ink);
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    text-align:center;
+    z-index:3;
+  }
+
+  .denom-badge-input:focus{ outline:none; }
+
+  .denom-minus{
+    position:absolute;
+    bottom:-8px;
+    left:-8px;
+    width:28px;
+    height:28px;
+    border-radius:100px;
+    border:2px solid var(--line);
+    background:var(--white);
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
     font-size:16px;
     font-weight:700;
-    color:var(--ink);
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    z-index:2;
   }
 
-  .denom-qtd:focus{ outline:none; border-color:var(--ink); }
+  .denom-minus:hover{ border-color:var(--ink); color:var(--ink); }
+  .denom-minus:active{ transform:scale(0.9); }
 
   .denom-subtotal{
-    flex:0 0 90px;
-    text-align:right;
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
-    font-size:14px;
+    font-size:12px;
     font-weight:600;
     color:var(--muted);
   }
@@ -1171,19 +1264,28 @@
     return valor >= 1 ? (valor + '€') : (Math.round(valor * 100) + 'c');
   }
 
+  // Chip vetorial local (sem fotos, sem CDN, nunca reprodução foto-realista
+  // de numerário — ver CLAUDE.md). Moldura interior + friso lateral (notas) /
+  // anel bicolor (moedas) só para reconhecer mais depressa ao olhar para a
+  // pilha física ao lado — não é sobre desempenho, o SVG já era leve antes.
   function denomChipSvg(d){
     var texto = d.tipo === 'nota' ? (d.valor + '€') : formatMoedaLabel(d.valor);
     if (d.tipo === 'nota'){
       return '<svg class="denom-chip" viewBox="0 0 72 44" width="72" height="44" aria-hidden="true">' +
         '<rect x="1" y="1" width="70" height="42" rx="8" fill="' + d.cor + '"/>' +
-        '<text x="36" y="27" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="14" fill="#FFFFFF">' + texto + '</text>' +
+        '<rect x="7" y="7" width="58" height="30" rx="5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
+        '<rect x="7" y="7" width="14" height="30" rx="5" fill="rgba(255,255,255,0.18)"/>' +
+        '<text x="41" y="28" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="17" fill="#FFFFFF">' + texto + '</text>' +
         '</svg>';
     }
     return '<svg class="denom-chip" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">' +
       '<circle cx="24" cy="24" r="22" fill="' + d.cor + '" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>' +
-      '<text x="24" y="29" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="12" fill="#141414">' + texto + '</text>' +
+      '<circle cx="24" cy="24" r="15" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
+      '<text x="24" y="29" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="14" fill="#141414">' + texto + '</text>' +
       '</svg>';
   }
+
+  function idSafe(chave){ return chave.replace('.', '_'); }
 
   function novoContagemState(){
     var def = pessoasAtivas.length ? pessoasAtivas[0].id : 'outro';
@@ -1192,17 +1294,32 @@
     return { valores: valores, pessoaId: def, motivoDiferenca: '', aGuardar: false };
   }
 
+  // Chave da denominação com a edição inline aberta (uma de cada vez), ou
+  // null. Vive fora do contagemState porque é estado de UI, não de dados.
+  var contagemEditando = null;
+
   function abrirContagem(){
     contagemState = novoContagemState();
+    contagemEditando = null;
     renderContagemPanel();
   }
   window.abrirContagem = abrirContagem;
 
   function fecharContagem(){
     contagemState = null;
+    contagemEditando = null;
     renderContagemPanel();
   }
   window.fecharContagem = fecharContagem;
+
+  function limparContagem(){
+    if (!contagemState) return;
+    if (!confirm('Limpar todas as quantidades desta contagem?')) return;
+    contagemEditando = null;
+    DENOMINACOES.forEach(function(d){ contagemState.valores[d.chave] = ''; });
+    renderContagemPanel();
+  }
+  window.limparContagem = limparContagem;
 
   function totalContagem(st){
     var total = 0;
@@ -1218,17 +1335,128 @@
     return (esperadoBruto === null) ? 0 : esperadoBruto;
   }
 
-  function denomRowHtml(d, st){
-    var idSafe = d.chave.replace('.', '_');
-    var val = st.valores[d.chave];
+  // Badge de quantidade: span discreto por omissão, vira input inline (tocar
+  // no PRÓPRIO NÚMERO, não no chip) para quantidades grandes. Só um de cada
+  // vez — contagemEditando guarda qual.
+  function denomBadgeHtml(chave){
+    var val = contagemState.valores[chave];
+    var q = parseInt(val, 10);
+    var qtd = (!isNaN(q) && q > 0) ? q : 0;
+    var idb = 'denomBadge_' + idSafe(chave);
+    if (contagemEditando === chave){
+      return '<input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" class="denom-badge-input" id="' + idb + '" data-chave="' + chave + '" value="' + escapeHtml(val) + '" onclick="event.stopPropagation()" oninput="onContagemQtdInput(this)" onblur="onDenomBadgeBlur(this,\'' + chave + '\')" onkeydown="onDenomBadgeKeydown(event,this)">';
+    }
+    return '<span class="denom-badge' + (qtd === 0 ? ' zero' : '') + '" id="' + idb + '" onclick="onDenomBadgeClick(event,\'' + chave + '\')">' + qtd + '</span>';
+  }
+
+  function denomTileHtml(d){
+    var id = idSafe(d.chave);
+    var val = contagemState.valores[d.chave];
     var q = parseInt(val, 10);
     var subtotal = (!isNaN(q) && q > 0) ? round2(q * d.valor) : 0;
-    var html = '<div class="denom-row">';
+    var html = '<div class="denom-tile">';
+    html += '  <div class="denom-chip-wrap" id="denomWrap_' + id + '" onclick="onDenomTap(\'' + d.chave + '\')">';
     html += denomChipSvg(d);
-    html += '<input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" class="denom-qtd" data-chave="' + d.chave + '" value="' + escapeHtml(val) + '" placeholder="0" oninput="onContagemQtdInput(this)">';
-    html += '<span class="denom-subtotal" id="denomSub_' + idSafe + '">' + formatEUR(subtotal) + '</span>';
+    html += '    <button type="button" class="denom-minus" onclick="onDenomMinus(event,\'' + d.chave + '\')" aria-label="Diminuir ' + escapeHtml(d.chave) + '">−</button>';
+    html += denomBadgeHtml(d.chave);
+    html += '  </div>';
+    html += '  <span class="denom-subtotal" id="denomSub_' + id + '">' + formatEUR(subtotal) + '</span>';
     html += '</div>';
     return html;
+  }
+
+  // Actualiza só o subtotal e o total/diferença — a MESMA lógica de sempre
+  // (aplicarDenomValor), chamada pelos três pontos de entrada (tap, −,
+  // edição inline). O badge em si (span vs. total exibido) é actualizado à
+  // parte por quem chama, porque nem sempre há um <input> a disparar oninput.
+  function aplicarDenomValor(chave, valorStr){
+    if (!contagemState) return;
+    contagemState.valores[chave] = valorStr;
+    var d = DENOMINACOES.filter(function(x){ return x.chave === chave; })[0];
+    if (d){
+      var q = parseInt(valorStr, 10);
+      var subtotal = (!isNaN(q) && q > 0) ? round2(q * d.valor) : 0;
+      var subEl = document.getElementById('denomSub_' + idSafe(chave));
+      if (subEl) subEl.textContent = formatEUR(subtotal);
+    }
+    atualizarContagemTotais();
+  }
+
+  function atualizarBadgeSpan(chave){
+    var badgeEl = document.getElementById('denomBadge_' + idSafe(chave));
+    // Em edição é um <input> — não mexer, o próprio input já mostra o valor.
+    if (!badgeEl || badgeEl.tagName === 'INPUT') return;
+    var q = parseInt(contagemState.valores[chave], 10);
+    var qtd = (!isNaN(q) && q > 0) ? q : 0;
+    badgeEl.textContent = qtd;
+    badgeEl.classList.toggle('zero', qtd === 0);
+  }
+
+  function pulseTile(chave){
+    var wrap = document.getElementById('denomWrap_' + idSafe(chave));
+    if (!wrap) return;
+    wrap.classList.remove('denom-pulse');
+    void wrap.offsetWidth; // força reflow para a animação reiniciar em toques seguidos
+    wrap.classList.add('denom-pulse');
+    setTimeout(function(){ wrap.classList.remove('denom-pulse'); }, 150);
+  }
+
+  // Tap no chip = +1. Ignorado enquanto a própria denominação está em edição
+  // inline (o input já tem stopPropagation, isto é só defensivo).
+  function onDenomTap(chave){
+    if (!contagemState || contagemEditando === chave) return;
+    var atual = parseInt(contagemState.valores[chave], 10);
+    if (isNaN(atual)) atual = 0;
+    aplicarDenomValor(chave, String(atual + 1));
+    atualizarBadgeSpan(chave);
+    pulseTile(chave);
+  }
+  window.onDenomTap = onDenomTap;
+
+  // Botão "−": nunca desce abaixo de 0.
+  function onDenomMinus(evt, chave){
+    evt.stopPropagation();
+    if (!contagemState) return;
+    var atual = parseInt(contagemState.valores[chave], 10);
+    if (isNaN(atual)) atual = 0;
+    if (atual <= 0) return;
+    aplicarDenomValor(chave, String(atual - 1));
+    atualizarBadgeSpan(chave);
+  }
+  window.onDenomMinus = onDenomMinus;
+
+  // Tocar no número do badge (não no chip) abre edição inline para
+  // quantidades grandes. Só uma denominação em edição de cada vez.
+  function onDenomBadgeClick(evt, chave){
+    evt.stopPropagation();
+    if (!contagemState || contagemEditando) return;
+    contagemEditando = chave;
+    trocarBadgeDom(chave);
+  }
+  window.onDenomBadgeClick = onDenomBadgeClick;
+
+  // Enter ou blur grava o valor (já em contagemState via oninput) e volta ao
+  // badge normal.
+  function onDenomBadgeBlur(input, chave){
+    if (contagemEditando !== chave) return;
+    contagemEditando = null;
+    trocarBadgeDom(chave);
+  }
+  window.onDenomBadgeBlur = onDenomBadgeBlur;
+
+  function onDenomBadgeKeydown(evt, input){
+    if (evt.key === 'Enter'){ evt.preventDefault(); input.blur(); }
+  }
+  window.onDenomBadgeKeydown = onDenomBadgeKeydown;
+
+  function trocarBadgeDom(chave){
+    var atual = document.getElementById('denomBadge_' + idSafe(chave));
+    if (!atual) return;
+    var temp = document.createElement('div');
+    temp.innerHTML = denomBadgeHtml(chave);
+    var novo = temp.firstElementChild;
+    atual.replaceWith(novo);
+    if (contagemEditando === chave){ novo.focus(); novo.select(); }
   }
 
   function contagemFormHtml(st){
@@ -1242,9 +1470,10 @@
 
     var html = '<div class="form-card" style="margin-top:16px;">';
     html += '<p class="form-title">Contar caixa</p>';
+    html += '<div class="denom-toolbar"><button type="button" class="btn-limpar" onclick="limparContagem()">Limpar contagem</button></div>';
     html += '<div class="denom-grid">';
-    notas.forEach(function(d){ html += denomRowHtml(d, st); });
-    moedas.forEach(function(d){ html += denomRowHtml(d, st); });
+    notas.forEach(function(d){ html += denomTileHtml(d); });
+    moedas.forEach(function(d){ html += denomTileHtml(d); });
     html += '</div>';
 
     html += '<div class="contagem-total"><span>Total contado</span><strong id="contagemTotalValue">' + formatEUR(total) + '</strong></div>';
@@ -1301,18 +1530,11 @@
     }
   }
 
+  // Único ponto de entrada com <input> real (a edição inline do badge) —
+  // chama a MESMA lógica central (aplicarDenomValor) que o tap e o "−" usam.
   function onContagemQtdInput(input){
     if (!contagemState) return;
-    var chave = input.getAttribute('data-chave');
-    contagemState.valores[chave] = input.value;
-    var d = DENOMINACOES.filter(function(x){ return x.chave === chave; })[0];
-    if (d){
-      var q = parseInt(input.value, 10);
-      var subtotal = (!isNaN(q) && q > 0) ? round2(q * d.valor) : 0;
-      var subEl = document.getElementById('denomSub_' + chave.replace('.', '_'));
-      if (subEl) subEl.textContent = formatEUR(subtotal);
-    }
-    atualizarContagemTotais();
+    aplicarDenomValor(input.getAttribute('data-chave'), input.value);
   }
   window.onContagemQtdInput = onContagemQtdInput;
 
