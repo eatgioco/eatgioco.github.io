@@ -1780,6 +1780,66 @@
     min-height:15px;
   }
 
+  /* Lista de levantamentos elegíveis dentro do modal de alocação. */
+  .aloc-op{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    text-align:left;
+    padding:10px 12px;
+    margin-bottom:6px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--white);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    cursor:pointer;
+  }
+
+  .aloc-op:hover{ border-color:var(--red); }
+
+  .aloc-op.escolhido{
+    border-color:var(--red);
+    box-shadow:2px 2px 0 var(--red);
+  }
+
+  .aloc-op .aloc-liq{
+    margin-left:auto;
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  .aloc-op .aloc-sub{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .aloc-vazio{
+    font-size:13px;
+    color:var(--muted);
+    margin:0 0 16px;
+  }
+
+  /* Linha de uma devolução por alocar. */
+  .dep-alocar-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+    color:var(--ink);
+  }
+
+  .dep-alocar-row:last-child{ border-bottom:none; }
+  .dep-alocar-row .dep-alocar-valor{ font-variant-numeric:tabular-nums; font-weight:700; }
+  .dep-alocar-row .dep-alocar-detalhe{ color:var(--muted); }
+  .dep-alocar-row .dep-alocar-acao{ margin-left:auto; }
+
   /* Sub-linha "600,00 € − 200,00 € devolvidos" debaixo do valor líquido. */
   .dep-sub{
     display:block;
@@ -2153,6 +2213,13 @@
     </div>
   </div>
 
+  <!-- Devoluções que voltaram à caixa sem se saber de que levantamento vieram
+       (a caixa.html não pergunta). Só aparece quando há alguma por alocar. -->
+  <div class="tes-block glass-light" id="depPorAlocarBloco" style="display:none;">
+    <p class="tes-block-title">Devoluções por alocar <span id="depPorAlocarResumo"></span></p>
+    <div id="depPorAlocarLista"></div>
+  </div>
+
   <!-- Só aparece quando esta sessão reconciliou alguma coisa. -->
   <div class="tes-block glass-light tes-recon" id="depReconBloco" style="display:none;">
     <p class="tes-block-title">Reconciliados agora <span class="tes-recon-badge">Novo</span></p>
@@ -2244,6 +2311,25 @@
     <div class="modal-actions">
       <button type="button" class="btn" id="depositadoNao">Cancelar</button>
       <button type="button" class="btn-add" id="depositadoSim">✓ Marcar como depositado</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal "Alocar a um levantamento" — liga uma devolução já em caixa ao
+     levantamento de onde o dinheiro saiu. A devolução aloca-se sempre por
+     inteiro a um só levantamento. -->
+<div class="modal-overlay" id="alocarModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Alocar a um levantamento</h2>
+      <button class="modal-close" id="alocarModalClose">×</button>
+    </div>
+    <p class="modal-contexto" id="alocarContexto"></p>
+    <div id="alocarLista"></div>
+    <p class="modal-erro" id="alocarErro"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="alocarNao">Cancelar</button>
+      <button type="button" class="btn-add" id="alocarSim" disabled>✓ Confirmar alocação</button>
     </div>
   </div>
 </div>
@@ -4278,6 +4364,38 @@ window.addEventListener('load', function () {
       .sort(function(a, b){ return new Date(b.depositadoEm || b.dataHora) - new Date(a.depositadoEm || a.dataHora); });
   }
 
+  /* Devoluções POR ALOCAR: entradas de "Devolução de depósito bancário" que
+     ainda não estão ligadas a nenhum levantamento. A caixa.html cria-as sempre
+     assim (depositoOrigemId: null) porque quem regista na loja não sabe de que
+     levantamento veio o dinheiro; alocar é uma decisão que só se toma aqui.
+     O motivo pode trazer detalhe livre ("Label: detalhe"), daí a comparação
+     por prefixo em vez de igualdade — a mesma convenção da caixa.html. */
+  var MOTIVO_DEVOLUCAO_DEPOSITO_NORM = normalizarTexto('Devolução de depósito bancário');
+
+  function isDevolucaoDeposito(m){
+    if (m.tipo !== 'entrada') return false;
+    var norm = normalizarTexto(m.motivo);
+    return norm === MOTIVO_DEVOLUCAO_DEPOSITO_NORM ||
+           norm.indexOf(MOTIVO_DEVOLUCAO_DEPOSITO_NORM + ':') === 0;
+  }
+
+  function devolucoesPorAlocar(){
+    return Object.keys(allCaixaMovs)
+      .map(function(id){ return Object.assign({ id: id }, allCaixaMovs[id]); })
+      .filter(function(m){ return isDevolucaoDeposito(m) && !m.depositoOrigemId; })
+      .sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+  }
+
+  function totalPorAlocar(){
+    return devolucoesPorAlocar().reduce(function(acc, m){ return acc + (parseFloat(m.valor) || 0); }, 0);
+  }
+
+  // "Devolução de depósito bancário: sobrou do depósito de sexta" -> o detalhe.
+  function detalheDoMotivo(motivo){
+    var i = String(motivo || '').indexOf(':');
+    return i === -1 ? '' : String(motivo).slice(i + 1).trim();
+  }
+
   // Sub-linha "600,00 € − 200,00 € devolvidos" debaixo do valor líquido.
   function subLinhaDevolvido(m){
     var dev = parseFloat(m.devolvidoDeposito) || 0;
@@ -4320,6 +4438,8 @@ window.addEventListener('load', function () {
     document.getElementById('depDetalheSub').textContent = pendentes.length === 0
       ? 'Tudo depositado ✓'
       : pendentes.length + (pendentes.length === 1 ? ' levantamento por depositar' : ' levantamentos por depositar');
+
+    renderPorAlocar();
 
     var pendentesEl = document.getElementById('depPendentesLista');
     if (pendentes.length === 0){
@@ -4364,6 +4484,30 @@ window.addEventListener('load', function () {
         }).join('') +
         '</tbody></table>';
     }
+  }
+
+  function renderPorAlocar(){
+    var lista = devolucoesPorAlocar();
+    var bloco = document.getElementById('depPorAlocarBloco');
+    if (lista.length === 0){
+      bloco.style.display = 'none';
+      return;
+    }
+    bloco.style.display = 'block';
+    document.getElementById('depPorAlocarResumo').textContent =
+      formatEuro(totalPorAlocar()) + ' (' + lista.length + (lista.length === 1 ? ' registo)' : ' registos)');
+
+    document.getElementById('depPorAlocarLista').innerHTML = lista.map(function(m){
+      var detalhe = detalheDoMotivo(m.motivo);
+      return '<div class="dep-alocar-row">' +
+        '<span class="mono">' + formatDataCurta(m.dataHora) + '</span>' +
+        '<span class="dep-alocar-valor">' + formatEuro(parseFloat(m.valor) || 0) + '</span>' +
+        '<span>' + escapeHtml(m.pessoa || '—') + '</span>' +
+        (detalhe ? '<span class="dep-alocar-detalhe">' + escapeHtml(detalhe) + '</span>' : '') +
+        '<span class="dep-alocar-acao"><button type="button" class="btn-small btn-alocar" data-id="' +
+          escapeHtml(m.id) + '">Alocar a um levantamento</button></span>' +
+        '</div>';
+    }).join('');
   }
 
   /* ---------- Cartão Contas Bancárias ----------
@@ -4711,6 +4855,142 @@ window.addEventListener('load', function () {
     if (e.key === 'Escape' && depositadoModalOverlay.classList.contains('open')) fecharModalMarcarDepositado();
   });
 
+  /* ---------- Modal "Alocar a um levantamento" ----------
+     Liga uma devolução já em caixa ao levantamento de onde saiu o dinheiro.
+     Duas escritas update(): a entrada ganha depositoOrigemId + alocadoEm, o
+     levantamento acumula devolvidoDeposito + devolucoes/{idDaEntrada}. Uma
+     devolução aloca-se por inteiro a um só levantamento. */
+  var alocarModalOverlay = document.getElementById('alocarModalOverlay');
+  var alocarContexto = document.getElementById('alocarContexto');
+  var alocarListaEl = document.getElementById('alocarLista');
+  var alocarErroEl = document.getElementById('alocarErro');
+  var alocarSimBtn = document.getElementById('alocarSim');
+  var alocarDevolucaoId = null;
+  var alocarEscolhidoId = null;
+
+  document.getElementById('depPorAlocarLista').addEventListener('click', function(e){
+    var btn = e.target.closest('.btn-alocar');
+    if (!btn) return;
+    var id = btn.getAttribute('data-id');
+    if (allCaixaMovs[id]) abrirModalAlocar(id);
+  });
+
+  function abrirModalAlocar(id){
+    alocarModalOverlay.classList.add('open');
+    var dev = allCaixaMovs[id];
+    var valor = parseFloat(dev.valor) || 0;
+    alocarDevolucaoId = id;
+    alocarEscolhidoId = null;
+    alocarErroEl.textContent = '';
+    alocarSimBtn.disabled = true;
+    alocarSimBtn.textContent = '✓ Confirmar alocação';
+
+    var detalhe = detalheDoMotivo(dev.motivo);
+    alocarContexto.textContent = 'Devolução de ' + formatEuro(valor) + ' — ' +
+      formatDataCurta(dev.dataHora) + ' — ' + (dev.pessoa || '—') +
+      (detalhe ? ' — ' + detalhe : '');
+
+    // Só levantamentos com líquido suficiente: a devolução vai por inteiro.
+    var todos = depositosPendentes();
+    var elegiveis = todos
+      .filter(function(m){ return liquidoDeposito(m) >= valor - 0.0001; })
+      .sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+
+    if (elegiveis.length === 0){
+      alocarListaEl.innerHTML = '<p class="aloc-vazio">' + (todos.length === 0
+        ? 'Não há levantamentos por depositar. Marca um como pendente ou regista o levantamento primeiro.'
+        : 'Nenhum dos ' + todos.length + ' levantamentos por depositar tem ' + formatEuro(valor) +
+          ' por depositar. Uma devolução aloca-se por inteiro a um só levantamento — divide-a em ' +
+          'registos mais pequenos na caixa, ou aloca-a a um levantamento maior.') + '</p>';
+      return;
+    }
+
+    alocarListaEl.innerHTML = elegiveis.map(function(m){
+      return '<button type="button" class="aloc-op" data-id="' + escapeHtml(m.id) + '">' +
+        '<span>' + formatDataCurta(m.dataHora) + '<span class="aloc-sub">' +
+          escapeHtml(m.pessoa || '—') + ' · levantou ' + formatEuro(parseFloat(m.valor) || 0) +
+        '</span></span>' +
+        '<span class="aloc-liq">' + formatEuro(liquidoDeposito(m)) + '<span class="aloc-sub">por depositar</span></span>' +
+        '</button>';
+    }).join('');
+  }
+
+  alocarListaEl.addEventListener('click', function(e){
+    var op = e.target.closest('.aloc-op');
+    if (!op) return;
+    alocarEscolhidoId = op.getAttribute('data-id');
+    Array.prototype.forEach.call(alocarListaEl.querySelectorAll('.aloc-op'), function(el){
+      el.classList.toggle('escolhido', el === op);
+    });
+    alocarErroEl.textContent = '';
+    alocarSimBtn.disabled = false;
+  });
+
+  function fecharModalAlocar(){
+    alocarModalOverlay.classList.remove('open');
+    alocarDevolucaoId = null;
+    alocarEscolhidoId = null;
+  }
+
+  alocarSimBtn.addEventListener('click', function(){
+    var devId = alocarDevolucaoId;
+    var levId = alocarEscolhidoId;
+    if (!devId || !levId) return;
+    var dev = allCaixaMovs[devId];
+    var lev = allCaixaMovs[levId];
+    if (!dev || !lev) return;
+
+    var valor = parseFloat(dev.valor) || 0;
+    var liquido = liquidoDeposito(Object.assign({ id: levId }, lev));
+    // Revalidação no momento do clique: outra sessão pode ter alocado
+    // entretanto e o líquido já não chegar.
+    if (valor > liquido + 0.0001){
+      alocarErroEl.textContent = 'Este levantamento já só tem ' + formatEuro(liquido) +
+        ' por depositar — não chega para uma devolução de ' + formatEuro(valor) + '.';
+      alocarSimBtn.disabled = true;
+      return;
+    }
+    if (dev.depositoOrigemId){
+      alocarErroEl.textContent = 'Esta devolução já foi alocada entretanto.';
+      alocarSimBtn.disabled = true;
+      return;
+    }
+
+    var devolvidoAnterior = parseFloat(lev.devolvidoDeposito) || 0;
+    var upLev = { devolvidoDeposito: Math.round((devolvidoAnterior + valor) * 100) / 100 };
+    upLev['devolucoes/' + devId] = {
+      valor: valor,
+      dataHora: dev.dataHora,
+      pessoa: dev.pessoa,
+      pessoaId: dev.pessoaId || null
+    };
+
+    alocarSimBtn.disabled = true;
+    alocarSimBtn.textContent = 'A alocar…';
+
+    caixaRef.child(devId).update({ depositoOrigemId: levId, alocadoEm: new Date().toISOString() })
+      .then(function(){
+        return caixaRef.child(levId).update(upLev);
+      })
+      .then(function(){
+        fecharModalAlocar();
+      })
+      .catch(function(err){
+        alocarSimBtn.disabled = false;
+        alocarSimBtn.textContent = '✓ Confirmar alocação';
+        alocarErroEl.textContent = 'Erro ao alocar: ' + (err && err.message ? err.message : String(err));
+      });
+  });
+
+  document.getElementById('alocarNao').addEventListener('click', fecharModalAlocar);
+  document.getElementById('alocarModalClose').addEventListener('click', fecharModalAlocar);
+  alocarModalOverlay.addEventListener('click', function(e){
+    if (e.target === alocarModalOverlay) fecharModalAlocar();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && alocarModalOverlay.classList.contains('open')) fecharModalAlocar();
+  });
+
   /* ---------- Modal "Devolver à caixa" ----------
      Escreve exatamente o mesmo que a caixa.html: uma ENTRADA nova em
      caixaMovimentos com depositoOrigemId, e depois um update() no
@@ -4781,7 +5061,9 @@ window.addEventListener('load', function () {
       estado: 'acertado',
       valorDevolvido: 0,
       notas: null,
-      depositoOrigemId: id
+      // Aqui a ligação é conhecida: a ação parte do próprio levantamento.
+      depositoOrigemId: id,
+      alocadoEm: agora
     };
 
     devolucaoSimBtn.disabled = true;

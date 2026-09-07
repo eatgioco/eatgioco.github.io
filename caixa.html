@@ -578,12 +578,6 @@
     cursor:pointer;
   }
 
-  .dep-erro{
-    margin-top:6px;
-    font-size:12px;
-    color:var(--red-ink);
-  }
-
   .gasto-real{
     margin-top:6px;
     font-size:12px;
@@ -753,16 +747,6 @@
         <div class="field" id="motivoDetalheField" style="display:none;">
           <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
           <input type="text" id="motivoDetalheInput" placeholder="">
-        </div>
-
-        <!-- Só na entrada "Devolução de depósito bancário": de que levantamento
-             veio o dinheiro que agora volta à caixa. -->
-        <div class="field" id="depositoOrigemField" style="display:none;">
-          <label class="field-label" for="depositoOrigemSelect">De que levantamento?</label>
-          <select id="depositoOrigemSelect">
-            <option value="">Seleciona o levantamento...</option>
-          </select>
-          <p class="dep-erro" id="depositoOrigemErro" style="display:none;"></p>
         </div>
 
         <!-- Só em saídas Compra / Pagamento a fornecedor. Obrigatório. -->
@@ -967,7 +951,13 @@
       { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo', semAcerto: true }
     ],
     entrada: [
-      { value: 'devolucaoDeposito', label: 'Devolução de depósito bancário' },
+      // Detalhe OPCIONAL (detalheOpcional) — ao contrário dos outros motivos,
+      // que não validam sem ele. Quem regista na loja não sabe a que
+      // levantamento o dinheiro pertence; escreve contexto livre, e a ligação
+      // (se for precisa) faz-se depois no mrn-dashboard.html.
+      { value: 'devolucaoDeposito', label: 'Devolução de depósito bancário',
+        detailLabel: 'Detalhe (opcional)', detailPlaceholder: 'ex: sobrou do depósito de sexta',
+        detalheOpcional: true },
       { value: 'troco', label: 'Troco de compra/saída', detailLabel: 'De quê?', detailPlaceholder: 'ex: troco da rúcula Pingo Doce' },
       { value: 'reforco', label: 'Reforço de caixa', detailLabel: 'De onde?', detailPlaceholder: 'ex: levantamento ATM' },
       { value: 'outro', label: 'Outro', detailLabel: 'Detalhe', detailPlaceholder: 'descreve o motivo' }
@@ -996,9 +986,6 @@
   var motivoDetalheField = document.getElementById('motivoDetalheField');
   var motivoDetalheLabel = document.getElementById('motivoDetalheLabel');
   var motivoDetalheInput = document.getElementById('motivoDetalheInput');
-  var depositoOrigemField = document.getElementById('depositoOrigemField');
-  var depositoOrigemSelect = document.getElementById('depositoOrigemSelect');
-  var depositoOrigemErro = document.getElementById('depositoOrigemErro');
   var trocoField = document.getElementById('trocoField');
   var trocoSimBtn = document.getElementById('trocoSimBtn');
   var trocoNaoBtn = document.getElementById('trocoNaoBtn');
@@ -1066,14 +1053,13 @@
   }
 
   // ---------- Devolução de depósito bancário ----------
-  // Levanta-se dinheiro da caixa para depositar e depois devolve-se parte:
-  // a devolução é uma ENTRADA nova ligada ao levantamento por
-  // depositoOrigemId, e o levantamento acumula devolvidoDeposito +
-  // devolucoes/{idDaEntrada}. NÃO tem nada a ver com valorDevolvido, que é
-  // do fluxo de troco das Compras/Pagamentos.
-  var MOTIVO_DEVOLUCAO_DEPOSITO = 'Devolução de depósito bancário';
-  var DIAS_LEVANTAMENTOS_ELEGIVEIS = 30;
-
+  // Levanta-se dinheiro da caixa para depositar e depois devolve-se parte.
+  // A devolução é uma ENTRADA normal: a caixa NÃO sabe (nem pergunta) a que
+  // levantamento pertence — o dinheiro em caixa é fungível e quem regista na
+  // loja não tem como saber a correspondência. A ligação, quando é precisa,
+  // faz-se só no mrn-dashboard.html (alocação), que escreve depositoOrigemId
+  // e alocadoEm na entrada e acumula devolvidoDeposito + devolucoes/ no
+  // levantamento. Nada disto toca no valorDevolvido, que é do fluxo de troco.
   function normalizarMotivo(txt){
     return String(txt || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   }
@@ -1085,51 +1071,6 @@
   // O que falta depositar de um levantamento = valor − já devolvido à caixa.
   function liquidoDeposito(m){
     return round2((parseFloat(m.valor) || 0) - (parseFloat(m.devolvidoDeposito) || 0));
-  }
-
-  function formatDiaMes(iso){
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
-  }
-
-  // Levantamentos que ainda têm dinheiro por devolver, dos últimos 30 dias.
-  // PRIVACIDADE: esta lista nunca olha para depositado / depositadoEm /
-  // movimentoContaRef — o estado bancário não pertence à caixa e não pode
-  // ser exposto aqui, nem sequer como filtro.
-  function levantamentosParaDevolucao(){
-    var limite = Date.now() - DIAS_LEVANTAMENTOS_ELEGIVEIS * 24 * 60 * 60 * 1000;
-    return Object.keys(allMovs)
-      .map(function(id){ return { id: id, m: allMovs[id] }; })
-      .filter(function(o){
-        if (!isDepositoBancario(o.m)) return false;
-        var t = new Date(o.m.dataHora).getTime();
-        if (isNaN(t) || t < limite) return false;
-        return liquidoDeposito(o.m) > 0.005;
-      })
-      .sort(function(a, b){ return new Date(b.m.dataHora) - new Date(a.m.dataHora); });
-  }
-
-  function popularDepositoOrigem(){
-    var lista = levantamentosParaDevolucao();
-    if (lista.length === 0){
-      depositoOrigemSelect.innerHTML = '<option value="">Sem levantamentos por devolver</option>';
-      depositoOrigemSelect.disabled = true;
-      return;
-    }
-    var html = '<option value="">Seleciona o levantamento...</option>';
-    lista.forEach(function(o){
-      var label = formatDiaMes(o.m.dataHora) + ' · ' + formatEUR(o.m.valor) + ' · ' +
-                  (o.m.pessoa || '—') + ' · por devolver ' + formatEUR(liquidoDeposito(o.m));
-      html += '<option value="' + o.id + '">' + escapeHtml(label) + '</option>';
-    });
-    depositoOrigemSelect.innerHTML = html;
-    depositoOrigemSelect.disabled = false;
-  }
-
-  function mostrarErroDeposito(msg){
-    depositoOrigemErro.textContent = msg || '';
-    depositoOrigemErro.style.display = msg ? 'block' : 'none';
   }
 
   // ---------- Formulário de registo ----------
@@ -1148,9 +1089,6 @@
     motivoSelect.disabled = lista.length === 0;
     motivoDetalheField.style.display = 'none';
     motivoDetalheInput.value = '';
-    depositoOrigemField.style.display = 'none';
-    depositoOrigemSelect.value = '';
-    mostrarErroDeposito('');
     setTroco(null);
     trocoField.style.display = 'none';
   }
@@ -1171,14 +1109,6 @@
       motivoDetalheField.style.display = 'none';
       motivoDetalheInput.value = '';
     }
-    var devolucao = !!(opcao && opcao.value === 'devolucaoDeposito');
-    depositoOrigemField.style.display = devolucao ? 'block' : 'none';
-    if (devolucao){
-      popularDepositoOrigem();
-    } else {
-      depositoOrigemSelect.value = '';
-      mostrarErroDeposito('');
-    }
     var pergunta = !!(opcao && opcao.pergTroco);
     trocoField.style.display = pergunta ? 'block' : 'none';
     if (!pergunta) setTroco(null);
@@ -1187,32 +1117,11 @@
 
   function validateForm(){
     var opcao = currentMotivoOpcao();
-    var motivoValido = !!opcao && (!opcao.detailLabel || motivoDetalheInput.value.trim().length > 0);
+    // detalheOpcional: o campo aparece mas não trava a validação.
+    var precisaDetalhe = !!opcao && !!opcao.detailLabel && !opcao.detalheOpcional;
+    var motivoValido = !!opcao && (!precisaDetalhe || motivoDetalheInput.value.trim().length > 0);
     var trocoValido = !opcao || !opcao.pergTroco || formState.troco !== null;
-    var valor = parseFloat(valorInput.value);
-
-    // Devolução de depósito: precisa de levantamento escolhido e de um valor
-    // que não passe do que ainda falta depositar desse levantamento.
-    var devolucaoValida = true;
-    if (opcao && opcao.value === 'devolucaoDeposito'){
-      var origem = allMovs[depositoOrigemSelect.value];
-      if (!origem){
-        devolucaoValida = false;
-        mostrarErroDeposito('');
-      } else {
-        var maximo = liquidoDeposito(origem);
-        if (valor > maximo + 0.0001){
-          devolucaoValida = false;
-          mostrarErroDeposito('Máximo: ' + formatEUR(maximo));
-        } else {
-          mostrarErroDeposito('');
-        }
-      }
-    } else {
-      mostrarErroDeposito('');
-    }
-
-    var valid = formState.tipo && valor > 0 && motivoValido && trocoValido && devolucaoValida;
+    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido && trocoValido;
     registarBtn.disabled = !valid;
   }
 
@@ -1229,7 +1138,6 @@
   valorInput.addEventListener('input', validateForm);
   motivoSelect.addEventListener('change', onMotivoChange);
   motivoDetalheInput.addEventListener('input', validateForm);
-  depositoOrigemSelect.addEventListener('change', validateForm);
   trocoSimBtn.addEventListener('click', function(){ setTroco('sim'); validateForm(); });
   trocoNaoBtn.addEventListener('click', function(){ setTroco('nao'); validateForm(); });
 
@@ -1241,7 +1149,8 @@
     var valor = parseFloat(valorInput.value);
     var opcao = currentMotivoOpcao();
     var detalhe = motivoDetalheInput.value.trim();
-    var motivo = opcao.detailLabel ? (opcao.label + ': ' + detalhe) : opcao.label;
+    // Com detalhe opcional em branco fica só o Label — nunca "Label: ".
+    var motivo = (opcao.detailLabel && detalhe) ? (opcao.label + ': ' + detalhe) : opcao.label;
     var semAcerto = !!opcao.semAcerto;
     var pessoaSelecao = resolvePessoaSelecao(pessoaSelect);
 
@@ -1271,36 +1180,17 @@
       }
     }
 
-    // Devolução de depósito: a entrada leva a ligação ao levantamento e, logo
-    // a seguir ao push, o levantamento acumula a devolução. O valor anterior é
-    // lido de allMovs no momento do clique.
-    var origemDevolucaoId = null;
-    var devolvidoAnterior = 0;
+    // Devolução de depósito: nasce POR ALOCAR. A caixa não escolhe (nem sabe)
+    // o levantamento; a ligação faz-se depois no mrn-dashboard.html.
     if (opcao.value === 'devolucaoDeposito'){
-      origemDevolucaoId = depositoOrigemSelect.value;
-      devolvidoAnterior = parseFloat((allMovs[origemDevolucaoId] || {}).devolvidoDeposito) || 0;
-      novoMov.depositoOrigemId = origemDevolucaoId;
+      novoMov.depositoOrigemId = null;
+      novoMov.alocadoEm = null;
     }
 
     registarBtn.disabled = true;
     registarBtn.textContent = 'A registar…';
 
-    var pushRef = movRef.push(novoMov);
-    pushRef.then(function(){
-      if (origemDevolucaoId){
-        var upd = { devolvidoDeposito: round2(devolvidoAnterior + valor) };
-        upd['devolucoes/' + pushRef.key] = {
-          valor: valor,
-          dataHora: novoMov.dataHora,
-          pessoa: novoMov.pessoa,
-          pessoaId: novoMov.pessoaId
-        };
-        // A entrada já ficou gravada — se isto falhar, avisa-se e fica assim;
-        // apagar a entrada seria pior do que a soma ficar por atualizar.
-        movRef.child(origemDevolucaoId).update(upd).catch(function(err){
-          alert('A devolução foi registada, mas falhou a atualização do levantamento: ' + err.message);
-        });
-      }
+    movRef.push(novoMov).then(function(){
       valorInput.value = '';
       selectTipo(null);
       tipoSaidaBtn.classList.remove('active');
@@ -1696,7 +1586,10 @@
     }
     html += '  </div>';
 
-    if (m.estado === 'acertado' && m.tipo === 'saida' && m.valorDevolvido !== null && m.valorDevolvido !== undefined){
+    // Só Compra / Pagamento a fornecedor têm troco — sem isto, um Depósito
+    // bancário (valorDevolvido: 0 por semAcerto) mostrava "Devolvido 0,00 € ·
+    // Gasto real", que não quer dizer nada e contradizia a linha de baixo.
+    if (m.estado === 'acertado' && isCompraOuPagamento(m) && m.valorDevolvido !== null && m.valorDevolvido !== undefined){
       var gastoReal = m.valor - m.valorDevolvido;
       html += '  <p class="gasto-real">Devolvido ' + formatEUR(m.valorDevolvido) + ' · Gasto real: <strong>' + formatEUR(gastoReal) + '</strong></p>';
     }
