@@ -45,7 +45,7 @@
   main{
     display:block;
     margin:0;
-    padding:8px 0 40px;
+    padding:0 0 40px;
     color:var(--ink);
   }
 
@@ -58,11 +58,10 @@
     grid-template-columns:repeat(auto-fit, minmax(min(340px,100%),1fr));
     gap:24px;
     align-items:start;
-    margin-top:24px;
   }
 
   .listing-section{
-    margin-top:32px;
+    margin-top:0;
   }
 
   .section-title{
@@ -91,20 +90,18 @@
     color:var(--muted);
   }
 
-  /* ---------- Summary ---------- */
-  .summary-row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:14px;
-    margin-top:28px;
+  /* ---------- Summary (tiles de número dentro dos cartões) ---------- */
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(140px,100%),1fr));
+    gap:12px;
+    margin-bottom:22px;
   }
 
   .summary-card{
-    flex:1 1 200px;
-    max-width:260px;
     background:var(--white);
     border:1px solid var(--line);
-    padding:18px;
+    padding:14px 16px;
   }
 
   .summary-card.pending-active{
@@ -138,7 +135,7 @@
     margin:4px 0 0;
   }
 
-  /* ---------- Form ---------- */
+  /* ---------- Form (bloco interior dos cartões) ---------- */
   .form-card{
     background:var(--white);
     border:1px solid var(--line);
@@ -602,17 +599,6 @@
     font-size:13px;
   }
 
-  /* ---------- Saldos vivos (Caixa + Cofre) ---------- */
-  .btn-acertar.destaque{
-    border-color:var(--red);
-    color:var(--red-ink);
-  }
-
-  .btn-acertar.destaque:hover{
-    background:var(--red);
-    color:var(--on-red);
-  }
-
   /* ---------- Contar caixa (grelha tátil) ---------- */
   .denom-toolbar{
     display:flex;
@@ -793,6 +779,146 @@
   }
 
   /* ======================================================================
+     Reorganização Set/2026: dois cartões do shell (.card.glass-light) com
+     botões redondos tipo tecla de caixa registadora. */
+  .cx-card{ margin-top:22px; }
+  /* O ::before do .glass-light pinta por cima do conteúdo estático
+     (armadilha documentada no CLAUDE.md). */
+  .cx-card > *{ position:relative; z-index:1; }
+
+  .cx-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:0 0 16px;
+    color:var(--red);
+  }
+  .cx-head .icon{ width:20px; height:20px; flex:none; }
+  .cx-head h2{
+    margin:0;
+    font-family:'Inter',sans-serif;
+    font-size:18px;
+    font-weight:700;
+    letter-spacing:.2px;
+    color:var(--red);
+  }
+
+  .tool-row{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:16px;
+    padding:6px 0 4px;
+  }
+
+  .tool-btn{
+    -webkit-appearance:none; appearance:none;
+    background:none;
+    border:0;
+    padding:4px 6px 6px;
+    margin:0;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    width:86px;
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .tool-btn:focus-visible{ outline:2px solid var(--red); outline-offset:2px; border-radius:12px; }
+
+  .tool-btn .circle{
+    position:relative;
+    width:58px; height:58px;
+    border-radius:50%;
+    background:var(--dough);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 0 var(--line), 0 5px 8px rgba(0,0,0,.18);
+    transition:transform .08s ease, box-shadow .08s ease, background .15s ease, border-color .15s ease;
+    color:var(--ink);
+  }
+  .tool-btn .circle .icon{ width:24px; height:24px; stroke:currentColor; }
+
+  .tool-btn:hover .circle{
+    transform:translateY(-1px);
+    box-shadow:0 4px 0 var(--line), 0 7px 12px rgba(0,0,0,.20);
+  }
+  .tool-btn:active .circle{
+    transform:translateY(2px);
+    box-shadow:0 1px 0 var(--line), 0 1px 2px rgba(0,0,0,.15);
+  }
+
+  .tool-btn.active .circle{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+    box-shadow:0 3px 0 #9c0c1a, 0 5px 8px rgba(0,0,0,.22);
+  }
+  .tool-btn.active:hover .circle{
+    box-shadow:0 4px 0 #9c0c1a, 0 7px 12px rgba(0,0,0,.24);
+  }
+  .tool-btn.active:active .circle{
+    box-shadow:0 1px 0 #9c0c1a, 0 1px 2px rgba(0,0,0,.15);
+  }
+
+  /* Sem contagem nenhuma ainda: o "Contar caixa" pede atenção. */
+  .tool-btn.destaque:not(.active) .circle{
+    border-color:var(--red);
+    color:var(--red-ink);
+  }
+
+  .tool-btn .tool-label{
+    font-size:12px;
+    font-weight:600;
+    line-height:1.2;
+    text-align:center;
+    color:var(--ink);
+  }
+  .tool-btn.active .tool-label{ color:var(--red-ink); }
+
+  .tool-badge{
+    position:absolute;
+    top:-4px; right:-4px;
+    min-width:20px; height:20px;
+    padding:0 5px;
+    border-radius:100px;
+    background:var(--ink);
+    color:var(--white);
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    line-height:20px;
+    text-align:center;
+    box-sizing:border-box;
+    border:2px solid var(--white);
+  }
+  .tool-btn.active .tool-badge{
+    background:#FFFFFF;
+    color:var(--red);
+    border-color:var(--red);
+  }
+
+  .tool-bloco{ margin-top:22px; }
+  .tool-bloco[hidden]{ display:none; }
+
+  /* Tema escuro: a sombra sólida da tecla e o vidro dos tiles. */
+  [data-theme="dark"] .tool-btn .circle{
+    box-shadow:0 3px 0 var(--line), 0 5px 8px rgba(0,0,0,.45);
+  }
+  [data-theme="dark"] .tool-btn:hover .circle{
+    box-shadow:0 4px 0 var(--line), 0 7px 12px rgba(0,0,0,.5);
+  }
+  [data-theme="dark"] .tool-btn:active .circle{
+    box-shadow:0 1px 0 var(--line), 0 1px 2px rgba(0,0,0,.4);
+  }
+  [data-theme="dark"] .tool-btn.active .circle{
+    box-shadow:0 3px 0 #6e0812, 0 5px 8px rgba(0,0,0,.5);
+  }
+
+  /* ======================================================================
      Camada do design system — só aparência. Vem no fim de propósito: em
      empate de especificidade ganha a última regra, e é assim que arredonda o
      que está escrito acima. */
@@ -892,143 +1018,191 @@
       </div>
 
 <main>
-  <!-- Saldos vivos: ancorados na última contagem física confirmada (caixaContagens),
-       não no "Saldo hoje" (que reseta todos os dias). Ver saldoVivoCaixa() e
-       CLAUDE.md. -->
-  <div class="summary-row" id="saldosVivosRow">
-    <div class="summary-card" id="caixaVivaCard">
-      <p class="summary-label">Caixa</p>
-      <p class="summary-value" id="caixaVivaValue">A carregar…</p>
-      <p class="summary-sub" id="caixaVivaSub"></p>
-      <button type="button" class="btn-acertar" id="btnContarCaixa" style="margin-top:10px;" onclick="abrirContagem()">Contar caixa</button>
-    </div>
-    <div class="summary-card" id="cofreVivoCard">
-      <p class="summary-label">Cofre</p>
-      <p class="summary-value" id="cofreVivoValue">A carregar…</p>
-      <p class="summary-sub" id="cofreVivoSub"></p>
-    </div>
-  </div>
+  <!-- Reorganização visual (Set/2026): dois cartões do design system (Caixa e
+       Cofre). Os números ficam sempre à vista no topo de cada cartão; as
+       ferramentas (contar, registar, movimentos / retirar, movimentos) abrem
+       por baixo, uma de cada vez, a partir dos botões redondos .tool-btn.
+       Os ids internos são os de sempre — só o invólucro mudou. -->
 
-  <div id="contagemPanelWrap"></div>
-
-  <div class="summary-row">
-    <div class="summary-card">
-      <p class="summary-label">Saldo hoje</p>
-      <p class="summary-value" id="saldoHojeValue">0,00 €</p>
+  <!-- ================= CARTÃO CAIXA ================= -->
+  <section class="card glass-light cx-card" id="cardCaixa">
+    <div class="cx-head">
+      <svg class="icon" width="20" height="20" aria-hidden="true"><use href="#i-wallet"/></svg>
+      <h2>Caixa</h2>
     </div>
-    <div class="summary-card" id="pendingCard">
-      <p class="summary-label">Por acertar</p>
-      <p class="summary-value" id="pendingCount">0</p>
-      <p class="summary-sub" id="pendingTotal">0,00 €</p>
-    </div>
-  </div>
 
-  <!-- FERRAMENTA DE CAIXA: registo à esquerda, "há por fazer" à direita. -->
-  <div class="tool-grid">
-    <div class="form-card">
-      <p class="form-title">Registar movimento</p>
-      <form id="movForm">
-        <div class="tipo-toggle">
-          <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
-          <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
+    <!-- Saldo vivo: ancorado na última contagem física confirmada
+         (caixaContagens), não no "Saldo hoje" (que reseta todos os dias).
+         Ver saldoVivoCaixa() e CLAUDE.md. -->
+    <div class="stat-row">
+      <div class="summary-card" id="caixaVivaCard">
+        <p class="summary-label">Saldo vivo</p>
+        <p class="summary-value" id="caixaVivaValue">A carregar…</p>
+        <p class="summary-sub" id="caixaVivaSub"></p>
+      </div>
+      <div class="summary-card">
+        <p class="summary-label">Saldo hoje</p>
+        <p class="summary-value" id="saldoHojeValue">0,00 €</p>
+      </div>
+      <div class="summary-card" id="pendingCard">
+        <p class="summary-label">Por acertar</p>
+        <p class="summary-value" id="pendingCount">0</p>
+        <p class="summary-sub" id="pendingTotal">0,00 €</p>
+      </div>
+    </div>
+
+    <div class="tool-row" data-grupo="caixa">
+      <button type="button" class="tool-btn" data-tool="contar" id="btnContarCaixa" onclick="toggleTool('caixa','contar')" aria-expanded="false">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-coins"/></svg></span>
+        <span class="tool-label" id="btnContarCaixaLabel">Contar caixa</span>
+      </button>
+      <button type="button" class="tool-btn" data-tool="registar" onclick="toggleTool('caixa','registar')" aria-expanded="false">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-receipt"/></svg><span class="tool-badge" id="registarBadge" hidden>0</span></span>
+        <span class="tool-label">Registar</span>
+      </button>
+      <button type="button" class="tool-btn" data-tool="movimentos" onclick="toggleTool('caixa','movimentos')" aria-expanded="false">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+        <span class="tool-label">Movimentos</span>
+      </button>
+    </div>
+
+    <!-- Bloco: Contar caixa (o painel é gerado por renderContagemPanel) -->
+    <div class="tool-bloco" data-grupo="caixa" data-tool="contar" hidden>
+      <div id="contagemPanelWrap"></div>
+    </div>
+
+    <!-- Bloco: Registar — registo à esquerda, "por devolver troco" à direita. -->
+    <div class="tool-bloco" data-grupo="caixa" data-tool="registar" hidden>
+      <div class="tool-grid">
+        <div class="form-card">
+          <p class="form-title">Registar movimento</p>
+          <form id="movForm">
+            <div class="tipo-toggle">
+              <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
+              <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="valorInput">Valor (€)</label>
+              <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="motivoSelect">Motivo</label>
+              <select id="motivoSelect" disabled>
+                <option value="">Escolhe primeiro Saída ou Entrada</option>
+              </select>
+            </div>
+
+            <div class="field" id="motivoDetalheField" style="display:none;">
+              <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
+              <input type="text" id="motivoDetalheInput" placeholder="">
+            </div>
+
+            <!-- Só em saídas Compra / Pagamento a fornecedor. Obrigatório. -->
+            <div class="field" id="trocoField" style="display:none;">
+              <span class="field-label">Vai haver troco?</span>
+              <div class="tipo-toggle" style="margin-bottom:0;">
+                <button type="button" class="tipo-btn troco" id="trocoSimBtn">Sim</button>
+                <button type="button" class="tipo-btn troco" id="trocoNaoBtn">Não</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="pessoaSelect">Pessoa</label>
+              <select id="pessoaSelect" disabled>
+                <option>A carregar...</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-registar" id="registarBtn" disabled>Registar</button>
+          </form>
         </div>
 
-        <div class="field">
-          <label class="field-label" for="valorInput">Valor (€)</label>
-          <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
-        </div>
-
-        <div class="field">
-          <label class="field-label" for="motivoSelect">Motivo</label>
-          <select id="motivoSelect" disabled>
-            <option value="">Escolhe primeiro Saída ou Entrada</option>
-          </select>
-        </div>
-
-        <div class="field" id="motivoDetalheField" style="display:none;">
-          <label class="field-label" id="motivoDetalheLabel" for="motivoDetalheInput">Detalhe</label>
-          <input type="text" id="motivoDetalheInput" placeholder="">
-        </div>
-
-        <!-- Só em saídas Compra / Pagamento a fornecedor. Obrigatório. -->
-        <div class="field" id="trocoField" style="display:none;">
-          <span class="field-label">Vai haver troco?</span>
-          <div class="tipo-toggle" style="margin-bottom:0;">
-            <button type="button" class="tipo-btn troco" id="trocoSimBtn">Sim</button>
-            <button type="button" class="tipo-btn troco" id="trocoNaoBtn">Não</button>
+        <div class="pending-col">
+          <p class="section-title">Por devolver troco <span class="count zero" id="pendingSectionCount">0</span></p>
+          <div class="pending-list" id="pendingList">
+            <div class="pending-empty">A carregar…</div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="field">
-          <label class="field-label" for="pessoaSelect">Pessoa</label>
-          <select id="pessoaSelect" disabled>
-            <option>A carregar...</option>
+    <!-- Bloco: Movimentos — listagem completa -->
+    <div class="tool-bloco" data-grupo="caixa" data-tool="movimentos" hidden>
+      <div class="listing-section">
+        <p class="section-title">Todos os movimentos</p>
+        <div class="filter-tabs">
+          <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
+          <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
+          <button type="button" class="filter-tab" data-filter="mes">Mês</button>
+          <button type="button" class="filter-tab" data-filter="tudo">Tudo</button>
+        </div>
+
+        <div class="filter-extra">
+          <input type="month" id="mesFiltroInput" style="display:none;">
+          <select id="motivoFiltroSelect">
+            <option value="">Todos os motivos</option>
+            <option value="Compra">Compra</option>
+            <option value="Pagamento a fornecedor">Pagamento a fornecedor</option>
+            <option value="Depósito bancário">Depósito bancário</option>
+            <option value="Devolução de depósito bancário">Devolução de depósito bancário</option>
+            <option value="Troco de compra/saída">Troco de compra/saída</option>
+            <option value="Reforço de caixa">Reforço de caixa</option>
+            <option value="Outro">Outro</option>
+            <option value="__semFatura">Sem fatura (declarado)</option>
+            <option value="__trocoNaoConferiu">Troco não conferiu</option>
           </select>
         </div>
 
-        <button type="submit" class="btn-registar" id="registarBtn" disabled>Registar</button>
-      </form>
-    </div>
+        <div class="filter-summary" id="filterSummary"></div>
 
-    <div class="pending-col">
-      <p class="section-title">Por devolver troco <span class="count zero" id="pendingSectionCount">0</span></p>
-      <div class="pending-list" id="pendingList">
-        <div class="pending-empty">A carregar…</div>
+        <div class="list" id="movList">
+          <div class="empty-state">A carregar movimentos…</div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- LISTAGEM COMPLETA -->
-  <div class="listing-section">
-    <p class="section-title">Todos os movimentos</p>
-    <div class="filter-tabs">
-      <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
-      <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
-      <button type="button" class="filter-tab" data-filter="mes">Mês</button>
-      <button type="button" class="filter-tab" data-filter="tudo">Tudo</button>
+  <!-- ================= CARTÃO COFRE =================
+       Segundo local de dinheiro físico. Saldo cumulativo (nunca só do dia),
+       movimentos dos últimos 30 dias e retirada in-page. -->
+  <section class="card glass-light cx-card" id="cardCofre">
+    <div class="cx-head">
+      <svg class="icon" width="20" height="20" aria-hidden="true"><use href="#i-lock"/></svg>
+      <h2>Cofre</h2>
     </div>
 
-    <div class="filter-extra">
-      <input type="month" id="mesFiltroInput" style="display:none;">
-      <select id="motivoFiltroSelect">
-        <option value="">Todos os motivos</option>
-        <option value="Compra">Compra</option>
-        <option value="Pagamento a fornecedor">Pagamento a fornecedor</option>
-        <option value="Depósito bancário">Depósito bancário</option>
-        <option value="Devolução de depósito bancário">Devolução de depósito bancário</option>
-        <option value="Troco de compra/saída">Troco de compra/saída</option>
-        <option value="Reforço de caixa">Reforço de caixa</option>
-        <option value="Outro">Outro</option>
-        <option value="__semFatura">Sem fatura (declarado)</option>
-        <option value="__trocoNaoConferiu">Troco não conferiu</option>
-      </select>
-    </div>
-
-    <div class="filter-summary" id="filterSummary"></div>
-
-    <div class="list" id="movList">
-      <div class="empty-state">A carregar movimentos…</div>
-    </div>
-  </div>
-
-  <!-- COFRE: segundo local de dinheiro físico. Saldo cumulativo (nunca só do
-       dia), movimentos dos últimos 30 dias e retirada in-page. -->
-  <div class="listing-section">
-    <p class="section-title">Cofre</p>
-    <div class="summary-row">
-      <div class="summary-card">
+    <div class="stat-row">
+      <div class="summary-card" id="cofreVivoCard">
         <p class="summary-label">Saldo do cofre</p>
-        <p class="summary-value" id="cofreSaldoValue">0,00 €</p>
+        <p class="summary-value" id="cofreVivoValue">A carregar…</p>
+        <p class="summary-sub" id="cofreVivoSub"></p>
       </div>
     </div>
 
-    <div class="tool-grid">
+    <div class="tool-row" data-grupo="cofre">
+      <button type="button" class="tool-btn" data-tool="retirar" onclick="toggleTool('cofre','retirar')" aria-expanded="false">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-log-out"/></svg></span>
+        <span class="tool-label">Retirar</span>
+      </button>
+      <button type="button" class="tool-btn" data-tool="movimentos" onclick="toggleTool('cofre','movimentos')" aria-expanded="false">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+        <span class="tool-label">Movimentos</span>
+      </button>
+    </div>
+
+    <!-- Bloco: Retirar do cofre (formulário gerado por renderCofre) -->
+    <div class="tool-bloco" data-grupo="cofre" data-tool="retirar" hidden>
       <div class="form-card">
         <p class="form-title">Retirar do cofre</p>
         <button type="button" class="btn-acertar" id="btnAbrirRetirarCofre" style="margin-top:0;" onclick="toggleRetirarCofre()">↩ Retirar do cofre</button>
         <div id="retirarCofreFormWrap"></div>
       </div>
+    </div>
 
+    <!-- Bloco: Movimentos do cofre -->
+    <div class="tool-bloco" data-grupo="cofre" data-tool="movimentos" hidden>
       <div class="pending-col">
         <p class="section-title">Movimentos do cofre (30 dias) <span class="count zero" id="cofreCountBadge">0</span></p>
         <div class="pending-list" id="cofreList">
@@ -1036,7 +1210,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </main>
 
     </div>
@@ -1477,7 +1651,45 @@
     var wrap = document.getElementById('contagemPanelWrap');
     if (!wrap) return;
     wrap.innerHTML = contagemState ? contagemFormHtml(contagemState) : '';
+    if (!contagemState && toolAberta.caixa === 'contar') setTool('caixa', null);
   }
+
+  // ---------- Ferramentas dos cartões (botões redondos) ----------
+  // Um bloco aberto de cada vez por cartão; clicar no mesmo botão fecha.
+  // Só UI: não toca em dados. "contar" e "retirar" arrastam o estado do
+  // respetivo formulário (abrir a ferramenta abre o formulário; fechar a
+  // ferramenta cancela-o, tal como o botão Cancelar já fazia).
+  var toolAberta = { caixa: null, cofre: null };
+
+  function setTool(grupo, tool){
+    toolAberta[grupo] = tool;
+    document.querySelectorAll('.tool-row[data-grupo="' + grupo + '"] .tool-btn').forEach(function(b){
+      var on = b.getAttribute('data-tool') === tool;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.tool-bloco[data-grupo="' + grupo + '"]').forEach(function(b){
+      b.hidden = b.getAttribute('data-tool') !== tool;
+    });
+  }
+
+  function toggleTool(grupo, tool){
+    var anterior = toolAberta[grupo];
+    var nova = (anterior === tool) ? null : tool;
+    if (anterior === 'contar' && nova !== 'contar' && contagemState){
+      contagemState = null;
+      contagemEditando = null;
+      renderContagemPanel();
+    }
+    if (anterior === 'retirar' && nova !== 'retirar' && retirarCofre){
+      retirarCofre = null;
+      renderCofre();
+    }
+    setTool(grupo, nova);
+    if (nova === 'contar' && !contagemState) abrirContagem();
+    if (nova === 'retirar' && !retirarCofre) toggleRetirarCofre();
+  }
+  window.toggleTool = toggleTool;
 
   // Actualizações pontuais nos elementos já existentes — nunca regenera o
   // painel inteiro num input, senão perde-se o foco a meio de uma linha.
@@ -1579,15 +1791,18 @@
     var valEl = document.getElementById('caixaVivaValue');
     var subEl = document.getElementById('caixaVivaSub');
     var btnEl = document.getElementById('btnContarCaixa');
+    var btnLabelEl = document.getElementById('btnContarCaixaLabel');
     if (valEl && subEl){
       if (!contagem){
         valEl.textContent = 'Sem contagem registada';
         subEl.textContent = '';
-        if (btnEl){ btnEl.textContent = 'Fazer primeira contagem'; btnEl.classList.add('destaque'); }
+        if (btnLabelEl) btnLabelEl.textContent = 'Primeira contagem';
+        if (btnEl) btnEl.classList.add('destaque');
       } else {
         valEl.textContent = formatEUR(saldoVivoCaixa());
         subEl.textContent = 'Última contagem: ' + formatDataHora(contagem.dataHora) + ' · ' + (contagem.pessoa || '');
-        if (btnEl){ btnEl.textContent = 'Contar caixa'; btnEl.classList.remove('destaque'); }
+        if (btnLabelEl) btnLabelEl.textContent = 'Contar caixa';
+        if (btnEl) btnEl.classList.remove('destaque');
       }
     }
 
@@ -2291,6 +2506,11 @@
 
     pendingSectionCountEl.textContent = ids.length;
     pendingSectionCountEl.classList.toggle('zero', ids.length === 0);
+    var registarBadgeEl = document.getElementById('registarBadge');
+    if (registarBadgeEl){
+      registarBadgeEl.textContent = ids.length;
+      registarBadgeEl.hidden = ids.length === 0;
+    }
 
     if (ids.length === 0){
       pendingListEl.innerHTML = '<div class="pending-empty">Nada por devolver</div>';
@@ -2568,8 +2788,6 @@
 
   function renderCofre(){
     var saldo = saldoCofre();
-    var saldoEl = document.getElementById('cofreSaldoValue');
-    if (saldoEl) saldoEl.textContent = formatEUR(saldo);
 
     var wrap = document.getElementById('retirarCofreFormWrap');
     var btn = document.getElementById('btnAbrirRetirarCofre');
@@ -2582,6 +2800,7 @@
         wrap.innerHTML = '';
       }
     }
+    if (!retirarCofre && toolAberta.cofre === 'retirar') setTool('cofre', null);
 
     var now = Date.now();
     var ids = Object.keys(allCofreMovs).filter(function(id){

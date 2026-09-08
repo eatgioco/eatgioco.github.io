@@ -78,6 +78,10 @@
     '<symbol id="i-volume-2" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>',
     '<symbol id="i-volume-x" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></symbol>',
     '<symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><path d="M21 9h-6a2 2 0 0 0 0 4h6V9Z"/><path d="M3 7h16"/></symbol>',
+    /* Set/2026, reorganização caixa.html (traço Feather/Lucide): */
+    '<symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>',
+    '<symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>',
+    '<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -97,7 +101,9 @@
     // Set/2026, cartão Música do centro de controlo (traço Feather):
     'music', 'play', 'pause', 'skip-back', 'skip-forward', 'volume-2', 'volume-x',
     // Set/2026, cartão Posição Financeira do mrn-dashboard.html (traço Feather/Lucide):
-    'wallet'
+    'wallet',
+    // Set/2026, reorganização caixa.html
+    'coins', 'list', 'lock'
   ];
 
   function injectSprite() {
