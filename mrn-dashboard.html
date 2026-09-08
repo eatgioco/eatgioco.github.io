@@ -2194,8 +2194,8 @@
     <!-- Centro de Controlo: cartão de ESTADO, só leitura. Espelha
          lojas/sb154/ac/estado (escrito pelo serviço ac-bridge no PC do POS)
          e liga para a centro-de-controlo.html, onde vivem os controlos.
-         Nada aqui escreve no Firebase. Sonos: lojas/sb154/sonos/estado ainda
-         não existe — a linha fica "Em breve" até o nó aparecer. -->
+         Nada aqui escreve no Firebase. Sonos: espelha lojas/sb154/sonos/estado
+         (serviço sonos-bridge no POS); sem nó, a linha fica "Em breve". -->
     <a class="card glass-light card-compact card-cc" id="cardCentroControlo" href="centro-de-controlo.html?loja=sb154">
       <span class="cc-badge" id="ccBadge" hidden>0</span>
       <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-store"/></svg></div>
@@ -5891,17 +5891,32 @@ window.addEventListener('load', function () {
       }
       el.linhaPc.classList.toggle('alerta', acCarregado && !online);
 
-      // Linha Sonos — o nó lojas/sb154/sonos/estado ainda não existe; quando
-      // existir, os nomes dos campos são a confirmar (faixa/volume abaixo
-      // são um palpite e ficam só como guia).
+      // Linha Sonos — lojas/sb154/sonos/estado (forma no CLAUDE.md, secção
+      // "Loja SB154 — música / Sonos"): faixa é um OBJECTO {titulo, artista,
+      // album, posicao, duracao} ou null; transporte PLAYING|PAUSED|STOPPED|
+      // TRANSITIONING; fonte airplay|spotify|radio|fila|nada. Só leitura.
       if (sonosEstado) {
-        var faixa = sonosEstado.faixa || sonosEstado.titulo || sonosEstado.track || '';
+        var fx = sonosEstado.faixa;
+        var titulo = (fx && typeof fx === 'object') ? String(fx.titulo || '').trim() : '';
+        var artista = (fx && typeof fx === 'object') ? String(fx.artista || '').trim() : '';
+        var transporte = String(sonosEstado.transporte || '').toUpperCase();
+        var aTocar = transporte === 'PLAYING' || transporte === 'TRANSITIONING';
+        var texto;
+        if (titulo) {
+          texto = titulo + (artista ? ' — ' + artista : '');
+          if (!aTocar) texto = 'Em pausa · ' + texto;
+        } else if (aTocar) {
+          texto = 'A tocar' + (sonosEstado.fonte && sonosEstado.fonte !== 'nada' ? ' (' + sonosEstado.fonte + ')' : '');
+        } else {
+          texto = transporte === 'PAUSED' ? 'Em pausa' : 'Parado';
+        }
         var vol = sonosEstado.volume;
-        el.sonos.innerHTML = (faixa ? ccEsc(faixa) : (sonosEstado.aTocar === false ? 'Parado' : 'A tocar')) +
-          (vol != null ? ' · vol <span class="num">' + ccEsc(vol) + '</span>' : '');
+        el.sonos.innerHTML = ccEsc(texto) +
+          (vol != null ? ' · vol <span class="num">' + ccEsc(vol) + '</span>' : '') +
+          (sonosEstado.mute ? ' · mudo' : '');
         el.linhaSonos.classList.remove('neutro');
-        // Preparado, por ligar quando o nó existir:
-        // if (sonosEstado.aTocar === false && horaLisboa() >= HORARIO_LOJA[0] && horaLisboa() < HORARIO_LOJA[1]) {
+        // Preparado, por ligar quando fizer sentido:
+        // if (!aTocar && horaLisboa() >= HORARIO_LOJA[0] && horaLisboa() < HORARIO_LOJA[1]) {
         //   alertas.push('Sonos parado em horário de abertura');
         //   el.linhaSonos.classList.add('alerta');
         // }
