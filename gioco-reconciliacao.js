@@ -91,6 +91,17 @@
    Não escreve em mais nó nenhum e nunca apaga nada (nem remove(), nem
    null fora dos campos da ligação ao desligar).
 
+   MOTOR DE CORRESPONDÊNCIA (Set/2026): a procura de candidatos em modo
+   único (pagamentos e receitas CD) e a dos débitos directos delegam no
+   gioco-correspondencia.js (função pura, carregada ANTES deste ficheiro):
+   pagamentos ['exacto','soma2'] — dois débitos do mesmo dia e conta que
+   somam o valor ligam-se juntos (Mensalidade Abanca 10,00 + 0,40);
+   receitas CD só ['exacto']; débitos fixos ['exacto','soma2']; débitos
+   variáveis ['descritivo']. A soma-de-N das receitas OU e a regra A2
+   ficaram fora do motor. Uma ligação com 2 movimentos grava movimentoKey
+   (o primeiro) + movimentoKeys[] + valor (soma) + estrategia — aditivo,
+   em qualquer família de chave; entradas antigas não mudam.
+
    DÉBITO DIRETO — confirmação ANTES do clique (Set/2026, só tesouraria.html):
    calcularDebitos()/aplicarDebitosAutomaticos() correm a par de calcular()/
    aplicarAutomaticas(), mas sobre ocorrências de compromissos
@@ -113,6 +124,10 @@ function giocoReconciliacaoEngine(deps){
   'use strict';
 
   var CE = deps.compromissos;
+  // Motor de correspondência valor ↔ movimentos (gioco-correspondencia.js,
+  // carregado antes deste ficheiro). Injectável para testes sem browser.
+  var CORR = deps.correspondencia || (typeof giocoCorrespondencia === 'function' ? giocoCorrespondencia : null);
+  if (!CORR) throw new Error('gioco-correspondencia.js tem de ser carregado antes do gioco-reconciliacao.js');
   var JANELA_IBAN   = { antes: 2, depois: 7 };
   var JANELA_DEBITO = { antes: 3, depois: 5 };
   var JANELA_MANUAL_DIAS = 30;      // pesquisa manual: ±30 dias
@@ -361,16 +376,10 @@ function giocoReconciliacaoEngine(deps){
     { teste: /epal/i,    regex: /epal/i }
   ];
 
-  // Pura e testável isoladamente: raiz comparável de um descritivo bancário
-  // — maiúsculas, sem dígitos (datas e referências são feitas de dígitos)
-  // nem pontuação, espaços colapsados. "IBELECTRA FT202609123" e
-  // "IBELECTRA FT202608091" dão a mesma raiz "IBELECTRA FT".
-  function normalizarDescritivo(desc){
-    var s = String(desc || '').toUpperCase();
-    s = s.replace(/[0-9]/g, ' ');
-    s = s.replace(/[^A-Z ]/g, ' ');
-    return s.replace(/\s+/g, ' ').trim();
-  }
+  // Raiz comparável de um descritivo bancário ("IBELECTRA FT202609123" →
+  // "IBELECTRA FT"). A implementação vive no gioco-correspondencia.js — a
+  // única versão no OS; aqui é só um alias para os consumidores antigos.
+  var normalizarDescritivo = CORR.normalizarDescritivo;
 
   // 'aprendendo' (< 3 confirmações, ou as últimas 3 raízes não batem entre
   // si) ou 'aprendido' (3+, últimas 3 com a mesma raiz).
@@ -427,39 +436,36 @@ function giocoReconciliacaoEngine(deps){
     return out;
   }
 
-  // Candidatos de valor fixo: mesmos cêntimos, dentro da JANELA_DEBITO,
-  // livres (movs já vem filtrado por movimentosDebito(), sem "INTERNA").
-  function candidatosDebitoFixo(item, movs, usados){
-    return movs.filter(function(m){
-      if (usados[m.id]) return false;
-      if (m.cents !== item.cents) return false;
-      var d = diasEntre(item.esperado, m.dia);
-      return d !== null && d >= -JANELA_DEBITO.antes && d <= JANELA_DEBITO.depois;
-    });
+  function livres(movs, usados){
+    return movs.filter(function(m){ return !usados[m.id]; });
   }
 
-  // Candidatos de valor variável: sem exigir valor exacto. Tenta primeiro o
-  // histórico aprendido (confiança 'historico' — pode confirmar sozinho);
-  // só se não bater nenhuma raiz do histórico tenta a regex de arranque
-  // (confiança 'fallback' — nunca confirma sozinho, só sugestão).
+  // Valor fixo (Mensalidade Abanca, NOS, ZoneSoft): motor com 'exacto' e
+  // 'soma2', âncora no dia esperado, JANELA_DEBITO, sobre os débitos livres
+  // das duas contas. O soma2 é o que resolve a Mensalidade Abanca (10,00 €
+  // + 0,40 € de imposto de selo no mesmo dia) sem código próprio.
+  function candidatosDebitoFixo(item, movs, usados){
+    return CORR({ cents: item.cents, dia: item.esperado, janela: JANELA_DEBITO,
+                  movimentos: livres(movs, usados), estrategias: ['exacto', 'soma2'] });
+  }
+
+  // Valor variável (Eletricidade, EPAL): sem valor para comparar, motor só
+  // com 'descritivo' — histórico aprendido primeiro, regex de arranque
+  // depois. aprendido = 3+ confirmações cujas últimas 3 raízes batem.
   function candidatosDebitoVariavel(item, movs, usados){
-    var naJanela = movs.filter(function(m){
-      if (usados[m.id]) return false;
-      var d = diasEntre(item.esperado, m.dia);
-      return d !== null && d >= -JANELA_DEBITO.antes && d <= JANELA_DEBITO.depois;
-    });
-    var raizes = (item.historico || []).map(normalizarDescritivo);
-    if (raizes.length){
-      var porHistorico = naJanela.filter(function(m){ return raizes.indexOf(normalizarDescritivo(m.desc)) !== -1; });
-      if (porHistorico.length) return { candidatos: porHistorico, confianca: 'historico' };
-    }
-    var fallback = regexFallbackDebito(item.nome);
-    var porFallback = fallback ? naJanela.filter(function(m){ return fallback.test(m.desc || ''); }) : [];
-    return { candidatos: porFallback, confianca: 'fallback' };
+    return CORR({ cents: null, dia: item.esperado, janela: JANELA_DEBITO,
+                  movimentos: livres(movs, usados), estrategias: ['descritivo'],
+                  descritivosConhecidos: (item.historico || []).map(normalizarDescritivo),
+                  regexFallback: regexFallbackDebito(item.nome),
+                  aprendido: estadoAprendizagemDebito(item.historico) === 'aprendido' });
   }
 
   // Classifica as pendências de débito direto dos meses dados em dois
   // grupos: autoConfirmar (escreve sozinho) e sugestoes (só um clique).
+  // Estado do motor → comportamento: confirmado → automático · sugestao →
+  // clique · ambiguo / semCandidato → nada (fica pendente, manual). Aqui
+  // ambiguo PÁRA de propósito — ao contrário do dashboard de depósitos,
+  // que escolhe sozinho o mais antigo (ver mrn-dashboard.html).
   function calcularDebitos(meses){
     var movs = movimentosDebito();
     var usados = Object.assign({}, movimentosUsados());
@@ -467,23 +473,18 @@ function giocoReconciliacaoEngine(deps){
     var autoConfirmar = [];
     var sugestoes = [];
     itens.forEach(function(item){
-      if (!item.valorVariavel){
-        var candsFixo = candidatosDebitoFixo(item, movs, usados);
-        if (candsFixo.length === 1){
-          autoConfirmar.push({ item: item, mov: candsFixo[0] });
-          usados[candsFixo[0].id] = item.chaveReconciliacao;
-        }
-        return;
-      }
-      var r = candidatosDebitoVariavel(item, movs, usados);
-      if (r.candidatos.length !== 1) return;
-      var mov = r.candidatos[0];
-      var confiavel = r.confianca === 'historico' && estadoAprendizagemDebito(item.historico) === 'aprendido';
-      if (confiavel){
-        autoConfirmar.push({ item: item, mov: mov });
-        usados[mov.id] = item.chaveReconciliacao;
+      var r = item.valorVariavel ? candidatosDebitoVariavel(item, movs, usados)
+                                 : candidatosDebitoFixo(item, movs, usados);
+      item.correspondencia = r;
+      if (r.estado !== 'confirmado' && r.estado !== 'sugestao') return;
+      // mov = o primeiro (formato de sempre, usado pela UI da sugestão);
+      // movs = todos (1, ou 2 no soma2) — é o que se liga.
+      var par = { item: item, mov: r.movimentos[0], movs: r.movimentos, estrategia: r.estrategia };
+      if (r.estado === 'confirmado'){
+        autoConfirmar.push(par);
+        r.movimentos.forEach(function(m){ usados[m.id] = item.chaveReconciliacao; });
       } else {
-        sugestoes.push({ item: item, mov: mov });
+        sugestoes.push(par);
       }
     });
     return { itens: itens, autoConfirmar: autoConfirmar, sugestoes: sugestoes };
@@ -513,16 +514,18 @@ function giocoReconciliacaoEngine(deps){
   // de valor variável, acrescenta o descritivo ao histórico de
   // aprendizagem. auto:true marca sempre a origem; confirmadoManualmente:
   // true só quando veio de um clique na sugestão (nunca da automática).
+  // mov: um movimento ou um array (soma2 → 2 movimentos ligados juntos).
   function confirmarDebito(item, mov, opts){
     if (!deps.refPagamentos) return Promise.reject(new Error('refPagamentos em falta na configuração do motor.'));
     opts = opts || {};
-    var patchPC = { concluidoEm: Date.parse(mov.dia + 'T12:00:00') || Date.now(), auto: true };
+    var movs = Array.isArray(mov) ? mov : [mov];
+    var patchPC = { concluidoEm: Date.parse(movs[0].dia + 'T12:00:00') || Date.now(), auto: true };
     if (opts.confirmadoManualmente) patchPC.confirmadoManualmente = true;
     var escritas = [
       deps.refPagamentos.child(item.chaveConcluido).set(patchPC),
-      ligar(item.chaveReconciliacao, mov, 'auto')
+      ligar(item.chaveReconciliacao, movs, 'auto', null, null, opts.estrategia)
     ];
-    if (item.valorVariavel) escritas.push(acrescentarHistoricoDescritivo(item.compromissoId, mov.desc));
+    if (item.valorVariavel) escritas.push(acrescentarHistoricoDescritivo(item.compromissoId, movs[0].desc));
     return Promise.all(escritas);
   }
 
@@ -540,7 +543,7 @@ function giocoReconciliacaoEngine(deps){
     function passo(){
       var par = fila.shift();
       if (!par) return Promise.resolve(feitas);
-      return confirmarDebito(par.item, par.mov, {})
+      return confirmarDebito(par.item, par.movs || par.mov, { estrategia: par.estrategia })
         .then(function(){ feitas.push(par); })
         .catch(function(err){ console.warn('confirmação automática de débito falhou em ' + par.item.chaveConcluido, err); })
         .then(passo);
@@ -556,7 +559,7 @@ function giocoReconciliacaoEngine(deps){
   function confirmarSugestaoDebito(res, compromissoId, periodo){
     var s = sugestaoDebitoPara(res, compromissoId, periodo);
     if (!s) return Promise.reject(new Error('Sugestão já não é válida — os dados mudaram entretanto.'));
-    return confirmarDebito(s.item, s.mov, { confirmadoManualmente: true });
+    return confirmarDebito(s.item, s.movs || s.mov, { confirmadoManualmente: true, estrategia: s.estrategia });
   }
 
   /* ---------- receitas (vendasDiario) ---------- */
@@ -626,18 +629,27 @@ function giocoReconciliacaoEngine(deps){
     return usados;
   }
 
-  // Candidatos exactos: mesmos cêntimos (ou dentro de item.tolerancia,
-  // quando o item a define) dentro da janela do item, livres e não excluídos.
-  function candidatosDe(item, movs, usados){
-    if (item.cents === null || !item.ancora) return [];
+  // Correspondência de um item em modo único pelo motor partilhado
+  // (gioco-correspondencia.js): pagamentos com 'exacto' + 'soma2' (dois
+  // débitos do mesmo dia que somam o valor — Mensalidade Abanca), receitas
+  // CD só 'exacto' com a tolerância do item (a regra A2 fica fora do
+  // motor, mais abaixo). Só recebe movimentos livres e não excluídos.
+  function correspondenciaDe(item, movs, usados){
+    if (item.cents === null || !item.ancora) return null;
     var excluidos = excluidosDe(__REC()[item.chave]);
-    var tol = item.tolerancia || 0;
-    return movs.filter(function(m){
-      if (usados[m.id] || excluidos[m.key]) return false;
-      if (tol ? Math.abs(m.cents - item.cents) > tol : m.cents !== item.cents) return false;
-      var d = diasEntre(item.ancora, m.dia);
-      return d !== null && d >= -item.janela.antes && d <= item.janela.depois;
+    return CORR({
+      cents: item.cents, dia: item.ancora, janela: item.janela,
+      toleranciaCents: item.tolerancia || 0,
+      movimentos: movs.filter(function(m){ return !usados[m.id] && !excluidos[m.key]; }),
+      estrategias: item.fonte === 'venda' ? ['exacto'] : ['exacto', 'soma2']
     });
+  }
+
+  // Lista plana (sem repetidos) dos movimentos de todos os grupos candidatos.
+  function achatarGrupos(grupos){
+    var vistos = {}, out = [];
+    (grupos || []).forEach(function(g){ g.forEach(function(m){ if (!vistos[m.id]){ vistos[m.id] = true; out.push(m); } }); });
+    return out;
   }
 
   // Todos os movimentos livres na janela do item, sem olhar ao valor
@@ -672,13 +684,17 @@ function giocoReconciliacaoEngine(deps){
       it.ligacao = entradaLigada(it.registo) ? it.registo : null;
       it.excluidos = excluidosDe(it.registo);
       it.movs = movsDoItem(it, movs);
-      it.candidatos = it.ligacao ? [] : candidatosDe(it, it.movs, usados);
-      if (!it.ligacao && it.candidatos.length === 1){
-        reclamacoes[it.candidatos[0].id] = (reclamacoes[it.candidatos[0].id] + 1) || 1;
+      it.correspondencia = (it.ligacao || it.modo === 'soma') ? null : correspondenciaDe(it, it.movs, usados);
+      it.candidatosGrupos = it.correspondencia ? it.correspondencia.candidatos : [];
+      it.candidatos = achatarGrupos(it.candidatosGrupos);
+      // Reclamação = o motor propôs estes movimentos (1, ou 2 no soma2) a
+      // este item; dois itens a reclamar o mesmo ficam ambos ambíguos.
+      if (it.correspondencia && it.correspondencia.estado === 'confirmado'){
+        it.correspondencia.movimentos.forEach(function(m){ reclamacoes[m.id] = (reclamacoes[m.id] + 1) || 1; });
       }
     });
-    // Movimentos que são candidato exacto de algum item: a passagem
-    // aproximada (A2) não os pode levar.
+    // Movimentos que são candidato exacto (ou metade de um par soma2) de
+    // algum item: a passagem aproximada (A2) não os pode levar.
     var reservados = {};
     itens.forEach(function(it){ it.candidatos.forEach(function(m){ reservados[m.id] = true; }); });
 
@@ -725,19 +741,26 @@ function giocoReconciliacaoEngine(deps){
         return;
       }
 
-      var n = it.candidatos.length;
-      if (n >= 2){ it.estado = 'ambiguo'; return; }
-      if (n === 1){
-        var disputado = reclamacoes[it.candidatos[0].id] > 1;
+      // Decisão do motor (exacto / soma2). Ambiguo PÁRA e pede ligação
+      // manual — regra dos pagamentos, ao contrário do dashboard de depósitos.
+      var corr = it.correspondencia;
+      if (corr && corr.estado === 'ambiguo'){
+        it.estado = 'ambiguo';
+        if (corr.estrategia === 'soma2') it.motivoAmbiguo = 'vários pares de movimentos somam o valor';
+        return;
+      }
+      if (corr && corr.estado === 'confirmado'){
+        var disputado = corr.movimentos.some(function(m){ return reclamacoes[m.id] > 1; });
         if (disputado || it.estimado){
           it.estado = 'ambiguo';
           it.motivoAmbiguo = disputado ? 'outro pagamento com o mesmo candidato' : 'valor estimado — só ligação manual';
           return;
         }
         it.estado = 'aguarda'; // até a escrita automática confirmar
-        // Pagamentos: a proposta é o movimento (formato de sempre);
-        // receitas: { movs, estado }, o formato das regras A2 e B.
-        it.autoProposta = it.fonte === 'venda' ? { movs: [it.candidatos[0]], estado: 'confirmado' } : it.candidatos[0];
+        // Pagamentos: a proposta é o movimento (formato de sempre) ou o
+        // par (soma2); receitas: { movs, estado }, o formato das regras A2 e B.
+        it.autoProposta = it.fonte === 'venda' ? { movs: corr.movimentos, estado: 'confirmado' }
+                                               : (corr.movimentos.length === 1 ? corr.movimentos[0] : corr.movimentos);
         autoNovas.push(it);
         return;
       }
@@ -874,9 +897,19 @@ function giocoReconciliacaoEngine(deps){
 
   /* ---------- escritas (as únicas do módulo) ---------- */
 
-  function registo(mov, metodo){
-    return { conta: mov.conta, movimentoKey: mov.key, valor: mov.valor, dataMovimento: mov.dia,
-             metodo: metodo, em: Date.now(), ligado: true };
+  // Entrada de pagamento: 1 movimento (formato de sempre — movimentoKey,
+  // valor) ou vários (soma2): movimentoKey = o primeiro, movimentoKeys[] =
+  // todos, valor = a soma. As 17 entradas antigas não mudam de forma; quem
+  // lê usa chavesDaEntrada(), que junta as duas. estrategia é metadado
+  // ('exacto' | 'soma2' | 'descritivo'), só quando o motor a deu.
+  function registo(movs, metodo, estrategia){
+    movs = Array.isArray(movs) ? movs : [movs];
+    var total = movs.reduce(function(a, m){ return a + m.cents; }, 0);
+    var r = { conta: movs[0].conta, movimentoKey: movs[0].key, valor: total / 100, dataMovimento: movs[0].dia,
+              metodo: metodo, em: Date.now(), ligado: true };
+    if (movs.length > 1) r.movimentoKeys = movs.map(function(m){ return m.key; });
+    if (estrategia) r.estrategia = estrategia;
+    return r;
   }
 
   // Entrada de receita: um ou vários movimentos (regra B), valor faturado,
@@ -895,9 +928,11 @@ function giocoReconciliacaoEngine(deps){
   // outro item (lido da cópia em memória, que o listener mantém).
   // Ligar à mão a um movimento excluído é permitido: o mesmo update tira a
   // chave de excluidos/.
-  // Pagamentos: ligar(chave, mov, metodo). Receitas: ligar(chave, mov ou
-  // [movs], metodo, item, estado) — item obrigatório (dá o valor faturado).
-  function ligar(chave, mov, metodo, item, estado){
+  // Pagamentos: ligar(chave, mov ou [movs], metodo, null, null, estrategia?).
+  // Receitas: ligar(chave, mov ou [movs], metodo, item, estado) — item
+  // obrigatório (dá o valor faturado). Vários movimentos numa chave
+  // qualquer gravam movimentoKeys[] além do movimentoKey singular.
+  function ligar(chave, mov, metodo, item, estado, estrategia){
     var movs = Array.isArray(mov) ? mov : [mov];
     var usados = movimentosUsados();
     for (var i = 0; i < movs.length; i++){
@@ -912,7 +947,7 @@ function giocoReconciliacaoEngine(deps){
     if (entradaLigada(atual)){
       return Promise.reject(new Error('Este pagamento já tem um movimento ligado.'));
     }
-    var patch = (item && item.fonte === 'venda') ? registoReceita(movs, metodo, item, estado) : registo(movs[0], metodo);
+    var patch = (item && item.fonte === 'venda') ? registoReceita(movs, metodo, item, estado) : registo(movs, metodo, estrategia);
     var excl = excluidosDe(atual);
     movs.forEach(function(m){ if (excl[m.key]) patch['excluidos/' + m.key] = null; });
     return deps.ref.child(chave).update(patch);
@@ -934,7 +969,7 @@ function giocoReconciliacaoEngine(deps){
       if (!it) return Promise.resolve(feitas);
       var p = (it.fonte === 'venda')
         ? ligar(it.chave, it.autoProposta.movs, 'auto', it, it.autoProposta.estado)
-        : ligar(it.chave, it.autoProposta, 'auto');
+        : ligar(it.chave, it.autoProposta, 'auto', null, null, it.correspondencia && it.correspondencia.estrategia);
       return p
         .then(function(){ feitas.push(it); })
         .catch(function(err){ console.warn('reconciliação automática falhou em ' + it.chave, err); })
@@ -958,13 +993,15 @@ function giocoReconciliacaoEngine(deps){
     var agora = Date.now();
     var patch = { conta: null, movimentoKey: null, valor: null, dataMovimento: null, metodo: null, em: null,
                   ligado: false, desligadoEm: agora };
+    // Todas as chaves da entrada (movimentoKey e, se existir, movimentoKeys[])
+    // vão para excluidos/ — em qualquer família de chave.
+    chavesDaEntrada(atual).forEach(function(k){ patch['excluidos/' + k] = agora; });
+    if (Array.isArray(atual.movimentoKeys)) patch.movimentoKeys = null;
+    if (atual.estrategia) patch.estrategia = null;
     if (/^venda:/.test(chave)){
       delete patch.valor;
       patch.movimentoKeys = null; patch.valorVenda = null; patch.valorMovimento = null;
       patch.diferenca = null; patch.estado = null;
-      chavesDaEntrada(atual).forEach(function(k){ patch['excluidos/' + k] = agora; });
-    } else {
-      patch['excluidos/' + atual.movimentoKey] = agora;
     }
     return deps.ref.child(chave).update(patch);
   }

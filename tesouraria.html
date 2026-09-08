@@ -1710,6 +1710,14 @@
     padding:7px 0;
     border-top:1px solid var(--line);
   }
+  /* Par soma2 (dois débitos que somam o valor): os dois movimentos
+     agrupados, com um só botão para os ligar juntos. */
+  .rec-par{
+    margin:6px 0;
+    padding:0 10px 6px;
+    border-left:3px solid var(--red);
+  }
+  .rec-par .rec-acoes{ margin-top:4px; }
   .rec-cand:first-of-type{ border-top:0; }
   .rec-cand .rec-cand-data{ white-space:nowrap; font-weight:600; }
   .rec-cand .rec-cand-desc{ flex:1 1 180px; min-width:0; overflow-wrap:anywhere; }
@@ -1785,6 +1793,7 @@
 <body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-correspondencia.js"></script>
 <script src="gioco-reconciliacao.js"></script>
 <script src="gioco-pagamentos.js"></script>
 
@@ -3140,10 +3149,14 @@ window.addEventListener('load', function () {
     var it = itemReconciliacao(chave);
     if (!it) return '';
     var h = '<div class="card-row"><span>Banco: ' + reconBadge(chave) + '</span></div>';
-    if (it.estado === 'confirmado' && it.movimento){
-      h += '<div class="card-row"><span class="pay-detalhe-nota">' + fmtDiaISO(it.movimento.dia) + ' · ' +
-           escapeHtml(nomeConta(it.movimento.conta)) + ' · ' + escapeHtml(it.movimento.desc) + ' · ' +
-           formatEuro(it.movimento.valor) + ' (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') + ')</span></div>';
+    // Vários movimentos (soma2: "10,00 € + 0,40 €") ou um só — as entradas
+    // antigas só têm movimentoKey e caem no singular sem mudar de aspecto.
+    var movsLig = (it.movimentos && it.movimentos.length) ? it.movimentos : (it.movimento ? [it.movimento] : []);
+    if (it.estado === 'confirmado' && movsLig.length){
+      var m0 = movsLig[0];
+      h += '<div class="card-row"><span class="pay-detalhe-nota">' + fmtDiaISO(m0.dia) + ' · ' +
+           escapeHtml(nomeConta(m0.conta)) + ' · ' + movsLig.map(function(m){ return escapeHtml(m.desc); }).join(' + ') + ' · ' +
+           movsLig.map(function(m){ return formatEuro(m.valor); }).join(' + ') + ' (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') + ')</span></div>';
     } else if (it.estado === 'confirmado'){
       h += '<div class="card-row"><span class="pay-detalhe-nota">Movimento ligado (' + escapeHtml(nomeConta(it.ligacao.conta)) +
            ' ' + escapeHtml(it.ligacao.movimentoKey) + ') já não está na sincronização.</span></div>';
@@ -3175,13 +3188,23 @@ window.addEventListener('load', function () {
     var janela = 'janela ' + fmtDiaISO(addDiasISO(it.ancora, -it.janela.antes)) + ' a ' + fmtDiaISO(addDiasISO(it.ancora, it.janela.depois));
 
     if (it.estado === 'confirmado'){
-      h += '<p class="rec-cands-titulo">Movimento ligado (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') + ')</p>';
-      h += it.movimento ? htmlMovimento(it.movimento, it.chave, false, it)
-                        : '<p class="rec-vazio">' + escapeHtml(nomeConta(it.ligacao.conta)) + ' ' + escapeHtml(it.ligacao.movimentoKey) + ' — já não está na sincronização.</p>';
+      var movsLig = (it.movimentos && it.movimentos.length) ? it.movimentos : (it.movimento ? [it.movimento] : []);
+      h += '<p class="rec-cands-titulo">Movimento' + (movsLig.length > 1 ? 's ligados' : ' ligado') + ' (' + (it.ligacao.metodo === 'auto' ? 'automático' : 'manual') +
+           (it.ligacao.estrategia === 'soma2' ? ' · soma de 2' : '') + ')</p>';
+      h += movsLig.length ? movsLig.map(function(m){ return htmlMovimento(m, it.chave, false, movsLig.length > 1 ? null : it); }).join('')
+                          : '<p class="rec-vazio">' + escapeHtml(nomeConta(it.ligacao.conta)) + ' ' + escapeHtml(it.ligacao.movimentoKey) + ' — já não está na sincronização.</p>';
       h += '<div class="rec-acoes"><button type="button" class="btn-small rec-desligar" data-rec-desligar="' + escapeHtml(it.chave) + '">Desligar</button></div>';
     } else if (it.estado === 'ambiguo'){
       h += '<p class="rec-cands-titulo">Candidatos (' + janela + ')' + (it.motivoAmbiguo ? ' · ' + escapeHtml(it.motivoAmbiguo) : '') + '</p>';
-      h += it.candidatos.map(function(m){ return htmlMovimento(m, it.chave, true, it); }).join('');
+      var grupos = (it.candidatosGrupos && it.candidatosGrupos.length) ? it.candidatosGrupos : it.candidatos.map(function(m){ return [m]; });
+      grupos.forEach(function(g){
+        if (g.length === 1){ h += htmlMovimento(g[0], it.chave, true, it); return; }
+        // Par soma2: os dois movimentos e um só botão para ligar os dois.
+        h += '<div class="rec-par">' + g.map(function(m){ return htmlMovimento(m, it.chave, false, null); }).join('') +
+             '<div class="rec-acoes"><button type="button" class="btn-small" data-rec-ligar-par="' + escapeHtml(it.chave) + '" data-rec-ids="' +
+             escapeHtml(g.map(function(m){ return m.conta + '|' + m.key; }).join(';')) + '">Ligar o par (' +
+             g.map(function(m){ return formatEuro(m.valor); }).join(' + ') + ')</button></div></div>';
+      });
     } else if (it.estado === 'aguarda'){
       h += '<p class="rec-vazio">Ainda sem movimento no banco — ' + janela + '.</p>';
     } else {
@@ -3472,6 +3495,21 @@ window.addEventListener('load', function () {
       ligar.disabled = true;
       (itemVenda ? RE.ligar(chave, mov, 'manual', itemVenda, 'confirmado') : RE.ligar(chave, mov, 'manual')).catch(function(err){
         ligar.disabled = false;
+        alert('Não foi possível ligar: ' + (err && err.message ? err.message : err));
+      });
+      return;
+    }
+    // Par soma2 ambíguo (pagamentos): ligar à mão os dois movimentos do par.
+    var ligarPar = e.target.closest('[data-rec-ligar-par]');
+    if (ligarPar){
+      var chaveP = ligarPar.getAttribute('data-rec-ligar-par');
+      var movsP = ligarPar.getAttribute('data-rec-ids').split(';').map(function(s){
+        var p = s.split('|'); return RE.movimentoPorId(p[0], p[1]);
+      });
+      if (movsP.some(function(m){ return !m; })){ alert('Movimentos já não estão disponíveis.'); return; }
+      ligarPar.disabled = true;
+      RE.ligar(chaveP, movsP, 'manual', null, null, 'soma2').catch(function(err){
+        ligarPar.disabled = false;
         alert('Não foi possível ligar: ' + (err && err.message ? err.message : err));
       });
       return;

@@ -2062,6 +2062,7 @@
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-caixa.js"></script>
+<script src="gioco-correspondencia.js"></script>
 <script src="gioco-eventos.js"></script>
 
 <div class="shell">
@@ -5091,6 +5092,43 @@ window.addEventListener('load', function () {
       .sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : 0); });
   }
 
+  /* Escolha do crédito para um depósito, pelo motor partilhado
+     (gioco-correspondencia.js): só 'exacto', janela [0, +7] a partir do dia
+     de caixa, só ABANCA (allContaMovs — os depósitos físicos só acontecem
+     nessa conta). Devolve o movimento no formato {ref, dia, cents} de
+     creditosDoBanco(), ou null.
+
+     DECISÃO DELIBERADA E EXCLUSIVA DESTE CASO: quando o motor devolve
+     'ambiguo' (2+ créditos com o mesmo valor na janela), o dashboard NÃO
+     pára — ordena os candidatos por data de booking, ascendente, e liga o
+     MAIS ANTIGO, exactamente o comportamento greedy que já existia (um
+     levantamento casa com o crédito mais próximo). Isto é aceitável aqui
+     porque dois depósitos de valor igual e dias próximos são
+     indistinguíveis de qualquer maneira, e a ordem cronológica é o melhor
+     critério possível. NÃO é um padrão a replicar nos outros usos do motor
+     (pagamentos, débitos fixos, débitos variáveis — gioco-reconciliacao.js),
+     onde 'ambiguo' continua a parar e a pedir confirmação manual. */
+  var JANELA_DEPOSITO = { antes: 0, depois: JANELA_RECONCILIACAO_DIAS };
+  function escolherCreditoDeposito(cents, diaCaixa, creditosLivres){
+    var r = giocoCorrespondencia({
+      cents: cents, dia: diaCaixa, janela: JANELA_DEPOSITO, estrategias: ['exacto'],
+      movimentos: creditosLivres.map(function(c){ return { id: c.ref, dia: c.dia, cents: c.cents, desc: c.descricao }; })
+    });
+    var lista;
+    if (r.estado === 'confirmado') lista = r.movimentos;
+    else if (r.estado === 'ambiguo') lista = r.candidatos.map(function(g){ return g[0]; });
+    else return null;
+    // Ordenação explícita por data (e ref para desempate) — nunca confiar
+    // na ordem em que o motor os devolve.
+    lista = lista.slice().sort(function(a, b){
+      if (a.dia !== b.dia) return a.dia < b.dia ? -1 : 1;
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+    var escolhido = lista[0];
+    for (var i = 0; i < creditosLivres.length; i++) if (creditosLivres[i].ref === escolhido.id) return creditosLivres[i];
+    return null;
+  }
+
   function reconciliarDepositos(){
     if (!caixaCarregada || !cofreCarregada || !contaMovsCarregados || reconciliacaoAEscrever) return;
 
@@ -5113,16 +5151,10 @@ window.addEventListener('load', function () {
       var diaCaixa = diaLocalDe(m.dataHora);
       var cents = centimos(liquidoDeposito(m));
       if (!diaCaixa || cents === null) return;
-
-      for (var i = 0; i < creditos.length; i++){
-        var c = creditos[i];
-        if (usados[c.ref] || c.cents !== cents) continue;
-        var delta = diasEntre(diaCaixa, c.dia);
-        if (delta === null || delta < 0 || delta > JANELA_RECONCILIACAO_DIAS) continue;
-        usados[c.ref] = true;
-        novos.push({ id: m.id, mov: m, credito: c });
-        break;
-      }
+      var c = escolherCreditoDeposito(cents, diaCaixa, creditos.filter(function(c){ return !usados[c.ref]; }));
+      if (!c) return;
+      usados[c.ref] = true;
+      novos.push({ id: m.id, mov: m, credito: c });
     });
 
     renderReconEstado(creditos.length, novos.length);
