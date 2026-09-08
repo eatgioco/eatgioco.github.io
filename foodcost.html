@@ -181,6 +181,18 @@
     margin-left:8px;
   }
 
+  /* Arquivado: a variância NÃO esconde — o histórico de consumo e de compras
+     desse ingrediente continua a ser real. Marca-se e pronto. */
+  .selo-arq{
+    display:inline-block;
+    font-family:'Inter',sans-serif;
+    font-size:9.5px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;
+    padding:2px 7px; border-radius:100px;
+    background:var(--line); color:var(--muted);
+    margin-left:8px;
+  }
+
   /* ---------- Formato de compra: ⚙ + mini-modal ---------- */
   .btn-compra-edit{
     background:none; border:none; cursor:pointer;
@@ -764,6 +776,9 @@
       if (s > melhorScore) { melhorScore = s; melhor = id; melhorTipo = 'receita'; }
     });
     Object.keys(allIngredientes).forEach(function (id) {
+      // Nunca sugerir um ingrediente arquivado: continua escolhível à mão, mas
+      // propor sozinho um artigo que saiu da lista seria propor um erro.
+      if (allIngredientes[id].arquivado === true) return;
       var s = semelhanca(descProduto, allIngredientes[id].nome);
       if (s > melhorScore) { melhorScore = s; melhor = id; melhorTipo = 'ingrediente'; }
     });
@@ -907,6 +922,7 @@
       linhas.push({
         id: id,
         nome: ing.nome || id,
+        arquivado: ing.arquivado === true,
         categoria: ing.categoria || '',
         unidade: (ing.unidade || (itensDe[id] && itensDe[id].unidadeBase) || ''),
         semPreco: preco <= 0,
@@ -1074,6 +1090,7 @@
       var cls = l.desvioEuro === null ? '' : (l.desvioEuro > 0 ? 'desvio-pos' : (l.desvioEuro < 0 ? 'desvio-neg' : ''));
       return '<tr>' +
         '<td>' + esc(l.nome) +
+          (l.arquivado ? '<span class="selo-arq" title="Ingrediente arquivado: fora da lista viva, mas o histórico continua a contar">arquivado</span>' : '') +
           (l.semPreco ? '<span class="selo-est" title="Sem precoUltimaCompra: os euros deste ingrediente são zero">sem preço</span>' : '') +
           (l.qtdDeFatura ? '<span class="selo-est" title="A quantidade comprada veio da fatura, na unidade da fatura — sem formato de compra definido">qtd da fatura</span>' : '') +
           '<button type="button" class="btn-compra-edit" data-id="' + esc(l.id) + '" title="Formato de compra (unidade da fatura + fator)">⚙</button>' +
@@ -1164,7 +1181,7 @@
               return String(mapa[a].nome).localeCompare(String(mapa[b].nome), 'pt');
             }).map(function (id) {
               return '<option value="' + esc(id) + '"' + (sug && sug.tipo === tipo && sug.id === id ? ' selected' : '') + '>' +
-                     esc(mapa[id].nome) + '</option>';
+                     esc(mapa[id].nome) + (mapa[id].arquivado === true ? ' (arquivado)' : '') + '</option>';
             }).join('');
         }
         var tipoInicial = (sug && sug.tipo) || 'receita';

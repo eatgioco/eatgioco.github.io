@@ -1538,8 +1538,15 @@
     renderCatContadores();
   }
 
+  // Ingredientes arquivados (arquivado:true — fundidos, movidos para preparações ou
+  // fora da lista de contagem) nunca entram aqui: a contagem física é da lista viva.
+  // As contagens já fechadas não são tocadas e continuam a referir os ids antigos.
   ingredientesRef.on('value', function (snap) {
-    allIngredientes = snap.val() || {};
+    var todos = snap.val() || {};
+    allIngredientes = {};
+    Object.keys(todos).forEach(function (id) {
+      if (!todos[id] || todos[id].arquivado !== true) allIngredientes[id] = todos[id];
+    });
     ingredientesCarregados = true;
     if (!vistaLista.hidden) { renderLista(); return; }
     if (dataAtual) comFocoPreservado(function () { renderLinhas(); renderProgresso(); });

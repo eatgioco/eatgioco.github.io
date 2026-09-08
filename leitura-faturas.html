@@ -336,6 +336,17 @@
     margin-top:10px;
   }
 
+  /* Arquivado: a leitura de faturas NÃO esconde — uma fatura antiga tem de continuar
+     a resolver o ingrediente a que foi ligada. Marca-se e esbate-se. */
+  .selo-arq{
+    display:inline-block; margin-left:8px; padding:2px 7px; border-radius:100px;
+    font-family:'Inter',sans-serif; font-size:9.5px; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase;
+    background:var(--line); color:var(--muted);
+  }
+  .ing-select-item.arquivado{ opacity:0.6; }
+  .ing-select-item.arquivado:hover{ opacity:1; }
+
   .ing-select-item{
     display:block;
     width:100%;
@@ -1105,6 +1116,8 @@ window.addEventListener('load', function () {
     var candidates = [];
     Object.keys(allIngredientes).forEach(function (id) {
       var ing = allIngredientes[id] || {};
+      // Um arquivado nunca é proposto sozinho — continua escolhível à mão na lista.
+      if (ing.arquivado === true) return;
       var nomes = [ing.nome].concat(Array.isArray(ing.aliases) ? ing.aliases : []);
       var melhor = 0;
       nomes.forEach(function (nome) {
@@ -1421,7 +1434,9 @@ window.addEventListener('load', function () {
   function linhaIngredienteHtml(l) {
     var ligado = l.ingredienteId && allIngredientes[l.ingredienteId];
     if (ligado) {
-      return '<span class="linha-ing-nome">✓ ' + escapeHtml(allIngredientes[l.ingredienteId].nome || 'Ingrediente') + '</span>' +
+      return '<span class="linha-ing-nome">✓ ' + escapeHtml(allIngredientes[l.ingredienteId].nome || 'Ingrediente') +
+        (allIngredientes[l.ingredienteId].arquivado === true
+          ? '<span class="selo-arq" title="Ingrediente arquivado: continua ligado, mas saiu da lista viva">arquivado</span>' : '') + '</span>' +
         '<button type="button" class="btn-mini btn-linha-trocar" title="Trocar ingrediente">✎</button>';
     }
 
@@ -1602,7 +1617,7 @@ window.addEventListener('load', function () {
   function renderIngSelectList() {
     var termo = normalizeNome(ingSelectSearch.value);
     var items = Object.keys(allIngredientes).map(function (id) {
-      return { id: id, nome: allIngredientes[id].nome || '' };
+      return { id: id, nome: allIngredientes[id].nome || '', arquivado: allIngredientes[id].arquivado === true };
     }).filter(function (ing) {
       return !termo || normalizeNome(ing.nome).indexOf(termo) !== -1;
     }).sort(function (a, b) {
@@ -1614,8 +1629,8 @@ window.addEventListener('load', function () {
       html += '<div class="ing-select-vazio">Nenhum ingrediente encontrado.</div>';
     }
     items.forEach(function (ing) {
-      html += '<button type="button" class="ing-select-item" data-id="' + escapeHtml(ing.id) + '">' +
-        escapeHtml(ing.nome) + '</button>';
+      html += '<button type="button" class="ing-select-item' + (ing.arquivado ? ' arquivado' : '') + '" data-id="' + escapeHtml(ing.id) + '">' +
+        escapeHtml(ing.nome) + (ing.arquivado ? '<span class="selo-arq">arquivado</span>' : '') + '</button>';
     });
     html += '<button type="button" class="ing-select-item ing-select-novo" id="ingSelectCriarNovo">+ Criar novo ingrediente</button>';
 

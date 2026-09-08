@@ -88,6 +88,18 @@
 
   /* ---------- Barra de ferramentas ---------- */
   .barra{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 12px; margin:18px 0 12px; }
+  /* Arquivados: fora da folha por omissão. Com o toggle ligado a linha aparece
+     esbatida e com o selo — continua editável, porque continua a ser um registo real. */
+  .arq-toggle{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); white-space:nowrap; cursor:pointer; }
+  .arq-toggle input{ accent-color:var(--red); cursor:pointer; }
+  tr.arquivado > td{ opacity:0.55; }
+  tr.arquivado:hover > td{ opacity:1; }
+  .selo-arquivado{
+    display:inline-block; margin-left:6px; padding:1px 5px;
+    font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;
+    background:var(--line); color:var(--muted);
+  }
+
   .search-box.gestao-search{ flex:1 1 220px; max-width:340px; margin:0; min-width:0; }
   .search-box.gestao-search input{
     flex:1; min-width:0; background:none; border:none; outline:none;
@@ -278,6 +290,7 @@
           <svg class="icon" width="14" height="14"><use href="#i-search"/></svg>
           <input type="text" id="pesquisa" placeholder="Procurar…" autocomplete="off">
         </div>
+        <label class="arq-toggle" id="arqToggleWrap"><input type="checkbox" id="mostrarArquivados"> Mostrar arquivados</label>
         <select class="mes" id="mesSel" hidden></select>
         <button type="button" class="btn" id="btnReporOrdem" title="Repor a ordem original das colunas">Repor ordem</button>
         <p class="hint" id="hint"></p>
@@ -482,6 +495,9 @@ window.addEventListener('load', function () {
   var carregado = { ing:false, rec:false, prep:false, cat:false, sup:false, catalogo:false, mapa:false, meses:false };
 
   var abaAtiva = 'ingredientes';
+  // Um ingrediente arquivado (arquivado:true) continua a existir e a ser referido por
+  // receitas e faturas antigas — só não aparece na folha por omissão.
+  var mostrarArquivados = false;
   var termo = '';
   var ordenacao = { ingredientes: { col:null, dir:1 }, produtos: { col:null, dir:1 } };
   var emEdicao = null;         // célula em edição (td)
@@ -681,12 +697,21 @@ window.addEventListener('load', function () {
   // Valores por célula (texto para pesquisa/ordenação + html)
   // ===================================================================
 
+  // O porquê do arquivo, para o title do selo: fusão, movido para preparações, ou
+  // simplesmente fora da lista de contagem.
+  function motivoArquivo(ing) {
+    if (ing.fundidoEm) return 'Fundido em ' + ((ingredientes[ing.fundidoEm] && ingredientes[ing.fundidoEm].nome) || ing.fundidoEm);
+    if (ing.movidoPara) return 'Movido para ' + ing.movidoPara;
+    return 'Fora da lista de contagem';
+  }
+
   function valorCelula(aba, col, id) {
     if (aba === 'ingredientes') {
       var ing = ingredientes[id];
       var cont = contagemEfetiva(ing);
       switch (col.id) {
-        case 'nome': return { v: ing.nome || '', html: escapeHtml(ing.nome || '') || '<span class="vazio">sem nome</span>' };
+        case 'nome': return { v: ing.nome || '', html: (escapeHtml(ing.nome || '') || '<span class="vazio">sem nome</span>') +
+          (ing.arquivado === true ? '<span class="selo-arquivado" title="' + escapeHtml(motivoArquivo(ing)) + '">Arquivado</span>' : '') };
         case 'categoria': return { v: categoriasIng[ing.categoria] || ing.categoria || '', html: ing.categoria ? escapeHtml(categoriasIng[ing.categoria] || ing.categoria) : '<span class="vazio">—</span>' };
         case 'fornecedor': return { v: ing.fornecedor || '', html: ing.fornecedor ? escapeHtml(ing.fornecedor) : '<span class="vazio">—</span>' };
         case 'unidade': return { v: labelUnidade(ing.unidade), html: ing.unidade ? escapeHtml(labelUnidade(ing.unidade)) : '<span class="vazio">—</span>' };
@@ -756,6 +781,7 @@ window.addEventListener('load', function () {
     var cols = COLUNAS[aba];
     var t = normalizar(termo);
     var ids = Object.keys(fonte).filter(function (id) {
+      if (aba === 'ingredientes' && !mostrarArquivados && fonte[id] && fonte[id].arquivado === true) return false;
       if (!t) return true;
       var texto = cols.map(function (c) { var r = valorCelula(aba, c, id); return r.v === null || r.v === undefined ? '' : String(r.v); }).join(' ');
       return normalizar(texto).indexOf(t) !== -1;
@@ -784,7 +810,10 @@ window.addEventListener('load', function () {
     if (emEdicao) { renderPendente = true; return; }
     renderPendente = false;
 
-    document.getElementById('countIngredientes').textContent = '(' + Object.keys(ingredientes).length + ')';
+    document.getElementById('countIngredientes').textContent = '(' + Object.keys(ingredientes).filter(function (id) {
+      return mostrarArquivados || !(ingredientes[id] && ingredientes[id].arquivado === true);
+    }).length + ')';
+    document.getElementById('arqToggleWrap').hidden = abaAtiva !== 'ingredientes';
     document.getElementById('countProdutos').textContent = '(' + Object.keys(receitas).length + ')';
     statusMsg.textContent = abaAtiva === 'ingredientes'
       ? 'Clica numa célula branca para editar. Grava ao sair da célula ou com Enter; Esc cancela.'
@@ -818,6 +847,7 @@ window.addEventListener('load', function () {
     ids.forEach(function (id) {
       var rowCls = '';
       if (aba === 'produtos' && !artigosDaFicha(id).length) rowCls = ' class="sem-pos"';
+      if (aba === 'ingredientes' && ingredientes[id] && ingredientes[id].arquivado === true) rowCls = ' class="arquivado"';
       html += '<tr data-id="' + escapeHtml(id) + '"' + rowCls + '>';
       cols.forEach(function (c) {
         var r = valorCelula(aba, c, id);
@@ -1314,6 +1344,10 @@ window.addEventListener('load', function () {
   });
 
   pesquisa.addEventListener('input', function () { termo = pesquisa.value.trim(); render(); });
+  document.getElementById('mostrarArquivados').addEventListener('change', function () {
+    mostrarArquivados = this.checked;
+    render();
+  });
 
   Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (btn) {
     btn.addEventListener('click', function () {

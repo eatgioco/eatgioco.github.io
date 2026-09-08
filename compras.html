@@ -883,6 +883,24 @@
     flex:1;
   }
 
+  /* Arquivados: escondidos por omissão, visíveis com o toggle. Quando visíveis,
+     o cartão fica esbatido e leva o selo — nunca desaparecem da base de dados. */
+  .arq-toggle{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:'Inter',sans-serif;font-size:12px;color:var(--muted);
+    white-space:nowrap;cursor:pointer;
+  }
+  .arq-toggle input{ accent-color:var(--red);cursor:pointer; }
+  .ing-card.arquivado{ opacity:0.55; }
+  .ing-card.arquivado:hover{ opacity:1; }
+  .selo-arquivado{
+    display:inline-block;
+    font-family:'Inter',sans-serif;font-size:9.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.4px;
+    padding:2px 6px;margin-left:6px;
+    background:var(--line);color:var(--muted);
+  }
+
   .ing-card-cat{
     align-self:flex-start;
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
@@ -1942,6 +1960,7 @@
   <div class="controls">
     <input type="text" class="search-input" id="ingSearchInput" placeholder="Pesquisar ingrediente por nome...">
     <button type="button" class="btn" id="btnCatManage">⚙ Categorias</button>
+    <label class="arq-toggle"><input type="checkbox" id="ingMostrarArquivados"> Mostrar arquivados</label>
   </div>
 
   <div class="ing-chips" id="ingCatChips"></div>
@@ -2630,8 +2649,21 @@ window.addEventListener('load', function () {
     encAbrir();
   });
 
+  // Ingredientes arquivados (arquivado:true) continuam em memória — as encomendas e
+  // as faturas antigas precisam deles para resolver — mas ficam fora da listagem
+  // por omissão. O toggle "Mostrar arquivados" é só de leitura, não escreve nada.
+  var mostrarArquivados = false;
+
+  function ingArquivado(ing) { return !!ing && ing.arquivado === true; }
+
+  function idsIngVisiveis() {
+    return Object.keys(allIngredientes).filter(function (id) {
+      return mostrarArquivados || !ingArquivado(allIngredientes[id]);
+    });
+  }
+
   function renderIngStats() {
-    var ids = Object.keys(allIngredientes);
+    var ids = idsIngVisiveis();
     var total = ids.length;
     var semFornecedor = ids.filter(function (id) { return !allIngredientes[id].fornecedor; }).length;
     ingStatsBar.innerHTML =
@@ -2641,11 +2673,12 @@ window.addEventListener('load', function () {
 
   function renderIngChips() {
     var grupos = {};
-    Object.keys(allIngredientes).forEach(function (id) {
+    var visiveis = idsIngVisiveis();
+    visiveis.forEach(function (id) {
       var cat = allIngredientes[id].categoria || 'null';
       grupos[cat] = (grupos[cat] || 0) + 1;
     });
-    var total = Object.keys(allIngredientes).length;
+    var total = visiveis.length;
 
     var html = '<button type="button" class="ing-chip' + (ingCurrentCategoria === 'Todas' ? ' active' : '') + '" data-cat="Todas">Todas (' + total + ')</button>';
     CATEGORIA_ORDER.forEach(function (key) {
@@ -2681,18 +2714,19 @@ window.addEventListener('load', function () {
         '</span>'
       : '<span class="ing-cart-add" title="Adicionar ao carrinho">+</span>';
 
-    return '<div class="ing-card" data-id="' + escapeHtml(ing.id) + '">' +
+    var arq = ingArquivado(ing) ? '<span class="selo-arquivado">Arquivado</span>' : '';
+    return '<div class="ing-card' + (ingArquivado(ing) ? ' arquivado' : '') + '" data-id="' + escapeHtml(ing.id) + '">' +
       '<div class="ing-card-image">🖼</div>' +
       '<div class="ing-card-body">' +
         '<span class="ing-card-cat' + catClass + '">' + escapeHtml(catLabel) + '</span>' +
-        '<div class="ing-card-name">' + escapeHtml(ing.nome) + '</div>' +
+        '<div class="ing-card-name">' + escapeHtml(ing.nome) + arq + '</div>' +
         '<div class="ing-card-footer">' + fornecedorHtml + cartHtml + '<span class="ing-edit-icon">✎</span></div>' +
       '</div>' +
     '</div>';
   }
 
   function renderIngGrid() {
-    var ids = Object.keys(allIngredientes);
+    var ids = idsIngVisiveis();
     var items = ids.map(function (id) {
       return Object.assign({ id: id }, allIngredientes[id]);
     });
@@ -2936,6 +2970,13 @@ window.addEventListener('load', function () {
     if (!data.nome) return;
     ingredientesRef.child(id).update(data);
     closeIngModal();
+  });
+
+  document.getElementById('ingMostrarArquivados').addEventListener('change', function () {
+    mostrarArquivados = this.checked;
+    renderIngStats();
+    renderIngChips();
+    renderIngGrid();
   });
 
   ingSearchInput.addEventListener('input', function () {
@@ -4663,7 +4704,7 @@ window.addEventListener('load', function () {
     var resultados = Object.keys(allIngredientes).map(function (id) {
       return Object.assign({ id: id }, allIngredientes[id]);
     }).filter(function (ing) {
-      return ingredienteMatchesQuery(ing, query);
+      return !ingArquivado(ing) && ingredienteMatchesQuery(ing, query);
     }).slice(0, 6);
 
     if (resultados.length === 0) {
@@ -5034,6 +5075,9 @@ window.addEventListener('load', function () {
     Object.keys(allIngredientes).forEach(function (id) {
       var ing = allIngredientes[id];
       if (!ing) return;
+      // Arquivado saiu da lista de propósito: nunca entra numa encomenda sugerida,
+      // mesmo que o histórico de consumo ainda o mostre.
+      if (ingArquivado(ing)) return;
 
       var nec = encNecessidade(procura, id, n, margem);
       var fmt = encFormatoCompra(id);

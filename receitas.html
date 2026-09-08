@@ -298,6 +298,14 @@
     overflow-wrap:anywhere;
   }
 
+  /* Ingrediente arquivado: as fichas NÃO o escondem — escondê-lo faria a receita
+     parecer incompleta. Marca-se, para se perceber que saiu da lista viva. */
+  .comp-arq-badge{
+    flex:0 0 auto;
+    font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    padding:1px 5px; background:var(--line); color:var(--muted); white-space:nowrap;
+  }
+
   .comp-prep-badge{
     flex:0 0 auto;
     font-size:9px;
@@ -1330,10 +1338,23 @@ window.addEventListener('load', function () {
 
   // Linha ao estilo de talão: nome (e quantidade) à esquerda, pontos a
   // preencher o vão, custo sempre encostado à direita.
-  function linhaComponenteHtml(nome, qtd, unidade, res, badge) {
+  // Um componente que aponta para um ingrediente arquivado continua a contar para o
+  // custo. Só leva o selo — as receitas e as faturas antigas têm de continuar a resolver.
+  function componenteArquivado(comp) {
+    if (!comp) return false;
+    if (comp.tipo === 'preparacao') {
+      var p = allPreparacoes[comp.prepId];
+      return !!p && p.arquivado === true;
+    }
+    var ing = allIngredientes[comp.ingredienteId];
+    return !!ing && ing.arquivado === true;
+  }
+
+  function linhaComponenteHtml(nome, qtd, unidade, res, badge, arquivado) {
     var html = '<div class="comp-line"><div class="comp-main">';
     html += '<span class="comp-nome">' + escapeHtml(nome) + '</span>';
     if (badge) html += '<span class="comp-prep-badge">' + escapeHtml(badge) + '</span>';
+    if (arquivado) html += '<span class="comp-arq-badge" title="Fora da lista viva de ingredientes">arquivado</span>';
     html += '<span class="comp-dots"></span>';
     if (res.ok) {
       html += '<span class="comp-custo">' + escapeHtml(formatEuros(res.custo, 3)) + '</span>';
@@ -1416,7 +1437,7 @@ window.addEventListener('load', function () {
     }
     calc.linhas.forEach(function (l) {
       var badge = l.comp.tipo === 'preparacao' ? 'preparação' : null;
-      html += linhaComponenteHtml(l.res.nome, l.comp.qtd, l.comp.unidade, l.res, badge);
+      html += linhaComponenteHtml(l.res.nome, l.comp.qtd, l.comp.unidade, l.res, badge, componenteArquivado(l.comp));
     });
 
     html += '<div class="totais">';
@@ -1477,7 +1498,8 @@ window.addEventListener('load', function () {
         html += '<p class="rel-empty">Sem ingredientes registados.</p>';
       }
       lote.linhas.forEach(function (l) {
-        html += linhaComponenteHtml(l.res.nome, l.item.qtd, l.item.unidade, l.res, null);
+        html += linhaComponenteHtml(l.res.nome, l.item.qtd, l.item.unidade, l.res, null,
+          componenteArquivado({ tipo: 'ingrediente', ingredienteId: l.item.ingredienteId }));
       });
     }
 
