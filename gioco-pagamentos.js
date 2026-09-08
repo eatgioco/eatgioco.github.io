@@ -47,12 +47,23 @@
                              e o ÚNICO formato sem zero do OS (vendas, recibos
                              e contagens levam zero). Confundi-los é o erro
                              clássico deste modelo de dados.
-     compromissoPago(id,d) — existe pagamentosConcluidos[id + '_' + periodo]
+     compromissoPago(id,d) — ocorrenciaPaga(pagamentosConcluidos[id + '_' + periodo])
+
+   "ESTÁ PAGO?" — fonte ÚNICA de verdade (Set/2026): ocorrenciaPaga(reg),
+   também exposta como giocoPagamentosEngine.ocorrenciaPaga para páginas e
+   motores que não constroem o engine (mrn-dashboard.html, equipa.html,
+   gioco-reconciliacao.js). Uma entrada de pagamentosConcluidos conta como
+   paga se existir E anulado !== true. "Anular confirmação" (RE.anularConfirmacao
+   no gioco-reconciliacao.js) nunca remove() a entrada: escreve anulado:true +
+   anuladoEm e a ocorrência volta a pendente; reconfirmar escreve anulado:false
+   + reconfirmadoEm por update(), preservando anuladoEm como rasto. NUNCA
+   decidir "está pago" pela verdade booleana da chave — passa sempre por aqui.
 
    Datas dos pedidos vêm em texto 'DD/MM/AAAA' (lines[i].prazo);
    ddmmyyyyToDate devolve null para vazio/inválido. */
 function giocoPagamentosEngine(deps){
   'use strict';
+  var ocorrenciaPaga = giocoPagamentosEngine.ocorrenciaPaga;
   var CE = deps.compromissos;
   var parseMontante = deps.parseMontante;
   var formatDateDDMMYYYY = deps.formatDateDDMMYYYY;
@@ -123,7 +134,7 @@ function giocoPagamentosEngine(deps){
   }
 
   function compromissoPago(compromissoId, prazoDate){
-    return !!allPagamentosConcluidosGet()[compromissoId + '_' + periodoCompromisso(prazoDate)];
+    return ocorrenciaPaga(allPagamentosConcluidosGet()[compromissoId + '_' + periodoCompromisso(prazoDate)]);
   }
 
   // Achata as ocorrências de compromissos fixos ativos de um mês, no mesmo
@@ -207,6 +218,7 @@ function giocoPagamentosEngine(deps){
     lineStatus: lineStatus,
     periodoCompromisso: periodoCompromisso,
     compromissoPago: compromissoPago,
+    ocorrenciaPaga: ocorrenciaPaga,
     linhasPaymentRequestsTodas: linhasPaymentRequestsTodas,
     linhasCompromissosDoMes: linhasCompromissosDoMes,
     itensDoMes: itensDoMes,
@@ -214,3 +226,10 @@ function giocoPagamentosEngine(deps){
     chaveReconciliacao: chaveReconciliacao
   };
 }
+
+// "Está pago?" — a ÚNICA definição do OS (ver cabeçalho). Estática na
+// factory para poder ser usada sem construir o engine. reg = a entrada de
+// pagamentosConcluidos/{chave} (ou undefined/null quando não existe).
+giocoPagamentosEngine.ocorrenciaPaga = function(reg){
+  return !!(reg && reg.anulado !== true);
+};

@@ -1855,6 +1855,7 @@
 <body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-pagamentos.js"></script>
 
 <div class="shell">
 
@@ -3204,7 +3205,7 @@ window.addEventListener('load', function () {
           /* A chave de pagamentosConcluidos é {id+sufixo}_{ano}-{mes}, com o
              mês SEM zero à esquerda — não confundir com o AAAA-MM dos
              recibos. A ocorrência do cartão do modelo antigo leva '~cartao'. */
-          if (pagamentosConcluidos[c.id + s.sufixo + '_' + m.ano + '-' + m.mes]) return;
+          if (giocoPagamentosEngine.ocorrenciaPaga(pagamentosConcluidos[c.id + s.sufixo + '_' + m.ano + '-' + m.mes])) return;
           out.push({
             nome: CE.nomeOcorrencia(c.id + s.sufixo, c.nome || c.id),
             valor: s.valor,

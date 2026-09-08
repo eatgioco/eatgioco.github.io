@@ -118,7 +118,18 @@
    {concluidoEm, auto, confirmadoManualmente?}) e, só nos de valor
    variável, compromissosFixos/{id}/historicoDescritivos (set do array
    completo lido de memória — a única forma de "acrescentar" um campo no
-   RTDB sem update() multi-chave). Nunca remove(). */
+   RTDB sem update() multi-chave). Nunca remove().
+
+   ANULAR CONFIRMAÇÃO (Set/2026): anularConfirmacao(chaveConcluido) desfaz
+   "está pago" de uma ocorrência de compromisso fixo sem remove(): desliga
+   primeiro a entrada fixo:{chave} (o desligar() de sempre, movimentos para
+   excluidos/) e só depois escreve anulado:true + anuladoEm em
+   pagamentosConcluidos/{chave}. "Está pago" é SEMPRE
+   giocoPagamentosEngine.ocorrenciaPaga(reg) — por isso o gioco-pagamentos.js
+   tem de estar carregado antes deste ficheiro. Reconfirmar (manual nas
+   páginas, ou confirmarDebito aqui) faz update() com anulado:false +
+   reconfirmadoEm, preservando anuladoEm. historicoDescritivos nunca é
+   tocado pela anulação. */
 
 function giocoReconciliacaoEngine(deps){
   'use strict';
@@ -128,6 +139,10 @@ function giocoReconciliacaoEngine(deps){
   // carregado antes deste ficheiro). Injectável para testes sem browser.
   var CORR = deps.correspondencia || (typeof giocoCorrespondencia === 'function' ? giocoCorrespondencia : null);
   if (!CORR) throw new Error('gioco-correspondencia.js tem de ser carregado antes do gioco-reconciliacao.js');
+  // "Está pago?" vem SEMPRE do gioco-pagamentos.js (fonte única): uma
+  // entrada de pagamentosConcluidos com anulado:true não conta.
+  var ocorrenciaPaga = (typeof giocoPagamentosEngine === 'function' && giocoPagamentosEngine.ocorrenciaPaga) || null;
+  if (!ocorrenciaPaga) throw new Error('gioco-pagamentos.js tem de ser carregado antes do gioco-reconciliacao.js');
   var JANELA_IBAN   = { antes: 2, depois: 7 };
   var JANELA_DEBITO = { antes: 3, depois: 5 };
   var JANELA_MANUAL_DIAS = 30;      // pesquisa manual: ±30 dias
@@ -314,6 +329,7 @@ function giocoReconciliacaoEngine(deps){
     Object.keys(pc).forEach(function(k){
       var parsed = parseChaveConcluido(k);
       if (!parsed) return;
+      if (!ocorrenciaPaga(pc[k])) return; // confirmação anulada: volta a pendente
       var c = CE.compromissoPorId(parsed.id);
       var reg = pc[k] || {};
       var base = {
@@ -419,7 +435,7 @@ function giocoReconciliacaoEngine(deps){
       meses.forEach(function(per){
         if (mesesLista.length && mesesLista.indexOf(per.mes) === -1) return;
         var chaveConcluido = id + '_' + per.ano + '-' + per.mes;
-        if (pc[chaveConcluido]) return;
+        if (ocorrenciaPaga(pc[chaveConcluido])) return;
         var dia = CE.resolveDia(CE.diaDaSaida(c, ''), per.ano, per.mes);
         if (dia === null) return;
         var cents = centimos(CE.valorOcorrencia(id, per.ano, per.mes));
@@ -521,8 +537,18 @@ function giocoReconciliacaoEngine(deps){
     var movs = Array.isArray(mov) ? mov : [mov];
     var patchPC = { concluidoEm: Date.parse(movs[0].dia + 'T12:00:00') || Date.now(), auto: true };
     if (opts.confirmadoManualmente) patchPC.confirmadoManualmente = true;
+    // Chave nova: set() como sempre. Chave já existente mas ANULADA:
+    // update() que reabre a confirmação e preserva anuladoEm como rasto.
+    var atualPC = __PC()[item.chaveConcluido];
+    var escritaPC;
+    if (atualPC && atualPC.anulado === true){
+      patchPC.anulado = false; patchPC.reconfirmadoEm = Date.now();
+      escritaPC = deps.refPagamentos.child(item.chaveConcluido).update(patchPC);
+    } else {
+      escritaPC = deps.refPagamentos.child(item.chaveConcluido).set(patchPC);
+    }
     var escritas = [
-      deps.refPagamentos.child(item.chaveConcluido).set(patchPC),
+      escritaPC,
       ligar(item.chaveReconciliacao, movs, 'auto', null, null, opts.estrategia)
     ];
     if (item.valorVariavel) escritas.push(acrescentarHistoricoDescritivo(item.compromissoId, movs[0].desc));
@@ -1006,6 +1032,30 @@ function giocoReconciliacaoEngine(deps){
     return deps.ref.child(chave).update(patch);
   }
 
+  /* ---------- anular confirmação de um compromisso fixo ---------- */
+
+  // Desfaz "está pago" de UMA ocorrência de compromisso fixo (chave de
+  // pagamentosConcluidos, ex. "-Oz7_9bb..._2026-8"), manual ou automática.
+  // Ordem deliberada: (1) se a entrada fixo:{chave} de reconciliacaoBancaria
+  // estiver ligada, o desligar() de sempre — PATCH, movimento(s) para
+  // excluidos/, voltam a estar livres para outro match; (2) só depois,
+  // update() em pagamentosConcluidos/{chave} com anulado:true + anuladoEm —
+  // concluidoEm/auto/confirmadoManualmente ficam como rasto. Se (1) falhar,
+  // (2) não corre e o pagamento continua confirmado e coerente. NUNCA toca
+  // em historicoDescritivos (um falso positivo não apaga aprendizagem
+  // válida) e NUNCA remove(). Reconfirmar depois é update() com
+  // anulado:false + reconfirmadoEm (ver confirmarDebito e as páginas).
+  function anularConfirmacao(chaveConcluido){
+    if (!deps.refPagamentos) return Promise.reject(new Error('refPagamentos em falta na configuração do motor.'));
+    var reg = __PC()[chaveConcluido];
+    if (!ocorrenciaPaga(reg)) return Promise.reject(new Error('Esta ocorrência não está marcada como paga.'));
+    var chaveRec = chaveFixo(chaveConcluido);
+    var passo1 = entradaLigada(__REC()[chaveRec]) ? desligar(chaveRec) : Promise.resolve();
+    return passo1.then(function(){
+      return deps.refPagamentos.child(chaveConcluido).update({ anulado: true, anuladoEm: Date.now() });
+    });
+  }
+
   return {
     JANELA_IBAN: JANELA_IBAN, JANELA_DEBITO: JANELA_DEBITO,
     JANELA_MANUAL_DIAS: JANELA_MANUAL_DIAS, TOLERANCIA_MANUAL: TOLERANCIA_MANUAL,
@@ -1021,7 +1071,7 @@ function giocoReconciliacaoEngine(deps){
     pagamentosConcluidos: pagamentosConcluidos, receitasDiarias: receitasDiarias,
     calcular: calcular, calcularReceitas: calcularReceitas, itemPorChave: itemPorChave,
     pesquisaManual: pesquisaManual,
-    ligar: ligar, desligar: desligar, aplicarAutomaticas: aplicarAutomaticas,
+    ligar: ligar, desligar: desligar, anularConfirmacao: anularConfirmacao, aplicarAutomaticas: aplicarAutomaticas,
     normalizarDescritivo: normalizarDescritivo, estadoAprendizagemDebito: estadoAprendizagemDebito,
     mesesJanelaDebito: mesesJanelaDebito, calcularDebitos: calcularDebitos,
     sugestaoDebitoPara: sugestaoDebitoPara, aplicarDebitosAutomaticos: aplicarDebitosAutomaticos,

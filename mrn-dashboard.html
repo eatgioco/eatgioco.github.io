@@ -2061,6 +2061,7 @@
 <body>
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
+<script src="gioco-pagamentos.js"></script>
 <script src="gioco-caixa.js"></script>
 <script src="gioco-correspondencia.js"></script>
 <script src="gioco-eventos.js"></script>
@@ -2789,10 +2790,18 @@ window.addEventListener('load', function () {
   // ao contrário de paymentRequests, não são pedidos enviados a um
   // fornecedor via este fluxo, só custos recorrentes cuja instância mensal
   // se está a marcar como resolvida.
+  // Chave nova: set() como sempre. Chave já existente mas ANULADA (ver
+  // RE.anularConfirmacao no gioco-reconciliacao.js): update() que reabre a
+  // confirmação e preserva anuladoEm como rasto. Igual à tesouraria.html.
   function marcarCompromissoConcluido(compromissoId, periodo){
     var chave = compromissoId + '_' + periodo;
-    if (allPagamentosConcluidos[chave]) return;
-    pagamentosConcluidosRef.child(chave).set({ concluidoEm: Date.now() });
+    var atual = allPagamentosConcluidos[chave];
+    if (giocoPagamentosEngine.ocorrenciaPaga(atual)) return;
+    if (atual && atual.anulado === true){
+      pagamentosConcluidosRef.child(chave).update({ concluidoEm: Date.now(), anulado: false, reconfirmadoEm: Date.now() });
+    } else {
+      pagamentosConcluidosRef.child(chave).set({ concluidoEm: Date.now() });
+    }
   }
 
   // Idênticos aos de pagamentos.html — páginas standalone, sem módulos
@@ -2932,8 +2941,11 @@ window.addEventListener('load', function () {
     return d.getFullYear() + '-' + (d.getMonth() + 1);
   }
 
+  // "Está pago?" é a fonte única do gioco-pagamentos.js (uma entrada com
+  // anulado:true não conta) — nunca decidir pela verdade booleana da chave.
+  var ocorrenciaPaga = giocoPagamentosEngine.ocorrenciaPaga;
   function compromissoPago(compromissoId, prazoDate){
-    return !!allPagamentosConcluidos[compromissoId + '_' + periodoCompromisso(prazoDate)];
+    return ocorrenciaPaga(allPagamentosConcluidos[compromissoId + '_' + periodoCompromisso(prazoDate)]);
   }
 
   // Achata as ocorrências de compromissos fixos ativos de um mês, no mesmo

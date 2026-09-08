@@ -393,9 +393,30 @@ mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          encJanelaSemanas/ENC_SEMANAS na compras.html — conjuntos
                          diferentes nas duas páginas seriam pior do que nenhum
 pagamentosConcluidos  — ocorrências mensais de compromissosFixos marcadas como pagas,
-                         chave {compromissoId}_{ano}-{mes} = { concluidoEm }. O período
-                         (AAAA-M sem zero) é o periodoCompromisso() do gioco-pagamentos.js
-                         e a leitura é compromissoPago() do mesmo módulo — não reescrever
+                         chave {compromissoId}_{ano}-{mes} = { concluidoEm, auto?,
+                         confirmadoManualmente?, anulado?, anuladoEm?, reconfirmadoEm? }.
+                         O período (AAAA-M sem zero) é o periodoCompromisso() do
+                         gioco-pagamentos.js e a leitura é compromissoPago() do mesmo
+                         módulo — não reescrever.
+                         "ESTÁ PAGO?" (Set/2026) = giocoPagamentosEngine.ocorrenciaPaga(reg)
+                         = reg existe E reg.anulado !== true. É a fonte ÚNICA de verdade:
+                         tesouraria.html, mrn-dashboard.html, equipa.html, calendario.html
+                         (via compromissoPago) e gioco-reconciliacao.js passam todos por ela —
+                         NUNCA decidir pela verdade booleana da chave.
+                         ANULAR CONFIRMAÇÃO: RE.anularConfirmacao(chave) no
+                         gioco-reconciliacao.js (botão "Anular" só no detalhe da linha da
+                         tesouraria.html, para linhas fixo; nem no dashboard nem na secção
+                         Reconciliação bancária). Ordem: (1) se reconciliacaoBancaria/
+                         fixo:{chave} estiver ligada, o desligar() de sempre (PATCH,
+                         movimentos para excluidos/, ficam livres para novo match); (2) só
+                         depois update() com { anulado:true, anuladoEm } — concluidoEm/auto/
+                         confirmadoManualmente ficam como rasto. Não toca em
+                         historicoDescritivos. A ocorrência volta a pendente no sítio onde
+                         estava (sem secção "Anulados"), com a nota "Confirmação anulada em
+                         dd/mm" até ser reconfirmada. RECONFIRMAR (manual nas páginas ou
+                         confirmarDebito no motor): chave nova → set({concluidoEm}) como
+                         sempre; chave anulada → update({ concluidoEm, anulado:false,
+                         reconfirmadoEm }), preservando anuladoEm. NUNCA remove() neste nó
 classificacaoRegras   — regras de classificação de movimentos bancários da
                          resultados.html: {idPush} = { padrao, rubrica, criadoEm,
                          origemExemplo, despesa? }. padrao = substring do

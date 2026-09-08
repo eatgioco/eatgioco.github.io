@@ -1794,8 +1794,8 @@
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-correspondencia.js"></script>
-<script src="gioco-reconciliacao.js"></script>
 <script src="gioco-pagamentos.js"></script>
+<script src="gioco-reconciliacao.js"></script>
 
 <div class="shell">
 
@@ -2385,10 +2385,18 @@ window.addEventListener('load', function () {
   // ao contrário de paymentRequests, não são pedidos enviados a um
   // fornecedor via este fluxo, só custos recorrentes cuja instância mensal
   // se está a marcar como resolvida.
+  // Chave nova: set() como sempre. Chave já existente mas ANULADA
+  // (ver RE.anularConfirmacao): update() que reabre a confirmação e
+  // preserva anuladoEm como rasto. Nunca set() por cima de uma existente.
   function marcarCompromissoConcluido(compromissoId, periodo){
     var chave = compromissoId + '_' + periodo;
-    if (allPagamentosConcluidos[chave]) return;
-    pagamentosConcluidosRef.child(chave).set({ concluidoEm: Date.now() });
+    var atual = allPagamentosConcluidos[chave];
+    if (ocorrenciaPaga(atual)) return;
+    if (atual && atual.anulado === true){
+      pagamentosConcluidosRef.child(chave).update({ concluidoEm: Date.now(), anulado: false, reconfirmadoEm: Date.now() });
+    } else {
+      pagamentosConcluidosRef.child(chave).set({ concluidoEm: Date.now() });
+    }
   }
 
   // Idênticos aos de pagamentos.html — páginas standalone, sem módulos
@@ -2780,6 +2788,16 @@ window.addEventListener('load', function () {
     return h;
   }
 
+  // Helpers do "Anular confirmação": data curta (dd/mm) de um timestamp ms
+  // e "Mês Ano" de uma ocorrência, para a nota e o confirm().
+  function fmtDiaMes(ms){
+    var d = new Date(ms);
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+  }
+  function nomeMesAno(d){
+    return MESES_PT[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
   function blocoDetalhePagamento(l, incluirPedido, pago){
     var h = '<div class="pay-detalhe" data-chave="' + escapeHtml(chaveLinha(l)) + '">';
     h += '<div class="pay-detalhe-info">';
@@ -2833,7 +2851,18 @@ window.addEventListener('load', function () {
       if (estadoReconciliacao(chaveReconciliacao(l)) === 'confirmado'){
         h += '<button type="button" class="btn-small rec-desligar" data-rec-desligar="' + escapeHtml(chaveReconciliacao(l)) + '">Desligar</button>';
       }
+      // Só compromissos fixos: desfaz a marcação (manual ou automática)
+      // sem remove() — RE.anularConfirmacao. Pedidos têm o seu "Anular".
+      if (l.tipo === 'fixo'){
+        h += '<button type="button" class="btn-small pay-detalhe-anular" title="Anular a confirmação de pagamento">Anular</button>';
+      }
     } else {
+      // Ocorrência cuja confirmação foi anulada: nota discreta com a data,
+      // visível até ser reconfirmada (anulado volta a false).
+      var regAnulado = l.tipo === 'fixo' ? allPagamentosConcluidos[l.compromissoId + '_' + periodoCompromisso(l.prazoDate)] : null;
+      if (regAnulado && regAnulado.anulado === true && regAnulado.anuladoEm){
+        h += '<span class="pay-detalhe-nota">Confirmação anulada em ' + fmtDiaMes(regAnulado.anuladoEm) + '</span>';
+      }
       if (l.iban && !(l.tipo === 'fixo' && l.metodoPagamento === 'debito')){
         h += '<button type="button" class="btn-small pay-detalhe-pagar">🏦 Pagar</button>';
       }
@@ -2952,6 +2981,25 @@ window.addEventListener('load', function () {
       }
       return true;
     }
+    var btnAnular = e.target.closest('.pay-detalhe-anular');
+    if (btnAnular){
+      var blocoAnular = btnAnular.closest('.pay-detalhe');
+      var linhaAnular = blocoAnular && linhaPorChave(blocoAnular.getAttribute('data-chave'));
+      if (linhaAnular && linhaAnular.tipo === 'fixo'){
+        var chaveAnular = linhaAnular.compromissoId + '_' + periodoCompromisso(linhaAnular.prazoDate);
+        var ligada = RE.entradaLigada(allReconciliacao[RE.chaveFixo(chaveAnular)]);
+        var msg = 'Anular a confirmação de pagamento de «' + linhaAnular.fornecedor + '» (' +
+                  nomeMesAno(linhaAnular.prazoDate) + ')?\nA ocorrência volta a ficar pendente.';
+        if (ligada) msg += '\nO movimento bancário ligado fica livre e disponível para um novo match.';
+        if (!confirm(msg)) return true;
+        btnAnular.disabled = true;
+        RE.anularConfirmacao(chaveAnular).catch(function(err){
+          btnAnular.disabled = false;
+          alert('Não foi possível anular: ' + (err && err.message ? err.message : err));
+        });
+      }
+      return true;
+    }
     var btnConfirmarDebito = e.target.closest('.pay-detalhe-confirmar-debito');
     if (btnConfirmarDebito){
       var blocoConfirmarDebito = btnConfirmarDebito.closest('.pay-detalhe');
@@ -3056,6 +3104,7 @@ window.addEventListener('load', function () {
   });
   var lineStatus = PG.lineStatus, ddmmyyyyToDate = PG.ddmmyyyyToDate,
       periodoCompromisso = PG.periodoCompromisso, compromissoPago = PG.compromissoPago,
+      ocorrenciaPaga = PG.ocorrenciaPaga,
       linhasPaymentRequestsTodas = PG.linhasPaymentRequestsTodas,
       linhasCompromissosDoMes = PG.linhasCompromissosDoMes, itensDoMes = PG.itensDoMes,
       chaveLinha = PG.chaveLinha, chaveReconciliacao = PG.chaveReconciliacao;
@@ -3920,6 +3969,7 @@ window.addEventListener('load', function () {
       var c = compromissoPorId(parsed.id);
       if (!c) return; // compromisso apagado: sem valor, não dá para contar
       var reg = allPagamentosConcluidos[chave];
+      if (!ocorrenciaPaga(reg)) return; // confirmação anulada: não saiu
       out.push({
         nome: nomeOcorrencia(parsed.id, c.nome || idBase(parsed.id)),
         montante: valorOcorrencia(parsed.id, parsed.ano, parsed.mes),
