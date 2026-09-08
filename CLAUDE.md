@@ -570,6 +570,31 @@ plAjustes             — ajustes manuais do P&L (resultados.html, o ÚNICO que
                          escritas multi-chave. Excluir nunca apaga dados de
                          origem — um item excluído com expressão bancária volta
                          a contar no "Não classificado" da reconciliação
+ingredientes          — lista de ingredientes. Desde a migração de 08/09/2026 cada
+                         registo ativo tem nome, categoria (CÓDIGO, resolvido por
+                         categoriasIngredientes/{cod}/label — nunca o rótulo em texto),
+                         origem ('compra') e bucket ('food' | 'bebida').
+                         CICLO DE VIDA: nada se apaga, NUNCA. Um registo que sai da lista
+                         viva leva arquivado:true e, quando foi absorvido por outro,
+                         fundidoEm:{idCanonico} (fusão de duplicados) ou
+                         movidoPara:'preparacoes/{id}' (passou a preparação). Um arquivado
+                         sem nenhum dos dois é simplesmente um artigo fora da lista de
+                         contagem. As referências antigas (receitas, faturas, contagens
+                         fechadas) continuam a resolver — é essa a razão de não se apagar.
+                         A contagem fechada de 2026-08-31 tem 9 itens em registos
+                         arquivados; resolvem-se seguindo o fundidoEm.
+                         QUEM ESCONDE: contagens.html esconde sempre; compras.html e
+                         gestao.html escondem por omissão com toggle "Mostrar arquivados"
+                         (e na compras um arquivado nunca entra na encomenda sugerida nem
+                         no autocomplete); receitas.html, foodcost.html e
+                         leitura-faturas.html NÃO escondem — senão as receitas e faturas
+                         antigas deixavam de resolver — só marcam com selo e deixam de os
+                         propor nas sugestões automáticas. Ao criar uma página que leia
+                         este nó, decidir explicitamente em qual dos dois grupos entra.
+                         Aliases vivem só aqui (a leitura-faturas casa linhas de fatura
+                         por nome + aliases); numa fusão, os aliases do absorvido passam
+                         para o canónico
+
 contagens             — contagens físicas de stock: contagens/{AAAA-MM-DD} =
                          { estado: 'rascunho'|'fechada', criadaEm, fechadaEm,
                            itens: { {ingredienteId}: { qtdContada, unidadeContagem,
