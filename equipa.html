@@ -1850,6 +1850,360 @@
     color:var(--muted);
     line-height:1.55;
   }
+  /* ---------- Separador ADMISSÕES ----------
+     Checklist de entrada de uma pessoa nova, do pré-primeiro-dia ao fim do
+     primeiro mês. Ao contrário das checklists da loja, cada visto é gravado
+     no momento: uma admissão dura semanas e é retomada em várias sessões.
+
+     Prefixo adm- de propósito: 'check-' já é do selector de pessoas dos
+     padrões de turno, e os nomes do shell (.card/.status/.panel/.kpi/.num)
+     nunca se redeclaram aqui.
+
+     Sem @media, como o resto da página: minmax(min(...,100%),1fr),
+     flex-wrap e overflow-x:auto tratam o telemóvel sozinhos. */
+  .adm-topo{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:12px;
+    margin-bottom:16px;
+  }
+
+  .adm-form{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:18px;
+    color:var(--ink);
+  }
+
+  .adm-form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    gap:14px;
+  }
+
+  .adm-form-hint{
+    margin:10px 0 0;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .adm-form-hint.adm-erro{ color:var(--red-ink); font-weight:600; }
+
+  .adm-form-acoes{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .adm-link-btn{
+    background:none;
+    border:none;
+    padding:0;
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+
+  .adm-link-btn:hover{ color:var(--red); }
+
+  .adm-lista{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr));
+    gap:14px;
+    align-items:start;
+  }
+
+  /* O ::before do .glass-light pinta por cima do conteúdo estático. */
+  .adm-card > *{ position:relative; z-index:1; }
+
+  .adm-card{ color:var(--ink); }
+
+  .adm-card-head{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    gap:8px 12px;
+  }
+
+  .adm-card-nome{
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink);
+    flex:1;
+    min-width:0;
+  }
+
+  .adm-card-meta{
+    margin:6px 0 0;
+    font-size:12px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .adm-itens{
+    margin-top:14px;
+    border-top:1px solid var(--line);
+  }
+
+  .adm-item{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 2px;
+    border-bottom:1px solid var(--line);
+    color:var(--ink);
+  }
+
+  .adm-item:last-child{ border-bottom:none; }
+
+  .adm-item input[type="checkbox"].adm-check{
+    width:18px;
+    height:18px;
+    margin-top:1px;
+    flex-shrink:0;
+    accent-color:var(--red);
+    cursor:pointer;
+  }
+
+  .adm-item-corpo{
+    flex:1;
+    min-width:0;
+  }
+
+  .adm-item-txt{
+    font-size:13.5px;
+    color:var(--ink);
+    line-height:1.35;
+  }
+
+  .adm-item-txt.adm-feito{
+    text-decoration:line-through;
+    color:var(--muted);
+  }
+
+  .adm-item-meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px 10px;
+    margin-top:3px;
+    font-size:11.5px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* Atraso a vermelho, no padrão da tesouraria.html. A condição que aplica
+     esta classe inclui SEMPRE "e não está feito" — senão tudo o que foi
+     feito com atraso ficava vermelho para sempre. */
+  /* --red-ink, não --red: o --red é cor de SUPERFÍCIE e no tema escuro dá
+     3,58:1 sobre o fundo dos cartões. O --red-ink clareia lá e mantém a
+     leitura. A barra lateral, essa, é superfície — fica com --red. */
+  .adm-item.adm-atrasado .adm-item-txt,
+  .adm-item.adm-atrasado .adm-item-meta{ color:var(--red-ink); }
+
+  .adm-item.adm-atrasado{ border-left:3px solid var(--red); padding-left:8px; }
+
+  .adm-item-linha{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+  }
+
+  .adm-input{
+    flex:1;
+    min-width:min(200px, 100%);
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    color:var(--ink);
+    background:var(--dough);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 10px;
+  }
+
+  .adm-input:focus{
+    outline:none;
+    border-color:var(--red);
+  }
+
+  .adm-abrir{
+    font-family:'Inter', sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink);
+    text-decoration:none;
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:6px 12px;
+    white-space:nowrap;
+  }
+
+  .adm-abrir:hover{ border-color:var(--red); color:var(--red); }
+
+  .adm-nota-btn{
+    margin-top:6px;
+    font-size:11.5px;
+  }
+
+  .adm-item-erro{
+    margin-top:5px;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--red-ink);
+  }
+
+  .adm-card-acoes{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .adm-concluidas{ margin-top:22px; }
+
+  .adm-concluidas summary{
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .adm-concluidas .adm-lista{ margin-top:12px; }
+
+  /* ---------- Template das admissões ---------- */
+  .adm-tpl-details summary{
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .adm-tpl-nota{
+    margin:10px 0 0;
+    font-size:12px;
+    color:var(--muted);
+    max-width:70ch;
+  }
+
+  .adm-tpl-box{
+    margin-top:12px;
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    overflow-x:auto;
+    color:var(--ink);
+  }
+
+  .adm-tpl-row{
+    display:grid;
+    grid-template-columns:minmax(min(240px, 100%), 3fr) minmax(70px, .6fr) minmax(min(140px, 100%), 1.2fr) auto auto;
+    align-items:center;
+    gap:8px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+    min-width:min(560px, 100%);
+  }
+
+  .adm-tpl-row:last-child{ border-bottom:none; }
+
+  .adm-tpl-row input[type="text"],
+  .adm-tpl-row input[type="number"]{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    color:var(--ink);
+    background:var(--dough);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:7px 9px;
+  }
+
+  .adm-tpl-row input:focus{ outline:none; border-color:var(--red); }
+
+  .adm-tpl-row input[type="number"]{ font-variant-numeric:tabular-nums; }
+
+  .adm-tpl-link{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:11.5px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .adm-tpl-link input[type="checkbox"]{
+    width:16px;
+    height:16px;
+    accent-color:var(--red);
+    cursor:pointer;
+  }
+
+  .adm-tpl-btns{
+    display:flex;
+    gap:4px;
+  }
+
+  .adm-tpl-btn{
+    width:26px;
+    height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    line-height:1;
+    color:var(--ink);
+    background:var(--dough);
+    border:1px solid var(--line);
+    border-radius:7px;
+    cursor:pointer;
+  }
+
+  .adm-tpl-btn:hover{ border-color:var(--red); color:var(--red); }
+
+  .adm-tpl-add{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:12px;
+    padding-top:12px;
+    border-top:2px solid var(--line);
+  }
+
+  .adm-tpl-add input[type="text"]{
+    flex:1;
+    min-width:min(220px, 100%);
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    color:var(--ink);
+    background:var(--dough);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 10px;
+  }
+
+  .adm-tpl-add input[type="text"]:focus{ outline:none; border-color:var(--red); }
+
+  .adm-tpl-cab{
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
 </style>
 </head>
 <body class="shell-mobile">
@@ -1910,6 +2264,7 @@
         <button class="tab-btn active" id="tabEscala" data-tab="escala">Escala</button>
         <button class="tab-btn" id="tabPessoas" data-tab="pessoas">Pessoas<span class="tab-count" id="countPessoas"></span></button>
         <button class="tab-btn" id="tabRecibos" data-tab="recibos">Recibos</button>
+        <button class="tab-btn" id="tabAdmissoes" data-tab="admissoes">Admissões<span class="tab-count" id="countAdmissoes"></span></button>
       </div>
 
       <!-- ================= Separador ESCALA ================= -->
@@ -1990,6 +2345,57 @@
         <div class="section">
           <p class="section-title">Histórico</p>
           <div id="recHistorico"></div>
+        </div>
+      </div>
+
+      <!-- ================= Separador ADMISSÕES =================
+           Checklist que acompanha a entrada de uma pessoa nova, de antes do
+           primeiro dia ao fim do primeiro mês.
+
+           Ao contrário das checklists da loja-sao-bento.html, o estado NÃO
+           se acumula em memória para gravar no fim: cada visto, link ou nota
+           é um update() na folha do próprio item, no momento. Uma admissão
+           dura semanas e é retomada em várias sessões, por várias pessoas. -->
+      <div class="tab-panel" id="painelAdmissoes">
+        <div class="section">
+          <p class="section-title">Admissões</p>
+
+          <div class="adm-topo">
+            <button type="button" class="btn-add" id="btnNovaAdmissao"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Nova admissão</button>
+          </div>
+
+          <div class="adm-form" id="admForm" style="display:none;">
+            <div class="adm-form-grid">
+              <div class="field">
+                <label class="field-label" for="admPessoaSelect">Pessoa</label>
+                <select id="admPessoaSelect"></select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="admDataInicio">Data de início</label>
+                <input type="date" id="admDataInicio">
+              </div>
+            </div>
+            <p class="adm-form-hint" id="admFormHint"></p>
+            <div class="adm-form-acoes">
+              <button type="button" class="btn-add" id="admCriarBtn">Criar</button>
+              <button type="button" class="adm-link-btn" id="admCancelarBtn">Cancelar</button>
+            </div>
+          </div>
+
+          <div id="admLista"></div>
+        </div>
+
+        <div class="section">
+          <details class="adm-tpl-details" id="admTplDetails">
+            <summary>Editar itens do template</summary>
+            <p class="adm-tpl-nota">
+              O template é o molde das admissões novas. Editá-lo NÃO altera as admissões
+              já criadas — os itens são copiados no momento da criação, de propósito:
+              uma admissão a decorrer não muda de regras a meio.
+              O prazo de cada item conta-se em dias face à data de início (negativo = antes).
+            </p>
+            <div class="adm-tpl-box" id="admTplBox"></div>
+          </details>
         </div>
       </div>
 
@@ -5998,6 +6404,655 @@ window.addEventListener('load', function () {
   recibosRef.on('value', function(snapshot){
     recibos = snapshot.val() || {};
     recRenderHistorico();
+  });
+
+
+  /* ======================================================================
+     SEPARADOR ADMISSÕES
+     ======================================================================
+     Uma admissão é a checklist de entrada de uma pessoa nova, de antes do
+     primeiro dia ao fim do primeiro mês. Dura semanas e é retomada em
+     várias sessões — por isso cada visto é gravado no Firebase NO MOMENTO,
+     num update() da folha do próprio item. O padrão do loja-sao-bento.html
+     (acumular em memória e gravar tudo num push() no fim) NÃO serve aqui:
+     fechar o separador a meio perderia o trabalho.
+
+     Nós (ver CLAUDE.md):
+       admissoesTemplate/itens  — array de objectos, configuração. É o único
+         sítio onde um set() do array inteiro é aceitável.
+       admissoes/{pushId}       — uma admissão. set() só na criação; a partir
+         daí update() por caminho. Nunca remove(): anular é uma flag.
+
+     Os itens são COPIADOS do template no momento da criação. Editar o
+     template não mexe nas admissões já abertas — é intencional, não um
+     defeito a corrigir: uma admissão a decorrer não muda de regras a meio.
+     ====================================================================== */
+
+  var admissoesRef = db.ref('admissoes');
+  var admissoesTemplateRef = db.ref('admissoesTemplate');
+
+  /* Semeado no nó se ele vier vazio no primeiro on('value'), no mesmo padrão
+     do lojaChecklistTemplates. Os ids são slugs estáveis: é por eles que os
+     itens de uma admissão já criada se identificam, e nunca mudam quando o
+     texto é editado. */
+  var ADM_TEMPLATE_DEFAULT = [
+    { id:'adm-contrato',        texto:'Contrato de trabalho assinado', offsetDias:-7, responsavel:'', exigeLink:true },
+    { id:'adm-documentos',      texto:'Recolher documentos: NIF, NISS, IBAN, identificação (e título de trabalho, se estrangeiro)', offsetDias:-7, responsavel:'', exigeLink:false },
+    { id:'adm-medicina',        texto:'Exame de admissão de medicina do trabalho e ficha de aptidão', offsetDias:-2, responsavel:'', exigeLink:true },
+    { id:'adm-seg-social',      texto:'Comunicar admissão à Segurança Social (até 24h antes do início)', offsetDias:-1, responsavel:'', exigeLink:true },
+    { id:'adm-seguradora',      texto:'Comunicar entrada à seguradora de acidentes de trabalho', offsetDias:-1, responsavel:'', exigeLink:false },
+    { id:'adm-higiene',         texto:'Formação de higiene e segurança alimentar', offsetDias:0, responsavel:'', exigeLink:true },
+    { id:'adm-fardamento',      texto:'Entrega de fardamento e chaves', offsetDias:0, responsavel:'', exigeLink:false },
+    { id:'adm-acesso-loja-app', texto:'Criar acesso no loja-app e definir PIN', offsetDias:0, responsavel:'', exigeLink:false },
+    { id:'adm-enquadramento',   texto:'Explicar horário, funções e a quem reporta', offsetDias:0, responsavel:'', exigeLink:false },
+    { id:'adm-periodo-exp',     texto:'Calcular e agendar o fim do período experimental', offsetDias:0, responsavel:'', exigeLink:false },
+    { id:'adm-cartao-refeicao', texto:'Cartão-refeição pedido e ativo', offsetDias:5, responsavel:'', exigeLink:false },
+    { id:'adm-compromissos',    texto:'Confirmar compromissos fixos gerados (salário e cartão)', offsetDias:15, responsavel:'', exigeLink:false },
+    { id:'adm-formacao-anual',  texto:'Registar plano de formação anual (40h)', offsetDias:30, responsavel:'', exigeLink:false }
+  ];
+
+  var admissoes = {};
+  var admTemplate = [];
+  var admCarregadas = false;
+  var admTemplateCarregado = false;
+  var admFormAberto = false;
+  /* Um snapshot que chegue enquanto se escreve num campo não pode reconstruir
+     o HTML por baixo dos dedos: fica pendente e desenha-se ao sair do campo. */
+  var admRenderPendente = false;
+  /* Erros de validação por item, só em memória: nunca vão ao Firebase. */
+  var admErros = {};
+  var admConcluidasAbertas = false;
+  /* Notas abertas à mão nesta sessão (chave 'admId/itemId'). Só UI. */
+  var admNotasAbertas = {};
+
+  function admHojeISO(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  /* Soma dias a uma data AAAA-MM-DD. Em UTC de propósito: com datas locais,
+     uma mudança de hora a meio do intervalo tirava ou punha um dia. */
+  function admSomaDias(iso, dias){
+    var p = String(iso || '').split('-');
+    if (p.length !== 3) return '';
+    var t = Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])) + (Number(dias) || 0) * 86400000;
+    var d = new Date(t);
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+  }
+
+  function admDataValida(iso){
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''));
+  }
+
+  /* Slug estável para um item novo do template. Restrito a [a-z0-9-]: é chave
+     de objecto no RTDB (que proíbe . $ # [ ] /) e entra em atributos data-. */
+  function admSlug(texto, usados){
+    var base = String(texto || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    base = base ? 'adm-' + base : 'adm-item';
+    var id = base;
+    var n = 2;
+    while (usados.indexOf(id) !== -1){ id = base + '-' + n; n++; }
+    return id;
+  }
+
+  /* O template a usar numa criação: o do Firebase, ou o default enquanto o
+     listener ainda não respondeu (não se cria uma admissão sem itens). */
+  function admTemplateAtual(){
+    return admTemplate.length ? admTemplate : ADM_TEMPLATE_DEFAULT;
+  }
+
+  /* Um URL colado à mão. Só https: — e passa sempre por new URL() antes de
+     ser gravado ou de chegar ao DOM. */
+  function admLinkValido(valor){
+    var v = String(valor || '').trim();
+    var u;
+    try { u = new URL(v); }
+    catch (e){ return { ok:false, erro:'Link inválido — cola o endereço completo, a começar por https://' }; }
+    if (u.protocol !== 'https:') return { ok:false, erro:'Só se aceitam links https://' };
+    return { ok:true, url: u.href };
+  }
+
+  function admListaDe(a){
+    var itens = (a && a.itens) || {};
+    return Object.keys(itens).map(function(id){
+      return Object.assign({ id: id }, itens[id]);
+    }).sort(function(x, y){
+      var px = x.prazo || '', py = y.prazo || '';
+      if (px !== py) return px < py ? -1 : 1;
+      return String(x.texto || '').localeCompare(String(y.texto || ''), 'pt');
+    });
+  }
+
+  function admEstado(a){
+    var lista = admListaDe(a);
+    var hoje = admHojeISO();
+    var feitos = 0, atrasados = 0;
+    lista.forEach(function(it){
+      if (it.feito === true){ feitos++; return; }
+      if (it.prazo && it.prazo <= hoje) atrasados++;   /* nunca sem o "não feito" */
+    });
+    return { total: lista.length, feitos: feitos, atrasados: atrasados, lista: lista };
+  }
+
+  function admTodas(){
+    return Object.keys(admissoes)
+      .map(function(id){ return Object.assign({ id: id }, admissoes[id]); })
+      .filter(function(a){ return a.anulado !== true; });
+  }
+
+  function admAbertas(){
+    return admTodas().filter(function(a){ return !a.concluidaEm; })
+      .sort(function(x, y){ return String(x.dataInicio || '').localeCompare(String(y.dataInicio || '')); });
+  }
+
+  function admConcluidas(){
+    return admTodas().filter(function(a){ return !!a.concluidaEm; })
+      .sort(function(x, y){ return String(y.concluidaEm || '').localeCompare(String(x.concluidaEm || '')); });
+  }
+
+  /* ---------- Criação ----------
+     PONTO ÚNICO de criação de admissões, exposto em window de propósito: o
+     botão "Nova admissão" chama-o com origem 'manual', e um futuro funil de
+     candidaturas chamará exactamente este com origem 'candidatura'. Não
+     duplicar lógica de criação em lado nenhum. */
+  window.criarAdmissao = function(pessoaId, pessoaNome, dataInicio, origem, candidaturaId){
+    if (!pessoaId) return Promise.reject(new Error('Falta a pessoa.'));
+    if (!admDataValida(dataInicio)) return Promise.reject(new Error('Data de início inválida.'));
+
+    var base = admTemplateAtual();
+    if (!base.length) return Promise.reject(new Error('O template de admissões está vazio.'));
+
+    var itens = {};
+    base.forEach(function(t){
+      if (!t || !t.id) return;
+      var off = Number(t.offsetDias) || 0;
+      itens[t.id] = {
+        texto: String(t.texto || ''),
+        offsetDias: off,
+        responsavel: String(t.responsavel || ''),
+        exigeLink: t.exigeLink === true,
+        prazo: admSomaDias(dataInicio, off),
+        feito: false,
+        feitoEm: null,
+        link: '',
+        nota: ''
+      };
+    });
+
+    var novaRef = admissoesRef.push();
+    /* Escrita ÚNICA no caminho da admissão. A partir daqui é sempre
+       update() por caminho — nunca outro set() neste nó. */
+    return novaRef.set({
+      pessoaId: pessoaId,
+      pessoaNome: String(pessoaNome || ''),
+      dataInicio: dataInicio,
+      origem: origem || 'manual',
+      candidaturaId: candidaturaId || null,
+      criadoEm: new Date().toISOString(),
+      concluidaEm: null,
+      anulado: false,
+      itens: itens
+    }).then(function(){ return novaRef.key; });
+  };
+
+  /* ---------- Escritas por folha ---------- */
+
+  /* concluidaEm segue o estado real: enche quando o último item fica feito e
+     esvazia se algum for desmarcado, senão uma admissão reaberta ficava presa
+     no bloco das concluídas. update() no nó da admissão, como o anular —
+     nunca um set(), que apagaria os itens. */
+  function admAtualizarConclusao(admId, itemAlterado, feitoNovo){
+    var a = admissoes[admId];
+    if (!a || !a.itens) return Promise.resolve();
+    var ids = Object.keys(a.itens);
+    if (!ids.length) return Promise.resolve();
+    var todos = ids.every(function(k){
+      return k === itemAlterado ? feitoNovo === true : a.itens[k].feito === true;
+    });
+    if (todos === !!a.concluidaEm) return Promise.resolve();
+    return admissoesRef.child(admId).update({ concluidaEm: todos ? new Date().toISOString() : null });
+  }
+
+  function admMarcarItem(admId, itemId, feito){
+    return admissoesRef.child(admId).child('itens').child(itemId)
+      .update({ feito: feito, feitoEm: feito ? new Date().toISOString() : null })
+      .then(function(){ return admAtualizarConclusao(admId, itemId, feito); })
+      .catch(function(err){ alert('Erro ao gravar o item: ' + err.message); });
+  }
+
+  function admGuardarCampo(admId, itemId, campo, valor){
+    var chave = admId + '/' + itemId;
+    delete admErros[chave];
+    var patch = {};
+
+    if (campo === 'link'){
+      var v = String(valor || '').trim();
+      if (v === ''){
+        patch.link = '';
+      } else {
+        var val = admLinkValido(v);
+        if (!val.ok){
+          admErros[chave] = val.erro;
+          renderAdmissoes();
+          return Promise.resolve();
+        }
+        patch.link = val.url;
+      }
+    } else {
+      patch.nota = String(valor || '').trim();
+    }
+
+    return admissoesRef.child(admId).child('itens').child(itemId).update(patch)
+      .catch(function(err){ alert('Erro ao gravar: ' + err.message); });
+  }
+
+  /* Anular NUNCA é remove(): a admissão fica no nó com a flag. */
+  function admAnular(admId){
+    var a = admissoes[admId];
+    if (!a) return;
+    if (!confirm('Anular a admissão de ' + (a.pessoaNome || 'esta pessoa') + '?\n\nDeixa de aparecer na lista. O registo fica guardado, não é apagado.')) return;
+    admissoesRef.child(admId).update({ anulado: true, anuladoEm: new Date().toISOString() })
+      .catch(function(err){ alert('Erro ao anular: ' + err.message); });
+  }
+
+  /* ---------- Formulário "Nova admissão" ---------- */
+
+  function admPessoasDisponiveis(){
+    var comAberta = {};
+    admAbertas().forEach(function(a){ comAberta[a.pessoaId] = true; });
+    return Object.keys(pessoas)
+      .map(function(id){ return Object.assign({ id: id }, pessoas[id]); })
+      .filter(function(p){ return !comAberta[p.id]; })
+      .sort(function(x, y){ return String(x.nome || '').localeCompare(String(y.nome || ''), 'pt'); });
+  }
+
+  function admRenderFormulario(){
+    var sel = document.getElementById('admPessoaSelect');
+    if (!sel) return;
+    var anterior = sel.value;
+    var disponiveis = admPessoasDisponiveis();
+    sel.innerHTML = '<option value="">— escolher pessoa —</option>' + disponiveis.map(function(p){
+      return '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.nome || '(sem nome)') +
+             (p.ativo === false ? ' · inativa' : '') + '</option>';
+    }).join('');
+    if (anterior && disponiveis.some(function(p){ return p.id === anterior; })) sel.value = anterior;
+    admAtualizarHint();
+  }
+
+  function admAtualizarHint(){
+    var sel = document.getElementById('admPessoaSelect');
+    var hint = document.getElementById('admFormHint');
+    if (!sel || !hint) return;
+    hint.classList.remove('adm-erro');
+    var p = pessoas[sel.value];
+    if (!sel.value){
+      hint.textContent = 'Todas as pessoas com uma admissão aberta ficam fora da lista.';
+      return;
+    }
+    if (p && p.dataAdmissao){
+      hint.textContent = 'Data de início lida da ficha desta pessoa. Podes alterá-la aqui.';
+    } else {
+      hint.textContent = 'Esta pessoa não tem data de admissão na ficha. A data indicada aqui fica também gravada na ficha dela.';
+    }
+  }
+
+  function admAbrirFormulario(){
+    admFormAberto = true;
+    document.getElementById('admForm').style.display = 'block';
+    document.getElementById('btnNovaAdmissao').style.display = 'none';
+    document.getElementById('admDataInicio').value = '';
+    admRenderFormulario();
+  }
+
+  function admFecharFormulario(){
+    admFormAberto = false;
+    document.getElementById('admForm').style.display = 'none';
+    document.getElementById('btnNovaAdmissao').style.display = '';
+    document.getElementById('admPessoaSelect').value = '';
+    document.getElementById('admDataInicio').value = '';
+  }
+
+  /* ---------- Render da lista ---------- */
+
+  function admCardHtml(a){
+    var est = admEstado(a);
+    var concluida = !!a.concluidaEm;
+    var html = '<div class="card glass-light adm-card" data-adm="' + escapeHtml(a.id) + '">';
+
+    html += '<div class="adm-card-head">';
+    html += '  <span class="adm-card-nome">' + escapeHtml(a.pessoaNome || '(sem nome)') + '</span>';
+    if (concluida){
+      html += '  <span class="status ok">Concluída</span>';
+    } else if (est.atrasados > 0){
+      html += '  <span class="status high">' + est.atrasados + (est.atrasados === 1 ? ' em atraso' : ' em atraso') + '</span>';
+    }
+    html += '</div>';
+
+    html += '<p class="adm-card-meta">Início ' + escapeHtml(formatDataCurta(a.dataInicio)) +
+            ' · ' + est.feitos + ' / ' + est.total + ' feitos' +
+            (concluida ? ' · fechada em ' + escapeHtml(formatDataCurta(String(a.concluidaEm).slice(0, 10))) : '') +
+            '</p>';
+
+    html += '<div class="adm-itens">';
+    var hoje = admHojeISO();
+    est.lista.forEach(function(it){
+      var feito = it.feito === true;
+      var atrasado = !feito && it.prazo && it.prazo <= hoje;
+      var chave = a.id + '/' + it.id;
+      html += '<div class="adm-item' + (atrasado ? ' adm-atrasado' : '') + '">';
+      html += '  <input type="checkbox" class="adm-check"' + (feito ? ' checked' : '') +
+              ' data-adm="' + escapeHtml(a.id) + '" data-item="' + escapeHtml(it.id) + '"' +
+              ' aria-label="' + escapeHtml(it.texto || '') + '">';
+      html += '  <div class="adm-item-corpo">';
+      html += '    <div class="adm-item-txt' + (feito ? ' adm-feito' : '') + '">' + escapeHtml(it.texto || '') + '</div>';
+      html += '    <div class="adm-item-meta">';
+      html += '      <span>' + escapeHtml(formatDataCurta(it.prazo)) + '</span>';
+      if (it.responsavel) html += '      <span>' + escapeHtml(it.responsavel) + '</span>';
+      if (feito && it.feitoEm) html += '      <span>✓ ' + escapeHtml(formatDataCurta(String(it.feitoEm).slice(0, 10))) + '</span>';
+      html += '    </div>';
+
+      if (it.exigeLink === true){
+        html += '    <div class="adm-item-linha">';
+        html += '      <input type="text" class="adm-input" placeholder="https://… link do ficheiro"' +
+                ' value="' + escapeHtml(it.link || '') + '"' +
+                ' data-adm="' + escapeHtml(a.id) + '" data-item="' + escapeHtml(it.id) + '" data-campo="link">';
+        /* it.link só chega aqui depois de passar por new URL() e pela
+           exigência de https: — ver admGuardarCampo/admLinkValido. */
+        if (it.link) html += '      <a class="adm-abrir" href="' + escapeHtml(it.link) + '" target="_blank" rel="noopener noreferrer">Abrir ↗</a>';
+        html += '    </div>';
+      }
+
+      /* A nota é opt-in: treze caixas de texto sempre abertas afogavam a
+         checklist. Aparece já preenchida, ou atrás do "+ nota". */
+      var chaveNota = a.id + '/' + it.id;
+      if (it.nota || admNotasAbertas[chaveNota]){
+        html += '    <div class="adm-item-linha">';
+        html += '      <input type="text" class="adm-input" placeholder="nota"' +
+                ' value="' + escapeHtml(it.nota || '') + '"' +
+                ' data-adm="' + escapeHtml(a.id) + '" data-item="' + escapeHtml(it.id) + '" data-campo="nota">';
+        html += '    </div>';
+      } else {
+        html += '    <button type="button" class="adm-link-btn adm-nota-btn" data-nota="' + escapeHtml(chaveNota) + '">+ nota</button>';
+      }
+
+      if (admErros[chave]) html += '    <div class="adm-item-erro">' + escapeHtml(admErros[chave]) + '</div>';
+
+      html += '  </div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="adm-card-acoes">';
+    html += '  <button type="button" class="adm-link-btn" data-anular="' + escapeHtml(a.id) + '">Anular admissão</button>';
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderAdmissoes(){
+    var wrap = document.getElementById('admLista');
+    if (!wrap) return;
+
+    /* Não reconstruir por baixo de quem está a escrever num campo. */
+    var ae = document.activeElement;
+    if (ae && ae.classList && ae.classList.contains('adm-input') && wrap.contains(ae)){
+      admRenderPendente = true;
+      return;
+    }
+    admRenderPendente = false;
+
+    var abertas = admAbertas();
+    var concluidas = admConcluidas();
+
+    var contador = document.getElementById('countAdmissoes');
+    if (contador) contador.textContent = abertas.length ? String(abertas.length) : '';
+
+    if (!admCarregadas){
+      wrap.innerHTML = '<p class="empty-state">A carregar…</p>';
+      return;
+    }
+
+    var html = '';
+    html += abertas.length
+      ? '<div class="adm-lista">' + abertas.map(admCardHtml).join('') + '</div>'
+      : '<p class="empty-state">Sem admissões abertas. O botão «Nova admissão» abre uma para uma pessoa da equipa.</p>';
+
+    if (concluidas.length){
+      html += '<details class="adm-concluidas"' + (admConcluidasAbertas ? ' open' : '') + ' id="admConcluidasDetails">';
+      html += '<summary>Admissões concluídas (' + concluidas.length + ')</summary>';
+      html += '<div class="adm-lista">' + concluidas.map(admCardHtml).join('') + '</div>';
+      html += '</details>';
+    }
+
+    wrap.innerHTML = html;
+
+    if (admFormAberto) admRenderFormulario();
+  }
+
+
+  /* ---------- Render do template ---------- */
+
+  function renderAdmTemplate(){
+    var box = document.getElementById('admTplBox');
+    if (!box) return;
+
+    var ae = document.activeElement;
+    if (ae && ae.classList && ae.classList.contains('adm-tpl-input') && box.contains(ae)) return;
+
+    if (!admTemplateCarregado){
+      box.innerHTML = '<p class="empty-state">A carregar…</p>';
+      return;
+    }
+
+    var html = '';
+    html += '<div class="adm-tpl-row">';
+    html += '  <span class="adm-tpl-cab">Item</span>';
+    html += '  <span class="adm-tpl-cab">Dias</span>';
+    html += '  <span class="adm-tpl-cab">Responsável</span>';
+    html += '  <span class="adm-tpl-cab">Link</span>';
+    html += '  <span class="adm-tpl-cab"></span>';
+    html += '</div>';
+
+    admTemplate.forEach(function(t, idx){
+      html += '<div class="adm-tpl-row">';
+      html += '  <input type="text" class="adm-tpl-input" value="' + escapeHtml(t.texto || '') + '" data-idx="' + idx + '" data-campo="texto">';
+      html += '  <input type="number" class="adm-tpl-input" step="1" value="' + (Number(t.offsetDias) || 0) + '" data-idx="' + idx + '" data-campo="offsetDias">';
+      html += '  <input type="text" class="adm-tpl-input" value="' + escapeHtml(t.responsavel || '') + '" placeholder="—" data-idx="' + idx + '" data-campo="responsavel">';
+      html += '  <label class="adm-tpl-link"><input type="checkbox"' + (t.exigeLink === true ? ' checked' : '') + ' data-idx="' + idx + '" data-campo="exigeLink"> ficheiro</label>';
+      html += '  <span class="adm-tpl-btns">';
+      html += '    <button type="button" class="adm-tpl-btn" data-mover="' + idx + '" data-dir="-1" title="Subir">▲</button>';
+      html += '    <button type="button" class="adm-tpl-btn" data-mover="' + idx + '" data-dir="1" title="Descer">▼</button>';
+      html += '    <button type="button" class="adm-tpl-btn" data-remover="' + idx + '" title="Remover">✕</button>';
+      html += '  </span>';
+      html += '</div>';
+    });
+
+    html += '<div class="adm-tpl-add">';
+    html += '  <input type="text" id="admTplNovo" placeholder="novo item do template">';
+    html += '  <button type="button" class="btn-add" id="admTplAddBtn">Acrescentar</button>';
+    html += '</div>';
+
+    box.innerHTML = html;
+  }
+
+  function admGravarTemplate(arr){
+    return admissoesTemplateRef.child('itens').set(arr)
+      .catch(function(err){ alert('Erro ao gravar o template: ' + err.message); });
+  }
+
+  /* ---------- Ligações ---------- */
+
+  document.getElementById('btnNovaAdmissao').addEventListener('click', admAbrirFormulario);
+  document.getElementById('admCancelarBtn').addEventListener('click', admFecharFormulario);
+
+  document.getElementById('admPessoaSelect').addEventListener('change', function(){
+    var p = pessoas[this.value];
+    var campoData = document.getElementById('admDataInicio');
+    campoData.value = (p && p.dataAdmissao) ? p.dataAdmissao : '';
+    admAtualizarHint();
+  });
+
+  document.getElementById('admCriarBtn').addEventListener('click', function(){
+    var btn = this;
+    var pessoaId = document.getElementById('admPessoaSelect').value;
+    var dataInicio = document.getElementById('admDataInicio').value;
+    var hint = document.getElementById('admFormHint');
+
+    var falha = function(msg){
+      hint.textContent = msg;
+      hint.classList.add('adm-erro');
+    };
+
+    if (!pessoaId) return falha('Escolhe a pessoa.');
+    if (!admDataValida(dataInicio)) return falha('Indica a data de início.');
+
+    var p = pessoas[pessoaId] || {};
+    btn.disabled = true;
+    window.criarAdmissao(pessoaId, p.nome || '', dataInicio, 'manual', null)
+      .then(function(){
+        /* A ficha da pessoa passa a ter a data, se ainda não tinha. Um set()
+           só nesta folha: um set() em pessoas/{id} apagaria a ficha toda. */
+        if (!p.dataAdmissao) return pessoasRef.child(pessoaId).child('dataAdmissao').set(dataInicio);
+      })
+      .then(function(){
+        btn.disabled = false;
+        admFecharFormulario();
+      })
+      .catch(function(err){
+        btn.disabled = false;
+        falha('Erro ao criar: ' + err.message);
+      });
+  });
+
+  /* Delegação no contentor da lista: o HTML é reconstruído a cada snapshot e
+     handlers presos a cada linha morriam com ele. */
+  document.getElementById('admLista').addEventListener('change', function(e){
+    var alvo = e.target;
+    if (alvo.classList.contains('adm-check')){
+      admMarcarItem(alvo.getAttribute('data-adm'), alvo.getAttribute('data-item'), alvo.checked);
+      return;
+    }
+    if (alvo.classList.contains('adm-input')){
+      admGuardarCampo(alvo.getAttribute('data-adm'), alvo.getAttribute('data-item'), alvo.getAttribute('data-campo'), alvo.value);
+    }
+  });
+
+  document.getElementById('admLista').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-anular]');
+    if (btn){ admAnular(btn.getAttribute('data-anular')); return; }
+
+    var nota = e.target.closest('[data-nota]');
+    if (nota){
+      admNotasAbertas[nota.getAttribute('data-nota')] = true;
+      renderAdmissoes();
+      var campo = document.querySelector('#admLista .adm-input[data-campo="nota"][data-adm="' +
+        nota.getAttribute('data-nota').split('/')[0] + '"][data-item="' +
+        nota.getAttribute('data-nota').split('/')[1] + '"]');
+      if (campo) campo.focus();
+    }
+  });
+
+  document.getElementById('admLista').addEventListener('toggle', function(e){
+    if (e.target && e.target.id === 'admConcluidasDetails') admConcluidasAbertas = e.target.open;
+  }, true);
+
+  /* Um snapshot que chegou enquanto se escrevia fica pendente até o campo
+     perder o foco — é aqui que se desenha. */
+  document.getElementById('admLista').addEventListener('focusout', function(){
+    if (admRenderPendente) setTimeout(renderAdmissoes, 0);
+  });
+
+  document.getElementById('admTplBox').addEventListener('change', function(e){
+    var alvo = e.target;
+    var idx = parseInt(alvo.getAttribute('data-idx'), 10);
+    if (isNaN(idx) || !admTemplate[idx]) return;
+    var campo = alvo.getAttribute('data-campo');
+    var arr = admTemplate.map(function(t){ return Object.assign({}, t); });
+
+    if (campo === 'exigeLink'){
+      arr[idx].exigeLink = alvo.checked;
+    } else if (campo === 'offsetDias'){
+      var n = parseInt(alvo.value, 10);
+      arr[idx].offsetDias = isNaN(n) ? 0 : n;
+    } else if (campo === 'texto'){
+      /* O id NÃO muda com o texto: é ele que liga este item aos que já foram
+         copiados para admissões abertas. */
+      arr[idx].texto = alvo.value.trim();
+    } else if (campo === 'responsavel'){
+      arr[idx].responsavel = alvo.value.trim();
+    } else {
+      return;
+    }
+    admGravarTemplate(arr);
+  });
+
+  document.getElementById('admTplBox').addEventListener('click', function(e){
+    var mover = e.target.closest('[data-mover]');
+    if (mover){
+      var i = parseInt(mover.getAttribute('data-mover'), 10);
+      var dir = parseInt(mover.getAttribute('data-dir'), 10);
+      var j = i + dir;
+      if (isNaN(i) || j < 0 || j >= admTemplate.length) return;
+      var arr = admTemplate.map(function(t){ return Object.assign({}, t); });
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+      admGravarTemplate(arr);
+      return;
+    }
+
+    var rem = e.target.closest('[data-remover]');
+    if (rem){
+      var k = parseInt(rem.getAttribute('data-remover'), 10);
+      if (isNaN(k) || !admTemplate[k]) return;
+      if (!confirm('Remover «' + (admTemplate[k].texto || '') + '» do template?\n\nAs admissões já criadas não mudam.')) return;
+      var arr2 = admTemplate.map(function(t){ return Object.assign({}, t); });
+      arr2.splice(k, 1);
+      admGravarTemplate(arr2);
+      return;
+    }
+
+    if (e.target.id === 'admTplAddBtn'){
+      var input = document.getElementById('admTplNovo');
+      var txt = input.value.trim();
+      if (!txt) return;
+      var usados = admTemplate.map(function(t){ return t.id; });
+      var arr3 = admTemplate.map(function(t){ return Object.assign({}, t); });
+      arr3.push({ id: admSlug(txt, usados), texto: txt, offsetDias: 0, responsavel: '', exigeLink: false });
+      input.value = '';
+      admGravarTemplate(arr3);
+    }
+  });
+
+  /* ---------- Listeners ---------- */
+
+  admissoesTemplateRef.on('value', function(snapshot){
+    var val = snapshot.val();
+    var itens = val && val.itens;
+    /* Nó vazio no primeiro on('value') = semear, mesmo padrão do
+       lojaChecklistTemplates. Só semeia quando está mesmo vazio: nunca
+       sobrepõe um template já existente. */
+    if (!itens || !itens.length){
+      admTemplateCarregado = true;
+      admTemplate = [];
+      renderAdmTemplate();
+      if (!itens) admissoesTemplateRef.child('itens').set(ADM_TEMPLATE_DEFAULT);
+      return;
+    }
+    admTemplate = itens.filter(function(t){ return t && t.id; });
+    admTemplateCarregado = true;
+    renderAdmTemplate();
+  });
+
+  admissoesRef.on('value', function(snapshot){
+    admissoes = snapshot.val() || {};
+    admCarregadas = true;
+    renderAdmissoes();
+    if (admFormAberto) admRenderFormulario();
   });
 
   renderGrelha();

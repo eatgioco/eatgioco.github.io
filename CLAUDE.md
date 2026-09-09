@@ -59,7 +59,7 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 | `centro-de-controlo.html` | Painel da loja (`?loja=sb154`): câmaras go2rtc, A/C, cartão **Música** (Sonos via `lojas/sb154/sonos`, no padrão do A/C desde Set/2026 —
 essencial no cartão, resto no `giocoModal`; ver secção "Loja SB154 — música"), e o cartão **Consumo** ligado a `contasBancarias/{abanca,revolut}/movimentos` — € mensal/anual dos débitos de eletricidade (despesa de `classificacaoMovimentos`/`classificacaoRegras` a casar `/eletric|edp|ibelectra/i`, fallback `IBELECTRA`, mesma normalização da `resultados.html`; só leitura). kWh pendente de um futuro nó `consumoEnergia/{AAAA-MM}`. Cartão **Vendas hoje** ligado a `vendasDiario/{AAAA-MM}/{AAAA-MM-DD}/resumo` (lê só os nós dos dias precisos, `bruto` c/ IVA): mostra hoje se o nó existir (selo "Hoje"), senão o mesmo dia da semana a −7/−14/−21/−28 dias, o primeiro que exista (selo "Ref. …", neutro); sem nenhum, placeholder. Comparação = a N.ª ocorrência do mesmo dia da semana no mês anterior (N = posição do dia no seu mês; sem N.ª, a última), chave AAAA-MM derivada de cada data — só a variação % na linha, valor absoluto no title. Resumo do mês (Faturação/Ticket/Média por dia) de `vendas/{AAAA-MM}/resumo` do mês corrente, senão o anterior rotulado "(fechado)". Usa o mesmo `.cc-valor` do cartão Consumo. Por baixo de Média/dia, o acumulado do dia médio até à hora atual (`vendas/{AAAA-MM}/porHora` do mesmo mês; `giocoAcumuladoHoras`, cópia tal e qual da função pura do `vendas.html` — alterar as duas juntas; aproximação linear dentro da hora; refresca a cada 60 s da memória). Restantes cartões em placeholder. **Telemóvel** (Set/2026): viewport `device-width` + opt-in `shell-mobile`; com `body.shell-touch` (sem hover) a `.cc-grid` passa a coluna única, `.cc-col`/`.cc-fila` a `display:contents`, e os cartões ordenam-se por `order`: 1 Câmara `#cam` · 2 A/C `#acCard` · 3 Música `#musicaCard` · 4 Vendas hoje `.vh-card` · 5 Consumo `#consumoCard` · 6 HACCP `#haccpCard` · 7 Equipa `#equipaCard` · 8 Entradas `#entradasCard` · 9 Mensagens `#chatCard`. Critério: ligados a dados primeiro, placeholders "Em breve" no fim — ao ligar um cartão novo, subir a sua `order`. Com rato nada disto aplica | Equipa |
 | `contagens.html` | Contagens físicas de stock por data, com navegação ao teclado e conversão de unidades | Equipa |
-| `equipa.html` | Três separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela) e Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) | Equipa |
+| `equipa.html` | Quatro separadores: Escala (turnos), Pessoas (registo de colaboradores; criar uma pessoa gera os compromissos de tesouraria dela), Recibos (importação de recibos de vencimento em PDF com pdf.js, conferência com 5 validações e histórico de custo por mês) e **Admissões** (Set/2026, ver nós `admissoes` e `admissoesTemplate`): checklist de entrada de uma pessoa nova, de antes do primeiro dia ao fim do primeiro mês. Cada visto, link ou nota é gravado NO MOMENTO numa folha própria — nunca acumulado em memória como nas checklists da loja, porque uma admissão dura semanas e é retomada em várias sessões. Os itens são copiados do template na criação, e editar o template não mexe nas admissões já abertas. Toda a criação passa por `window.criarAdmissao(pessoaId, pessoaNome, dataInicio, origem, candidaturaId)` — ponto único, preparado para um futuro funil de candidaturas (`origem:'candidatura'`). Item em atraso a vermelho só quando NÃO está feito (`--red-ink` no texto, `--red` na barra); links de ficheiro validados com `new URL()` + https: obrigatório; anular é uma flag, nunca `remove()` | Equipa |
 | `receitas.html` | Fichas técnicas: preparações e artigos, com custo calculado ao vivo e food cost | Equipa |
 | `foodcost.html` | Duas secções independentes: (1) **mapa de produtos ZoneSoft → fichas técnicas**, sempre visível, alimentado pelos produtos distintos de `vendasDiario` nas últimas 4 semanas completas — a MESMA janela do painel "Encomenda sugerida" da `compras.html`, de que o mapa é pré-requisito — com sugestão automática, escolha manual, "Ignorar" e progresso "X de Y produtos tratados"; (2) **variância** de food cost: consumo teórico (vendas × ficha técnica) vs. real (contagem inicial + compras − contagem final), por período entre duas contagens fechadas. Só (2) depende das contagens: o estado vazio "ainda não há um período para comparar" está confinado a ela, e (1) continua utilizável com zero ou uma contagem | Equipa |
 | `resultados.html` | P&L mensal **em ótica de caixa, valores com IVA** (decisão de 02/09/2026): receita = `vendas/{mes}/resumo.bruto` (o líquido fica informativo no drill-down); custos nos valores brutos das fontes, sem estimar nem deduzir IVA; entregas de IVA/impostos aparecem como saídas bancárias na reconciliação quando ocorrem. Rubricas: CMV (paymentRequests concluídos + saídas bancárias de fornecedores), Pessoal (linha única: recibos + TSU patronal via gioco-compromissos.js + sem recibo como estimativa), Fixos (sem pessoal/TSU). Reconciliação bancária movimento a movimento com "Não classificado" sempre visível. Exclusões reversíveis de linhas via `plAjustes/` (ver nós). Classificação de movimentos em DUAS dimensões: a rubrica do P&L e a despesa concreta ("Meta Ads", "EDP"), ambas aprendidas pelas mesmas regras; a despesa é metadado e nunca mexe em valores | Equipa |
@@ -264,6 +264,66 @@ turnos                — escala semanal (confirmações manuais, chave {data}_{
 padroes               — padrão semanal recorrente por pessoa
 ferias                — períodos de férias por pessoa
 fechados              — loja encerrada por data: { diaTodo, turnos:{t1,t3,t2} }
+admissoesTemplate     — molde das admissões (separador Admissões da equipa.html, o
+                         ÚNICO que escreve aqui). admissoesTemplate/itens = ARRAY de
+                         { id (slug estável, minúsculas, sem acentos, só [a-z0-9-] —
+                         é chave de objecto em admissoes/{id}/itens e nunca muda quando
+                         o texto é editado), texto, offsetDias (dias face à data de
+                         início; negativo = antes), responsavel (texto livre, pode ser
+                         ''), exigeLink (bool — mostra o campo de link do ficheiro) }.
+                         É CONFIGURAÇÃO: aqui um set() do array INTEIRO é aceitável
+                         (admissoesTemplateRef.child('itens').set(arr)), como no
+                         lojaChecklistTemplates — e é a única escrita que existe.
+                         Nó vazio no primeiro on('value') = semeado com os 13 itens do
+                         ADM_TEMPLATE_DEFAULT da equipa.html; nunca sobrepõe um template
+                         já existente.
+                         EDITAR O TEMPLATE NÃO ALTERA AS ADMISSÕES JÁ CRIADAS — os itens
+                         são copiados no momento da criação. É intencional, não um
+                         defeito a corrigir: uma admissão a decorrer não muda de regras
+                         a meio do caminho
+admissoes             — uma admissão = a checklist de entrada de uma pessoa nova, de
+                         antes do primeiro dia ao fim do primeiro mês. Escrita SÓ pela
+                         equipa.html (separador Admissões).
+                         admissoes/{pushId} = { pessoaId, pessoaNome, dataInicio
+                         ('AAAA-MM-DD'), origem ('manual' | 'candidatura'),
+                         candidaturaId (reservado, hoje sempre null), criadoEm (ISO),
+                         concluidaEm (ISO ou ausente), anulado (bool), anuladoEm? (ISO),
+                         itens: { {itemId do template}: { texto, offsetDias,
+                         responsavel, exigeLink — COPIADOS do template —, prazo
+                         ('AAAA-MM-DD' = dataInicio + offsetDias, somado em UTC para uma
+                         mudança de hora não tirar nem pôr um dia), feito (bool),
+                         feitoEm (ISO ou null), link (string, '' ou URL https:),
+                         nota (string) } } }.
+                         O RTDB descarta nulls: concluidaEm e candidaturaId NÃO existem
+                         no nó enquanto valerem null — ausente = null, como no resto do OS.
+                         ESCRITAS (invioláveis):
+                         · criar = UM set() em admissoes/{novoId} com o objecto completo
+                           — o único set() neste nó, e só na criação;
+                         · marcar/desmarcar um item = update() APENAS em
+                           admissoes/{id}/itens/{itemId} com { feito, feitoEm };
+                         · link ou nota = update() na MESMA folha do item;
+                         · concluidaEm = update() em admissoes/{id} (enche quando o
+                           último item fica feito, esvazia se algum for desmarcado —
+                           senão uma admissão reaberta ficava presa nas concluídas);
+                         · anular = update({ anulado:true, anuladoEm }).
+                         NUNCA um set() no nó pai admissoes/{id} (apagaria os itens),
+                         NUNCA em admissoes/, e NUNCA remove(): anular é uma flag.
+                         Cada visto é gravado NO MOMENTO. O padrão do
+                         lojaChecklistRegistos (acumular em memória e gravar tudo num
+                         push() no fim) NÃO serve aqui: uma admissão dura semanas e é
+                         retomada em várias sessões, por várias pessoas.
+                         CRIAÇÃO NUM SÓ SÍTIO: window.criarAdmissao(pessoaId,
+                         pessoaNome, dataInicio, origem, candidaturaId) na equipa.html.
+                         O botão "Nova admissão" chama-a com origem 'manual'; um futuro
+                         funil de candidaturas chama exactamente esta função com
+                         origem 'candidatura'. Não duplicar lógica de criação por página.
+                         Criar uma admissão para uma pessoa SEM dataAdmissao grava-a
+                         também em pessoas/{id}/dataAdmissao (set() só nessa folha).
+                         LINKS DE FICHEIRO: URL colado à mão (OneDrive/SharePoint).
+                         Passa sempre por new URL() dentro de try/catch e exige
+                         protocolo https: ANTES de ser gravado ou de chegar ao DOM; um
+                         link que não passe não é gravado. Abre com target="_blank"
+                         rel="noopener noreferrer"
 notificacoes          — central de notificações (lida: bool, tipo, criadoEm)
 tasks                 — tarefas do dashboard
 eventos               — agenda pessoal. Escrevem aqui a calendario.html e o
