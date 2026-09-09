@@ -100,6 +100,73 @@
     background:var(--line); color:var(--muted);
   }
 
+  /* ---------- Barra de estado (contadores-filtro) ----------
+     Os contadores são o feedback do preenchimento em massa: clicar num
+     filtra a grelha para esses registos, clicar outra vez limpa. Contam
+     SEMPRE sobre os ingredientes activos (arquivado !== true), mesmo com o
+     toggle "Mostrar arquivados" ligado — um arquivado sem unidade não é
+     trabalho por fazer. ---------------------------------------------- */
+  .barra-estado{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:16px 0 0; }
+  .est-chip{
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    background:var(--white); color:var(--ink);
+    border:1.5px solid var(--line); border-radius:100px;
+    padding:6px 13px; cursor:pointer; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .est-chip:hover{ border-color:var(--red); }
+  .est-chip.on{ background:var(--ink); border-color:var(--ink); color:var(--dough); }
+  .est-chip .est-n{ font-variant-numeric:tabular-nums; }
+  .est-chip.total{ cursor:default; background:none; border-style:dashed; color:var(--muted); }
+  .est-chip.total:hover{ border-color:var(--line); }
+  .est-chip.zero{ opacity:.5; }
+  .est-chip.zero .est-n{ color:var(--green); }
+
+  /* ---------- Selecção e edição em massa ----------
+     A caixa de selecção vive DENTRO da célula fixa do nome: uma coluna
+     própria teria de ser sticky ao lado da do nome (duas `left:0`) e
+     entrava na ordenação e no arrasto de colunas sem necessidade. */
+  .sel-box{ margin-right:8px; vertical-align:middle; accent-color:var(--red); cursor:pointer; }
+  table.grid tr.selecionada td{ background-image:linear-gradient(var(--sug-bg),var(--sug-bg)); }
+  table.grid tr.selecionada td.fixa{ box-shadow:inset 3px 0 0 var(--red), 2px 0 0 var(--line); }
+
+  .massa{
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+    margin:12px 0 0; padding:10px 14px;
+    border:1.5px solid var(--red); border-radius:14px; background:var(--white);
+  }
+  .massa[hidden]{ display:none; }
+  .massa .massa-n{ font-size:12.5px; font-weight:700; color:var(--red-ink); white-space:nowrap; }
+  .massa select, .massa input{
+    font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink);
+    background:var(--white); border:1.5px solid var(--line); border-radius:100px;
+    padding:7px 12px; outline:none; box-sizing:border-box;
+  }
+  .massa input{ width:130px; }
+  .massa input.num{ width:100px; text-align:right; font-variant-numeric:tabular-nums; }
+  .massa select:focus, .massa input:focus{ border-color:var(--red); }
+  .massa .massa-conv{ font-size:12px; color:var(--muted); font-style:italic; }
+  .massa .massa-sep{ flex-basis:100%; height:0; }
+
+  /* ---------- Conversão ao vivo e sugestões de fator ---------- */
+  .cel .conv{ margin-left:7px; font-size:11px; color:var(--muted); font-style:italic; font-variant-numeric:normal; }
+  .cel .sug-fator{
+    background:var(--sug-bg); color:var(--muted); font-style:italic;
+    padding:2px 8px; border-radius:100px; font-size:11.5px; font-variant-numeric:normal;
+  }
+  .conv-live{
+    display:block; margin-top:3px; padding:0 2px;
+    font-size:11px; font-weight:600; color:var(--red-ink); font-style:italic;
+    text-align:left; white-space:nowrap;
+  }
+  .conv-live.vazia{ color:var(--muted); font-weight:500; }
+
+  /* ---------- Avisos de preenchimento ----------
+     Nunca bloqueiam a gravação: marcam a célula e explicam-se no title. */
+  .cel .alerta{ margin-left:6px; color:var(--amber); cursor:help; font-style:normal; font-weight:700; }
+  table.grid td.tem-alerta{ box-shadow:inset 0 -2px 0 var(--amber); }
+
   .search-box.gestao-search{ flex:1 1 220px; max-width:340px; margin:0; min-width:0; }
   .search-box.gestao-search input{
     flex:1; min-width:0; background:none; border:none; outline:none;
@@ -127,7 +194,7 @@
   /* ---------- Grelha ---------- */
   .grid-wrap{
     overflow:auto;
-    max-height:calc(100vh - 250px);
+    max-height:calc(100vh - 296px);
     min-height:220px;
     border:1px solid var(--line); border-radius:14px;
     background:var(--white);
@@ -285,6 +352,8 @@
         <button class="tab-btn" data-tab="produtos" id="tabProdutos">Produtos<span class="tab-count" id="countProdutos"></span></button>
       </div>
 
+      <div class="barra-estado" id="barraEstado" hidden></div>
+
       <div class="barra">
         <div class="search-box gestao-search">
           <svg class="icon" width="14" height="14"><use href="#i-search"/></svg>
@@ -294,6 +363,19 @@
         <select class="mes" id="mesSel" hidden></select>
         <button type="button" class="btn" id="btnReporOrdem" title="Repor a ordem original das colunas">Repor ordem</button>
         <p class="hint" id="hint"></p>
+      </div>
+
+      <div class="massa" id="massaBar" hidden>
+        <span class="massa-n" id="massaN"></span>
+        <select id="massaCampo">
+          <option value="unidade">Unidade base</option>
+          <option value="contUnidade">Contagem: unidade</option>
+          <option value="contFator">Contagem: fator</option>
+        </select>
+        <span id="massaValorWrap"></span>
+        <button type="button" class="btn" id="massaAplicar">Aplicar</button>
+        <button type="button" class="btn" id="massaLimpar">Limpar selecção</button>
+        <span class="massa-conv" id="massaConv"></span>
       </div>
 
       <div class="grid-wrap" id="gridWrap"></div>
@@ -502,6 +584,12 @@ window.addEventListener('load', function () {
   var ordenacao = { ingredientes: { col:null, dir:1 }, produtos: { col:null, dir:1 } };
   var emEdicao = null;         // célula em edição (td)
   var renderPendente = false;
+  // Filtro da barra de estado: null, ou o id de um FILTROS_ESTADO.
+  var filtroEstado = null;
+  // Selecção para edição em massa: { idIngrediente: true }. Só na aba
+  // Ingredientes; sobrevive a re-renders e é podada quando um id desaparece.
+  var selecionados = {};
+  var ultimoSelClicado = null; // âncora do shift-click
 
   var statusMsg = document.getElementById('statusMsg');
   var gridWrap = document.getElementById('gridWrap');
@@ -617,11 +705,125 @@ window.addEventListener('load', function () {
     });
   }
 
-  function contagemHerdada(ing) { return !ing.contagem; }
   function contagemEfetiva(ing) {
     if (ing.contagem) return { unidade: ing.contagem.unidade || '', fator: ing.contagem.fator, herdada:false };
     var c = ing.compra || {};
     return { unidade: c.unidade || '', fator: c.fator, herdada:true };
+  }
+
+  // ===================================================================
+  // Preenchimento: estado, conversões, sugestões e avisos.
+  //
+  // O alvo é a contagem de 1 de Outubro: a contagens.html só sabe contar um
+  // ingrediente com unidade base E contagem {unidade, fator} (configPronta()
+  // dessa página). Estas funções são a mesma leitura, do lado da folha.
+  // ===================================================================
+
+  // "Sem contagem" é medido no nó PRÓPRIO do ingrediente, não no efectivo:
+  // a contagens.html lê ingredientes/{id}/contagem e ignora a herança do
+  // formato de compra que esta folha mostra em itálico.
+  function temContagemPropria(ing) {
+    var c = ing && ing.contagem;
+    return !!(c && c.unidade && typeof c.fator === 'number' && isFinite(c.fator));
+  }
+  function temCompra(ing) {
+    var c = ing && ing.compra;
+    return !!(c && c.unidade && typeof c.fator === 'number' && isFinite(c.fator));
+  }
+  function temPreco(ing) { return typeof (ing && ing.precoUltimaCompra) === 'number'; }
+  function ativo(ing) { return !!ing && ing.arquivado !== true; }
+
+  // Cada filtro da barra de estado: rótulo, teste e o title que explica o
+  // critério. A ordem é a do trabalho a fazer.
+  var FILTROS_ESTADO = [
+    { id:'semUnidade',  label:'sem unidade',            teste:function (i) { return !i.unidade; },
+      titulo:'Ingredientes activos sem unidade base (kg · L · un) definida.' },
+    { id:'semContagem', label:'sem contagem',           teste:function (i) { return !temContagemPropria(i); },
+      titulo:'Sem contagem própria {unidade, fator} — é o que a página de Contagens precisa para contar o artigo.' },
+    { id:'semCompra',   label:'sem formato de compra',  teste:function (i) { return !temCompra(i); },
+      titulo:'Sem compra {unidade, fator}. Não é o alvo desta sessão: escreve-se na leitura de faturas.' },
+    { id:'semPreco',    label:'sem preço',              teste:function (i) { return !temPreco(i); },
+      titulo:'Sem precoUltimaCompra. Não é o alvo desta sessão: vem da leitura de faturas.' }
+  ];
+
+  // ---------- Conversões ----------
+  // Famílias de unidade e quanto vale 1 dessa unidade na base da família.
+  var FAMILIA_UNIDADE = {
+    kg:{ fam:'massa', emBase:1 }, kgs:{ fam:'massa', emBase:1 }, quilo:{ fam:'massa', emBase:1 }, quilos:{ fam:'massa', emBase:1 },
+    g:{ fam:'massa', emBase:0.001 }, gr:{ fam:'massa', emBase:0.001 }, grs:{ fam:'massa', emBase:0.001 },
+    grama:{ fam:'massa', emBase:0.001 }, gramas:{ fam:'massa', emBase:0.001 }, mg:{ fam:'massa', emBase:0.000001 },
+    lt:{ fam:'volume', emBase:1 }, lts:{ fam:'volume', emBase:1 }, l:{ fam:'volume', emBase:1 },
+    litro:{ fam:'volume', emBase:1 }, litros:{ fam:'volume', emBase:1 },
+    dl:{ fam:'volume', emBase:0.1 }, cl:{ fam:'volume', emBase:0.01 }, ml:{ fam:'volume', emBase:0.001 },
+    un:{ fam:'unidade', emBase:1 }, und:{ fam:'unidade', emBase:1 }, unid:{ fam:'unidade', emBase:1 },
+    unidade:{ fam:'unidade', emBase:1 }, unidades:{ fam:'unidade', emBase:1 }
+  };
+  function familiaDe(u) {
+    var e = FAMILIA_UNIDADE[normalizar(u)];
+    return e ? e.fam : null;
+  }
+  // Texto ao vivo do que o fator significa: "1 caixa = 0,25 kg".
+  // É o que evita o erro clássico de escrever 4 onde devia estar 0,25.
+  function textoConversao(unidadeCont, fator, unidadeBase) {
+    if (!unidadeBase) return null;
+    if (typeof fator !== 'number' || !isFinite(fator)) return null;
+    var uc = unidadeCont || unidadeBase;
+    return '1 ' + labelUnidade(uc) + ' = ' + fmtNum(fator) + ' ' + labelUnidade(unidadeBase);
+  }
+
+  // ---------- Sugestão de fator ----------
+  // Lê a gramagem/capacidade escrita no nome ou num alias ("Farinha 00 25 kg",
+  // "Água 33 cl") e converte-a para a unidade base. NUNCA é gravada sozinha:
+  // aparece como sugestão e só entra com um clique ou por cima dela.
+  var RE_MEDIDA = /(\d+(?:[.,]\d+)?)\s*(kgs?|quilos?|gramas?|grs?|g|mg|lts?|litros?|l|dl|cl|ml|unidades?|unid|und|un)\b/gi;
+  function sugerirFator(ing) {
+    var base = ing && ing.unidade;
+    if (!base) return null;
+    var famBase = familiaDe(base);
+    if (!famBase) return null;
+    var fontes = [{ t: ing.nome || '', o:'nome' }];
+    (Array.isArray(ing.aliases) ? ing.aliases : []).forEach(function (a) { if (a) fontes.push({ t:String(a), o:'alias' }); });
+    for (var i = 0; i < fontes.length; i++) {
+      var achado = null;
+      RE_MEDIDA.lastIndex = 0;
+      var m;
+      // A medida costuma vir no fim do nome ("Farinha 00 25 kg"): fica a última.
+      while ((m = RE_MEDIDA.exec(fontes[i].t)) !== null) {
+        var e = FAMILIA_UNIDADE[normalizar(m[2])];
+        if (!e || e.fam !== famBase) continue;
+        var n = parseNum(m[1]);
+        if (n === null || isNaN(n) || n <= 0) continue;
+        achado = { fator: Math.round(n * e.emBase * 1e6) / 1e6, texto: m[0].replace(/\s+/g, ' ').trim(), origem: fontes[i].o };
+      }
+      if (achado) return achado;
+    }
+    return null;
+  }
+
+  // ---------- Avisos ----------
+  // Regra da página: avisar, nunca bloquear. Um ingrediente meio preenchido
+  // grava na mesma — o que não se pode é ficar preenchido e errado em silêncio.
+  function avisosContagem(ing) {
+    var out = [];
+    if (!ing) return out;
+    var c = ing.contagem || null;
+    var uc = c && c.unidade ? c.unidade : '';
+    var f = c && typeof c.fator === 'number' ? c.fator : null;
+    if (uc && (f === null || f <= 0)) {
+      out.push(f === null
+        ? 'Unidade de contagem "' + uc + '" sem fator — a contagem ainda não consegue converter para a unidade base.'
+        : 'Fator ' + fmtNum(f) + ': tem de ser maior do que zero.');
+    }
+    if (!uc && f !== null) out.push('Fator de contagem sem unidade — falta dizer o que é 1 unidade contada (peça, caixa, garrafa…).');
+    if (uc && !ing.unidade) out.push('Unidade de contagem definida sem unidade base — define kg, L ou un primeiro.');
+    if (uc && ing.unidade && normalizar(uc) === normalizar(ing.unidade) && f !== null && f !== 1) {
+      out.push('A unidade de contagem é a mesma da base (' + labelUnidade(ing.unidade) + '), por isso o fator devia ser 1 e está ' + fmtNum(f) + '.');
+    }
+    if (f !== null && f > 0) {
+      if (f > 100) out.push('Fator ' + fmtNum(f) + ' é muito alto — confirma que não é um erro de vírgula.');
+      else if (f < 0.001) out.push('Fator ' + fmtNum(f) + ' é muito baixo — confirma que não é um erro de vírgula.');
+    }
+    return out;
   }
 
   function slugFoto(nome) {
@@ -714,14 +916,35 @@ window.addEventListener('load', function () {
           (ing.arquivado === true ? '<span class="selo-arquivado" title="' + escapeHtml(motivoArquivo(ing)) + '">Arquivado</span>' : '') };
         case 'categoria': return { v: categoriasIng[ing.categoria] || ing.categoria || '', html: ing.categoria ? escapeHtml(categoriasIng[ing.categoria] || ing.categoria) : '<span class="vazio">—</span>' };
         case 'fornecedor': return { v: ing.fornecedor || '', html: ing.fornecedor ? escapeHtml(ing.fornecedor) : '<span class="vazio">—</span>' };
-        case 'unidade': return { v: labelUnidade(ing.unidade), html: ing.unidade ? escapeHtml(labelUnidade(ing.unidade)) : '<span class="vazio">—</span>' };
+        case 'unidade': return { v: labelUnidade(ing.unidade), html: ing.unidade ? escapeHtml(labelUnidade(ing.unidade)) : '<span class="vazio">—</span>',
+          alertas: ing.unidade ? null : avisosContagem(ing).filter(function (a) { return a.indexOf('define kg, L ou un') !== -1; }) };
         case 'compraUnidade': return { v: (ing.compra && ing.compra.unidade) || '', html: (ing.compra && ing.compra.unidade) ? escapeHtml(labelUnidade(ing.compra.unidade)) : '<span class="vazio">—</span>' };
         case 'compraFator': { var f = ing.compra && typeof ing.compra.fator === 'number' ? ing.compra.fator : null; return { v: f, html: f === null ? '<span class="vazio">—</span>' : fmtNum(f) }; }
         case 'preco': return { v: typeof ing.precoUltimaCompra === 'number' ? ing.precoUltimaCompra : null, html: typeof ing.precoUltimaCompra === 'number' ? fmtEuros(ing.precoUltimaCompra, 2) : '<span class="muted">—</span>' };
         case 'data': return { v: ing.dataUltimaCompra || '', html: ing.dataUltimaCompra ? escapeHtml(fmtData(ing.dataUltimaCompra)) : '<span class="muted">—</span>' };
         case 'custoBase': { var c = GiocoCustos.custoIngrediente(ing); return { v: c, html: c === null ? '<span class="muted">—</span>' : fmtEuros(c, 3) + ' <span class="muted">/ ' + escapeHtml(labelUnidade(ing.unidade) || 'un') + '</span>' }; }
         case 'contUnidade': return { v: cont.unidade || '', html: cont.unidade ? escapeHtml(labelUnidade(cont.unidade)) : '<span class="vazio">—</span>', herdado: cont.herdada };
-        case 'contFator': { var cf = typeof cont.fator === 'number' ? cont.fator : null; return { v: cf, html: (cf === null ? '<span class="vazio">—</span>' : fmtNum(cf)) + (cont.herdada ? '' : ' <button type="button" class="btn-mini" data-acao="herdar" title="Voltar a herdar da compra (remove o nó contagem)">herdar</button>'), herdado: cont.herdada }; }
+
+        case 'contFator': {
+          var cf = typeof cont.fator === 'number' ? cont.fator : null;
+          var h = (cf === null ? '<span class="vazio">—</span>' : fmtNum(cf));
+          // O que o fator significa, ao vivo, ao lado do próprio número.
+          var conv = textoConversao(cont.unidade, cf, ing.unidade);
+          if (conv) h += '<span class="conv">' + escapeHtml(conv) + '</span>';
+          // Sem fator: propõe o que estiver escrito no nome ou num alias.
+          // Só proposta — o "usar" é que escreve.
+          if (cf === null) {
+            var sug = sugerirFator(ing);
+            if (sug) {
+              h += '<span class="sug-fator" title="Lido de &quot;' + escapeHtml(sug.texto) + '&quot; no ' + sug.origem + '. Nada foi gravado.">' +
+                   escapeHtml(fmtNum(sug.fator) + ' ' + labelUnidade(ing.unidade)) + '?</span>' +
+                   '<button type="button" class="btn-mini" data-acao="usarFator" data-fator="' + escapeHtml(String(sug.fator)) +
+                   '" title="Escrever ' + escapeHtml(fmtNum(sug.fator)) + ' como fator de contagem">usar</button>';
+            }
+          }
+          if (!cont.herdada) h += ' <button type="button" class="btn-mini" data-acao="herdar" title="Voltar a herdar da compra (remove o nó contagem)">herdar</button>';
+          return { v: cf, html: h, herdado: cont.herdada, alertas: avisosContagem(ing) };
+        }
         case 'aliases': { var al = Array.isArray(ing.aliases) ? ing.aliases.filter(Boolean) : []; return { v: al.join(', '), html: al.length ? escapeHtml('(' + al.join(', ') + ')') : '<span class="vazio">+ adicionar</span>' }; }
         case 'tipoArm': { var t = TIPO_ARMAZENAMENTO.filter(function (x) { return x.v === (ing.tipoArmazenamento || ''); })[0]; return { v: ing.tipoArmazenamento || '', html: ing.tipoArmazenamento ? escapeHtml(t ? t.l : ing.tipoArmazenamento) : '<span class="vazio">—</span>' }; }
         case 'localArm': return { v: ing.localArmazenamento || '', html: ing.localArmazenamento ? escapeHtml(ing.localArmazenamento) : '<span class="vazio">—</span>' };
@@ -782,6 +1005,12 @@ window.addEventListener('load', function () {
     var t = normalizar(termo);
     var ids = Object.keys(fonte).filter(function (id) {
       if (aba === 'ingredientes' && !mostrarArquivados && fonte[id] && fonte[id].arquivado === true) return false;
+      if (aba === 'ingredientes' && filtroEstado) {
+        // Os contadores contam só activos, por isso o filtro também os limita.
+        if (!ativo(fonte[id])) return false;
+        var f = FILTROS_ESTADO.filter(function (x) { return x.id === filtroEstado; })[0];
+        if (f && !f.teste(fonte[id])) return false;
+      }
       if (!t) return true;
       var texto = cols.map(function (c) { var r = valorCelula(aba, c, id); return r.v === null || r.v === undefined ? '' : String(r.v); }).join(' ');
       return normalizar(texto).indexOf(t) !== -1;
@@ -805,6 +1034,91 @@ window.addEventListener('load', function () {
     return ids;
   }
 
+  // ---------- Barra de estado ----------
+  // Contadores clicáveis que funcionam como filtro. Actualizam a cada render,
+  // e cada gravação chama render() — é o feedback que faz o trabalho render.
+  function renderBarraEstado() {
+    var el = document.getElementById('barraEstado');
+    el.hidden = abaAtiva !== 'ingredientes';
+    if (el.hidden) return;
+    var ativos = Object.keys(ingredientes).filter(function (id) { return ativo(ingredientes[id]); });
+    var html = '<span class="est-chip total"><span class="est-n">' + ativos.length + '</span> activos</span>';
+    FILTROS_ESTADO.forEach(function (f) {
+      var n = ativos.filter(function (id) { return f.teste(ingredientes[id]); }).length;
+      var cls = 'est-chip' + (filtroEstado === f.id ? ' on' : '') + (n === 0 ? ' zero' : '');
+      html += '<button type="button" class="' + cls + '" data-filtro="' + f.id + '" title="' + escapeHtml(f.titulo) +
+              ' Clica para filtrar; clica outra vez para limpar.">' +
+              '<span class="est-n">' + n + '</span> ' + escapeHtml(f.label) + '</button>';
+    });
+    if (filtroEstado) html += '<button type="button" class="est-chip" data-filtro="">Limpar filtro</button>';
+    el.innerHTML = html;
+  }
+
+  // ---------- Edição em massa ----------
+  function idsSelecionados() {
+    return Object.keys(selecionados).filter(function (id) { return selecionados[id] && ingredientes[id]; });
+  }
+  function podarSelecao() {
+    Object.keys(selecionados).forEach(function (id) { if (!ingredientes[id]) delete selecionados[id]; });
+  }
+  function renderMassa() {
+    var bar = document.getElementById('massaBar');
+    podarSelecao();
+    var n = idsSelecionados().length;
+    bar.hidden = abaAtiva !== 'ingredientes' || n === 0;
+    if (bar.hidden) return;
+    document.getElementById('massaN').textContent = n + (n === 1 ? ' linha seleccionada' : ' linhas seleccionadas');
+    renderMassaValor();
+  }
+  // O controlo do valor muda com o campo escolhido: select para a unidade
+  // base, texto com sugestões para a unidade de contagem, número para o fator.
+  function renderMassaValor() {
+    var campo = document.getElementById('massaCampo').value;
+    var wrap = document.getElementById('massaValorWrap');
+    var antes = wrap.querySelector('#massaValor');
+    var valorAntes = antes ? antes.value : '';
+    var html;
+    if (campo === 'unidade') {
+      html = '<select id="massaValor">' + UNIDADES_BASE.map(function (u) {
+        return '<option value="' + escapeHtml(u.v) + '">' + escapeHtml(u.l) + '</option>';
+      }).join('') + '</select>';
+    } else if (campo === 'contUnidade') {
+      html = '<input type="text" id="massaValor" list="massaUnidades" placeholder="ex: caixa" autocomplete="off">' +
+             '<datalist id="massaUnidades">' + UNIDADES_FORMATO.map(function (u) {
+               return '<option value="' + escapeHtml(u) + '"></option>';
+             }).join('') + '</datalist>';
+    } else {
+      html = '<input type="text" id="massaValor" class="num" inputmode="decimal" placeholder="ex: 0,25" autocomplete="off">';
+    }
+    wrap.innerHTML = html;
+    var novo = wrap.querySelector('#massaValor');
+    if (novo && novo.tagName !== 'SELECT') novo.value = valorAntes;
+    if (novo) novo.addEventListener('input', atualizarMassaConv);
+    atualizarMassaConv();
+  }
+  // Mesma conversão ao vivo da célula, mas para o conjunto seleccionado: só
+  // se mostra quando todos partilham a mesma unidade base e de contagem.
+  function atualizarMassaConv() {
+    var el = document.getElementById('massaConv');
+    var campo = document.getElementById('massaCampo').value;
+    var ctrl = document.getElementById('massaValor');
+    el.textContent = '';
+    if (campo !== 'contFator' || !ctrl) return;
+    var f = parseNum(ctrl.value);
+    if (f === null || isNaN(f)) return;
+    var ids = idsSelecionados();
+    var bases = {}, unis = {};
+    ids.forEach(function (id) {
+      bases[ingredientes[id].unidade || ''] = true;
+      unis[contagemEfetiva(ingredientes[id]).unidade || ''] = true;
+    });
+    var base = Object.keys(bases).length === 1 ? Object.keys(bases)[0] : null;
+    var uni = Object.keys(unis).length === 1 ? Object.keys(unis)[0] : null;
+    if (!base) { el.textContent = 'Unidades base diferentes na selecção.'; return; }
+    var t = textoConversao(uni, f, base);
+    el.textContent = t ? (uni ? t : 'unidade de contagem por definir · ' + t) : '';
+  }
+
   function render() {
     if (!tudoCarregado()) return;
     if (emEdicao) { renderPendente = true; return; }
@@ -822,6 +1136,9 @@ window.addEventListener('load', function () {
     hint.innerHTML = abaAtiva === 'produtos'
       ? 'Linhas assinaladas a amarelo ainda não têm artigo POS ligado. As <b>sugestões</b> só ficam gravadas depois de carregares em "ligar".'
       : 'Contagem em <i>itálico</i> é herdada da compra (sem escrita própria). Preço e data vêm da leitura de faturas.';
+
+    renderBarraEstado();
+    renderMassa();
 
     var aba = abaAtiva;
     var cols = colunasOrdenadas(aba);
@@ -848,6 +1165,7 @@ window.addEventListener('load', function () {
       var rowCls = '';
       if (aba === 'produtos' && !artigosDaFicha(id).length) rowCls = ' class="sem-pos"';
       if (aba === 'ingredientes' && ingredientes[id] && ingredientes[id].arquivado === true) rowCls = ' class="arquivado"';
+      if (aba === 'ingredientes' && selecionados[id]) rowCls = rowCls ? rowCls.replace('"', '"selecionada ') : ' class="selecionada"';
       html += '<tr data-id="' + escapeHtml(id) + '"' + rowCls + '>';
       cols.forEach(function (c) {
         var r = valorCelula(aba, c, id);
@@ -859,7 +1177,19 @@ window.addEventListener('load', function () {
         if (!ro && tipoEditor(aba, c.id) === 'select') cls.push('select');
         if (r.herdado) cls.push('herdado');
         if (aba === 'ingredientes' && (c.id === 'alergenios' || c.id === 'usadoEm')) cls.push('link');
-        html += '<td class="' + cls.join(' ') + '" data-col="' + c.id + '"' + (r.slug ? ' data-slug="' + r.slug + '"' : '') + '><span class="cel">' + r.html + '</span></td>';
+        var interior = r.html;
+        // Caixa de selecção dentro da célula fixa do nome (ver .sel-box no CSS).
+        if (aba === 'ingredientes' && c.fixa) {
+          interior = '<input type="checkbox" class="sel-box" data-sel="' + escapeHtml(id) + '"' +
+                     (selecionados[id] ? ' checked' : '') + ' title="Seleccionar para edição em massa">' + interior;
+        }
+        // Avisos: marcam a célula e explicam-se no title. Nunca bloqueiam.
+        var alertas = (r.alertas || []).filter(Boolean);
+        if (alertas.length) {
+          cls.push('tem-alerta');
+          interior += '<span class="alerta" title="' + escapeHtml(alertas.join('\n')) + '">⚠</span>';
+        }
+        html += '<td class="' + cls.join(' ') + '" data-col="' + c.id + '"' + (r.slug ? ' data-slug="' + r.slug + '"' : '') + '><span class="cel">' + interior + '</span></td>';
       });
       html += '</tr>';
     });
@@ -936,6 +1266,19 @@ window.addEventListener('load', function () {
     return '';
   }
 
+  // Põe (ou repõe) o hint de conversão na célula e liga-o ao controlo actual.
+  function ligarLive(cel, ctrl) {
+    if (!cel.querySelector('.conv-live')) {
+      var live = document.createElement('span');
+      live.className = 'conv-live';
+      cel.appendChild(live);
+    }
+    var fn = function () { if (emEdicao && emEdicao.atualizarLive) emEdicao.atualizarLive(); };
+    ctrl.addEventListener('input', fn);
+    ctrl.addEventListener('change', fn);
+    fn();
+  }
+
   function abrirEditor(td) {
     if (emEdicao) fecharEditor(false);
     var aba = abaAtiva;
@@ -966,6 +1309,26 @@ window.addEventListener('load', function () {
     td.classList.add('a-editar');
     cel.innerHTML = '';
     cel.appendChild(ctrl);
+
+    // Conversão ao vivo por baixo do editor: "1 caixa = 0,25 kg". É aqui, a
+    // escrever, que o erro clássico (4 em vez de 0,25) se vê a tempo. O span é
+    // procurado a cada chamada porque o "Outro…" refaz o innerHTML da célula.
+    if (aba === 'ingredientes' && (colId === 'contFator' || colId === 'contUnidade')) {
+      emEdicao.atualizarLive = function () {
+        var live = cel.querySelector('.conv-live');
+        if (!live || !emEdicao) return;
+        var ing0 = ingredientes[id];
+        var ef = contagemEfetiva(ing0);
+        var uni = colId === 'contUnidade' ? (emEdicao.ctrl.value || '') : (ef.unidade || '');
+        var f = colId === 'contFator' ? parseNum(emEdicao.ctrl.value) : (typeof ef.fator === 'number' ? ef.fator : null);
+        if (uni === '__outro__') uni = '';
+        var t = (f === null || isNaN(f)) ? null : textoConversao(uni, f, ing0.unidade);
+        live.textContent = t || (ing0.unidade ? '' : 'sem unidade base definida');
+        live.classList.toggle('vazia', !t);
+      };
+      ligarLive(cel, ctrl);
+    }
+
     ctrl.focus();
     if (ctrl.select && tipo !== 'select') ctrl.select();
 
@@ -981,6 +1344,7 @@ window.addEventListener('load', function () {
           var inp = document.createElement('input');
           inp.type = 'text'; inp.className = 'edit'; inp.placeholder = 'Escreve o valor…';
           cel.innerHTML = ''; cel.appendChild(inp); emEdicao.ctrl = inp; emEdicao.tipo = 'text';
+          if (emEdicao.atualizarLive) ligarLive(cel, inp);
           inp.focus();
           inp.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') { e.preventDefault(); emEdicao.cancelado = true; fecharEditor(false); }
@@ -1012,8 +1376,12 @@ window.addEventListener('load', function () {
       var n = parseNum(novo);
       if (novo.trim() === '') n = null;
       if (n !== null && (isNaN(n) || n < 0)) { toast('Valor inválido — tem de ser um número não negativo. Valor anterior reposto.', true); if (renderPendente) render(); return; }
-      if ((ed.colId === 'compraFator' || ed.colId === 'contFator') && n === 0) { toast('O fator nunca pode ser 0. Valor anterior reposto.', true); if (renderPendente) render(); return; }
-      if ((ed.colId === 'compraFator' || ed.colId === 'contFator') && n === null && ed.colId === 'contFator' && !contagemHerdada(ingredientes[ed.id])) { toast('A contagem precisa de fator. Para voltar a herdar usa o botão "herdar".', true); if (renderPendente) render(); return; }
+      // O fator de COMPRA é divisor do custo (precoUltimaCompra ÷ compra.fator):
+      // um 0 aqui não é preenchimento a meio, é uma divisão por zero.
+      if (ed.colId === 'compraFator' && n === 0) { toast('O fator de compra nunca pode ser 0. Valor anterior reposto.', true); if (renderPendente) render(); return; }
+      // Um fator de contagem 0 ou em falta grava e fica assinalado com ⚠ (avisosContagem):
+      // a regra da página é avisar, não bloquear. Negativos continuam fora,
+      // que não são preenchimento a meio, são valor impossível.
       valor = n;
     } else if (ed.tipo === 'text') {
       valor = String(novo).trim();
@@ -1049,15 +1417,32 @@ window.addEventListener('load', function () {
         case 'compraFator': lista.push({ path: base + 'compra/fator', antes: ing.compra ? ing.compra.fator : undefined, depois: valor }); break;
         case 'contUnidade':
         case 'contFator': {
-          // Editar a contagem torna-a independente: grava o nó inteiro
-          // { unidade, fator } (dois campos, um set() no path contagem — o
-          // mesmo formato que o contagens.html escreve).
+          // Editar a contagem torna-a independente do formato de compra.
+          // Escreve-se FOLHA A FOLHA (contagem/unidade, contagem/fator), nunca
+          // um set() no nó contagem inteiro: assim gravar metade não apaga a
+          // outra metade que outra sessão possa ter acabado de escrever.
+          //
+          // Meio preenchido GRAVA na mesma — a contagens.html trata um nó
+          // incompleto como "por definir" (configPronta()) e a folha marca-o
+          // com ⚠. Bloquear aqui era o que obrigava a preencher os dois campos
+          // de uma assentada, e é isso que torna o trabalho lento.
           var ef = contagemEfetiva(ing);
-          var nova = { unidade: colId === 'contUnidade' ? (valor || null) : (ef.unidade || null), fator: colId === 'contFator' ? valor : (typeof ef.fator === 'number' ? ef.fator : null) };
-          if (nova.fator === null && nova.unidade === null) { toast('A contagem precisa de unidade e fator.', true); return null; }
-          if (typeof nova.fator !== 'number') { toast('Define também o fator de contagem — sem ele o nó não é gravado.', true); return null; }
-          if (!nova.unidade) { toast('Define também a unidade de contagem — sem ela o nó não é gravado.', true); return null; }
-          lista.push({ path: base + 'contagem', antes: ing.contagem ? { unidade: ing.contagem.unidade, fator: ing.contagem.fator } : undefined, depois: nova });
+          var alvo = {
+            unidade: colId === 'contUnidade' ? (valor || null) : (ef.unidade || null),
+            fator: colId === 'contFator' ? valor : (typeof ef.fator === 'number' ? ef.fator : null)
+          };
+          // `antes` guarda o valor CRU do nó (mesmo que seja lixo antigo, como
+          // um fator em string): é o que o "Anular" tem de repor tal e qual.
+          var atualNo = ing.contagem || {};
+          var antesUni = atualNo.unidade;
+          var antesFat = atualNo.fator;
+          if (!igual(antesUni === undefined ? null : antesUni, alvo.unidade)) {
+            lista.push({ path: base + 'contagem/unidade', antes: antesUni, depois: alvo.unidade });
+          }
+          if (!igual(antesFat === undefined ? null : antesFat, alvo.fator)) {
+            lista.push({ path: base + 'contagem/fator', antes: antesFat, depois: alvo.fator });
+          }
+          if (!lista.length) return null;
           break;
         }
         case 'aliases': {
@@ -1138,7 +1523,24 @@ window.addEventListener('load', function () {
         render();
         piscar(id, colId);
         ultimaEscrita = escritas;
-        toast('Gravado: ' + escritas.descricao, false, 'Anular', anular);
+        // Validação depois de gravar: avisa, não bloqueia. Os avisos vão no
+        // mesmo aviso da gravação para não roubar o botão "Anular", e ficam
+        // sempre visíveis no ⚠ da célula.
+        var avisos = [];
+        escritas.forEach(function (e) {
+          var m = /^ingredientes\/([^\/]+)\//.exec(e.path);
+          if (!m || !ingredientes[m[1]]) return;
+          avisosContagem(ingredientes[m[1]]).forEach(function (a) {
+            var linha = (ingredientes[m[1]].nome || m[1]) + ': ' + a;
+            if (avisos.indexOf(linha) === -1) avisos.push(linha);
+          });
+        });
+        var msg = 'Gravado: ' + escritas.descricao;
+        if (avisos.length) {
+          msg += ' — ⚠ ' + (avisos.length === 1 ? avisos[0]
+            : avisos.length + ' avisos por rever (⚠ nas células)');
+        }
+        toast(msg, false, 'Anular', anular);
         return;
       }
       var e = fila.shift();
@@ -1227,6 +1629,30 @@ window.addEventListener('load', function () {
   // ===================================================================
 
   gridWrap.addEventListener('click', function (e) {
+    // Selecção em massa: a caixa vive na célula do nome, e o clique nela nunca
+    // abre o editor. Com shift estende desde a última caixa clicada, pela
+    // ordem em que as linhas estão NA GRELHA (a ordenação/filtro em vigor).
+    var box = e.target.closest('input.sel-box');
+    if (box) {
+      e.stopPropagation();
+      var alvo = box.getAttribute('data-sel');
+      var ligar = box.checked;
+      if (e.shiftKey && ultimoSelClicado && ultimoSelClicado !== alvo) {
+        var visiveis = idsFiltrados('ingredientes');
+        var a = visiveis.indexOf(ultimoSelClicado), b = visiveis.indexOf(alvo);
+        if (a !== -1 && b !== -1) {
+          var de = Math.min(a, b), ate = Math.max(a, b);
+          for (var k = de; k <= ate; k++) {
+            if (ligar) selecionados[visiveis[k]] = true; else delete selecionados[visiveis[k]];
+          }
+        }
+      }
+      if (ligar) selecionados[alvo] = true; else delete selecionados[alvo];
+      ultimoSelClicado = alvo;
+      render();
+      return;
+    }
+
     var btn = e.target.closest('button[data-acao]');
     var td = e.target.closest('td');
     if (!td) return;
@@ -1244,6 +1670,11 @@ window.addEventListener('load', function () {
           esc.descricao = (ing.nome || id) + ' · contagem volta a herdar';
           executar(esc, td, colId, id);
         });
+      } else if (acao === 'usarFator') {
+        // A sugestão só entra aqui, com o clique. Até este ponto nada foi
+        // gravado — é só texto lido do nome/alias.
+        var esc3 = planearEscritas('ingredientes', 'contFator', id, parseNum(btn.getAttribute('data-fator')));
+        if (esc3) executar(esc3, td, 'contFator', id);
       } else if (acao === 'confirmarSugestao') {
         var chave = btn.getAttribute('data-chave');
         var esc2 = planearEscritas('produtos', 'artigoPos', id, chave);
@@ -1341,6 +1772,66 @@ window.addEventListener('load', function () {
   document.getElementById('btnReporOrdem').addEventListener('click', function () {
     try { localStorage.removeItem(chaveOrdem(abaAtiva)); } catch (e) { /* sem storage */ }
     render();
+  });
+
+  // ---------- Barra de estado: contadores como filtro ----------
+  document.getElementById('barraEstado').addEventListener('click', function (e) {
+    var chip = e.target.closest('button[data-filtro]');
+    if (!chip) return;
+    var f = chip.getAttribute('data-filtro');
+    filtroEstado = (!f || f === filtroEstado) ? null : f;   // clicar outra vez limpa
+    render();
+  });
+
+  // ---------- Edição em massa ----------
+  document.getElementById('massaCampo').addEventListener('change', renderMassaValor);
+  document.getElementById('massaLimpar').addEventListener('click', function () {
+    selecionados = {}; ultimoSelClicado = null; render();
+  });
+  document.getElementById('massaAplicar').addEventListener('click', function () {
+    var ids = idsSelecionados();
+    if (!ids.length) return;
+    var campo = document.getElementById('massaCampo').value;
+    var ctrl = document.getElementById('massaValor');
+    var bruto = ctrl ? ctrl.value : '';
+    var valor;
+    if (campo === 'contFator') {
+      valor = parseNum(bruto);
+      if (valor === null || isNaN(valor) || valor < 0) { toast('Escreve um fator — número não negativo.', true); return; }
+    } else {
+      valor = String(bruto || '').trim();
+      if (campo === 'unidade' && !valor) { toast('Escolhe a unidade base a aplicar.', true); return; }
+    }
+
+    // Um plano só, com as escritas de todas as linhas: uma gravação, um
+    // "Anular" que desfaz o lote inteiro. Linhas onde o valor já é o actual
+    // não geram escrita nenhuma.
+    var plano = [];
+    var tocados = [];
+    ids.forEach(function (id) {
+      var parcial = planearEscritas('ingredientes', campo, id, valor);
+      if (!parcial || !parcial.length) return;
+      if (parcial.confirmar) return;   // não há confirmações nesta aba, mas nunca as engolir em massa
+      // A edição de uma célula compara antes de planear; aqui a comparação é
+      // feita aqui, senão uma linha que já tem o valor gerava escrita à mesma.
+      var muda = parcial.filter(function (x) {
+        return !igual(x.antes === undefined ? null : x.antes, x.depois === undefined ? null : x.depois);
+      });
+      if (!muda.length) return;
+      muda.forEach(function (x) { plano.push(x); });
+      tocados.push(id);
+    });
+    if (!plano.length) { toast('Nada a mudar — as linhas seleccionadas já têm esse valor.'); return; }
+
+    var rotuloCampo = campo === 'unidade' ? 'unidade base' : (campo === 'contUnidade' ? 'unidade de contagem' : 'fator de contagem');
+    var rotuloValor = campo === 'contFator' ? fmtNum(valor) : labelUnidade(valor);
+    confirmar('Aplicar a ' + tocados.length + (tocados.length === 1 ? ' linha' : ' linhas'),
+      'Escrever ' + rotuloCampo + ' = "' + rotuloValor + '" em ' + tocados.length +
+      (tocados.length === 1 ? ' ingrediente' : ' ingredientes') + '? Fica um "Anular" no aviso de gravação.',
+      function () {
+        plano.descricao = tocados.length + (tocados.length === 1 ? ' ingrediente' : ' ingredientes') + ' · ' + rotuloCampo;
+        executar(plano, null, campo, tocados[0]);
+      });
   });
 
   pesquisa.addEventListener('input', function () { termo = pesquisa.value.trim(); render(); });
