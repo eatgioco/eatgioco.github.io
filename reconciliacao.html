@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Reconc.">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Reconciliação POS ↔ TPA</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<!-- Mesmo JSZip e mesma versão do vendas.html: os SAF-T do ZoneSoft chegam em ZIP. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+  /* ============================================================
+     reconciliacao.html — página PRIVADA. Compara, transação a
+     transação, o que o POS registou (SAF-T do ZoneSoft) contra o que
+     o terminal cobrou (extrato CSV do TPA). Tudo no browser: nada é
+     escrito no Firebase, em nó nenhum; o Firebase é lido só para o
+     agregado diário de vendasDiario (modo degradado, sem SAF-T).
+     Prefixo rec- em todas as classes próprias.
+     ============================================================ */
+  body{ -webkit-font-smoothing:antialiased; }
+
+  main{ margin:0; padding:24px 0 80px; }
+
+  /* Volta ao dashboard privado. Pílula neutra, no vocabulário do shell
+     (igual à da conta-bancaria.html). */
+  .back-link{
+    display:inline-block; margin-bottom:18px; padding:7px 14px;
+    border:1px solid var(--line); border-radius:100px;
+    background:var(--white); color:var(--ink);
+    font-size:12.5px; font-weight:600; text-decoration:none;
+    transition:border-color .15s ease;
+  }
+  .back-link:hover{ border-color:var(--red); }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  /* O ::before do .glass-light pinta por cima do conteúdo estático. */
+  .card > *{ position:relative; z-index:1; }
+
+  /* ---------- Uploads ---------- */
+  .rec-uploads{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  .rec-upload h3{ margin:0 0 6px; font-size:14.5px; font-weight:700; color:var(--ink); }
+  .rec-upload p{ margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .rec-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rec-upload input[type=file]{ font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); max-width:100%; }
+  .rec-upload select{
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+  }
+  .rec-ficheiros{ list-style:none; margin:12px 0 0; padding:0; font-size:12px; color:var(--ink); }
+  .rec-ficheiros li{ padding:5px 0; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; }
+  .rec-ficheiros li b{ font-weight:600; word-break:break-all; }
+  .rec-ficheiros li span{ color:var(--muted); }
+  .rec-ficheiros li .rec-erro{ color:var(--red-ink); }
+  .rec-memoria{
+    margin:0 0 20px; padding:10px 14px; border-radius:10px;
+    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
+  }
+
+  /* ---------- Zona 1: lista de dias ---------- */
+  .rec-barra{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .rec-barra h2{ margin:0; font-size:16px; font-weight:700; color:var(--ink); }
+  .rec-barra .spacer{ flex:1; }
+  .rec-barra select{
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+  }
+  .rec-legenda{ font-size:11.5px; color:var(--muted); }
+
+  .rec-dias{ list-style:none; margin:0; padding:0; }
+  .rec-dia{
+    display:grid; grid-template-columns:200px 1fr 1fr 32px; align-items:center; gap:12px;
+    padding:12px 16px; border-radius:12px; cursor:pointer; color:var(--ink);
+    border:1px solid transparent; transition:border-color .12s ease;
+  }
+  .rec-dia:hover{ border-color:var(--line); }
+  .rec-dia.aberto{ border-color:var(--red); }
+  .rec-dia + .rec-dia{ margin-top:4px; }
+  .rec-dia-data{ font-weight:700; font-size:13.5px; }
+  .rec-dia-data small{ display:block; font-weight:500; color:var(--muted); font-size:11.5px; }
+  .rec-dia-seta{ color:var(--muted); text-align:right; }
+
+  /* Indicador por meio: label | chip, com o texto secundário por baixo do
+     chip — nunca ao lado, senão empurrava a coluna seguinte para fora. */
+  .rec-ind{ display:grid; grid-template-columns:78px minmax(0,1fr); align-items:center; column-gap:8px; row-gap:2px; font-size:12.5px; min-width:0; }
+  .rec-ind-label{ color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; grid-row:1 / span 2; }
+  .rec-chip{
+    display:inline-block; padding:4px 11px; border-radius:100px; font-size:12px; font-weight:700;
+    border:1px solid transparent; white-space:nowrap; justify-self:start; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+  }
+  .rec-chip.ok{ background:var(--green-bg); color:var(--green); }
+  .rec-chip.bad{ background:var(--red); color:var(--on-red); }
+  .rec-chip.na{ background:transparent; color:var(--muted); border-color:var(--line); font-weight:600; }
+  .rec-chip-sub{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; grid-column:2; }
+
+  .rec-vazio{ padding:28px 16px; color:var(--muted); font-size:13px; text-align:center; }
+
+  /* ---------- Zona 2: detalhe ---------- */
+  .rec-detalhe{ margin-top:16px; display:grid; gap:16px; }
+  .rec-bloco h3{ margin:0; font-size:15px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rec-bloco h3 small{ font-weight:500; color:var(--muted); font-size:12px; }
+  .rec-bloco-nota{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .rec-bloco-nota.aviso{ color:var(--amber); }
+
+  .rec-sec{ margin-top:20px; }
+  .rec-sec-titulo{
+    margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+    display:flex; align-items:center; gap:8px;
+  }
+  .rec-sec-titulo .rec-conta{ color:var(--ink); font-weight:700; }
+
+  /* Sem par: em destaque, no topo. */
+  .rec-orfas{ border-left:4px solid var(--red); border-radius:10px; padding:12px 16px; background:var(--white); }
+  .rec-orfas.ok{ border-left-color:var(--green); color:var(--green); font-size:13px; font-weight:600; }
+  .rec-orfas table{ margin-top:6px; }
+  .rec-orfas th{ padding:6px 8px; }
+  .rec-orfas td{ padding:9px 8px; }
+  .rec-motivo{ font-weight:700; color:var(--red-ink); white-space:nowrap; }
+  .rec-proximas{ font-size:11.5px; color:var(--muted); }
+
+  .rec-ambiguo{ margin-top:12px; padding:10px 12px; border:1px dashed var(--line); border-radius:10px; }
+  .rec-ambiguo-titulo{ font-size:12.5px; font-weight:700; color:var(--ink); margin:0 0 8px; }
+  .rec-ambiguo-duo{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .rec-ambiguo-lado p{ margin:0 0 4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .rec-ambiguo-lado ul{ list-style:none; margin:0; padding:0; font-size:12.5px; }
+  .rec-ambiguo-lado li{ padding:5px 0; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; color:var(--ink); }
+
+  /* Casadas: lado a lado. */
+  .rec-pares th.rec-lado, .rec-pares td.rec-lado{ border-left:2px solid var(--line); }
+  .rec-pares td{ padding:9px 8px; color:var(--ink); }
+  .rec-pares th{ padding:6px 8px; }
+  .rec-pares .rec-delta{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
+  .rec-pares .rec-delta.longe{ color:var(--amber); font-weight:600; }
+
+  td.num, th.num{ text-align:right; white-space:nowrap; }
+  .rec-neg{ color:var(--red-ink); font-weight:700; }
+  .rec-mono{ color:var(--muted); font-size:11.5px; }
+
+  /* Totais */
+  .rec-totais{ display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; margin-top:8px; }
+  .rec-total{ padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
+  .rec-total .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .rec-total .v{ font-size:18px; font-weight:700; color:var(--ink); margin-top:4px; }
+  .rec-total .s{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .rec-total.bad{ border-color:var(--red); }
+  .rec-total.bad .v{ color:var(--red-ink); }
+  .rec-total.ok .v{ color:var(--green); }
+
+  .rec-lista td{ color:var(--ink); padding:9px 8px; }
+  .rec-lista th{ padding:6px 8px; }
+
+  .rec-outros-fb{ margin:0 0 10px; font-size:12.5px; color:var(--muted); }
+  .rec-outros-fb b{ color:var(--ink); font-weight:600; }
+
+  .rec-status-a td{ color:var(--muted); text-decoration:line-through; }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel privado</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('reconciliacao.html', 'privada');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Manel</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-scan"/></svg>GIOCO · <b>Reconciliação POS ↔ TPA</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Documentos do SAF-T contra transações do terminal, linha a linha. Só leitura: nada é gravado.</p>
+
+      <!-- Sem sessão anónima a página não lê nada. Escondido até falhar;
+           ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main>
+  <!-- Único caminho de volta ao dashboard privado (não está na nav pública). -->
+  <a class="back-link" href="mrn-dashboard.html">← Dashboard</a>
+
+  <p class="rec-memoria">Os ficheiros são lidos só neste separador e ficam em memória: ao recarregar a página perde-se tudo e é preciso voltar a escolhê-los. Nada é enviado para o Firebase nem para serviço nenhum.</p>
+
+  <div class="rec-uploads">
+    <div class="card glass-light rec-upload">
+      <h3>SAF-T</h3>
+      <p>ZIP exportado do ZoneSoft (XML em Windows-1252). Podes escolher vários de uma vez e voltar a escolher mais: acumulam. Documentos repetidos entre ficheiros contam uma vez.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inSaft" multiple accept=".zip,.xml,application/zip,text/xml">
+      </div>
+      <ul class="rec-ficheiros" id="listaSaft"></ul>
+    </div>
+    <div class="card glass-light rec-upload">
+      <h3>Extrato do terminal</h3>
+      <p>CSV de movimentos do TPA. Escolhe a origem antes de carregar. Vários ficheiros acumulam; a mesma operação repetida entre ficheiros conta uma vez.</p>
+      <div class="rec-upload-row">
+        <select id="selOrigem" aria-label="Origem do extrato">
+          <option value="ABANCA">ABANCA</option>
+          <option value="CD" disabled>CD — parser por implementar</option>
+        </select>
+        <input type="file" id="inTerminal" multiple accept=".csv,text/csv,text/plain">
+      </div>
+      <ul class="rec-ficheiros" id="listaTerminal"></ul>
+    </div>
+  </div>
+
+  <div class="rec-barra">
+    <h2>Dias</h2>
+    <select id="selMes" aria-label="Mês"></select>
+    <span class="rec-legenda" id="legenda">Verde bate · vermelho com o nº de linhas sem par · cinzento sem ficheiros para o dia.</span>
+    <div class="spacer"></div>
+  </div>
+
+  <div class="card glass-light" id="zona1">
+    <ul class="rec-dias" id="listaDias"></ul>
+    <div class="rec-vazio" id="diasVazio">A carregar…</div>
+  </div>
+
+  <div class="rec-detalhe" id="zona2"></div>
+</main>
+
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  /* ============================================================
+     CONSTANTES DO CASAMENTO
+     Passagens sucessivas, em minutos: na 1.ª só casa quem tem o valor
+     único de ambos os lados a ±15 min; o que sobra tenta a ±60. A
+     hora do POS e a do terminal não são o mesmo relógio, daí a
+     folga. A última janela é também a que define "candidato" para
+     os ambíguos.
+     ============================================================ */
+  var JANELAS_MINUTOS = [15, 60];
+
+  // Primeiro mês com vendas importadas no OS (para o selector de meses).
+  var PRIMEIRO_MES = '2026-05';
+
+  // Meios de pagamento do POS que têm terminal do lado de lá.
+  // OU = TPA ABANCA (código literal no PaymentMechanism, confirmado num
+  // SAF-T real). CD fica rotulado "CD" até se saber o que é depois de 27/08.
+  var MEIOS = [
+    { mec:'OU', origem:'ABANCA', label:'TPA ABANCA', labelCurto:'ABANCA' },
+    { mec:'CD', origem:'CD',     label:'CD',         labelCurto:'CD' }
+  ];
+  var MEIO_POR_MEC = {};
+  MEIOS.forEach(function(m){ MEIO_POR_MEC[m.mec] = m; });
+
+  var NOMES_MEIO = { NU:'Numerário', OU:'Outros (OU)', CD:'Cartão débito (CD)', CC:'Cartão crédito (CC)', TB:'Transferência (TB)', MB:'Multibanco (MB)', CH:'Cheque (CH)', CO:'Consignação (CO)', CS:'Compensação (CS)', DE:'Dinheiro eletrónico (DE)', LC:'Letra (LC)', PR:'Permuta (PR)', TR:'Ticket restaurante (TR)' };
+
+  /* ---------- estado (só memória) ---------- */
+  var docs = {};             // InvoiceNo → documento do SAF-T
+  var saftFicheiros = [];    // { nome, inicio, fim, novos, repetidos, erro }
+  var saftCobertura = {};    // dia 'AAAA-MM-DD' → true (StartDate..EndDate dos ficheiros)
+  var terminal = {};         // origem → { nOperacao → transação }
+  var termFicheiros = [];    // { nome, origem, inicio, fim, novos, repetidos, erro }
+  var termCobertura = {};    // origem → { dia → true }
+  var vendasMes = {};        // mês → { dia → porPagamento } (cache do Firebase)
+  var mesesComErro = {};
+  var mesAtivo = null;
+  var diaAberto = null;
+  var db = null;
+
+  /* ---------- helpers ---------- */
+  function esc(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function round2(n){ return Math.round(n * 100) / 100; }
+  function cents(n){ return Math.round(n * 100); }
+  function fmtEuro(n){
+    if (n == null || isNaN(n)) return '—';
+    var neg = n < 0; var abs = Math.abs(n);
+    var s = abs.toFixed(2).replace('.', ',');
+    s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return (neg ? '−' : '') + s + ' €';
+  }
+  function fmtEuroSinal(n){ return (n > 0 ? '+' : '') + fmtEuro(n); }
+  function fmtHora(seg){
+    if (seg == null || isNaN(seg)) return '—';
+    var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
+    return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+  }
+  function fmtDelta(seg){
+    var a = Math.abs(seg);
+    if (a < 60) return a + ' s';
+    var m = Math.round(a / 60);
+    return m + ' min';
+  }
+  var DIAS_SEMANA = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  var MESES_NOME = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  function fmtDia(iso){
+    var p = iso.split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function diaSemana(iso){
+    var d = new Date(iso + 'T12:00:00');
+    return isNaN(d.getTime()) ? '' : DIAS_SEMANA[d.getDay()];
+  }
+  function fmtMes(mes){
+    var p = mes.split('-');
+    return MESES_NOME[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  }
+  function horaParaSeg(hms){
+    var m = String(hms || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + (m[3] ? parseInt(m[3], 10) : 0);
+  }
+  function diasEntre(inicio, fim){
+    var out = [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fim)) return out;
+    var d = new Date(inicio + 'T12:00:00'), f = new Date(fim + 'T12:00:00');
+    var guard = 0;
+    while (d <= f && guard++ < 400){
+      out.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  function mesDeHoje(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+  }
+  function mesSeguinte(mes){
+    var p = mes.split('-'); var a = parseInt(p[0], 10), m = parseInt(p[1], 10) + 1;
+    if (m > 12){ m = 1; a++; }
+    return a + '-' + pad2(m);
+  }
+  // "35,91" → 35.91 ; "1.234,56" → 1234.56 ; "-0,16" → -0.16
+  function numPt(s){
+    s = String(s == null ? '' : s).trim();
+    if (!s) return null;
+    if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  function normData(s){
+    s = String(s || '').trim();
+    var m;
+    if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+    if ((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) return m[3] + '-' + m[2] + '-' + m[1];
+    return null;
+  }
+
+  /* ============================================================
+     SAF-T (mesmo padrão do vendas.html: ZIP → XML Windows-1252 → DOM)
+     ============================================================ */
+  function kid(el, name){
+    if (!el) return null;
+    for (var i = 0; i < el.children.length; i++){
+      if (el.children[i].localName === name) return el.children[i];
+    }
+    return null;
+  }
+  function kids(el, name){
+    var out = [];
+    if (!el) return out;
+    for (var i = 0; i < el.children.length; i++){
+      if (el.children[i].localName === name) out.push(el.children[i]);
+    }
+    return out;
+  }
+  function txt(el, name){
+    var k = kid(el, name);
+    return k && k.textContent != null ? k.textContent.trim() : '';
+  }
+
+  function lerFicheiroSaft(file){
+    var nome = file.name || '';
+    var pXml;
+    if (/\.xml$/i.test(nome)){
+      pXml = file.arrayBuffer();
+    } else {
+      if (typeof JSZip === 'undefined') return Promise.reject(new Error('A biblioteca JSZip não carregou. Verifica a ligação e recarrega.'));
+      pXml = file.arrayBuffer().then(function(buf){
+        return JSZip.loadAsync(buf).then(function(zip){
+          var xmlNome = null;
+          zip.forEach(function(path, entry){
+            if (xmlNome || entry.dir) return;
+            if (/\.xml$/i.test(path)) xmlNome = path;
+          });
+          if (!xmlNome) throw new Error('O ZIP não contém nenhum ficheiro .xml.');
+          return zip.file(xmlNome).async('arraybuffer');
+        });
+      });
+    }
+    return pXml.then(descodificar).then(parseSaft);
+  }
+
+  function descodificar(buffer){
+    var decoder;
+    try { decoder = new TextDecoder('windows-1252'); } catch (e){ decoder = new TextDecoder('iso-8859-1'); }
+    var texto = decoder.decode(buffer);
+    var m = texto.slice(0, 200).match(/encoding=["']([^"']+)["']/i);
+    if (m && /utf-?8/i.test(m[1])){
+      try { texto = new TextDecoder('utf-8').decode(buffer); } catch (e2){}
+    }
+    return texto;
+  }
+
+  // → { inicio, fim, docs:[{no, tipo, dia, entrada, hora, status, gross, pagamentos:[{mec, valor}]}] }
+  function parseSaft(xmlText){
+    var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('O XML não é válido. Confirma que é o SAF-T exportado do ZoneSoft.');
+    var root = doc.documentElement;
+    if (!root || root.localName !== 'AuditFile') throw new Error('Isto não é um SAF-T: a raiz é <' + (root ? root.localName : '?') + '>.');
+    var header = kid(root, 'Header');
+    var inicio = header ? txt(header, 'StartDate') : '';
+    var fim = header ? txt(header, 'EndDate') : '';
+    var src = kid(root, 'SourceDocuments');
+    var sales = src ? kid(src, 'SalesInvoices') : null;
+    if (!sales) throw new Error('O SAF-T não tem SourceDocuments > SalesInvoices.');
+    var invoices = kids(sales, 'Invoice');
+    var out = [];
+    for (var i = 0; i < invoices.length; i++){
+      var inv = invoices[i];
+      var no = txt(inv, 'InvoiceNo');
+      var invoiceDate = txt(inv, 'InvoiceDate');
+      var entrada = txt(inv, 'SystemEntryDate');
+      var status = kid(inv, 'DocumentStatus');
+      var st = status ? txt(status, 'InvoiceStatus') : '';
+      var dia = (invoiceDate || entrada.slice(0, 10)).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) continue;
+      var totais = kid(inv, 'DocumentTotals');
+      var gross = totais ? (numPt(txt(totais, 'GrossTotal')) || 0) : 0;
+      var pags = totais ? kids(totais, 'Payment') : [];
+      var pagamentos = [];
+      for (var p = 0; p < pags.length; p++){
+        var mec = txt(pags[p], 'PaymentMechanism');
+        var valor = numPt(txt(pags[p], 'PaymentAmount'));
+        pagamentos.push({ mec: mec || '', valor: valor == null ? 0 : valor });
+      }
+      var hm = entrada.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+      var hora = hm ? parseInt(hm[1], 10) * 3600 + parseInt(hm[2], 10) * 60 + (hm[3] ? parseInt(hm[3], 10) : 0) : null;
+      out.push({ no: no || ('sem-numero-' + i), tipo: txt(inv, 'InvoiceType') || '?', dia: dia, entrada: entrada, hora: hora, status: st, gross: gross, pagamentos: pagamentos });
+    }
+    return { inicio: inicio, fim: fim, docs: out };
+  }
+
+  /* ============================================================
+     EXTRATO DO TERMINAL
+     ============================================================ */
+  function normCabecalho(s){
+    return String(s || '').replace(/^﻿/, '').trim().toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  // ABANCA: UTF-8 com BOM, CRLF, ";", vírgula decimal. Preâmbulo até à
+  // linha que começa por "ESTABELECIMENTO;NOME ESTABELECIMENTO".
+  // → { inicio, fim, txs:[{nOp, dia, hora, tipo, marca, cartao, montante, comissao, taxaInterc, moeda, liquidacao}] }
+  function parseAbanca(texto){
+    texto = texto.replace(/^﻿/, '');
+    var linhas = texto.split(/\r?\n/);
+    var idx = -1;
+    for (var i = 0; i < linhas.length; i++){
+      if (/^ESTABELECIMENTO;NOME ESTABELECIMENTO/i.test(linhas[i].replace(/^﻿/, ''))){ idx = i; break; }
+    }
+    if (idx < 0) throw new Error('Não encontrei o cabeçalho "ESTABELECIMENTO;NOME ESTABELECIMENTO". É mesmo o CSV de movimentos do TPA da ABANCA?');
+    var inicio = null, fim = null;
+    for (var j = 0; j < idx; j++){
+      var mp = linhas[j].match(/PER[ÍI]ODO:?;\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i);
+      if (mp){ inicio = mp[1]; fim = mp[2]; }
+    }
+    var cab = linhas[idx].split(';').map(normCabecalho);
+    function col(nome){
+      var alvo = normCabecalho(nome);
+      for (var c = 0; c < cab.length; c++){ if (cab[c] === alvo) return c; }
+      return -1;
+    }
+    var C = {
+      nOp: col('Nº OPERAÇÃO'), dia: col('DATA DA OPERAÇÃO'), hora: col('HORA DA OPERAÇÃO'),
+      tipo: col('TIPO DE TRANSAÇÃO'), marca: col('MARCA CARTÃO'), cartao: col('CARTÃO'),
+      montante: col('MONTANTE'), comissao: col('TSC/RSC'), taxaInterc: col('TAXA INTERCÂMBIO'),
+      moeda: col('MOEDA'), liquidacao: col('DATA DE LIQUIDAÇÃO')
+    };
+    var obrig = ['nOp','dia','hora','montante'];
+    for (var o = 0; o < obrig.length; o++){
+      if (C[obrig[o]] < 0) throw new Error('Falta a coluna "' + obrig[o] + '" no cabeçalho do CSV.');
+    }
+    var txs = [];
+    for (var r = idx + 1; r < linhas.length; r++){
+      var linha = linhas[r];
+      if (!linha || !linha.replace(/;/g, '').trim()) continue;
+      var f = linha.split(';');
+      var dia = normData(f[C.dia]);
+      var montante = numPt(f[C.montante]);
+      if (!dia || montante == null) continue;
+      txs.push({
+        nOp: (f[C.nOp] || '').trim(),
+        dia: dia,
+        hora: horaParaSeg(f[C.hora]),
+        horaTexto: (f[C.hora] || '').trim(),
+        tipo: (f[C.tipo] || '').trim(),
+        marca: (f[C.marca] || '').trim(),
+        cartao: (f[C.cartao] || '').trim(),
+        montante: montante,
+        comissao: C.comissao >= 0 ? (numPt(f[C.comissao]) || 0) : 0,
+        taxaInterc: C.taxaInterc >= 0 ? numPt(f[C.taxaInterc]) : null,
+        moeda: C.moeda >= 0 ? (f[C.moeda] || '').trim() : '',
+        liquidacao: C.liquidacao >= 0 ? (normData(f[C.liquidacao]) || (f[C.liquidacao] || '').trim()) : ''
+      });
+    }
+    if (!txs.length) throw new Error('O CSV não tem nenhuma linha de movimento.');
+    return { inicio: inicio, fim: fim, txs: txs };
+  }
+
+  // Sem ficheiro de exemplo não se inventam colunas.
+  function parseIntercard(){
+    throw new Error('Parser por implementar — falta o ficheiro de exemplo');
+  }
+
+  var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
+
+  /* ============================================================
+     CARREGAMENTO E ACUMULAÇÃO
+     ============================================================ */
+  document.getElementById('inSaft').addEventListener('change', function(e){
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = '';
+    files.reduce(function(p, file){
+      return p.then(function(){
+        return lerFicheiroSaft(file).then(function(res){
+          var novos = 0, repetidos = 0;
+          res.docs.forEach(function(d){
+            if (docs[d.no]){ repetidos++; return; }
+            docs[d.no] = d; novos++;
+          });
+          var dias = diasEntre(res.inicio, res.fim);
+          if (!dias.length) dias = res.docs.map(function(d){ return d.dia; });
+          dias.forEach(function(dia){ saftCobertura[dia] = true; });
+          saftFicheiros.push({ nome: file.name, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos });
+        }).catch(function(err){
+          saftFicheiros.push({ nome: file.name, erro: err && err.message ? err.message : String(err) });
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      renderFicheiros(); garantirMesesDosFicheiros(); renderTudo();
+    });
+  });
+
+  document.getElementById('inTerminal').addEventListener('change', function(e){
+    var files = Array.prototype.slice.call(e.target.files || []);
+    var origem = document.getElementById('selOrigem').value;
+    e.target.value = '';
+    files.reduce(function(p, file){
+      return p.then(function(){
+        return file.text().then(function(texto){
+          var parser = PARSERS[origem];
+          if (!parser) throw new Error('Origem desconhecida: ' + origem);
+          var res = parser(texto);
+          var mapa = terminal[origem] || (terminal[origem] = {});
+          var cob = termCobertura[origem] || (termCobertura[origem] = {});
+          var novos = 0, repetidos = 0;
+          res.txs.forEach(function(tx){
+            var chave = tx.nOp || (tx.dia + '|' + tx.horaTexto + '|' + tx.montante + '|' + tx.cartao);
+            if (mapa[chave]){ repetidos++; return; }
+            tx.id = origem + '|' + chave;
+            mapa[chave] = tx; novos++;
+          });
+          var dias = diasEntre(res.inicio, res.fim);
+          if (!dias.length) dias = res.txs.map(function(t){ return t.dia; });
+          dias.forEach(function(dia){ cob[dia] = true; });
+          termFicheiros.push({ nome: file.name, origem: origem, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos });
+        }).catch(function(err){
+          termFicheiros.push({ nome: file.name, origem: origem, erro: err && err.message ? err.message : String(err) });
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      renderFicheiros(); garantirMesesDosFicheiros(); renderTudo();
+    });
+  });
+
+  function renderFicheiros(){
+    var a = document.getElementById('listaSaft');
+    a.innerHTML = saftFicheiros.map(function(f){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span></li>';
+      return '<li><b>' + esc(f.nome) + '</b><span>' + (f.inicio ? fmtDia(f.inicio) + ' → ' + fmtDia(f.fim) + ' · ' : '') +
+        f.novos + ' doc' + (f.novos === 1 ? '' : 's') + (f.repetidos ? ' · ' + f.repetidos + ' repetidos ignorados' : '') + '</span></li>';
+    }).join('');
+    var b = document.getElementById('listaTerminal');
+    b.innerHTML = termFicheiros.map(function(f){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + '</span><span class="rec-erro">' + esc(f.erro) + '</span></li>';
+      return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + ' · ' + (f.inicio ? fmtDia(f.inicio) + ' → ' + fmtDia(f.fim) + ' · ' : '') +
+        f.novos + ' transaç' + (f.novos === 1 ? 'ão' : 'ões') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span></li>';
+    }).join('');
+  }
+
+  /* ============================================================
+     FIREBASE — leitura do agregado diário (modo degradado)
+     ============================================================ */
+  function carregarMes(mes){
+    if (vendasMes[mes] || !db) return Promise.resolve();
+    return db.ref('vendasDiario/' + mes).once('value').then(function(snap){
+      var v = snap.val() || {};
+      var out = {};
+      Object.keys(v).forEach(function(dia){
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dia)) out[dia] = (v[dia] && v[dia].porPagamento) || {};
+      });
+      vendasMes[mes] = out;
+      delete mesesComErro[mes];
+    }).catch(function(err){
+      console.error('vendasDiario/' + mes, err);
+      mesesComErro[mes] = err && err.message ? err.message : String(err);
+      vendasMes[mes] = vendasMes[mes] || {};
+    });
+  }
+
+  /* ============================================================
+     CASAMENTO (por dia e por meio)
+     ============================================================ */
+  // Linhas de pagamento do POS de um dia e meio (uma por <Payment>, nunca o GrossTotal).
+  function linhasPos(dia, mec){
+    var out = [];
+    Object.keys(docs).forEach(function(no){
+      var d = docs[no];
+      if (d.dia !== dia || d.status === 'A') return;
+      d.pagamentos.forEach(function(p, i){
+        if (p.mec !== mec) return;
+        out.push({ id: 'pos|' + no + '|' + i, doc: d, no: no, tipo: d.tipo, hora: d.hora, valor: p.valor, cents: cents(p.valor) });
+      });
+    });
+    out.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+    return out;
+  }
+  function docsAnulados(dia){
+    return Object.keys(docs).map(function(no){ return docs[no]; })
+      .filter(function(d){ return d.dia === dia && d.status === 'A'; })
+      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+  }
+  function transacoesTerminal(dia, origem){
+    var mapa = terminal[origem] || {};
+    return Object.keys(mapa).map(function(k){ return mapa[k]; })
+      .filter(function(t){ return t.dia === dia; })
+      .map(function(t){ t.cents = cents(t.montante); return t; })
+      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+  }
+
+  function candidatos(item, lista, janelaSeg){
+    return lista.filter(function(o){
+      return o.cents === item.cents && item.hora != null && o.hora != null && Math.abs(o.hora - item.hora) <= janelaSeg;
+    });
+  }
+
+  // → { pares, posSemPar, termSemPar, ambiguos:[{cents, valor, pos:[], term:[]}] }
+  function casar(pos, term){
+    var livresA = pos.slice(), livresB = term.slice();
+    var pares = [];
+    JANELAS_MINUTOS.forEach(function(min){
+      var seg = min * 60;
+      var candA = {}, candB = {};
+      livresA.forEach(function(a){ candA[a.id] = candidatos(a, livresB, seg); });
+      livresB.forEach(function(b){ candB[b.id] = candidatos(b, livresA, seg); });
+      var casadosA = {}, casadosB = {};
+      livresA.forEach(function(a){
+        var ca = candA[a.id];
+        if (ca.length !== 1) return;
+        var b = ca[0];
+        if (candB[b.id].length !== 1) return;
+        pares.push({ pos: a, term: b, delta: b.hora - a.hora, janela: min });
+        casadosA[a.id] = true; casadosB[b.id] = true;
+      });
+      livresA = livresA.filter(function(a){ return !casadosA[a.id]; });
+      livresB = livresB.filter(function(b){ return !casadosB[b.id]; });
+    });
+    var segMax = JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1] * 60;
+    var posSemPar = [], termSemPar = [];
+    var ambPorCents = {};
+    livresA.forEach(function(a){
+      var c = candidatos(a, livresB, segMax);
+      if (!c.length){ posSemPar.push(a); return; }
+      var g = ambPorCents[a.cents] || (ambPorCents[a.cents] = { cents: a.cents, valor: a.valor, pos: [], term: [], _p: {}, _t: {} });
+      if (!g._p[a.id]){ g.pos.push(a); g._p[a.id] = true; }
+      c.forEach(function(b){ if (!g._t[b.id]){ g.term.push(b); g._t[b.id] = true; } });
+    });
+    livresB.forEach(function(b){
+      var c = candidatos(b, livresA, segMax);
+      if (!c.length){ termSemPar.push(b); return; }
+      var g = ambPorCents[b.cents] || (ambPorCents[b.cents] = { cents: b.cents, valor: b.montante, pos: [], term: [], _p: {}, _t: {} });
+      if (!g._t[b.id]){ g.term.push(b); g._t[b.id] = true; }
+      c.forEach(function(a){ if (!g._p[a.id]){ g.pos.push(a); g._p[a.id] = true; } });
+    });
+    var ambiguos = Object.keys(ambPorCents).map(function(k){
+      var g = ambPorCents[k];
+      g.pos.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+      g.term.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+      return { cents: g.cents, valor: g.valor, pos: g.pos, term: g.term };
+    }).sort(function(a, b){ return (a.pos[0] || a.term[0]).hora - (b.pos[0] || b.term[0]).hora; });
+    pares.sort(function(a, b){ return (a.pos.hora || 0) - (b.pos.hora || 0); });
+    return { pares: pares, posSemPar: posSemPar, termSemPar: termSemPar, ambiguos: ambiguos, segMax: segMax };
+  }
+
+  // Estado de um dia para um meio. Nunca escreve; recalcula sempre.
+  function calcularMeio(dia, meio){
+    var mes = dia.slice(0, 7);
+    var fb = vendasMes[mes] && vendasMes[mes][dia] ? vendasMes[mes][dia][meio.mec] : null;
+    var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
+    var temSaft = !!saftCobertura[dia];
+    var term = temTerm ? transacoesTerminal(dia, meio.origem) : [];
+    var pos = temSaft ? linhasPos(dia, meio.mec) : [];
+    var termBruto = 0, comissao = 0;
+    term.forEach(function(t){ termBruto += t.montante; comissao += t.comissao; });
+    termBruto = round2(termBruto); comissao = round2(comissao);
+    var posSaft = round2(pos.reduce(function(s, l){ return s + l.valor; }, 0));
+    var r = {
+      meio: meio, dia: dia, fb: fb, temTerm: temTerm, temSaft: temSaft,
+      term: term, pos: pos, termBruto: termBruto, comissao: comissao, liquido: round2(termBruto + comissao),
+      posSaft: posSaft, anulados: temSaft ? docsAnulados(dia) : []
+    };
+    if (temTerm && temSaft){
+      r.modo = 'completo';
+      r.casamento = casar(pos, term);
+      var c = r.casamento;
+      var nAmb = c.ambiguos.reduce(function(s, g){ return s + g.pos.length + g.term.length; }, 0);
+      r.semPar = c.posSemPar.length + c.termSemPar.length + nAmb;
+      r.diferenca = round2(posSaft - termBruto);
+      r.estado = r.semPar === 0 ? 'ok' : 'bad';
+      r.texto = r.semPar === 0 ? '✓ bate' : r.semPar + ' sem par';
+      r.sub = r.semPar === 0 ? pos.length + ' linhas' : 'Δ ' + fmtEuroSinal(r.diferenca);
+    } else if (temTerm && !term.length && fb && fb.bruto != null){
+      // O período declarado no CSV cobre o dia mas não há uma linha dele
+      // (visto num extrato real: período 07–09 com movimentos só de 07).
+      // Sem SAF-T, um Δ igual ao total do POS seria ruído; fica cinzento
+      // e explícito. Com SAF-T carregado o casamento corre na mesma.
+      r.modo = 'degradado';
+      r.diferenca = round2(fb.bruto - termBruto);
+      r.estado = 'na';
+      r.texto = 'extrato sem linhas';
+      r.sub = '0 transações no período · POS ' + fmtEuro(fb.bruto);
+    } else if (temTerm && fb && fb.bruto != null){
+      r.modo = 'degradado';
+      r.diferenca = round2(fb.bruto - termBruto);
+      r.estado = Math.abs(r.diferenca) < 0.005 ? 'ok' : 'bad';
+      r.texto = r.estado === 'ok' ? '✓ bate ao dia' : 'Δ ' + fmtEuroSinal(r.diferenca);
+      r.sub = 'sem SAF-T';
+    } else if (temTerm){
+      r.modo = 'degradado';
+      r.estado = 'na';
+      r.texto = 'sem POS';
+      r.sub = term.length + ' no terminal';
+    } else if (temSaft || (fb && fb.bruto != null)){
+      r.modo = 'so-pos';
+      r.estado = 'na';
+      r.texto = 'sem extrato';
+      r.sub = temSaft ? pos.length + ' no POS' : fmtEuro(fb.bruto) + ' no POS';
+    } else {
+      r.modo = 'nada';
+      r.estado = 'na';
+      r.texto = 'sem dados';
+      r.sub = '';
+    }
+    return r;
+  }
+
+  /* ============================================================
+     ZONA 1 — dias
+     ============================================================ */
+  function garantirMesesDosFicheiros(){
+    var sel = document.getElementById('selMes');
+    var meses = {};
+    Object.keys(saftCobertura).forEach(function(d){ meses[d.slice(0, 7)] = true; });
+    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
+    var existentes = {};
+    Array.prototype.forEach.call(sel.options, function(op){ existentes[op.value] = true; });
+    var novos = Object.keys(meses).filter(function(m){ return !existentes[m]; });
+    if (!novos.length) return;
+    var todos = Object.keys(existentes).concat(novos).sort().reverse();
+    var atual = sel.value;
+    sel.innerHTML = todos.map(function(m){ return '<option value="' + m + '">' + fmtMes(m) + '</option>'; }).join('');
+    sel.value = atual;
+  }
+
+  function montarSelectorMeses(){
+    var sel = document.getElementById('selMes');
+    var meses = [];
+    var m = PRIMEIRO_MES, hoje = mesDeHoje(), guard = 0;
+    while (m <= hoje && guard++ < 240){ meses.push(m); m = mesSeguinte(m); }
+    meses.reverse();
+    sel.innerHTML = meses.map(function(x){ return '<option value="' + x + '">' + fmtMes(x) + '</option>'; }).join('');
+    sel.value = hoje;
+    mesAtivo = hoje;
+    sel.addEventListener('change', function(){
+      mesAtivo = sel.value; diaAberto = null;
+      carregarMes(mesAtivo).then(renderTudo);
+    });
+  }
+
+  function diasDoMes(mes){
+    var set = {};
+    Object.keys(vendasMes[mes] || {}).forEach(function(d){ set[d] = true; });
+    Object.keys(saftCobertura).forEach(function(d){ if (d.slice(0, 7) === mes) set[d] = true; });
+    Object.keys(terminal).forEach(function(o){
+      Object.keys(terminal[o]).forEach(function(k){ var d = terminal[o][k].dia; if (d.slice(0, 7) === mes) set[d] = true; });
+    });
+    return Object.keys(set).sort().reverse();
+  }
+
+  function chipHtml(r){
+    return '<span class="rec-ind"><span class="rec-ind-label">' + esc(r.meio.labelCurto) + '</span>' +
+      '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span>' +
+      (r.sub ? '<span class="rec-chip-sub">' + esc(r.sub) + '</span>' : '') + '</span>';
+  }
+
+  function renderDias(){
+    var ul = document.getElementById('listaDias');
+    var vazio = document.getElementById('diasVazio');
+    var dias = mesAtivo ? diasDoMes(mesAtivo) : [];
+    if (!dias.length){
+      ul.innerHTML = '';
+      vazio.style.display = '';
+      vazio.textContent = mesesComErro[mesAtivo] ? 'Não consegui ler vendasDiario/' + mesAtivo + ': ' + mesesComErro[mesAtivo] : 'Sem dias neste mês: nem vendas importadas, nem ficheiros carregados.';
+      return;
+    }
+    vazio.style.display = 'none';
+    ul.innerHTML = dias.map(function(dia){
+      var rs = MEIOS.map(function(m){ return calcularMeio(dia, m); });
+      return '<li class="rec-dia' + (diaAberto === dia ? ' aberto' : '') + '" data-dia="' + dia + '">' +
+        '<div class="rec-dia-data">' + fmtDia(dia) + '<small>' + diaSemana(dia) + '</small></div>' +
+        rs.map(chipHtml).join('') +
+        '<div class="rec-dia-seta"><svg class="icon" width="14" height="14"><use href="#i-chevron-' + (diaAberto === dia ? 'down' : 'right') + '"/></svg></div>' +
+        '</li>';
+    }).join('');
+  }
+
+  document.getElementById('listaDias').addEventListener('click', function(e){
+    var li = e.target.closest('.rec-dia');
+    if (!li) return;
+    var dia = li.getAttribute('data-dia');
+    diaAberto = diaAberto === dia ? null : dia;
+    renderTudo();
+    if (diaAberto){
+      var z = document.getElementById('zona2');
+      if (z && z.getBoundingClientRect().top > window.innerHeight - 120) z.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+  });
+
+  /* ============================================================
+     ZONA 2 — detalhe do dia
+     ============================================================ */
+  function celValor(n, opts){
+    opts = opts || {};
+    var cls = 'num' + (n < 0 ? ' rec-neg' : '');
+    return '<td class="' + cls + '">' + (opts.sinal ? fmtEuroSinal(n) : fmtEuro(n)) + '</td>';
+  }
+  function linhaPosHtml(l){
+    return '<td class="num">' + fmtHora(l.hora) + '</td><td>' + esc(l.no) + ' <span class="rec-mono">' + esc(l.tipo) + '</span></td>' + celValor(l.valor);
+  }
+  function linhaTermHtml(t){
+    return '<td class="num">' + fmtHora(t.hora) + '</td><td>' + esc(t.tipo) + '</td><td>' + esc(t.marca) + '</td><td class="rec-mono">' + esc(t.cartao) + '</td>' +
+      celValor(t.montante) + celValor(t.comissao) + '<td class="rec-mono">' + (t.liquidacao ? esc(fmtDia(t.liquidacao)) : '—') + '</td>';
+  }
+  var TH_TERM = '<th class="num">Hora</th><th>Tipo</th><th>Marca</th><th>Cartão</th><th class="num">Montante</th><th class="num">Comissão</th><th>Liquidação</th>';
+  var TH_POS = '<th class="num">Hora</th><th>Documento</th><th class="num">Valor</th>';
+
+  function proximasHtml(item, outras, segMax, ladoNome){
+    var perto = outras.filter(function(o){ return item.hora != null && o.hora != null && Math.abs(o.hora - item.hora) <= segMax; });
+    if (!perto.length) return '<span class="rec-proximas">nada sem par do lado do ' + ladoNome + ' nos ±' + Math.round(segMax / 60) + ' min</span>';
+    return '<span class="rec-proximas">sem par do lado do ' + ladoNome + ' nos ±' + Math.round(segMax / 60) + ' min: ' +
+      perto.map(function(o){ return fmtHora(o.hora) + ' ' + fmtEuro(o.valor != null ? o.valor : o.montante); }).join(' · ') + '</span>';
+  }
+
+  function totaisHtml(r){
+    var fbBruto = r.fb && r.fb.bruto != null ? r.fb.bruto : null;
+    var posValor = r.temSaft ? r.posSaft : fbBruto;
+    var posSub = r.temSaft ? (r.pos.length + ' linhas de pagamento no SAF-T') : (fbBruto != null ? (r.fb.docs || 0) + ' docs (vendasDiario, sem SAF-T)' : 'sem dados');
+    var fbAviso = '';
+    if (r.temSaft && fbBruto != null && Math.abs(round2(fbBruto - r.posSaft)) >= 0.005){
+      fbAviso = '<div class="s">vendasDiario diz ' + fmtEuro(fbBruto) + ' — não bate com o SAF-T</div>';
+    }
+    var dif = r.diferenca;
+    var difCls = dif == null ? '' : (Math.abs(dif) < 0.005 ? ' ok' : ' bad');
+    return '<div class="rec-totais">' +
+      '<div class="rec-total"><div class="k">POS · ' + esc(r.meio.mec) + '</div><div class="v num">' + fmtEuro(posValor) + '</div><div class="s">' + esc(posSub) + '</div>' + fbAviso + '</div>' +
+      '<div class="rec-total"><div class="k">Terminal bruto</div><div class="v num">' + (r.temTerm ? fmtEuro(r.termBruto) : '—') + '</div><div class="s">' + (r.temTerm ? r.term.length + ' transações' : 'sem extrato') + '</div></div>' +
+      '<div class="rec-total"><div class="k">Comissão</div><div class="v num">' + (r.temTerm ? fmtEuro(r.comissao) : '—') + '</div></div>' +
+      '<div class="rec-total"><div class="k">Líquido</div><div class="v num">' + (r.temTerm ? fmtEuro(r.liquido) : '—') + '</div><div class="s">bruto + comissão</div></div>' +
+      '<div class="rec-total' + difCls + '"><div class="k">Diferença POS − terminal</div><div class="v num">' + (dif == null ? '—' : fmtEuroSinal(dif)) + '</div></div>' +
+      '<div class="rec-total' + (r.modo === 'completo' ? (r.semPar ? ' bad' : ' ok') : '') + '"><div class="k">Linhas sem par</div><div class="v num">' + (r.modo === 'completo' ? r.semPar : '—') + '</div><div class="s">' + (r.modo === 'completo' ? 'órfãs + ambíguas' : 'precisa de SAF-T e extrato') + '</div></div>' +
+      '</div>';
+  }
+
+  function anuladosHtml(r){
+    if (!r.anulados.length) return '';
+    return '<div class="rec-sec"><p class="rec-sec-titulo">Documentos anulados no POS <span class="rec-conta">' + r.anulados.length + '</span> <span>· fora de todas as somas</span></p>' +
+      '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Documento</th><th>Meio</th><th class="num">Valor</th></tr></thead><tbody>' +
+      r.anulados.map(function(d){
+        return '<tr class="rec-status-a"><td class="num">' + fmtHora(d.hora) + '</td><td>' + esc(d.no) + ' <span class="rec-mono">' + esc(d.tipo) + '</span></td><td>' +
+          esc(d.pagamentos.map(function(p){ return p.mec || '?'; }).join(', ') || '—') + '</td><td class="num">' + fmtEuro(d.gross) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function blocoMeioHtml(r){
+    var h = '<div class="card glass-light rec-bloco"><h3>' + esc(r.meio.label) + ' <small>POS ' + esc(r.meio.mec) + ' ↔ extrato ' + esc(r.meio.origem) + '</small>' +
+      '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span></h3>';
+
+    if (r.modo === 'nada'){
+      return h + '<p class="rec-bloco-nota">Sem SAF-T, sem extrato e sem vendas importadas para este dia e meio.</p></div>';
+    }
+
+    if (r.meio.origem === 'CD' && !r.temTerm){
+      h += '<p class="rec-bloco-nota aviso">O parser do extrato CD ainda não existe (falta o ficheiro de exemplo). Aqui só se vê o lado do POS.</p>';
+    }
+
+    if (r.modo === 'completo'){
+      var c = r.casamento;
+      var nOrf = c.posSemPar.length + c.termSemPar.length;
+      var nAmb = c.ambiguos.reduce(function(s, g){ return s + g.pos.length + g.term.length; }, 0);
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Sem par <span class="rec-conta">' + (nOrf + nAmb) + '</span> <span>· ' + c.posSemPar.length + ' só no POS · ' + c.termSemPar.length + ' só no terminal · ' + nAmb + ' ambíguas</span></p>';
+      if (!nOrf && !nAmb){
+        h += '<div class="rec-orfas ok">Todas as linhas têm par.</div>';
+      } else {
+        h += '<div class="rec-orfas">';
+        if (c.posSemPar.length){
+          h += '<table><thead><tr><th>Motivo</th>' + TH_POS + '<th>Do outro lado</th></tr></thead><tbody>' +
+            c.posSemPar.map(function(l){
+              return '<tr><td class="rec-motivo">só no POS</td>' + linhaPosHtml(l) + '<td>' + proximasHtml(l, c.termSemPar, c.segMax, 'terminal') + '</td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+        if (c.termSemPar.length){
+          h += '<table><thead><tr><th>Motivo</th>' + TH_TERM + '<th>Do outro lado</th></tr></thead><tbody>' +
+            c.termSemPar.map(function(t){
+              return '<tr><td class="rec-motivo">só no terminal</td>' + linhaTermHtml(t) + '<td>' + proximasHtml(t, c.posSemPar, c.segMax, 'POS') + '</td></tr>';
+            }).join('') + '</tbody></table>';
+        }
+        c.ambiguos.forEach(function(g){
+          h += '<div class="rec-ambiguo"><p class="rec-ambiguo-titulo">Ambíguo · ' + fmtEuro(g.valor) + ' · ' + g.pos.length + ' no POS e ' + g.term.length + ' no terminal a ±' + Math.round(c.segMax / 60) + ' min — nenhum escolhido</p>' +
+            '<div class="rec-ambiguo-duo"><div class="rec-ambiguo-lado"><p>POS</p><ul>' +
+            g.pos.map(function(l){ return '<li><span class="num">' + fmtHora(l.hora) + '</span><span>' + esc(l.no) + '</span><span class="rec-mono">' + esc(l.tipo) + '</span></li>'; }).join('') +
+            '</ul></div><div class="rec-ambiguo-lado"><p>Terminal</p><ul>' +
+            g.term.map(function(t){ return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + esc(t.marca) + '</span><span class="rec-mono">' + esc(t.cartao) + '</span><span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span></li>'; }).join('') +
+            '</ul></div></div></div>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
+
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Casadas <span class="rec-conta">' + c.pares.length + '</span> <span>· valor igual, hora dentro da janela, único de ambos os lados</span></p>';
+      if (c.pares.length){
+        h += '<table class="rec-pares"><thead><tr>' + TH_POS + '<th class="rec-lado">Δ hora</th>' + TH_TERM.replace('<th class="num">Hora</th>', '<th class="num rec-lado">Hora</th>') + '</tr></thead><tbody>' +
+          c.pares.map(function(p){
+            var longe = Math.abs(p.delta) > JANELAS_MINUTOS[0] * 60;
+            return '<tr>' + linhaPosHtml(p.pos) + '<td class="rec-lado rec-delta' + (longe ? ' longe' : '') + '">' + (p.delta >= 0 ? '+' : '−') + fmtDelta(p.delta) + (longe ? ' (2.ª passagem)' : '') + '</td>' +
+              linhaTermHtml(p.term).replace('<td class="num">', '<td class="num rec-lado">') + '</tr>';
+          }).join('') + '</tbody></table>';
+      } else {
+        h += '<p class="rec-bloco-nota">Nenhuma linha casada.</p>';
+      }
+      h += '</div>';
+
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
+      h += anuladosHtml(r);
+      return h + '</div>';
+    }
+
+    if (r.modo === 'degradado'){
+      h += '<p class="rec-bloco-nota aviso">Sem SAF-T para este dia: a comparação é só ao total do dia, com o agregado de vendasDiario. O casamento linha a linha precisa do SAF-T de ' + fmtDia(r.dia) + '.</p>';
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Transações do terminal <span class="rec-conta">' + r.term.length + '</span></p>' +
+        '<table class="rec-lista"><thead><tr>' + TH_TERM + '</tr></thead><tbody>' + r.term.map(function(t){ return '<tr>' + linhaTermHtml(t) + '</tr>'; }).join('') + '</tbody></table></div>';
+      return h + '</div>';
+    }
+
+    // so-pos: há POS (SAF-T ou agregado) mas não há extrato.
+    h += '<p class="rec-bloco-nota">Sem extrato ' + esc(r.meio.origem) + ' para este dia. Carrega-o em cima para casar linha a linha.</p>';
+    h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
+    if (r.temSaft){
+      h += '<div class="rec-sec"><p class="rec-sec-titulo">Documentos do POS · ' + esc(r.meio.mec) + ' <span class="rec-conta">' + r.pos.length + '</span></p>' +
+        '<table class="rec-lista"><thead><tr>' + TH_POS + '</tr></thead><tbody>' + r.pos.map(function(l){ return '<tr>' + linhaPosHtml(l) + '</tr>'; }).join('') + '</tbody></table></div>';
+    }
+    h += anuladosHtml(r);
+    return h + '</div>';
+  }
+
+  // Documentos de outros meios (NU e restantes): guardados de propósito,
+  // fora do casamento com o terminal.
+  function blocoOutrosHtml(dia){
+    var mes = dia.slice(0, 7);
+    var fb = (vendasMes[mes] && vendasMes[mes][dia]) || {};
+    var outrosFb = Object.keys(fb).filter(function(k){ return !MEIO_POR_MEC[k]; }).sort();
+    var linhas = [];
+    if (saftCobertura[dia]){
+      Object.keys(docs).forEach(function(no){
+        var d = docs[no];
+        if (d.dia !== dia || d.status === 'A') return;
+        if (!d.pagamentos.length){ linhas.push({ hora: d.hora, no: no, tipo: d.tipo, mec: '', valor: d.gross }); return; }
+        d.pagamentos.forEach(function(p){
+          if (MEIO_POR_MEC[p.mec]) return;
+          linhas.push({ hora: d.hora, no: no, tipo: d.tipo, mec: p.mec, valor: p.valor });
+        });
+      });
+      linhas.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+    }
+    var total = round2(linhas.reduce(function(s, l){ return s + l.valor; }, 0));
+    var h = '<div class="card glass-light rec-bloco"><h3>Outros meios de pagamento <small>fora do casamento com o terminal</small></h3>';
+    if (outrosFb.length){
+      h += '<p class="rec-outros-fb">vendasDiario: ' + outrosFb.map(function(k){ return '<b>' + esc(NOMES_MEIO[k] || k) + '</b> ' + fmtEuro(fb[k].bruto) + ' (' + (fb[k].docs || 0) + ' docs)'; }).join(' · ') + '</p>';
+    }
+    if (!saftCobertura[dia]){
+      h += '<p class="rec-bloco-nota">Sem SAF-T para este dia: não há documentos para listar.</p>';
+    } else if (!linhas.length){
+      h += '<p class="rec-bloco-nota">Nenhum documento de outros meios neste dia.</p>';
+    } else {
+      h += '<p class="rec-sec-titulo">Documentos <span class="rec-conta">' + linhas.length + '</span> <span>· ' + fmtEuro(total) + '</span></p>' +
+        '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Documento</th><th>Meio</th><th class="num">Valor</th></tr></thead><tbody>' +
+        linhas.map(function(l){
+          return '<tr><td class="num">' + fmtHora(l.hora) + '</td><td>' + esc(l.no) + ' <span class="rec-mono">' + esc(l.tipo) + '</span></td><td>' + esc(l.mec ? (NOMES_MEIO[l.mec] || l.mec) : 'sem meio') + '</td>' + celValor(l.valor) + '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+    return h + '</div>';
+  }
+
+  function renderDetalhe(){
+    var z = document.getElementById('zona2');
+    if (!diaAberto){ z.innerHTML = ''; return; }
+    var dia = diaAberto;
+    z.innerHTML = '<div class="rec-barra"><h2>' + fmtDia(dia) + ' <small class="rec-legenda">' + esc(diaSemana(dia)) + '</small></h2></div>' +
+      MEIOS.map(function(m){ return blocoMeioHtml(calcularMeio(dia, m)); }).join('') +
+      blocoOutrosHtml(dia);
+  }
+
+  function renderTudo(){
+    renderDias();
+    renderDetalhe();
+  }
+
+  /* ============================================================
+     Firebase — só leitura de vendasDiario/{mês}
+     ============================================================ */
+  firebase.initializeApp({
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  });
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  // Os uploads não dependem do Firebase: o selector de meses nasce já,
+  // e o agregado diário chega quando a sessão anónima assentar.
+  montarSelectorMeses();
+  renderTudo();
+
+  autenticarEContinuar(function () {
+    db = firebase.database();
+    carregarMes(mesAtivo).then(renderTudo);
+  }); // fim de autenticarEContinuar
+
+});
+</script>
+</body>
+</html>
