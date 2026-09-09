@@ -28,6 +28,14 @@
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
 <script src="gioco-eventos.js"></script>
+<!-- MSAL Browser 2.38.2 (CDN da Microsoft, mesma classe de confiança do gstatic
+     de onde já vem o Firebase). Versão FIXA e integrity obrigatório: os bytes
+     deste URL foram conferidos contra o tarball oficial do npm. Nunca "latest".
+     É a única dependência de terceiros do OS fora do Firebase/pdf.js. -->
+<script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"
+        integrity="sha384-hhkHFODse2T75wPL7oJ0RZ+0CgRa74LNPhgx6wO6DMNEhU3/fSbTZdVzxsgyUelp"
+        crossorigin="anonymous"></script>
+<script src="gioco-outlook.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -76,6 +84,43 @@
   .camada-btn:hover{ border-color:var(--red); }
   .camada-btn[aria-pressed="false"]{ opacity:.55; }
   .camada-btn[aria-pressed="false"] i{ background:transparent; box-shadow:inset 0 0 0 2px var(--blush); }
+  /* ---------- Camada Outlook ----------
+     Par neutro derivado da família --line / --muted do shell: as seis
+     superfícies de selo (lime, navy, mustard, red, blush, sky) estão todas
+     tomadas pelas categorias e o --blush é dos pagamentos, por isso a camada
+     de leitura do Outlook é cinzenta de propósito — informativa, não
+     acionável, e imediatamente distinta das outras duas. Par claro/escuro
+     obrigatório: é superfície COM texto por cima. */
+  :root{ --out-bg:#ddd8cf; --out-ink:#33302a; }
+  [data-theme="dark"]{ --out-bg:#37332c; --out-ink:#e6e0d4; }
+
+  .camada-btn.out i{ background:var(--out-bg); box-shadow:inset 0 0 0 1px var(--muted); }
+  /* Sem sessão Microsoft o mesmo botão vira "Ligar Outlook": sem ponto de
+     camada e sem o esbatido do aria-pressed="false" (que só faz sentido
+     quando já há camada para ligar/desligar). */
+  .camada-btn.ligar{ opacity:1; padding-left:14px; }
+  .camada-btn.ligar i{ display:none; }
+  .camada-btn.out[aria-pressed="false"] i{ background:transparent; box-shadow:inset 0 0 0 2px var(--out-bg); }
+  /* Abre o painel da conta Microsoft (giocoModal). Colado ao chip da camada. */
+  .camada-mais{
+    background:var(--white); color:var(--muted); border:1.5px solid var(--line);
+    border-radius:100px; width:28px; height:28px; padding:0; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; margin-left:-4px;
+  }
+  .camada-mais:hover{ border-color:var(--red); color:var(--ink); }
+  /* O display:inline-flex das classes acima vence o [hidden] do browser:
+     sem estas duas regras, esconder por hidden não fazia nada. */
+  .camada-btn[hidden], .camada-mais[hidden]{ display:none; }
+  .camada-mais .icon{ width:14px; height:14px; }
+  /* Erro do Graph: discreto e ao lado da camada — nunca bloqueia o render. */
+  .out-erro{ font-size:11.5px; color:var(--red-ink); cursor:help; }
+  .out-conta{ color:var(--ink); font-size:13px; }
+  .out-conta .out-email{ font-weight:600; margin:0 0 4px; }
+  .out-conta p{ margin:0 0 14px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+
+  .ev-chip.out{ background:var(--out-bg); color:var(--out-ink); }
+  .ev-bloco.out{ background:var(--out-bg); color:var(--out-ink); }
+
   .sem-data{ font-size:11.5px; color:var(--muted); text-decoration:none; border-bottom:1px dotted var(--muted); }
   .sem-data:hover{ color:var(--red-ink); border-bottom-color:var(--red-ink); }
 
@@ -269,6 +314,9 @@
         <div class="cal-titulo" id="calTitulo">—</div>
         <div class="cal-dir">
           <button type="button" class="camada-btn" id="camadaPag" aria-pressed="true" title="Mostrar ou esconder os pagamentos (só leitura)"><i></i>Pagamentos</button>
+          <button type="button" class="camada-btn out" id="camadaOut" aria-pressed="false" title="Mostrar ou esconder o calendário do Outlook (só leitura)"><i></i><span id="camadaOutTxt">Outlook</span></button>
+          <button type="button" class="camada-mais" id="outConta" title="Conta Microsoft" aria-label="Conta Microsoft" hidden><svg class="icon"><use href="#i-more-vertical"/></svg></button>
+          <span class="out-erro" id="outErro" hidden>Outlook indisponível</span>
           <a class="sem-data" id="semData" href="tesouraria.html" hidden title="Linhas de pedidos sem prazo — ver na Tesouraria"></a>
           <div class="seg" id="segVista" role="group" aria-label="Vista">
             <button type="button" data-vista="mes" title="Mês (M)">Mês</button>
@@ -526,6 +574,61 @@
     render();
   }
 
+  /* ---------- Camada 'outlook' (SÓ LEITURA) ----------
+     Segunda camada, no mesmo padrão da dos pagamentos (.camada-btn +
+     aria-pressed + localStorage), mas DESLIGADA por omissão: obriga a uma
+     sessão Microsoft e não deve ir buscar nada sem o Manel pedir.
+     Os eventos vivem só aqui em memória, por intervalo visível — NUNCA são
+     escritos no nó eventos/ (ver gioco-outlook.js).
+     A estrutura aguenta uma terceira camada sem refactor: uma fonteX(), um
+     flag próprio e mais uma entrada em listaParaRender(). */
+  var camadaOut = false;
+  try { camadaOut = localStorage.getItem('calendario.camada.outlook') === '1'; } catch (e) {}
+  var outEventos = [];      // itens normalizados do intervalo já carregado
+  var outIntervalo = null;  // 'ini|fim' ja pedido (evita repetir o mesmo GET)
+  var outErro = '';         // mensagem discreta; nunca bloqueia o render
+  var outAPedir = false;
+  var outCache = {};        // 'ini|fim' -> lista
+
+  function setCamadaOut(on) {
+    camadaOut = !!on;
+    try { localStorage.setItem('calendario.camada.outlook', camadaOut ? '1' : '0'); } catch (e) {}
+    if (!camadaOut) outErro = '';
+    render();
+  }
+  function outlookLigado() { return GiocoOutlook.disponivel() && GiocoOutlook.estaLigado(); }
+  function fonteOutlook() { return (camadaOut && outlookLigado()) ? outEventos : []; }
+  function ehOutlook(item) { return item.origem === 'outlook'; }
+
+  // Intervalo que a vista mostra, fim EXCLUSIVO (a janela do calendarView).
+  function intervaloVisivel() {
+    var datas;
+    if (estado.vista === 'mes') datas = monthGrid(parseInt(anoDe(estado.dataRef), 10), mesDe(estado.dataRef));
+    else if (estado.vista === 'semana') datas = semanaDe(estado.dataRef);
+    else datas = [estado.dataRef];
+    return { ini: datas[0], fim: addDays(datas[datas.length - 1], 1) };
+  }
+
+  /* Chamado a cada render: só vai à rede quando o intervalo muda de facto
+     (mudar de mês/semana/dia). Um erro fixa o intervalo na mesma, para não
+     martelar o Graph em ciclo com o render que ele próprio provoca. */
+  function atualizarOutlook() {
+    if (!camadaOut || !outlookLigado()) return;
+    var iv = intervaloVisivel(), chave = iv.ini + '|' + iv.fim;
+    if (chave === outIntervalo) return;
+    if (outCache[chave]) { outIntervalo = chave; outEventos = outCache[chave]; outErro = ''; render(); return; }
+    if (outAPedir) return;   // o render do fim do pedido volta a passar por aqui
+    outAPedir = true;
+    GiocoOutlook.carregarEventos(iv.ini, iv.fim).then(function (lista) {
+      outCache[chave] = lista;
+      outIntervalo = chave; outEventos = lista; outErro = '';
+    })['catch'](function (e) {
+      console.error('[outlook]', e);
+      outIntervalo = chave; outEventos = [];
+      outErro = (e && e.message) ? String(e.message) : 'Falha a ler o calendário.';
+    }).then(function () { outAPedir = false; render(); });
+  }
+
   function setVista(v) {
     if (VISTAS.indexOf(v) < 0 || v === estado.vista) return;
     estado.vista = v;
@@ -604,6 +707,7 @@
   function listaParaRender() {
     var lista = estado.eventos.slice();
     if (camadaPag) lista = lista.concat(fontePagamentos(mesesVisiveis()));
+    lista = lista.concat(fonteOutlook());
     return lista;
   }
 
@@ -641,6 +745,8 @@
     tituloEl.textContent = tituloPeriodo(estado.vista, estado.dataRef);
     var btnCamada = document.getElementById('camadaPag');
     btnCamada.setAttribute('aria-pressed', camadaPag ? 'true' : 'false');
+    renderCamadaOutlook();
+    atualizarOutlook();
     var semData = document.getElementById('semData');
     var nSem = linhasSemData();
     semData.hidden = nSem === 0;
@@ -653,6 +759,49 @@
     else renderDia();
   }
 
+  /* paleta(item): a cor de um item por FONTE, num só sítio.
+     Manual → a cor da categoria; Outlook → o par neutro --out-*.
+     Os pagamentos não passam por aqui (têm chip próprio, --blush). */
+  function paleta(ev) {
+    if (ehOutlook(ev)) return { cor: 'var(--out-bg)', texto: 'var(--out-ink)', label: 'Outlook', classe: ' out' };
+    var c = categoria(ev.categoria);
+    return { cor: c.cor, texto: c.texto, label: c.label, classe: '' };
+  }
+
+  /* Barra: o mesmo botão serve de toggle da camada e, sem sessão, de
+     "Ligar Outlook". O botão ao lado abre o painel da conta (giocoModal). */
+  function renderCamadaOutlook() {
+    var btn = document.getElementById('camadaOut');
+    var txt = document.getElementById('camadaOutTxt');
+    var mais = document.getElementById('outConta');
+    var erro = document.getElementById('outErro');
+    if (!btn) return;
+    var disp = GiocoOutlook.disponivel(), ligado = disp && GiocoOutlook.estaLigado();
+    btn.hidden = !disp;
+    mais.hidden = !ligado;
+    if (!disp) {
+      erro.hidden = false;
+      erro.textContent = 'Outlook indisponível';
+      erro.title = 'O SDK da Microsoft não carregou (rede, bloqueio do browser ou integrity).';
+      return;
+    }
+    if (!ligado) {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.title = 'Ligar a conta Microsoft para ver o calendário do Outlook';
+      txt.textContent = 'Ligar Outlook';
+    } else {
+      btn.classList.remove('ligar');
+      btn.setAttribute('aria-pressed', camadaOut ? 'true' : 'false');
+      btn.title = 'Mostrar ou esconder o calendário do Outlook (só leitura)';
+      txt.textContent = 'Outlook';
+    }
+    // Erro do Graph: discreto, só enquanto a camada está ligada.
+    var comErro = !!(outErro && camadaOut && ligado);
+    erro.hidden = !comErro;
+    if (comErro) { erro.textContent = 'Outlook sem resposta'; erro.title = outErro; }
+  }
+
   /* chipDe(item): o único sítio onde um chip sabe de que fonte vem. */
   function chipDe(ev) {
     if (ehPagamento(ev)) {
@@ -661,9 +810,9 @@
       return '<button type="button" class="ev-chip pag' + (pago ? ' pago' : '') + '" data-id="' + escapeHtml(ev.id) + '" title="' + escapeHtml(titulo) + '">' +
         (pago ? '✓ ' : '') + escapeHtml(ev.titulo) + ' ·<span class="num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span></button>';
     }
-    var c = categoria(ev.categoria);
+    var c = paleta(ev);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
-    return '<button type="button" class="ev-chip" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
+    return '<button type="button" class="ev-chip' + c.classe + '" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
       hora + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</button>';
   }
   var chipHtml = chipDe;
@@ -733,7 +882,7 @@
 
   /* blocoDe(item): bloco na grelha horária (só itens com hora; os pagamentos são de dia inteiro). */
   function blocoDe(it) {
-    var c = categoria(it.ev.categoria);
+    var c = paleta(it.ev);
     var base = HORA_INICIO_GRELHA * 60;
     var top = Math.max(0, (it.ini - base) / 60 * PX_HORA);
     var altura = Math.max(24, (it.fim - Math.max(it.ini, base)) / 60 * PX_HORA);
@@ -741,7 +890,7 @@
     if (top + altura > ALTURA_GRELHA) altura = Math.max(24, ALTURA_GRELHA - top);
     var largura = 100 / it.ncols, left = largura * it.col;
     var horas = it.ev.horaInicio + (it.ev.horaFim ? '–' + it.ev.horaFim : '');
-    return '<button type="button" class="ev-bloco" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
+    return '<button type="button" class="ev-bloco' + c.classe + '" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
       '<b>' + iconeLigacao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
   }
 
@@ -832,7 +981,7 @@
       lista = '<p class="dia-vazio">Sem eventos neste dia.</p>';
     } else {
       evs.forEach(function (ev) {
-        var c = categoria(ev.categoria);
+        var c = paleta(ev);
         var horas = ev.diaInteiro ? 'Dia inteiro' : (ev.horaInicio || '') + (ev.horaFim ? '–' + ev.horaFim : '');
         lista += '<button type="button" class="dia-item" data-id="' + escapeHtml(ev.id) + '"><i style="background:' + c.cor + '"></i><div style="min-width:0;flex:1">' +
           '<div class="dia-item-t">' + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</div>' +
@@ -872,15 +1021,20 @@
   /* ---------- Legenda ---------- */
   document.getElementById('calLegenda').innerHTML = CATEGORIAS.map(function (c) {
     return '<span><i style="background:' + c.cor + '"></i>' + c.label + '</span>';
-  }).join('') + '<span><i style="background:var(--blush)"></i>Pagamentos (Tesouraria, só leitura)</span>';
+  }).join('') + '<span><i style="background:var(--blush)"></i>Pagamentos (Tesouraria, só leitura)</span>' +
+    '<span><i style="background:var(--out-bg)"></i>Outlook (só leitura)</span>';
 
   /* ---------- Interação nas vistas ---------- */
   vistaEl.addEventListener('click', function (e) {
     var chip = e.target.closest('[data-id]');
     if (chip) {
       e.stopPropagation();
+      // Ramifica por ORIGEM (e não por !editavel): a próxima camada só de
+      // leitura acrescenta um ramo aqui, sem mexer nas outras.
       var item = itensPorId[chip.getAttribute('data-id')];
-      if (item && !item.editavel) abrirDetalhePagamento(item);
+      var org = item ? item.origem : 'manual';
+      if (org === 'pagamentos') abrirDetalhePagamento(item);
+      else if (org === 'outlook') abrirDetalheOutlook(item);
       else abrirEditar(chip.getAttribute('data-id'));
       return;
     }
@@ -922,6 +1076,27 @@
   document.getElementById('btnHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
   document.getElementById('btnNovo').addEventListener('click', function () { abrirNovo({ data: estado.dataRef }); });
   document.getElementById('camadaPag').addEventListener('click', function () { setCamadaPag(!camadaPag); });
+  document.getElementById('outConta').addEventListener('click', abrirContaOutlook);
+  document.getElementById('camadaOut').addEventListener('click', function () {
+    if (!GiocoOutlook.disponivel()) return;
+    if (GiocoOutlook.estaLigado()) { setCamadaOut(!camadaOut); return; }
+    // Sem sessão: o botão é "Ligar Outlook". Um erro aqui fica na barra e
+    // não mexe em mais nada do calendário.
+    var btn = this, txt = document.getElementById('camadaOutTxt');
+    btn.disabled = true; txt.textContent = 'A ligar…';
+    GiocoOutlook.ligar().then(function (c) {
+      btn.disabled = false;
+      if (c) setCamadaOut(true);   // ligou agora: mostra logo a camada
+      else render();               // caiu para redirect: a página vai embora
+    })['catch'](function (e) {
+      console.error('[outlook] login:', e);
+      btn.disabled = false;
+      outErro = (e && (e.errorCode || e.message)) ? String(e.errorCode || e.message) : 'Falha no login.';
+      render();
+      var erro = document.getElementById('outErro');
+      if (erro) { erro.hidden = false; erro.textContent = 'Login falhou'; erro.title = outErro; }
+    });
+  });
   document.getElementById('segVista').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-vista]');
     if (b) setVista(b.getAttribute('data-vista'));
@@ -963,6 +1138,55 @@
     fechar.addEventListener('click', function () { giocoModal.close(); });
     corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, abrir])]));
     giocoModal.open({ titulo: 'Pagamento', conteudo: corpo });
+  }
+
+  /* ---------- Detalhe só de leitura de um evento do Outlook ----------
+     Mesmo padrão do detalhe dos pagamentos (.pag-detalhe + .ev-actions).
+     NUNCA abre o formulário de edição: a fonte é o Outlook, e o OS não
+     escreve lá nem copia o evento para o nó eventos/. */
+  function abrirDetalheOutlook(item) {
+    var x = item.extra || {};
+    var corpo = el('div', { 'class': 'pag-detalhe' });
+    corpo.appendChild(el('p', { 'class': 'pag-titulo', text: item.titulo }));
+    function kv(k, v) { corpo.appendChild(el('div', { 'class': 'pag-kv' }, [el('span', { text: k }), v])); }
+    var dia = diaSemanaLongo(item.data) + ', ' + diaDe(item.data) + ' ' + mesCurto(item.data) + ' ' + anoDe(item.data);
+    var horas = item.diaInteiro ? 'Dia inteiro' : (item.horaInicio || '') + (item.horaFim ? '–' + item.horaFim : '');
+    kv('Quando', el('span', { 'class': 'num', text: dia + ' · ' + horas }));
+    if (x.local) kv('Local', el('span', { text: x.local }));
+    if (x.organizador) kv('Organizador', el('span', { text: x.organizador }));
+    kv('Origem', el('span', { text: 'Outlook · só leitura' }));
+
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    var direita = [fechar];
+    if (x.webLink) {
+      direita.push(el('a', { 'class': 'btn-add', href: x.webLink, target: '_blank', rel: 'noopener noreferrer', text: 'Abrir no Outlook' }));
+    }
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, direita)]));
+    giocoModal.open({ titulo: 'Evento do Outlook', conteudo: corpo });
+  }
+
+  /* Painel da conta Microsoft: quem está ligado e o botão de desligar.
+     Desligar é LOCAL — limpa a cache do MSAL neste browser e não manda o
+     Manel para a página de logout da Microsoft (ver gioco-outlook.js). */
+  function abrirContaOutlook() {
+    var c = GiocoOutlook.conta() || { email: '', nome: '' };
+    var corpo = el('div', { 'class': 'out-conta' });
+    corpo.appendChild(el('p', { 'class': 'out-email', text: c.email || c.nome || 'Conta ligada' }));
+    corpo.appendChild(el('p', { text: 'O calendário é lido em Calendars.Read. O GIOCO OS nunca escreve no Outlook nem copia estes eventos para a agenda do OS.' }));
+    var desligar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Desligar conta' });
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    desligar.addEventListener('click', function () {
+      desligar.disabled = true; desligar.textContent = 'A desligar…';
+      GiocoOutlook.desligar().then(function () {
+        outEventos = []; outCache = {}; outIntervalo = null; outErro = '';
+        setCamadaOut(false);
+        giocoModal.close();
+      });
+    });
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, desligar])]));
+    giocoModal.open({ titulo: 'Conta Microsoft', conteudo: corpo });
   }
 
   /* ---------- Modais de evento (gioco-eventos.js) ----------
@@ -1054,6 +1278,11 @@
   pagamentosConcluidosRef.on('value', function (s) { allPagamentosConcluidos = s.val() || {}; carregado.concl = true; render(); });
   recibosRef.on('value', function (s) { allRecibos = s.val() || {}; carregado.recibos = true; render(); });
   pessoasRef.on('value', function (s) { allPessoas = s.val() || {}; carregado.pessoas = true; render(); });
+
+  /* MSAL: idempotente e tolerante — se o SDK não carregou, disponivel() dá
+     false e o resto da página segue igual. O handleRedirectPromise tem de
+     correr no arranque para apanhar o retorno do fallback loginRedirect. */
+  GiocoOutlook.init().then(function () { render(); });
 
   render();
   }); // fim de autenticarEContinuar
