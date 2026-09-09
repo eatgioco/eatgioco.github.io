@@ -3591,8 +3591,16 @@ window.addEventListener('load', function () {
   });
 
 
-  function semanaDoDia(dia){
-    return Math.min(Math.floor((dia - 1) / 7), 4);
+  // As semanas de "Por semana" são as LINHAS do calendário mensal (segunda a
+  // domingo), não blocos fixos de 7 dias a contar do dia 1 — senão uma barra
+  // "8–14" não correspondia a nenhuma linha desenhada logo a seguir.
+  function offsetDoMes(ano, mes){
+    var primeiro = new Date(ano, mes - 1, 1).getDay();
+    return (primeiro + 6) % 7;   // 0 = mês começa à segunda
+  }
+
+  function semanaDoDia(dia, offset){
+    return Math.floor((offset + dia - 1) / 7);
   }
 
   // Os pedidos de pagamento contam sempre como variáveis: não há ligação
@@ -3623,21 +3631,23 @@ window.addEventListener('load', function () {
 
   function renderTesSemanas(itensTodos){
     var itens = itensTodos.filter(function(i){ return !i.pago; });
-    var nSemanas = Math.ceil(diasNoMes(anoAtivo, mesAtivo) / 7);
+    var nd = diasNoMes(anoAtivo, mesAtivo);
+    var offset = offsetDoMes(anoAtivo, mesAtivo);
+    var nSemanas = Math.ceil((offset + nd) / 7);
     var totais = [];
     var i;
     for (i = 0; i < nSemanas; i++) totais.push(0);
 
     itens.forEach(function(it){
-      var idx = Math.min(semanaDoDia(it.dia), nSemanas - 1);
+      var idx = Math.min(semanaDoDia(it.dia, offset), nSemanas - 1);
       totais[idx] += it.montante;
     });
 
     var max = Math.max.apply(null, totais.concat([0]));
 
     tesSemanasEl.innerHTML = totais.map(function(v, idx){
-      var ini = idx * 7 + 1;
-      var fim = Math.min(ini + 6, diasNoMes(anoAtivo, mesAtivo));
+      var ini = Math.max(1, idx * 7 + 1 - offset);
+      var fim = Math.min(nd, (idx + 1) * 7 - offset);
       var pct = max > 0 ? (v / max) * 100 : 0;
       return '<div class="tes-week">' +
         '<span class="tes-week-label">Semana ' + (idx + 1) + ' · ' + ini + '–' + fim + '</span>' +
