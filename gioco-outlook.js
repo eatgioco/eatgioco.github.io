@@ -46,6 +46,13 @@ var GiocoOutlook = (function () {
   // Travão da paginação do Graph: 250 × 20 = 5000 eventos, muito acima de
   // qualquer mês real. Sem ele, um nextLink em ciclo prendia a página.
   var MAX_PAGINAS = 20;
+  /* Campos pedidos ao calendarView. O conjunto completo traz o que a detecção
+     da videochamada precisa; o mínimo é o que a página precisa para desenhar,
+     e serve de rede se algum campo do completo for recusado (ver carregarEventos).
+     onlineMeetingUrl está DEPRECADO no Graph — nunca o pedir. */
+  var SELECT_COMPLETO = 'id,subject,start,end,isAllDay,isCancelled,location,locations,' +
+    'webLink,organizer,showAs,isOnlineMeeting,onlineMeeting,onlineMeetingProvider,bodyPreview';
+  var SELECT_MINIMO = 'id,subject,start,end,isAllDay,isCancelled,location,webLink,organizer,showAs';
 
   var pca = null;          // PublicClientApplication (uma só instância)
   var arrancou = false;    // init() já correu
@@ -203,6 +210,120 @@ var GiocoOutlook = (function () {
     return { data: m[1] + '-' + m[2] + '-' + m[3], hora: m[4] + ':' + m[5] };
   }
 
+  /* ---------- Link de videochamada ----------
+     O URL de entrada aparece em sítios diferentes conforme o serviço: um
+     convite Teams preenche `onlineMeeting.joinUrl`, um Google Meet / Zoom /
+     Whereby costuma deixar o link no `location` ou no corpo do convite.
+     detetarLinkReuniao(ev) devolve { url, servico } ou null, pela ordem de
+     prioridade dos campos (o primeiro que dê resultado ganha).
+
+     SEGURANÇA da comparação de host: nunca `includes()`. `casaDominio()`
+     exige host exacto OU sufixo `.dominio` — senão `zoom.us.phishing.com`
+     passava por Zoom. Só https: um `http://` é ignorado, e todo o URL passa
+     por `new URL()` dentro de try/catch antes de chegar ao DOM. */
+  var SERVICOS = [
+    { servico: 'Google Meet', dominios: ['meet.google.com'] },
+    { servico: 'Teams',       dominios: ['teams.microsoft.com', 'teams.live.com'] },
+    { servico: 'Zoom',        dominios: ['zoom.us'] },
+    { servico: 'Whereby',     dominios: ['whereby.com'] },
+    { servico: 'Jitsi',       dominios: ['meet.jit.si'] },
+    { servico: 'Webex',       dominios: ['webex.com'] }
+  ];
+  // O `onlineMeetingProvider` do Graph, quando o joinUrl não cai em nenhum
+  // host conhecido (ex.: um tenant Teams com domínio próprio).
+  var PROVIDERS = {
+    teamsForBusiness: 'Teams',
+    skypeForBusiness: 'Skype for Business',
+    skypeForConsumer: 'Skype'
+  };
+  // Conservador de propósito: pára no primeiro espaço, aspa, parêntese ou
+  // sinal de marcação. A pontuação final é aparada a seguir.
+  var RE_URL = /https:\/\/[^\s<>"'\]\[)（）]+/gi;
+
+  function casaDominio(host, dominio) {
+    return host === dominio || host.length > dominio.length + 1 &&
+      host.slice(-(dominio.length + 1)) === '.' + dominio;
+  }
+  function servicoDoHost(host) {
+    for (var i = 0; i < SERVICOS.length; i++) {
+      for (var j = 0; j < SERVICOS[i].dominios.length; j++) {
+        if (casaDominio(host, SERVICOS[i].dominios[j])) return SERVICOS[i].servico;
+      }
+    }
+    return null;
+  }
+  /* String → { url, host } com o URL já validado, ou null. Só https. */
+  function urlValido(bruto) {
+    var texto = String(bruto || '').replace(/[.,;:!?'"\)\]]+$/, '');
+    try {
+      var u = new URL(texto);
+      if (u.protocol !== 'https:') return null;
+      return { url: u.href, host: u.hostname.toLowerCase() };
+    } catch (e) { return null; }
+  }
+  function urlsDe(texto) {
+    var out = [], m, re = new RegExp(RE_URL.source, 'gi');
+    while ((m = re.exec(String(texto || ''))) !== null) {
+      var v = urlValido(m[0]);
+      if (v) out.push(v);
+      if (out.length > 20) break;   // travão: um corpo de convite pode ter dezenas
+    }
+    return out;
+  }
+  /* Num texto qualquer: só o primeiro URL de um serviço CONHECIDO conta. */
+  function reuniaoConhecida(texto) {
+    var us = urlsDe(texto);
+    for (var i = 0; i < us.length; i++) {
+      var srv = servicoDoHost(us[i].host);
+      if (srv) return { url: us[i].url, servico: srv };
+    }
+    return null;
+  }
+  /* Num campo de LOCAL: serviço conhecido primeiro; se não houver, aceita um
+     campo que seja APENAS um URL e mais nada (é o padrão de quem cola o link
+     de um serviço que não conhecemos no campo do local). Esta segunda regra
+     não se aplica ao corpo do convite, que está cheio de links alheios. */
+  function reuniaoDeLocal(texto) {
+    var conhecida = reuniaoConhecida(texto);
+    if (conhecida) return conhecida;
+    var limpo = String(texto || '').trim();
+    if (!/^https:\/\/\S+$/.test(limpo)) return null;
+    var v = urlValido(limpo);
+    return v ? { url: v.url, servico: 'Videochamada' } : null;
+  }
+
+  function detetarLinkReuniao(ev) {
+    if (!ev) return null;
+    // Cancelado nunca tem link de entrada, mesmo que o URL ainda lá esteja.
+    // Hoje o carregarEventos já filtra os cancelados antes de chegarem aqui;
+    // esta guarda é para o dia em que se decidir mostrá-los riscados.
+    if (ev.isCancelled === true) return null;
+    // 1. O campo oficial.
+    var join = ev.onlineMeeting && ev.onlineMeeting.joinUrl;
+    if (join) {
+      var v = urlValido(join);
+      if (v) {
+        return {
+          url: v.url,
+          servico: servicoDoHost(v.host) || PROVIDERS[ev.onlineMeetingProvider] || 'Videochamada'
+        };
+      }
+    }
+    // 2. location.displayName.
+    var r = reuniaoDeLocal(ev.location && ev.location.displayName);
+    if (r) return r;
+    // 3. locations[] (displayName e locationUri de cada um).
+    if (Object.prototype.toString.call(ev.locations) === '[object Array]') {
+      for (var i = 0; i < ev.locations.length; i++) {
+        var loc = ev.locations[i] || {};
+        r = reuniaoDeLocal(loc.displayName) || reuniaoDeLocal(loc.locationUri);
+        if (r) return r;
+      }
+    }
+    // 4. Corpo do convite: só serviços conhecidos.
+    return reuniaoConhecida(ev.bodyPreview);
+  }
+
   /* ---------- Normalização ----------
      Um evento do Graph → 1..N itens da lista normalizada (um por dia).
      - isAllDay: o `end` do Graph é EXCLUSIVO (um dia inteiro a 10/09 vem
@@ -217,6 +338,9 @@ var GiocoOutlook = (function () {
     var titulo = String(ev.subject || '(sem assunto)');
     var local = ev.location && ev.location.displayName ? String(ev.location.displayName) : '';
     var organizador = ev.organizer && ev.organizer.emailAddress ? String(ev.organizer.emailAddress.name || ev.organizer.emailAddress.address || '') : '';
+    // Uma detecção por EVENTO (não por dia): o base.extra é partilhado por
+    // referência por todos os itens-dia que este evento gerar.
+    var reuniao = detetarLinkReuniao(ev);
     var base = {
       titulo: titulo,
       // 'outro' é só o valor exigido pelo modelo normalizado: a camada
@@ -231,6 +355,8 @@ var GiocoOutlook = (function () {
         webLink: ev.webLink ? String(ev.webLink) : '',
         organizador: organizador,
         showAs: ev.showAs ? String(ev.showAs) : '',
+        // Ausente quando não há link — quem lê testa a existência, nunca o conteúdo.
+        reuniao: reuniao || null,
         inicio: ini,
         fim: fim
       }
@@ -270,11 +396,13 @@ var GiocoOutlook = (function () {
      da página). */
   function carregarEventos(dataInicio, dataFim) {
     return token().then(function (tk) {
-      var url = GRAPH +
-        '?startDateTime=' + encodeURIComponent(dataInicio + 'T00:00:00') +
-        '&endDateTime=' + encodeURIComponent(dataFim + 'T00:00:00') +
-        '&$top=250&$orderby=' + encodeURIComponent('start/dateTime') +
-        '&$select=' + encodeURIComponent('id,subject,start,end,isAllDay,isCancelled,location,webLink,organizer,showAs');
+      function base(campos) {
+        return GRAPH +
+          '?startDateTime=' + encodeURIComponent(dataInicio + 'T00:00:00') +
+          '&endDateTime=' + encodeURIComponent(dataFim + 'T00:00:00') +
+          '&$top=250&$orderby=' + encodeURIComponent('start/dateTime') +
+          '&$select=' + encodeURIComponent(campos);
+      }
       var todos = [];
 
       function pagina(u, n) {
@@ -287,7 +415,9 @@ var GiocoOutlook = (function () {
         }).then(function (r) {
           if (!r.ok) {
             return r.text().then(function (t) {
-              throw new Error('Graph ' + r.status + (t ? ': ' + t.slice(0, 200) : ''));
+              var erro = new Error('Graph ' + r.status + (t ? ': ' + t.slice(0, 200) : ''));
+              erro.status = r.status;
+              throw erro;
             });
           }
           return r.json();
@@ -301,12 +431,26 @@ var GiocoOutlook = (function () {
         });
       }
 
-      return pagina(url, 1).then(function () { return todos; });
+      /* Um 400 na PRIMEIRA página quase de certeza é um campo do $select que
+         este tenant não aceita. Em vez de deixar a camada inteira em erro,
+         repete-se uma única vez com o conjunto mínimo (o de sempre): perde-se
+         a detecção da videochamada, o calendário continua a aparecer. */
+      return pagina(base(SELECT_COMPLETO), 1).then(function () { return todos; })
+        ['catch'](function (e) {
+          if (e && e.status !== 400) throw e;
+          console.warn('[outlook] $select completo recusado, a repetir com o mínimo:', e && e.message);
+          todos = [];
+          return pagina(base(SELECT_MINIMO), 1).then(function () { return todos; });
+        });
     });
   }
 
   return {
     init: init,
+    // Funcao PURA, exposta para teste e reutilizacao (scripts/testa-outlook-reuniao.js).
+    // Nao toca em rede, DOM nem MSAL: recebe um evento do Graph, devolve
+    // { url, servico } ou null.
+    detetarLinkReuniao: detetarLinkReuniao,
     disponivel: disponivel,
     estaLigado: estaLigado,
     conta: conta,
@@ -315,3 +459,7 @@ var GiocoOutlook = (function () {
     carregarEventos: carregarEventos
   };
 })();
+
+/* Node (so para os testes de scripts/testa-outlook-reuniao.js). No browser
+   nao existe module e este bloco e ignorado. */
+if (typeof module !== 'undefined' && module.exports) module.exports = GiocoOutlook;

@@ -249,6 +249,10 @@
   .pag-detalhe .pag-kv{ display:flex; gap:10px; padding:6px 0; border-top:1px solid var(--line); }
   .pag-detalhe .pag-kv span:first-child{ width:90px; flex-shrink:0; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; padding-top:2px; }
   .pag-detalhe .pag-notas{ white-space:pre-line; line-height:1.45; }
+  /* O detalhe do Outlook tem o rotulo "Videochamada", que nao cabe nos 90px
+     da coluna de labels (o span tem flex-shrink:0 e transbordava por cima do
+     valor). Modificador so para este modal — o dos pagamentos fica igual. */
+  .pag-detalhe.out-detalhe .pag-kv span:first-child{ width:112px; }
   a.btn-add{ text-decoration:none; }
 
   /* O formulário do modal de evento vive em gioco-eventos.css (.ev-*). */
@@ -812,13 +816,23 @@
     }
     var c = paleta(ev);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
-    return '<button type="button" class="ev-chip' + c.classe + '" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
-      hora + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</button>';
+    var dica = ev.titulo + (temReuniao(ev) ? ' · ' + ev.extra.reuniao.servico : '');
+    return '<button type="button" class="ev-chip' + c.classe + '" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(dica) + '">' +
+      hora + iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo) + '</button>';
   }
   var chipHtml = chipDe;
   // Evento ligado a um pedido da loja: ícone store (14px) antes do título, sem categoria nova.
   function ehPedidoLoja(ev) { return !!(ev && ev.ligacao && ev.ligacao.tipo === 'lojaPedido'); }
   function iconeLigacao(ev) { return ehPedidoLoja(ev) ? '<svg class="icon" width="14" height="14"><use href="#i-store"/></svg>' : ''; }
+  /* Evento do Outlook com link de videochamada (extra.reuniao, detectado no
+     gioco-outlook.js): ícone i-video pela mesma porta do i-store — 14px inline,
+     já com CSS em `.ev-chip .icon, .ev-bloco .icon, .dia-item-t .icon`. Não
+     empurra o texto: o chip trunca com ellipsis, como sempre. */
+  function temReuniao(ev) { return !!(ev && ev.extra && ev.extra.reuniao && ev.extra.reuniao.url); }
+  function iconeReuniao(ev) {
+    if (!temReuniao(ev)) return '';
+    return '<svg class="icon" width="14" height="14"><use href="#i-video"/></svg>';
+  }
 
   function renderMes() {
     var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
@@ -891,7 +905,7 @@
     var largura = 100 / it.ncols, left = largura * it.col;
     var horas = it.ev.horaInicio + (it.ev.horaFim ? '–' + it.ev.horaFim : '');
     return '<button type="button" class="ev-bloco' + c.classe + '" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
-      '<b>' + iconeLigacao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
+      '<b>' + iconeLigacao(it.ev) + iconeReuniao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
   }
 
   function horaColHtml() {
@@ -984,7 +998,7 @@
         var c = paleta(ev);
         var horas = ev.diaInteiro ? 'Dia inteiro' : (ev.horaInicio || '') + (ev.horaFim ? '–' + ev.horaFim : '');
         lista += '<button type="button" class="dia-item" data-id="' + escapeHtml(ev.id) + '"><i style="background:' + c.cor + '"></i><div style="min-width:0;flex:1">' +
-          '<div class="dia-item-t">' + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</div>' +
+          '<div class="dia-item-t">' + iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo) + '</div>' +
           '<div class="dia-item-h num">' + escapeHtml(horas) + ' · ' + c.label + '</div>' +
           (ev.notas ? '<div class="dia-item-n">' + escapeHtml(ev.notas) + '</div>' : '') +
           '</div></button>';
@@ -1146,21 +1160,40 @@
      escreve lá nem copia o evento para o nó eventos/. */
   function abrirDetalheOutlook(item) {
     var x = item.extra || {};
-    var corpo = el('div', { 'class': 'pag-detalhe' });
+    var corpo = el('div', { 'class': 'pag-detalhe out-detalhe' });
     corpo.appendChild(el('p', { 'class': 'pag-titulo', text: item.titulo }));
     function kv(k, v) { corpo.appendChild(el('div', { 'class': 'pag-kv' }, [el('span', { text: k }), v])); }
     var dia = diaSemanaLongo(item.data) + ', ' + diaDe(item.data) + ' ' + mesCurto(item.data) + ' ' + anoDe(item.data);
     var horas = item.diaInteiro ? 'Dia inteiro' : (item.horaInicio || '') + (item.horaFim ? '–' + item.horaFim : '');
     kv('Quando', el('span', { 'class': 'num', text: dia + ' · ' + horas }));
-    if (x.local) kv('Local', el('span', { text: x.local }));
+    /* O campo Local quando é SÓ o URL da reunião não se mostra: fica
+       redundante ao lado do botão "Entrar na reunião". Com texto à volta
+       ("Sala 2 · https://…"), mostra-se o texto como sempre. */
+    var localSoLink = !!(x.reuniao && String(x.local || '').trim() === x.reuniao.url);
+    if (x.local && !localSoLink) kv('Local', el('span', { text: x.local }));
+    if (x.reuniao) kv('Videochamada', el('span', { text: x.reuniao.servico }));
     if (x.organizador) kv('Organizador', el('span', { text: x.organizador }));
     kv('Origem', el('span', { text: 'Outlook · só leitura' }));
 
     var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
     fechar.addEventListener('click', function () { giocoModal.close(); });
+    /* Ordem visual: [Fechar] [Entrar na reunião] [Abrir no Outlook].
+       Com link de reunião, a acção provável é ENTRAR, não ir ver o convite:
+       o "Entrar" fica com o .btn-add cheio e o "Abrir no Outlook" desce a
+       .ev-btn-outline, para não haver dois botões vermelhos indistintos. Sem
+       reunião, o "Abrir no Outlook" continua a ser o primário, como sempre. */
     var direita = [fechar];
+    if (x.reuniao) {
+      direita.push(el('a', {
+        'class': 'btn-add', href: x.reuniao.url, target: '_blank', rel: 'noopener noreferrer',
+        title: 'Abrir ' + x.reuniao.servico + ' em nova janela', text: 'Entrar na reunião'
+      }));
+    }
     if (x.webLink) {
-      direita.push(el('a', { 'class': 'btn-add', href: x.webLink, target: '_blank', rel: 'noopener noreferrer', text: 'Abrir no Outlook' }));
+      direita.push(el('a', {
+        'class': x.reuniao ? 'ev-btn-outline' : 'btn-add',
+        href: x.webLink, target: '_blank', rel: 'noopener noreferrer', text: 'Abrir no Outlook'
+      }));
     }
     corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, direita)]));
     giocoModal.open({ titulo: 'Evento do Outlook', conteudo: corpo });

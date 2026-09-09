@@ -82,6 +82,8 @@
     '<symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>',
     '<symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>',
     '<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>',
+    /* Set/2026, videochamada nos eventos do Outlook (calendario.html): */
+    '<symbol id="i-video" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -103,7 +105,9 @@
     // Set/2026, cartão Posição Financeira do mrn-dashboard.html (traço Feather/Lucide):
     'wallet',
     // Set/2026, reorganização caixa.html
-    'coins', 'list', 'lock'
+    'coins', 'list', 'lock',
+    // Set/2026, videochamada nos eventos do Outlook (calendario.html):
+    'video'
   ];
 
   function injectSprite() {
