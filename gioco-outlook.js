@@ -18,8 +18,12 @@
 
    USO:
      GiocoOutlook.init();                       // idempotente; trata o retorno do redirect
+     GiocoOutlook.pronto()                      // Promise: o handleRedirectPromise assentou
+     GiocoOutlook.estado()                      // 'webview'|'indisponivel'|'a-verificar'|'ligado'|'desligado'
+     GiocoOutlook.diagnostico()                 // objecto para o painel de erro da pagina
+     GiocoOutlook.detetarAmbiente(ua)           // PURA, exportada para teste
      GiocoOutlook.disponivel()                  // o SDK carregou?
-     GiocoOutlook.estaLigado()                  // há conta em cache?
+     GiocoOutlook.estaLigado()                  // atalho para estado() === 'ligado'
      GiocoOutlook.conta()                       // { email, nome } | null
      GiocoOutlook.ligar()                       // popup; cai para redirect se bloqueado
      GiocoOutlook.desligar()                    // limpa a cache local, sem ir à Microsoft
@@ -54,11 +58,77 @@ var GiocoOutlook = (function () {
     'webLink,organizer,showAs,isOnlineMeeting,onlineMeeting,onlineMeetingProvider,bodyPreview';
   var SELECT_MINIMO = 'id,subject,start,end,isAllDay,isCancelled,location,webLink,organizer,showAs';
 
-  var pca = null;          // PublicClientApplication (uma só instância)
-  var arrancou = false;    // init() já correu
+  var pca = null;            // PublicClientApplication (uma só instância)
+  var arrancou = false;      // init() já correu
   var redirectPronto = null; // Promise do handleRedirectPromise
+  var prontoOk = false;      // o handleRedirectPromise JÁ assentou
+  var redirectResultado = null; // o que o regresso do redirect trouxe (ou null)
+  var redirectTentado = false;  // um único loginRedirect por carregamento
+  var ultimoErro = null;        // objecto INTEIRO do último erro, para o diagnóstico
+
+  /* ---------- Ambiente ----------
+     PURA e exportável (recebe o UA em vez de o ir buscar), para ser testável
+     com strings reais de iPhone — mesma decisão do detetarLinkReuniao.
+
+     Porquê: o login da Microsoft comporta-se de trÊs maneiras diferentes.
+     - Numa WEBVIEW embutida (Facebook, Instagram, WhatsApp…) a Microsoft
+       BLOQUEIA o login de propósito. Não vale a pena tentar: avisa-se e ponto.
+       Em iOS uma WKWebView não põe "Safari" no UA; o Safari real põe.
+     - Em iOS (Safari incluído) o popup é pouco fiável: ou vem bloqueado e
+       reportado como cancelamento, ou a promessa nunca assenta. Vai-se
+       directo a redirect.
+     - No desktop o popup funciona e continua a ser o caminho. */
+  function detetarAmbiente(ua, plataforma, toques) {
+    ua = String(ua == null ? (navigator.userAgent || '') : ua);
+    plataforma = plataforma == null ? (navigator.platform || '') : plataforma;
+    toques = toques == null ? (navigator.maxTouchPoints || 0) : toques;
+    // iPadOS 13+ mente no UA e diz-se Macintosh: distingue-se pelo toque.
+    var ios = /iPad|iPhone|iPod/.test(ua) || (plataforma === 'MacIntel' && toques > 1);
+    var appEmbutida = /(FBAN|FBAV|FB_IAB|Instagram|Line\/|WhatsApp|MicroMessenger|LinkedInApp|Snapchat|TikTok)/i.test(ua);
+    // Browsers de terceiros em iOS (CriOS/FxiOS/EdgiOS) têm "Safari" no UA e
+    // são browsers a sério; só a ausência de "Safari" denuncia a webview.
+    var webviewIos = ios && !/Safari/.test(ua);
+    return {
+      ios: ios,
+      webview: !!(appEmbutida || webviewIos),
+      motivo: appEmbutida ? 'app' : (webviewIos ? 'ios-webview' : null),
+      ua: ua
+    };
+  }
+  var AMB = detetarAmbiente();
 
   function disponivel() { return typeof msal !== 'undefined' && !!msal.PublicClientApplication; }
+
+  /* Erro nosso, com a mesma forma dos do MSAL (errorCode + errorMessage), para
+     o painel de diagnóstico da página não ter de distinguir origens. */
+  function erroNosso(codigo, mensagem) {
+    var e = new Error(mensagem);
+    e.errorCode = codigo;
+    e.errorMessage = mensagem;
+    e.gioco = true;
+    return e;
+  }
+
+  /* Travão do nosso lado: o loginPopup do MSAL não tem timeout nenhum, e em
+     Safari um popup bloqueado pode deixar a promessa pendente para sempre —
+     o botão ficava "A ligar…" até recarregar a página. */
+  function comTimeout(promessa, ms, codigo, mensagem) {
+    return new Promise(function (resolve, reject) {
+      var assente = false;
+      var t = setTimeout(function () {
+        if (assente) return;
+        assente = true;
+        reject(erroNosso(codigo, mensagem));
+      }, ms);
+      promessa.then(function (v) {
+        if (assente) return;
+        assente = true; clearTimeout(t); resolve(v);
+      }, function (e) {
+        if (assente) return;
+        assente = true; clearTimeout(t); reject(e);
+      });
+    });
+  }
 
   function redirectUri() {
     // Sem query string nem hash: tem de bater certo com a SPA registada no
@@ -70,35 +140,59 @@ var GiocoOutlook = (function () {
   function init() {
     if (arrancou) return redirectPronto || Promise.resolve(null);
     arrancou = true;
-    if (!disponivel()) { redirectPronto = Promise.resolve(null); return redirectPronto; }
+    // Numa webview embutida nem se constrói o MSAL: não há login possível.
+    if (!disponivel() || AMB.webview) {
+      prontoOk = true;
+      redirectPronto = Promise.resolve(null);
+      return redirectPronto;
+    }
     try {
       pca = new msal.PublicClientApplication({
         auth: {
           clientId: CLIENT_ID,
           authority: AUTHORITY,
           redirectUri: redirectUri(),
-          navigateToLoginRequestUrl: true
+          // false: o redirectUri JÁ é esta página, e o salto extra de volta ao
+          // URL original (ex.: um deep-link ?dia=…) é mais uma oportunidade
+          // de o Safari perder estado pelo caminho.
+          navigateToLoginRequestUrl: false
         },
         cache: {
           // localStorage e não sessionStorage: a sessão tem de sobreviver a
           // fechar o separador, senão o Manel voltava a autenticar-se todos
           // os dias só para ver a agenda.
           cacheLocation: 'localStorage',
-          storeAuthStateInCookie: false
+          // OBRIGATÓRIO para o Safari (Set/2026): com o ITP, o `state` do fluxo
+          // de redirect guardado só em localStorage perde-se entre a ida à
+          // Microsoft e a volta, e o regresso falha a validar. Em cookie
+          // sobrevive. Não tem custo nos outros browsers.
+          storeAuthStateInCookie: true
         }
       });
     } catch (e) {
       console.error('[outlook] MSAL não arrancou:', e);
+      ultimoErro = e;
       pca = null;
+      prontoOk = true;
       redirectPronto = Promise.resolve(null);
       return redirectPronto;
     }
-    // Retorno do loginRedirect (fallback do popup bloqueado). Tem de correr
-    // no arranque, antes de qualquer outra operação MSAL.
-    redirectPronto = pca.handleRedirectPromise().catch(function (e) {
+    /* Retorno do loginRedirect. Tem de correr no arranque E de ser AGUARDADO
+       antes de qualquer getAllAccounts/acquireToken/login — senão, no regresso
+       do redirect, o getAllAccounts responde vazio enquanto o hash ainda está
+       a ser processado, a UI volta a dizer "Ligar Outlook" e entra-se em ciclo.
+       É a armadilha clássica do fluxo de redirect. Ver pronto() e estado(). */
+    redirectPronto = pca.handleRedirectPromise().then(function (r) {
+      redirectResultado = r || null;
+      if (r) console.info('[outlook] sessão obtida pelo regresso do redirect.');
+      return r;
+    })['catch'](function (e) {
+      // Guardado para o painel de diagnóstico: em iOS é aqui que aparece o
+      // "state não corresponde" quando o ITP come o estado do fluxo.
+      ultimoErro = e;
       console.error('[outlook] handleRedirectPromise:', e);
       return null;
-    });
+    }).then(function (r) { prontoOk = true; return r; });
     return redirectPronto;
   }
 
@@ -109,33 +203,93 @@ var GiocoOutlook = (function () {
       return cs && cs.length ? cs[0] : null;
     } catch (e) { return null; }
   }
-  function estaLigado() { return !!contaMsal(); }
+
+  /* O PORTAO. Tudo o que toca no MSAL passa por aqui primeiro. */
+  function pronto() { return init(); }
+
+  /* Estado SÍNCRONO para o render, que corre muitas vezes e nunca pode
+     bloquear à espera do MSAL:
+       'webview'      — browser embutido: login impossível, nem se tenta
+       'indisponivel' — o SDK não carregou
+       'a-verificar'  — o handleRedirectPromise ainda não assentou
+       'ligado' | 'desligado'
+     Enquanto for 'a-verificar' NINGUÉM pode concluir que não há sessão — era
+     exactamente isso que punha a UI a pedir login em cima de um redirect
+     bem sucedido. A página liga-se a pronto() para voltar a desenhar. */
+  function estado() {
+    if (AMB.webview) return 'webview';
+    if (!disponivel()) return 'indisponivel';
+    if (!prontoOk) return 'a-verificar';
+    return contaMsal() ? 'ligado' : 'desligado';
+  }
+  function estaLigado() { return estado() === 'ligado'; }
   function conta() {
+    if (estado() !== 'ligado') return null;
     var c = contaMsal();
     if (!c) return null;
     return { email: c.username || '', nome: c.name || c.username || '' };
   }
 
   /* ---------- Ligar ----------
-     loginPopup primeiro. Só se o popup for BLOQUEADO (ou a janela não abrir)
-     é que cai para loginRedirect — um cancelamento do utilizador rejeita,
-     nunca dispara um redirect que ele não pediu. */
-  var POPUP_BLOQUEADO = ['popup_window_error', 'empty_window_error', 'block_iframe_reload'];
+     Três caminhos, por ambiente:
+       webview — rejeita já, com uma mensagem que se mostra ao utilizador;
+       iOS     — loginRedirect DIRECTO. O popup em iOS é pouco fiável: vem
+                 bloqueado e reportado como cancelamento, ou fica pendente
+                 sem nunca assentar — e o fallback mascarava o erro real;
+       resto   — loginPopup (com timeout nosso) e fallback para redirect.
+
+     POPUP_FALHOU só vale no ramo do popup. Inclui user_cancelled e
+     interaction_in_progress porque no Safari de secretária um popup
+     bloqueado chega disfarçado de cancelamento. O cuidado original
+     mantem-se de duas maneiras: só se cai para redirect DENTRO de um
+     clique em "Ligar Outlook" (a acção que o utilizador pediu), e no
+     máximo UMA vez por carregamento da página (redirectTentado), para
+     quem fecha popups de propósito não entrar num ciclo de redirects. */
+  var POPUP_FALHOU = [
+    'popup_window_error', 'empty_window_error', 'block_iframe_reload',
+    'user_cancelled', 'interaction_in_progress', 'popup_sem_resposta'
+  ];
+  var TIMEOUT_POPUP_MS = 60000;
+
   function ligar() {
-    init();
-    if (!disponivel() || !pca) return Promise.reject(new Error('SDK da Microsoft não carregou.'));
-    return (redirectPronto || Promise.resolve()).then(function () {
-      return pca.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
-    }).then(function () {
-      return conta();
-    })['catch'](function (erro) {
-      var cod = (erro && erro.errorCode) || '';
-      if (POPUP_BLOQUEADO.indexOf(cod) >= 0) {
+    if (AMB.webview) {
+      return Promise.reject(erroNosso('webview_bloqueada',
+        'Este browser está embutido numa app e a Microsoft bloqueia o login aqui. ' +
+        'Abre a página no Safari para ligares o Outlook.'));
+    }
+    if (!disponivel()) return Promise.reject(erroNosso('sdk_ausente', 'O SDK da Microsoft não carregou.'));
+    return pronto().then(function () {
+      if (!pca) return Promise.reject(erroNosso('sdk_ausente', 'O SDK da Microsoft não arrancou.'));
+      // O regresso do redirect pode JÁ ter trazido a sessão: nesse caso não
+      // se pede login nenhum outra vez.
+      if (contaMsal()) return conta();
+
+      function porRedirect() {
+        if (redirectTentado) {
+          return Promise.reject(erroNosso('redirect_repetido',
+            'O login por redirecção já foi tentado neste carregamento e não resultou. ' +
+            'Recarrega a página e tenta outra vez.'));
+        }
+        redirectTentado = true;
         // A partir daqui a página vai embora e volta; quem chamou não recebe
         // resolução nenhuma, de propósito.
         return pca.loginRedirect({ scopes: SCOPES }).then(function () { return null; });
       }
-      throw erro;
+
+      if (AMB.ios) return porRedirect();
+
+      return comTimeout(
+        pca.loginPopup({ scopes: SCOPES, prompt: 'select_account' }),
+        TIMEOUT_POPUP_MS, 'popup_sem_resposta',
+        'A janela de login da Microsoft não respondeu em 60 segundos. ' +
+        'Pode ter sido bloqueada pelo browser.'
+      ).then(function () {
+        return conta();
+      })['catch'](function (erro) {
+        var cod = (erro && erro.errorCode) || '';
+        if (POPUP_FALHOU.indexOf(cod) >= 0) return porRedirect();
+        throw erro;
+      });
     });
   }
 
@@ -169,17 +323,32 @@ var GiocoOutlook = (function () {
     });
   }
 
-  /* ---------- Token ---------- */
+  /* ---------- Token ----------
+     Também passa pelo pronto(): sem isso, um carregarEventos() disparado no
+     regresso do redirect via a conta ainda vazia e falhava sem razão. */
   function token() {
-    if (!disponivel() || !pca) return Promise.reject(new Error('SDK da Microsoft não carregou.'));
-    var c = contaMsal();
-    if (!c) return Promise.reject(new Error('Sem conta Microsoft ligada.'));
+    if (!disponivel()) return Promise.reject(erroNosso('sdk_ausente', 'O SDK da Microsoft não carregou.'));
+    return pronto().then(function () {
+      if (!pca) throw erroNosso('sdk_ausente', 'O SDK da Microsoft não arrancou.');
+      var c = contaMsal();
+      if (!c) throw erroNosso('sem_conta', 'Sem conta Microsoft ligada.');
+      return tokenDaConta(c);
+    });
+  }
+  function tokenDaConta(c) {
     return pca.acquireTokenSilent({ scopes: SCOPES, account: c })
       .then(function (r) { return r.accessToken; })
       ['catch'](function (erro) {
         // Silencioso falhou (token expirado, consentimento novo, MFA):
         // só aqui é que se incomoda o utilizador com um popup.
         console.warn('[outlook] token silencioso falhou, a pedir popup:', erro && erro.errorCode);
+        // Em iOS o popup também não é de confiança aqui: mais vale dizer
+        // claramente que é preciso ligar outra vez do que abrir uma janela
+        // que não vai responder.
+        if (AMB.ios) {
+          throw erroNosso('sessao_expirada',
+            'A sessão da Microsoft expirou. Desliga e volta a ligar a conta.');
+        }
         return pca.acquireTokenPopup({ scopes: SCOPES, account: c }).then(function (r) { return r.accessToken; });
       });
   }
@@ -445,8 +614,35 @@ var GiocoOutlook = (function () {
     });
   }
 
+  /* Diagnóstico para o painel da página. Devolve o erro INTEIRO (nunca uma
+     string derivada) mais o contexto que só existe em runtime — no telemóvel
+     não há consola nem tooltip, e sem isto o "Login falhou" é indiagnosticável. */
+  function guardarErro(e) { ultimoErro = e || null; return e; }
+  function diagnostico() {
+    var e = ultimoErro || {};
+    return {
+      errorCode: e.errorCode || (e.name || null),
+      errorMessage: e.errorMessage || e.message || null,
+      subError: e.subError || null,
+      correlationId: e.correlationId || null,
+      stack: e.stack || null,
+      redirectUri: redirectUri(),
+      estado: estado(),
+      ambiente: { ios: AMB.ios, webview: AMB.webview, motivo: AMB.motivo },
+      ua: AMB.ua,
+      sdk: (typeof msal !== 'undefined' && msal.version) ? msal.version : 'não carregado',
+      redirectTrouxeSessao: !!redirectResultado
+    };
+  }
+
   return {
     init: init,
+    pronto: pronto,
+    estado: estado,
+    detetarAmbiente: detetarAmbiente,
+    diagnostico: diagnostico,
+    guardarErro: guardarErro,
+    redirectUri: redirectUri,
     // Funcao PURA, exposta para teste e reutilizacao (scripts/testa-outlook-reuniao.js).
     // Nao toca em rede, DOM nem MSAL: recebe um evento do Graph, devolve
     // { url, servico } ou null.

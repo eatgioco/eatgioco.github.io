@@ -112,8 +112,26 @@
      sem estas duas regras, esconder por hidden não fazia nada. */
   .camada-btn[hidden], .camada-mais[hidden]{ display:none; }
   .camada-mais .icon{ width:14px; height:14px; }
-  /* Erro do Graph: discreto e ao lado da camada — nunca bloqueia o render. */
-  .out-erro{ font-size:11.5px; color:var(--red-ink); cursor:help; }
+  /* Erro do Graph / do login: discreto ao lado da camada, e CLICÁVEL — no
+     telemóvel não há hover nem consola, por isso o detalhe tem de abrir num
+     painel em vez de viver só num title=. */
+  .out-erro{
+    font-size:11.5px; color:var(--red-ink); cursor:pointer;
+    background:none; border:none; padding:0; font-family:'Inter',sans-serif;
+    text-decoration:underline; text-underline-offset:2px;
+  }
+  .out-erro:hover{ color:var(--ink); }
+  .out-erro[hidden]{ display:none; }
+  /* Painel de diagnóstico do login. */
+  .diag{ color:var(--ink); font-size:13px; }
+  .diag p{ margin:0 0 12px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+  .diag pre{
+    margin:0 0 14px; padding:12px; border-radius:10px;
+    background:var(--dough); border:1px solid var(--line);
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word; max-height:320px; overflow:auto;
+    color:var(--ink); -webkit-user-select:text; user-select:text;
+  }
   .out-conta{ color:var(--ink); font-size:13px; }
   .out-conta .out-email{ font-weight:600; margin:0 0 4px; }
   .out-conta p{ margin:0 0 14px; color:var(--muted); font-size:12.5px; line-height:1.5; }
@@ -320,7 +338,7 @@
           <button type="button" class="camada-btn" id="camadaPag" aria-pressed="true" title="Mostrar ou esconder os pagamentos (só leitura)"><i></i>Pagamentos</button>
           <button type="button" class="camada-btn out" id="camadaOut" aria-pressed="false" title="Mostrar ou esconder o calendário do Outlook (só leitura)"><i></i><span id="camadaOutTxt">Outlook</span></button>
           <button type="button" class="camada-mais" id="outConta" title="Conta Microsoft" aria-label="Conta Microsoft" hidden><svg class="icon"><use href="#i-more-vertical"/></svg></button>
-          <span class="out-erro" id="outErro" hidden>Outlook indisponível</span>
+          <button type="button" class="out-erro" id="outErro" hidden title="Ver detalhe">Outlook indisponível</button>
           <a class="sem-data" id="semData" href="tesouraria.html" hidden title="Linhas de pedidos sem prazo — ver na Tesouraria"></a>
           <div class="seg" id="segVista" role="group" aria-label="Vista">
             <button type="button" data-vista="mes" title="Mês (M)">Mês</button>
@@ -413,6 +431,16 @@
       autenticarEContinuar(null);
     });
   })();
+
+  /* ---------- MSAL: arranca em PARALELO com o Firebase ----------
+     As duas autenticações são independentes e nenhuma pode esperar pela outra.
+     Antes disto o GiocoOutlook.init() vivia dentro do callback do
+     autenticarEContinuar, o que atrasava o handleRedirectPromise até 8 s (ou
+     para sempre, se o Firebase falhasse) — e o regresso do login da Microsoft
+     ficava por processar sem ter nada a ver com a Microsoft.
+     Se o Firebase falhar, a camada Outlook continua a funcionar; se o MSAL
+     falhar, o calendário continua a funcionar. */
+  try { GiocoOutlook.init(); } catch (e) { console.error('[outlook] init:', e); }
 
   autenticarEContinuar(function () {
   var db = firebase.database();
@@ -591,13 +619,14 @@
   var outEventos = [];      // itens normalizados do intervalo já carregado
   var outIntervalo = null;  // 'ini|fim' ja pedido (evita repetir o mesmo GET)
   var outErro = '';         // mensagem discreta; nunca bloqueia o render
+  var outErroObj = null;    // o objecto de erro INTEIRO (nunca uma string derivada)
   var outAPedir = false;
   var outCache = {};        // 'ini|fim' -> lista
 
   function setCamadaOut(on) {
     camadaOut = !!on;
     try { localStorage.setItem('calendario.camada.outlook', camadaOut ? '1' : '0'); } catch (e) {}
-    if (!camadaOut) outErro = '';
+    if (!camadaOut) { outErro = ''; outErroObj = null; }
     render();
   }
   function outlookLigado() { return GiocoOutlook.disponivel() && GiocoOutlook.estaLigado(); }
@@ -629,7 +658,9 @@
     })['catch'](function (e) {
       console.error('[outlook]', e);
       outIntervalo = chave; outEventos = [];
-      outErro = (e && e.message) ? String(e.message) : 'Falha a ler o calendário.';
+      outErroObj = e || null;
+      GiocoOutlook.guardarErro(e);
+      outErro = (e && (e.errorMessage || e.message)) ? String(e.errorMessage || e.message) : 'Falha a ler o calendário.';
     }).then(function () { outAPedir = false; render(); });
   }
 
@@ -780,16 +811,43 @@
     var mais = document.getElementById('outConta');
     var erro = document.getElementById('outErro');
     if (!btn) return;
-    var disp = GiocoOutlook.disponivel(), ligado = disp && GiocoOutlook.estaLigado();
-    btn.hidden = !disp;
+    var est = GiocoOutlook.estado();
+    var ligado = est === 'ligado';
+    btn.hidden = false;
+    btn.disabled = false;
     mais.hidden = !ligado;
-    if (!disp) {
+    erro.hidden = true;
+
+    /* 'webview': a Microsoft bloqueia o login dentro de browsers embutidos.
+       Não se tenta nada — diz-se o que fazer, e o detalhe abre no painel. */
+    if (est === 'webview') {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.disabled = true;
+      btn.title = 'Abre a página no Safari para ligares o Outlook';
+      txt.textContent = 'Abre no Safari';
       erro.hidden = false;
-      erro.textContent = 'Outlook indisponível';
-      erro.title = 'O SDK da Microsoft não carregou (rede, bloqueio do browser ou integrity).';
+      erro.textContent = 'Porquê?';
       return;
     }
-    if (!ligado) {
+    if (est === 'indisponivel') {
+      btn.hidden = true;
+      erro.hidden = false;
+      erro.textContent = 'Outlook indisponível';
+      return;
+    }
+    /* 'a-verificar': o handleRedirectPromise ainda não assentou. NUNCA dizer
+       aqui que não há sessão — era isso que, no regresso do redirect, punha o
+       botão a pedir login por cima de um login que tinha corrido bem. */
+    if (est === 'a-verificar') {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.disabled = true;
+      btn.title = 'A verificar a sessão da Microsoft…';
+      txt.textContent = 'A verificar…';
+      return;
+    }
+    if (est === 'desligado') {
       btn.classList.add('ligar');
       btn.removeAttribute('aria-pressed');
       btn.title = 'Ligar a conta Microsoft para ver o calendário do Outlook';
@@ -800,10 +858,11 @@
       btn.title = 'Mostrar ou esconder o calendário do Outlook (só leitura)';
       txt.textContent = 'Outlook';
     }
-    // Erro do Graph: discreto, só enquanto a camada está ligada.
-    var comErro = !!(outErro && camadaOut && ligado);
-    erro.hidden = !comErro;
-    if (comErro) { erro.textContent = 'Outlook sem resposta'; erro.title = outErro; }
+    // Erro (login ou Graph): discreto e clicável; nunca bloqueia o render.
+    if (outErro) {
+      erro.hidden = false;
+      erro.textContent = outErroObj && outErroObj.__login ? 'Login falhou' : 'Outlook sem resposta';
+    }
   }
 
   /* chipDe(item): o único sítio onde um chip sabe de que fonte vem. */
@@ -1091,9 +1150,13 @@
   document.getElementById('btnNovo').addEventListener('click', function () { abrirNovo({ data: estado.dataRef }); });
   document.getElementById('camadaPag').addEventListener('click', function () { setCamadaPag(!camadaPag); });
   document.getElementById('outConta').addEventListener('click', abrirContaOutlook);
+  document.getElementById('outErro').addEventListener('click', abrirDiagnosticoOutlook);
   document.getElementById('camadaOut').addEventListener('click', function () {
-    if (!GiocoOutlook.disponivel()) return;
-    if (GiocoOutlook.estaLigado()) { setCamadaOut(!camadaOut); return; }
+    var est = GiocoOutlook.estado();
+    // 'a-verificar', 'webview' e 'indisponivel' não fazem nada: o botão está
+    // desactivado nesses estados e o detalhe abre pelo link ao lado.
+    if (est !== 'ligado' && est !== 'desligado') return;
+    if (est === 'ligado') { setCamadaOut(!camadaOut); return; }
     // Sem sessão: o botão é "Ligar Outlook". Um erro aqui fica na barra e
     // não mexe em mais nada do calendário.
     var btn = this, txt = document.getElementById('camadaOutTxt');
@@ -1105,10 +1168,13 @@
     })['catch'](function (e) {
       console.error('[outlook] login:', e);
       btn.disabled = false;
-      outErro = (e && (e.errorCode || e.message)) ? String(e.errorCode || e.message) : 'Falha no login.';
+      // Guarda-se o objecto INTEIRO: o errorMessage do MSAL é o que diz mesmo
+      // o que se passou, e antes era deitado fora em favor do errorCode.
+      if (e) { try { e.__login = true; } catch (err) {} }
+      outErroObj = e || null;
+      GiocoOutlook.guardarErro(e);
+      outErro = (e && (e.errorMessage || e.message)) ? String(e.errorMessage || e.message) : 'Falha no login.';
       render();
-      var erro = document.getElementById('outErro');
-      if (erro) { erro.hidden = false; erro.textContent = 'Login falhou'; erro.title = outErro; }
     });
   });
   document.getElementById('segVista').addEventListener('click', function (e) {
@@ -1197,6 +1263,75 @@
     }
     corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, direita)]));
     giocoModal.open({ titulo: 'Evento do Outlook', conteudo: corpo });
+  }
+
+  /* Painel de diagnóstico do Outlook (giocoModal).
+     Existe porque o telemóvel não tem consola nem hover: sem isto, um login
+     falhado em iOS mostrava três palavras e mais nada. Mostra o errorCode E o
+     errorMessage completos, o redirectUri resolvido em runtime (a causa número
+     um de redirect_uri_mismatch), o ambiente detectado e o user agent. */
+  function textoDiagnostico() {
+    var d = GiocoOutlook.diagnostico();
+    var e = outErroObj || {};
+    var linhas = [
+      'GIOCO OS · diagnóstico do Outlook',
+      new Date().toISOString(),
+      '',
+      'errorCode:    ' + (e.errorCode || d.errorCode || '—'),
+      'errorMessage: ' + (e.errorMessage || e.message || d.errorMessage || '—'),
+      'subError:     ' + (e.subError || d.subError || '—'),
+      'correlationId:' + (e.correlationId || d.correlationId || '—'),
+      '',
+      'estado:       ' + d.estado,
+      'redirectUri:  ' + d.redirectUri,
+      'href:         ' + window.location.href,
+      'ambiente:     ios=' + d.ambiente.ios + ' webview=' + d.ambiente.webview +
+        (d.ambiente.motivo ? ' (' + d.ambiente.motivo + ')' : ''),
+      'MSAL:         ' + d.sdk,
+      'redirect deu sessão: ' + d.redirectTrouxeSessao,
+      '',
+      'userAgent:',
+      d.ua
+    ];
+    if (e.stack) linhas.push('', 'stack:', String(e.stack));
+    return linhas.join('\n');
+  }
+
+  function abrirDiagnosticoOutlook() {
+    var texto = textoDiagnostico();
+    var corpo = el('div', { 'class': 'diag' });
+    var est = GiocoOutlook.estado();
+    if (est === 'webview') {
+      corpo.appendChild(el('p', { text: 'Estás a ver esta página dentro de um browser embutido numa app. ' +
+        'A Microsoft bloqueia o login nestes browsers, por isso nem se tenta. ' +
+        'Abre a página no Safari (menu ··· → "Abrir no Safari") e liga aí a conta — ' +
+        'a sessão fica guardada e o resto do calendário funciona na mesma aqui.' }));
+    } else {
+      corpo.appendChild(el('p', { text: 'Detalhe técnico do último erro. Copia e envia isto se for preciso perceber o que falhou.' }));
+    }
+    corpo.appendChild(el('pre', { text: texto }));
+
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    var copiar = el('button', { type: 'button', 'class': 'btn-add', text: 'Copiar' });
+    copiar.addEventListener('click', function () {
+      function feito() { copiar.textContent = 'Copiado ✓'; setTimeout(function () { copiar.textContent = 'Copiar'; }, 2000); }
+      function falhou() {
+        // Sem clipboard (contexto não seguro, permissão negada): seleciona o
+        // texto para o utilizador copiar à mão, que em iOS é um toque longo.
+        copiar.textContent = 'Seleciona e copia';
+        var pre = corpo.querySelector('pre');
+        try {
+          var r = document.createRange(); r.selectNodeContents(pre);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        } catch (err) {}
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(feito, falhou);
+      } else { falhou(); }
+    });
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, copiar])]));
+    giocoModal.open({ titulo: est === 'webview' ? 'Abre no Safari' : 'Diagnóstico do Outlook', conteudo: corpo });
   }
 
   /* Painel da conta Microsoft: quem está ligado e o botão de desligar.
@@ -1312,10 +1447,10 @@
   recibosRef.on('value', function (s) { allRecibos = s.val() || {}; carregado.recibos = true; render(); });
   pessoasRef.on('value', function (s) { allPessoas = s.val() || {}; carregado.pessoas = true; render(); });
 
-  /* MSAL: idempotente e tolerante — se o SDK não carregou, disponivel() dá
-     false e o resto da página segue igual. O handleRedirectPromise tem de
-     correr no arranque para apanhar o retorno do fallback loginRedirect. */
-  GiocoOutlook.init().then(function () { render(); });
+  /* O MSAL JÁ arrancou lá em cima, em paralelo com o Firebase (ver o bloco
+     antes do autenticarEContinuar). Aqui só nos ligamos à promessa para voltar
+     a desenhar quando o estado deixar de ser 'a-verificar'. */
+  GiocoOutlook.pronto().then(function () { render(); }, function () { render(); });
 
   render();
   }); // fim de autenticarEContinuar
