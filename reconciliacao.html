@@ -336,7 +336,7 @@ window.addEventListener('load', function () {
   var termCobertura = {};    // origem → { dia → true }
   var vendasMes = {};        // mês → { dia → porPagamento } (cache do Firebase)
   var mesesComErro = {};
-  var mesAtivo = null;
+  var mesAtivo = '';     // '' = Todos os meses (por omissão): lista inteira, sem filtro
   var diaAberto = null;
   var db = null;
 
@@ -613,7 +613,7 @@ window.addEventListener('load', function () {
         });
       });
     }, Promise.resolve()).then(function(){
-      renderFicheiros(); garantirMesesDosFicheiros(); renderTudo();
+      renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
     });
   });
 
@@ -645,7 +645,7 @@ window.addEventListener('load', function () {
         });
       });
     }, Promise.resolve()).then(function(){
-      renderFicheiros(); garantirMesesDosFicheiros(); renderTudo();
+      renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
     });
   });
 
@@ -682,6 +682,23 @@ window.addEventListener('load', function () {
       mesesComErro[mes] = err && err.message ? err.message : String(err);
       vendasMes[mes] = vendasMes[mes] || {};
     });
+  }
+
+  // Meses do selector: do primeiro mês com vendas até hoje, mais os que
+  // vierem nos ficheiros carregados.
+  function listaMeses(){
+    var meses = {};
+    var m = PRIMEIRO_MES, hoje = mesDeHoje(), guard = 0;
+    while (m <= hoje && guard++ < 240){ meses[m] = true; m = mesSeguinte(m); }
+    Object.keys(saftCobertura).forEach(function(d){ meses[d.slice(0, 7)] = true; });
+    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
+    return Object.keys(meses).sort().reverse();
+  }
+
+  // "Todos": carrega todos os meses (os já em cache resolvem logo).
+  function carregarAtivo(){
+    if (mesAtivo) return carregarMes(mesAtivo);
+    return Promise.all(listaMeses().map(carregarMes));
   }
 
   /* ============================================================
@@ -886,42 +903,40 @@ window.addEventListener('load', function () {
   /* ============================================================
      ZONA 1 — dias
      ============================================================ */
-  function garantirMesesDosFicheiros(){
+  function preencherSelectorMeses(){
     var sel = document.getElementById('selMes');
-    var meses = {};
-    Object.keys(saftCobertura).forEach(function(d){ meses[d.slice(0, 7)] = true; });
-    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
-    var existentes = {};
-    Array.prototype.forEach.call(sel.options, function(op){ existentes[op.value] = true; });
-    var novos = Object.keys(meses).filter(function(m){ return !existentes[m]; });
-    if (!novos.length) return;
-    var todos = Object.keys(existentes).concat(novos).sort().reverse();
-    var atual = sel.value;
-    sel.innerHTML = todos.map(function(m){ return '<option value="' + m + '">' + fmtMes(m) + '</option>'; }).join('');
-    sel.value = atual;
+    sel.innerHTML = '<option value="">Todos os meses</option>' +
+      listaMeses().map(function(x){ return '<option value="' + x + '">' + fmtMes(x) + '</option>'; }).join('');
+    sel.value = mesAtivo;
+  }
+
+  // Depois de um upload: meses novos entram no selector e, em "Todos",
+  // carregam-se também do Firebase.
+  function garantirMesesDosFicheiros(){
+    preencherSelectorMeses();
+    return carregarAtivo();
   }
 
   function montarSelectorMeses(){
     var sel = document.getElementById('selMes');
-    var meses = [];
-    var m = PRIMEIRO_MES, hoje = mesDeHoje(), guard = 0;
-    while (m <= hoje && guard++ < 240){ meses.push(m); m = mesSeguinte(m); }
-    meses.reverse();
-    sel.innerHTML = meses.map(function(x){ return '<option value="' + x + '">' + fmtMes(x) + '</option>'; }).join('');
-    sel.value = hoje;
-    mesAtivo = hoje;
+    preencherSelectorMeses();
     sel.addEventListener('change', function(){
       mesAtivo = sel.value; diaAberto = null;
-      carregarMes(mesAtivo).then(renderTudo);
+      renderTudo();
+      carregarAtivo().then(renderTudo);
     });
   }
 
+  // Dias a listar: união de vendasDiario, cobertura dos SAF-T e transações
+  // do terminal. Sem mês (Todos) é a lista inteira, sempre ordenada por dia,
+  // mais recente primeiro, atravessando meses — nunca paginada nem cortada.
   function diasDoMes(mes){
     var set = {};
-    Object.keys(vendasMes[mes] || {}).forEach(function(d){ set[d] = true; });
-    Object.keys(saftCobertura).forEach(function(d){ if (d.slice(0, 7) === mes) set[d] = true; });
+    function poe(d){ if (!mes || d.slice(0, 7) === mes) set[d] = true; }
+    Object.keys(vendasMes).forEach(function(m){ Object.keys(vendasMes[m]).forEach(poe); });
+    Object.keys(saftCobertura).forEach(poe);
     Object.keys(terminal).forEach(function(o){
-      Object.keys(terminal[o]).forEach(function(k){ var d = terminal[o][k].dia; if (d.slice(0, 7) === mes) set[d] = true; });
+      Object.keys(terminal[o]).forEach(function(k){ poe(terminal[o][k].dia); });
     });
     return Object.keys(set).sort().reverse();
   }
@@ -935,11 +950,14 @@ window.addEventListener('load', function () {
   function renderDias(){
     var ul = document.getElementById('listaDias');
     var vazio = document.getElementById('diasVazio');
-    var dias = mesAtivo ? diasDoMes(mesAtivo) : [];
+    var dias = diasDoMes(mesAtivo);
     if (!dias.length){
       ul.innerHTML = '';
       vazio.style.display = '';
-      vazio.textContent = mesesComErro[mesAtivo] ? 'Não consegui ler vendasDiario/' + mesAtivo + ': ' + mesesComErro[mesAtivo] : 'Sem dias neste mês: nem vendas importadas, nem ficheiros carregados.';
+      var erros = Object.keys(mesesComErro);
+      vazio.textContent = (mesAtivo && mesesComErro[mesAtivo]) ? 'Não consegui ler vendasDiario/' + mesAtivo + ': ' + mesesComErro[mesAtivo]
+        : (!mesAtivo && erros.length) ? 'Não consegui ler vendasDiario/' + erros.join(', ')
+        : (!db ? 'A carregar…' : (mesAtivo ? 'Sem dias neste mês: nem vendas importadas, nem ficheiros carregados.' : 'Sem dias: nem vendas importadas, nem ficheiros carregados.'));
       return;
     }
     vazio.style.display = 'none';
@@ -1261,7 +1279,7 @@ window.addEventListener('load', function () {
 
   autenticarEContinuar(function () {
     db = firebase.database();
-    carregarMes(mesAtivo).then(renderTudo);
+    carregarAtivo().then(renderTudo);
   }); // fim de autenticarEContinuar
 
 });
