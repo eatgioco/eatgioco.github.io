@@ -35,8 +35,9 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   Aderem hoje: `equipa.html`, `contagens.html`, `tesouraria.html`, `gestao.html`,
   `caixa.html` (desde Set/2026: fotografar o talão no Devolver Troco),
   `loja-sao-bento.html` (desde 1 Set/2026: no computador da loja, que tem rato,
-  nada muda — o critério é o hover) e `centro-de-controlo.html` (desde Set/2026:
-  câmaras, controlo do A/C e música a partir do telemóvel).
+  nada muda — o critério é o hover), `centro-de-controlo.html` (desde Set/2026:
+  câmaras, controlo do A/C e música a partir do telemóvel) e `calendario.html`
+  (desde Set/2026: agenda ao telemóvel — ver a excepção logo a seguir).
   **Classe `shell-touch`.** O `gioco-shell.js` (`initShellTouch`) põe
   `body.shell-touch` quando o body tem `shell-mobile` E `matchMedia('(hover: none)')`
   casa; caso contrário tira-a. Corre no arranque do shell e volta a correr no
@@ -46,6 +47,23 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   cartões, alvos de toque maiores) com regras `body.shell-touch …` no seu
   `<style>`, sem escrever `@media` próprios — que continuam a viver só no shell.
   Com rato a classe não existe e o layout desktop fica intacto.
+- **Excepção à excepção: a `calendario.html` tem `@media` próprios** (Set/2026, a única
+  página do OS que os tem). Um calendário não se reorganiza só com `shell-touch`: a
+  vista Mês passa a células quadradas com pontos em vez de chips, a Semana passa de
+  7 colunas horárias a 7 faixas empilhadas, o painel lateral do dia passa a bottom
+  sheet e os `giocoModal` passam a ecrã inteiro. Tudo isso vive num só bloco
+  `@media (max-width: 767px)` no fim do `<style>` da página, e **só nesse bloco** —
+  o `gioco-shell.css` e o `gioco-eventos.css` não foram tocados. Regras: o limite é
+  de LARGURA (767px) e o JS usa o MESMO limite (`matchMedia('(max-width: 767px)')`,
+  `ehMobile()`) para decidir a vista Semana e a bottom sheet — os dois têm de mudar
+  juntos; acima de 768px a página é byte a byte o que era (verificado com diff de
+  píxeis das três vistas); as peças de telemóvel (`.mob-bg`, `.mob-sheet`, `.fab`,
+  `.cal-camadas-btn`, `.mes-pontos`, `.sem-faixas`) nascem `display:none` fora da
+  media query, para nunca aparecerem em desktop por descuido. O `#calCamadas`
+  (os toggles das camadas) é MOVIDO para o `<body>` ao abrir como folha e devolvido
+  à barra ao fechar: são os mesmos elementos e os mesmos handlers, mas o `.cal-bar`
+  é `.glass-light` (backdrop-filter) e sticky, e as duas coisas prendem lá dentro
+  qualquer `position:fixed` filho. Nenhuma leitura ou escrita no Firebase mudou.
 
 ## Ficheiros do repositório
 
