@@ -1039,6 +1039,12 @@ mecânica e é obrigatório antes de qualquer push que toque em páginas):
     nunca são linkadas de páginas públicas.
 11. **Cascata.** O `<style>` local vem depois do `<link>`: nunca criar classe
     local com nome de classe do shell.
+12. **Toggles.** Qualquer controlo binário (ligar/desligar uma coisa) usa o
+    componente `.gio-toggle` do shell — **obrigatório, sem excepções**. Zero
+    CSS de pílula+knob por página: era o que estava no `.cc-switch` do
+    centro-de-controlo e no `.pf-switch` do dashboard, e é o que o
+    `verifica-shell.sh` passou a apanhar (ponto 8). Ver a secção "Toggle"
+    abaixo para o que é — e o que NÃO é — um toggle.
 
 Fora do âmbito (lista de exceções do script): `abanca-callback.html`,
 `privacidade.html`, `termos.html` (páginas de suporte, design próprio),
@@ -1056,6 +1062,43 @@ Ao migrar uma página, no `<head>` a seguir ao bloco de ícones: as fontes
 `<link rel="stylesheet" href="gioco-shell.css">`. A seguir a
 `<body>`, `<script src="gioco-shell.js"></script>` — antes de qualquer markup
 com `<use href="#i-...">`, para o sprite já estar no DOM.
+
+**Toggle (controlo binário).** O componente é `.gio-toggle` (CSS no
+`gioco-shell.css`, helpers `giocoToggleHtml()` / `giocoToggleSet()` no
+`gioco-shell.js`), documentado na montra do `estilo.html`. É **obrigatório**
+para todo o controlo novo de ligar/desligar: nunca voltar a escrever CSS de
+pílula por página, nem redesenhar a track/knob do componente (o
+`verifica-shell.sh` falha nas duas coisas).
+
+- Duas medidas, mesmo desenho, derivadas por variáveis: `.gio-toggle` (40×22,
+  a de todo o lado) e `.gio-toggle--lg` (64×32, a do toggle de tema). Ajustar
+  a medida noutro contexto faz-se pelas variáveis (`--gt-w`, `--gt-h`,
+  `--gt-pad`, `--gt-knob`, `--gt-travel`) — é o que o centro-de-controlo faz
+  em `body.shell-touch` — nunca redeclarando as regras.
+- **Não muda de aparência com o tema**, de propósito: as cores são literais
+  fixas nos dois. O cinzento do desligado (`#6b6660`) é o único tom que passa
+  3:1 contra os dois fundos de página; um desligado claro ficava invisível no
+  tema claro. Ligado é `var(--red)`, que já é igual nos dois temas. A única
+  excepção é a variante `.gio-toggle--theme` — o toggle de claro/escuro —,
+  cujo estado **é** o tema e por isso acompanha-o (ligado = claro), e que é
+  também o único com ícones e com o `.gio-toggle-ghost`.
+- **Estrutura obrigatória:** `<label>` com um `<input type="checkbox">` real
+  como PRIMEIRO filho (é dele que saem os seletores `~` de estado), escondido
+  sem `display:none` para continuar focável. Daí vêm de graça o teclado, o
+  `:focus-visible`, o `:disabled` e os leitores de ecrã. O rótulo
+  (`.gio-toggle-txt`) fica antes ou depois da track e é a ordem no DOM que
+  decide o lado. O estado vive no `checked` — nunca uma classe `.on`, nunca
+  `aria-pressed`.
+- **O que NÃO é um toggle** (e não se converte): escolha entre opções
+  visíveis, mesmo com duas (o par segmentado Saída/Entrada e o Sim/Não da
+  `caixa.html` — os dois rótulos à vista são a informação); filtros de vista
+  (Hoje/7 dias/Mês/Tudo); disclosure/accordion (`.equip-manage-zona-toggle`
+  da loja, que só colapsa uma secção); botões de ícone numa fila de
+  controlos de media (o mute do cartão Música, ao lado do play/pause); um
+  botão que só às vezes é interruptor e às vezes é uma acção (a camada
+  Outlook da `calendario.html`, que sem sessão vira "Ligar Outlook"); e
+  vistos de checklist ou selecção de linhas, onde o checkbox nativo é a
+  affordance certa.
 
 **Gráficos.** Qualquer página que precise de barras, colunas, linha ou donut
 carrega `gioco-charts.css`/`.js` e usa `GiocoChart.*`. Nunca reimplementar por

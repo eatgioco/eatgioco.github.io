@@ -27,6 +27,10 @@
   .sg-icon-cell{ border-radius:12px; padding:14px 6px 10px; text-align:center; border:1px solid var(--line); background:var(--white); }
   .sg-icon-cell .nm{ font-size:10px; color:var(--muted); margin-top:8px; word-break:break-all; }
   .sg-row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .sg-lbl{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; color:var(--ink); margin:0 0 10px; }
+  .sg-lbl code, .sg-sub code{ font-family:'Inter',sans-serif; font-size:11px; background:var(--dough); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+  .sg-code{ font-family:'Inter',sans-serif; font-size:11.5px; line-height:1.6; color:var(--ink); background:var(--dough); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:0 0 14px; overflow-x:auto; }
+  .sg-lbl kbd{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700; background:var(--white); border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:1px 5px; }
   .sg-bend-demo{ border-radius:18px; padding:22px; color:#f2ede4; min-height:120px; }
   .sg-bend-demo h4{ margin:0 0 6px; font-size:14px; font-weight:700; }
   .sg-bend-demo p{ margin:0; font-size:12.5px; opacity:.8; line-height:1.5; }
@@ -67,10 +71,13 @@
       </button>
       <h1>Estilo <b>GIOCO OS</b></h1>
       <div class="spacer"></div>
-      <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
-        <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
-        <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
-      </div>
+      <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
+        <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
+        <span class="gio-toggle-track">
+          <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
+          <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
+        </span>
+      </label>
       <div class="icon-btn"><svg class="icon" width="18" height="18"><use href="#i-bell"/></svg><span class="ping"></span></div>
       <div class="icon-btn"><svg class="icon" width="18" height="18"><use href="#i-message-square"/></svg></div>
       <div class="user-drop"><div class="avatar">MR</div><span class="name">Manel</span><svg class="icon" width="14" height="14"><use href="#i-chevron-down"/></svg></div>
@@ -317,6 +324,95 @@
             <div class="page-dot"><svg class="icon" width="13" height="13"><use href="#i-chevron-right"/></svg></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== TOGGLE ===== -->
+    <div class="sg-section">
+      <h2 class="sg-h2">Toggle — controlo binário</h2>
+      <p class="sg-sub">
+        O único switch do OS. Qualquer controlo novo de ligar/desligar usa
+        <code>.gio-toggle</code> e mais nada — nunca CSS de pílula próprio por página.
+        Não muda de aparência com o tema: as cores são fixas nos dois, para "ligado"
+        se ler igual no claro e no escuro.
+      </p>
+      <div class="panel glass-light">
+
+        <p class="sg-lbl">Medida normal — <code>.gio-toggle</code> (40&times;22). A de listas, modais, cartões e painéis.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input">
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input" checked>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input" disabled>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input" checked disabled>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <span class="sg-sub" style="margin:0">desligado · ligado · desligado+disabled · ligado+disabled</span>
+        </div>
+
+        <p class="sg-lbl">Medida grande — <code>.gio-toggle--lg</code> (64&times;32). É a do toggle de tema; usar só quando o controlo é o assunto principal do bloco.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <label class="gio-toggle gio-toggle--lg">
+            <input type="checkbox" class="gio-toggle-input">
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle gio-toggle--lg">
+            <input type="checkbox" class="gio-toggle-input" checked>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle gio-toggle--lg">
+            <input type="checkbox" class="gio-toggle-input" checked disabled>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+        </div>
+
+        <p class="sg-lbl">Rótulo — a ordem no DOM decide o lado. O <code>&lt;input&gt;</code> é sempre o primeiro filho.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input" checked>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+            <span class="gio-toggle-txt">Rótulo à direita</span>
+          </label>
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input">
+            <span class="gio-toggle-txt">Rótulo à esquerda</span>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          </label>
+          <label class="gio-toggle">
+            <input type="checkbox" class="gio-toggle-input" disabled>
+            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+            <span class="gio-toggle-txt">Sem ligação ao serviço</span>
+          </label>
+        </div>
+
+        <p class="sg-lbl">Foco por teclado — <kbd>Tab</kbd> até ao toggle, <kbd>espaço</kbd> ou <kbd>enter</kbd> para ligar. O contorno vermelho aparece só na navegação por teclado (<code>:focus-visible</code>), nunca ao clicar com o rato.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <label class="gio-toggle"><input type="checkbox" class="gio-toggle-input"><span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span><span class="gio-toggle-txt">Experimenta com o Tab</span></label>
+          <label class="gio-toggle"><input type="checkbox" class="gio-toggle-input"><span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span><span class="gio-toggle-txt">…e outra vez</span></label>
+        </div>
+
+        <p class="sg-lbl">Markup a copiar</p>
+        <pre class="sg-code">&lt;label class="gio-toggle"&gt;
+  &lt;input type="checkbox" class="gio-toggle-input" id="algo"&gt;
+  &lt;span class="gio-toggle-track"&gt;&lt;span class="gio-toggle-knob"&gt;&lt;/span&gt;&lt;/span&gt;
+  &lt;span class="gio-toggle-txt"&gt;Rótulo&lt;/span&gt;
+&lt;/label&gt;</pre>
+        <p class="sg-sub">
+          Em HTML gerado por JS: <code>giocoToggleHtml({ id, rotulo, ligado, desativado, grande, rotuloAntes, classe, attrs })</code>.
+          Para refletir estado vindo do Firebase num toggle já no DOM:
+          <code>giocoToggleSet(el, ligado)</code> — por referência de elemento, nunca por id fixo,
+          para poder haver N por página. O estado vive no <code>checked</code> do checkbox:
+          nunca uma classe <code>.on</code>, nunca <code>aria-pressed</code>.
+        </p>
       </div>
     </div>
 

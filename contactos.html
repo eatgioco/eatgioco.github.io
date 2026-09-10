@@ -335,16 +335,12 @@
     border-color:var(--red);
   }
 
+  /* Só a folga da linha: a pílula é do componente .gio-toggle. */
   .field-checkbox{
-    display:flex;
-    align-items:center;
-    gap:8px;
     font-size:13px;
     margin-bottom:18px;
-    color:var(--ink);
   }
 
-  .field-checkbox input{ width:20px; height:20px; }
 
   .form-grid{
     display:grid;
@@ -444,10 +440,13 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-phone"/></svg>GIOCO · <b>Contactos</b></h1>
         <div class="spacer"></div>
-        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
-          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
-          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
-        </div>
+        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
+          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
+          <span class="gio-toggle-track">
+            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
+            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
+          </span>
+        </label>
       </div>
 
       <p class="page-subtitle" id="pageSubtitle">Fornecedores, equipa e serviços</p>
@@ -565,7 +564,7 @@
       <label class="field-label" for="svNotas">Notas</label>
       <textarea id="svNotas"></textarea>
     </div>
-    <label class="field-checkbox"><input type="checkbox" id="svPrivado"> Privado (só gestão)</label>
+    <label class="gio-toggle field-checkbox"><input type="checkbox" class="gio-toggle-input" id="svPrivado"><span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span><span class="gio-toggle-txt">Privado (só gestão)</span></label>
     <div class="modal-actions">
       <p class="modal-erro" id="servicoErro">O nome é obrigatório.</p>
       <button type="button" class="btn-sec" id="servicoArquivar" style="display:none">Arquivar</button>
