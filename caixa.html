@@ -441,6 +441,21 @@
   .troco-ok{ color:var(--green); font-weight:600; }
   .troco-ko{ color:var(--amber); font-weight:600; }
 
+  /* Aviso de registos ignorados no saldo vivo por dataHora inválida (ver
+     gioco-caixa.js). Frase, não badge curto — bloco, não pill do .status. */
+  .saldo-vivo-aviso{
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    line-height:1.4;
+    padding:6px 10px;
+    margin-top:8px;
+    border-radius:8px;
+    background:var(--caixa-warn-bg);
+    color:var(--amber);
+    border:1px solid var(--amber);
+  }
+
   .btn-acertar{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:12px;
@@ -1112,6 +1127,7 @@
         <p class="summary-label">Saldo vivo</p>
         <p class="summary-value" id="caixaVivaValue">A carregar…</p>
         <p class="summary-sub" id="caixaVivaSub"></p>
+        <p class="saldo-vivo-aviso" id="caixaVivaAviso" hidden></p>
       </div>
       <div class="summary-card">
         <p class="summary-label">Saldo hoje</p>
@@ -1869,6 +1885,7 @@
     var contagem = ultimaContagemCaixa();
     var valEl = document.getElementById('caixaVivaValue');
     var subEl = document.getElementById('caixaVivaSub');
+    var avisoEl = document.getElementById('caixaVivaAviso');
     var btnEl = document.getElementById('btnContarCaixa');
     var btnLabelEl = document.getElementById('btnContarCaixaLabel');
     if (valEl && subEl){
@@ -1882,6 +1899,23 @@
         subEl.textContent = 'Última contagem: ' + formatDataHora(contagem.dataHora) + ' · ' + (contagem.pessoa || '');
         if (btnLabelEl) btnLabelEl.textContent = 'Contar caixa';
         if (btnEl) btnEl.classList.remove('destaque');
+      }
+    }
+
+    // Avisa se alguma contagem ou movimento ficou fora do cálculo por ter
+    // dataHora inválida (ver gioco-caixa.js) — sem isto, um registo corrompido
+    // era descartado em silêncio e o saldo vivo parecia certo sem o ser.
+    if (avisoEl){
+      var contagensMas = GiocoCaixa.contagensInvalidas(allContagens);
+      var movsMas = GiocoCaixa.movimentosInvalidos(allContagens, allMovs);
+      if (contagensMas.length || movsMas.length){
+        var partes = [];
+        if (contagensMas.length) partes.push(contagensMas.length + ' ' + (contagensMas.length === 1 ? 'contagem' : 'contagens') + ' com data inválida');
+        if (movsMas.length) partes.push(movsMas.length + ' ' + (movsMas.length === 1 ? 'movimento' : 'movimentos') + ' com data inválida');
+        avisoEl.textContent = '⚠ ' + partes.join(' · ') + ' — ignorados no cálculo';
+        avisoEl.hidden = false;
+      } else {
+        avisoEl.hidden = true;
       }
     }
 
@@ -2630,9 +2664,10 @@
   // uma data: fica fora dos filtros de período e cai no grupo "Sem data" no
   // fim da lista. Sem isto, new Date(lixo) dava NaN e o cabeçalho do dia saía
   // "NaN/NaN/NaN" (ou "01/01/1970" para null/0).
+  // Delega no gioco-caixa.js — fonte única, também usada por ultimaContagem()
+  // e saldoVivoCaixa() para a âncora do saldo vivo.
   function dataHoraValida(iso){
-    if (typeof iso !== 'string' || !iso) return false;
-    return !isNaN(new Date(iso).getTime());
+    return GiocoCaixa.dataHoraValida(iso);
   }
 
   // 'AAAA-MM' de um registo, ou null se a data não presta. A fatia é UTC (é o
