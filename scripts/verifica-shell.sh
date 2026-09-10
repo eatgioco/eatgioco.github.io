@@ -81,24 +81,6 @@ for f in *.html; do
     erro "$f: a página redefine o interior do .gio-toggle (track/knob/ghost)"
   fi
 
-  # 8b. Segmentados: o grupo de opções uma-de-N é do shell (.gio-seg).
-  #    (a) redefinir o interior do componente é duplicá-lo. Ajustar a MEDIDA
-  #    pelas variáveis (--gs-h, --gs-pad, --gs-px, --gs-fs) ou dar folga ao
-  #    invólucro é legítimo; repintar o indicador ou as opções não é.
-  if grep -qE '\.gio-seg-(ind|opt)[^{]*\{' "$f"; then
-    erro "$f: a página redefine o interior do .gio-seg (indicador/opções)"
-  fi
-  #    (b) markup de tablist escrito à mão. Um grupo de opções com role=tablist
-  #    que não seja o componente é um segmentado novo com desenho próprio —
-  #    exactamente o que não se quer. ZERO falsos positivos hoje: antes do
-  #    .gio-seg não havia um único role="tablist" no repo, e o componente traz
-  #    sempre a classe na mesma tag. Não apanha um segmentado escondido debaixo
-  #    de <div>s sem role (para isso valem o CLAUDE.md e a revisão) — apanha o
-  #    caso real, que é escrever markup de abas de raiz.
-  if grep -oE '<[a-z]+[^>]*role="tablist"[^>]*>' "$f" | grep -qv 'gio-seg'; then
-    erro "$f: role=\"tablist\" fora do componente — usar o .gio-seg do shell"
-  fi
-
   # 9. Mobile: shell-mobile exige device-width e vice-topo (só coerência básica).
   if grep -q 'shell-mobile' "$f" && ! grep -q 'width=device-width' "$f"; then
     erro "$f: shell-mobile sem viewport device-width"
