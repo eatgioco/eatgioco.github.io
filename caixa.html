@@ -356,6 +356,22 @@
   .mov-tipo-tag.saida{ color:var(--red-ink); }
   .mov-tipo-tag.entrada{ color:var(--green); }
 
+  /* Ícone de tipo (Set/2026): SAÍDA/ENTRADA usam a mesma seta+cor já dadas
+     ao valor do movimento; CONTAGEM (ver .contagem-cabecalho) é um ícone de
+     outra natureza de propósito — não é uma transação, é um evento de
+     verificação. */
+  .mov-tipo-icon{ width:14px; height:14px; flex:none; }
+  .mov-tipo-icon.saida{ color:var(--red-ink); }
+  .mov-tipo-icon.entrada{ color:var(--green); }
+  .mov-tipo-icon.contagem{ color:var(--muted); }
+
+  .mov-valor-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:2px;
+  }
+
   .mov-valor{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
@@ -365,6 +381,15 @@
 
   .mov-valor.saida{ color:var(--red-ink); }
   .mov-valor.entrada{ color:var(--green); }
+
+  /* Saldo corrente por linha (Set/2026): subordinado ao valor do movimento —
+     menor e mais claro, para não competir com ele. */
+  .mov-saldo{
+    font-size:11px;
+    font-weight:400;
+    color:var(--muted);
+    white-space:nowrap;
+  }
 
   .mov-motivo{
     margin:8px 0 4px;
@@ -2545,10 +2570,23 @@
     var sinal = m.tipo === 'saida' ? '−' : '+';
     var horaLabel = opts.soHora ? formatHora(m.dataHora) : formatDataHora(m.dataHora);
 
+    // Ícone + saldo corrente só na listagem de Movimentos (opts.comSaldo) —
+    // nunca em "Por devolver troco" nem no cofre, que reusam este cartão.
+    var iconHtml = '';
+    var saldoHtml = '';
+    if (opts.comSaldo){
+      var iconNome = m.tipo === 'saida' ? 'i-arrow-down' : 'i-arrow-up';
+      iconHtml = '<svg class="icon mov-tipo-icon ' + m.tipo + '" width="14" height="14" aria-hidden="true"><use href="#' + iconNome + '"/></svg>';
+      var saldoTxt;
+      if (opts.saldo === null || opts.saldo === undefined) saldoTxt = '—';
+      else saldoTxt = (opts.saldo < 0 ? '−' + formatEUR(Math.abs(opts.saldo)) : formatEUR(opts.saldo));
+      saldoHtml = '<span class="mov-saldo num">' + saldoTxt + '</span>';
+    }
+
     var html = '<div class="mov-row' + (isAberto ? ' aberto' : '') + '">';
     html += '  <div class="mov-top">';
-    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
-    html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
+    html += '    <div class="mov-tipo-hora">' + iconHtml + '<span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
+    html += '    <div class="mov-valor-wrap"><div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>' + saldoHtml + '</div>';
     html += '  </div>';
     html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
     html += '  <div class="mov-meta">';
@@ -2720,7 +2758,7 @@
     var html = '<div class="mov-row contagem">';
     html += '  <div class="contagem-cabecalho" onclick="toggleContagemDetalhe(\'' + id + '\')">';
     html += '    <div class="mov-top">';
-    html += '      <div class="mov-tipo-hora"><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
+    html += '      <div class="mov-tipo-hora"><svg class="icon mov-tipo-icon contagem" width="14" height="14" aria-hidden="true"><use href="#i-clipboard-check"/></svg><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
     html += '      <div style="display:flex;align-items:center;gap:8px;">';
     html += '        <span class="mov-valor num">' + formatEUR(c.total) + '</span>';
     html += '        <svg class="icon contagem-chevron" width="16" height="16" aria-hidden="true"><use href="#' + chevronIcon + '"/></svg>';
@@ -2790,6 +2828,61 @@
     mesFiltroInput.innerHTML = html;
   }
 
+  // ---------- Saldo corrente por linha (Set/2026) ----------
+  // A mesma âncora do GiocoCaixa.saldoVivoCaixa (a contagem mais recente que
+  // precede a linha + os movimentos entre essa contagem e ela, inclusive) —
+  // replicada aqui porque saldoVivoCaixa só devolve o saldo de AGORA, não o
+  // valor histórico linha a linha. Fórmula por movimento IDÊNTICA à do
+  // gioco-caixa.js (entrada: +valor; saída 'acertado': −(valor−valorDevolvido);
+  // qualquer outra saída: −valor) — não reimplementar essa parte com outra
+  // fórmula. Reusa dataHoraValida() para a mesma validação de data (um
+  // registo sem data fica fora do encadeamento — nunca entra no acumulado de
+  // mais ninguém, é o grupo "Sem data"). Sem contagem nenhuma antes da linha,
+  // o saldo é null ("—"), nunca 0 — nunca assumir um ponto de partida.
+  function calcularSaldosPorLinha(){
+    var eventos = [];
+    Object.keys(allContagens).forEach(function(id){
+      var c = allContagens[id];
+      if (!c || !dataHoraValida(c.dataHora)) return;
+      eventos.push({ tipo: 'contagem', id: id, ts: new Date(c.dataHora).getTime() });
+    });
+    Object.keys(allMovs).forEach(function(id){
+      var m = allMovs[id];
+      if (!m || !dataHoraValida(m.dataHora)) return;
+      eventos.push({ tipo: 'mov', id: id, ts: new Date(m.dataHora).getTime() });
+    });
+    eventos.sort(function(a, b){
+      if (a.ts !== b.ts) return a.ts - b.ts;
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+
+    var saldos = {};
+    var ancora = null;
+    eventos.forEach(function(ev){
+      if (ev.tipo === 'contagem'){
+        ancora = round2(parseFloat(allContagens[ev.id].total) || 0);
+        saldos[ev.id] = ancora;
+        return;
+      }
+      var m = allMovs[ev.id];
+      if (ancora === null){
+        saldos[ev.id] = null;
+        return;
+      }
+      var delta;
+      if (m.tipo === 'entrada'){
+        delta = (parseFloat(m.valor) || 0);
+      } else if (m.estado === 'acertado'){
+        delta = -((parseFloat(m.valor) || 0) - (parseFloat(m.valorDevolvido) || 0));
+      } else {
+        delta = -(parseFloat(m.valor) || 0);
+      }
+      ancora = round2(ancora + delta);
+      saldos[ev.id] = ancora;
+    });
+    return saldos;
+  }
+
   // ---------- Listagem completa ----------
   function renderList(){
     popularMesFiltro();
@@ -2841,6 +2934,7 @@
     }
 
     var earliestId = earliestContagemId();
+    var saldosPorLinha = calcularSaldosPorLinha();
     var html = '';
     var totalValorMovs = 0;
 
@@ -2849,7 +2943,7 @@
         totalValorMovs += allMovs[entrada.id].valor;
         // soHora só quando o cabeçalho do grupo já diz o dia — num grupo
         // "Sem data" não diz, mas aí não há hora nenhuma para mostrar.
-        return movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje' });
+        return movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje', comSaldo: true, saldo: saldosPorLinha[entrada.id] });
       }
       return contagemCardHtml(entrada.id, allContagens[entrada.id], { isEarliest: entrada.id === earliestId });
     }
