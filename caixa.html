@@ -1904,15 +1904,11 @@
   var mesFiltroInput = document.getElementById('mesFiltroInput');
   var motivoFiltroSelect = document.getElementById('motivoFiltroSelect');
   var filterSummaryEl = document.getElementById('filterSummary');
-  // valor default do mês = mês corrente, formato YYYY-MM (o dropdown real é
-  // populado por popularMesFiltro(), a partir dos meses com registos — este
-  // valor só garante que o mês corrente fica seleccionado por omissão mesmo
-  // sem nenhum registo ainda nele).
-  var mesAtualYm = (function(){
-    var d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  })();
-  var mesFiltroSelecionado = mesAtualYm;
+  // Mês seleccionado no dropdown: 'AAAA-MM', '' para "Todos os meses", ou null
+  // enquanto não houver registo nenhum. Quem o escolhe é popularMesFiltro(),
+  // SÓ a partir dos meses que têm registos — o mês corrente não é injectado à
+  // força (dava um mês vazio no dropdown no dia 1 de cada mês).
+  var mesFiltroSelecionado = null;
   var formState = { tipo: null, troco: null };
 
   var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
@@ -1942,7 +1938,11 @@
     return round2(n).toFixed(2).replace('.', ',') + ' €';
   }
 
+  // Data inválida dá '—', nunca 'NaN:NaN' / 'NaN/NaN'. O guarda vive aqui, no
+  // único sítio por onde passam todas as datas da página; para uma data
+  // válida o resultado é exactamente o de sempre.
   function formatHora(iso){
+    if (!dataHoraValida(iso)) return '—';
     var d = new Date(iso);
     var hh = String(d.getHours()).padStart(2, '0');
     var mm = String(d.getMinutes()).padStart(2, '0');
@@ -1950,6 +1950,7 @@
   }
 
   function formatDataHora(iso){
+    if (!dataHoraValida(iso)) return '—';
     var d = new Date(iso);
     var dd = String(d.getDate()).padStart(2, '0');
     var mo = String(d.getMonth() + 1).padStart(2, '0');
@@ -2624,6 +2625,25 @@
   // contagens físicas de caixaContagens no mesmo histórico. Tudo leitura;
   // caixaContagens nunca é editado/apagado a partir daqui). ----------
 
+  // Um registo com dataHora em falta, não-string ou impossível de parsear
+  // (null, 0, 'ontem', '2026-13-45T99:99:99Z') NÃO é descartado nem inventa
+  // uma data: fica fora dos filtros de período e cai no grupo "Sem data" no
+  // fim da lista. Sem isto, new Date(lixo) dava NaN e o cabeçalho do dia saía
+  // "NaN/NaN/NaN" (ou "01/01/1970" para null/0).
+  function dataHoraValida(iso){
+    if (typeof iso !== 'string' || !iso) return false;
+    return !isNaN(new Date(iso).getTime());
+  }
+
+  // 'AAAA-MM' de um registo, ou null se a data não presta. A fatia é UTC (é o
+  // formato em que dataHora é gravado) e tem de ter mesmo a forma de mês —
+  // sem o teste, um 'ontem' passava a "mês" e ia parar ao dropdown.
+  function mesDe(iso){
+    if (!dataHoraValida(iso)) return null;
+    var ym = iso.slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(ym) ? ym : null;
+  }
+
   // Chave de dia em hora LOCAL (mesma base de isToday/isWithinLast7Days —
   // nunca a fatia UTC do ISO, que desalinhava a meia-noite).
   function dayKeyLocal(input){
@@ -2727,34 +2747,47 @@
     return html;
   }
 
-  // Meses com registos reais (movimentos OU contagens) + o mês corrente
-  // sempre presente, para o filtro "Mês" ter sempre uma opção seleccionada.
+  // SÓ meses com registos reais (movimentos OU contagens). Nada é injectado à
+  // força: um mês sem um único registo nunca aparece no dropdown.
   var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   function popularMesFiltro(){
     var metas = {};
     Object.keys(allMovs).forEach(function(id){
-      var ym = (allMovs[id].dataHora || '').slice(0, 7);
+      var ym = mesDe(allMovs[id].dataHora);
       if (ym) metas[ym] = true;
     });
     Object.keys(allContagens).forEach(function(id){
-      var ym = (allContagens[id].dataHora || '').slice(0, 7);
+      var ym = mesDe(allContagens[id].dataHora);
       if (ym) metas[ym] = true;
     });
-    metas[mesAtualYm] = true;
 
     var meses = Object.keys(metas).sort().reverse();
-    var html = '<option value="">Todos os meses</option>';
+
+    // Sem registo nenhum não há nada por que filtrar: dropdown desactivado, e
+    // a lista mostra o estado vazio de sempre.
+    if (meses.length === 0){
+      mesFiltroSelecionado = null;
+      mesFiltroInput.innerHTML = '<option value="">Sem registos</option>';
+      mesFiltroInput.disabled = true;
+      return;
+    }
+    mesFiltroInput.disabled = false;
+
+    // '' é "Todos os meses" — uma escolha válida, que tem de sobreviver aos
+    // re-renders. Só se cai para o mês mais recente com registos quando a
+    // escolha anterior não existe (primeira vez, ou o mês perdeu os registos).
+    if (mesFiltroSelecionado !== '' && meses.indexOf(mesFiltroSelecionado) === -1){
+      mesFiltroSelecionado = meses[0];
+    }
+
+    var html = '<option value=""' + (mesFiltroSelecionado === '' ? ' selected' : '') + '>Todos os meses</option>';
     meses.forEach(function(ym){
       var partes = ym.split('-');
-      var label = (MESES_PT[parseInt(partes[1], 10) - 1] || ym) + ' ' + partes[0];
+      var label = MESES_PT[parseInt(partes[1], 10) - 1] + ' ' + partes[0];
       html += '<option value="' + ym + '"' + (ym === mesFiltroSelecionado ? ' selected' : '') + '>' + label + '</option>';
     });
     mesFiltroInput.innerHTML = html;
-    if (mesFiltroInput.value !== mesFiltroSelecionado){
-      mesFiltroSelecionado = mesAtualYm;
-      mesFiltroInput.value = mesAtualYm;
-    }
   }
 
   // ---------- Listagem completa ----------
@@ -2762,12 +2795,17 @@
     popularMesFiltro();
     var filtro = motivoFiltroSelect.value;
 
+    // Um registo sem data válida fica SEMPRE fora de Hoje / 7 dias / Mês —
+    // explicitamente, não por acidente do NaN. Só aparece em "Tudo" e em
+    // "Todos os meses", no grupo "Sem data" do fim.
     function passaPeriodo(dataHora){
-      if (activeFilter === 'hoje') return isToday(dataHora);
-      if (activeFilter === '7dias') return isWithinLast7Days(dataHora);
+      var valida = dataHoraValida(dataHora);
+      if (activeFilter === 'hoje') return valida && isToday(dataHora);
+      if (activeFilter === '7dias') return valida && isWithinLast7Days(dataHora);
       if (activeFilter === 'mes'){
-        var ym = mesFiltroInput.value;
-        return !ym || (dataHora || '').slice(0, 7) === ym;
+        var ym = mesFiltroSelecionado;
+        if (!ym) return true; // '' = Todos os meses (e null = sem registos)
+        return valida && dataHora.slice(0, 7) === ym;
       }
       return true; // 'tudo'
     }
@@ -2787,9 +2825,15 @@
     var entradas = [];
     movIds.forEach(function(id){ entradas.push({ tipo: 'mov', id: id, dataHora: allMovs[id].dataHora }); });
     contagemIds.forEach(function(id){ entradas.push({ tipo: 'contagem', id: id, dataHora: allContagens[id].dataHora }); });
-    entradas.sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
 
-    if (entradas.length === 0){
+    // Os sem data saem da ordenação cronológica (comparar NaN dá uma ordem
+    // arbitrária) e vão para um grupo próprio no fim, por id para ser estável.
+    var semData = entradas.filter(function(e){ return !dataHoraValida(e.dataHora); });
+    entradas = entradas.filter(function(e){ return dataHoraValida(e.dataHora); });
+    entradas.sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+    semData.sort(function(a, b){ return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+
+    if (entradas.length === 0 && semData.length === 0){
       filterSummaryEl.textContent = '';
       var msgVazio = (modoLista === 'contagens') ? 'Sem contagens registadas neste período.' : 'Sem movimentos neste período.';
       movListEl.innerHTML = '<div class="empty-state">' + msgVazio + '</div>';
@@ -2799,6 +2843,17 @@
     var earliestId = earliestContagemId();
     var html = '';
     var totalValorMovs = 0;
+
+    function cartaoDaEntrada(entrada){
+      if (entrada.tipo === 'mov'){
+        totalValorMovs += allMovs[entrada.id].valor;
+        // soHora só quando o cabeçalho do grupo já diz o dia — num grupo
+        // "Sem data" não diz, mas aí não há hora nenhuma para mostrar.
+        return movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje' });
+      }
+      return contagemCardHtml(entrada.id, allContagens[entrada.id], { isEarliest: entrada.id === earliestId });
+    }
+
     var diaAtual = null;
     entradas.forEach(function(entrada){
       var chaveDia = dayKeyLocal(entrada.dataHora);
@@ -2807,14 +2862,16 @@
         diaAtual = chaveDia;
         html += '<div class="dia-grupo"><p class="dia-cabecalho">' + diaLabel(entrada.dataHora) + '</p>';
       }
-      if (entrada.tipo === 'mov'){
-        html += movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje' });
-        totalValorMovs += allMovs[entrada.id].valor;
-      } else {
-        html += contagemCardHtml(entrada.id, allContagens[entrada.id], { isEarliest: entrada.id === earliestId });
-      }
+      html += cartaoDaEntrada(entrada);
     });
-    html += '</div>';
+    if (diaAtual !== null) html += '</div>';
+
+    if (semData.length){
+      html += '<div class="dia-grupo"><p class="dia-cabecalho">Sem data <span class="dia-count">' +
+              semData.length + (semData.length === 1 ? ' registo' : ' registos') + '</span></p>';
+      semData.forEach(function(entrada){ html += cartaoDaEntrada(entrada); });
+      html += '</div>';
+    }
 
     var resumoPartes = [];
     if (modoLista !== 'contagens'){
