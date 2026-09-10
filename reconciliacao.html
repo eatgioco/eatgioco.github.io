@@ -62,7 +62,7 @@
   .card > *{ position:relative; z-index:1; }
 
   /* ---------- Uploads ---------- */
-  .rec-uploads{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  .rec-uploads{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
   .rec-upload h3{ margin:0 0 6px; font-size:14.5px; font-weight:700; color:var(--ink); }
   .rec-upload p{ margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .rec-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -76,6 +76,42 @@
   .rec-ficheiros li b{ font-weight:600; word-break:break-all; }
   .rec-ficheiros li span{ color:var(--muted); }
   .rec-ficheiros li .rec-erro{ color:var(--red-ink); }
+  .rec-ficheiros li .rec-origem{ font-weight:700; color:var(--ink); }
+  .rec-remover{
+    margin-left:auto; padding:2px 9px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line);
+  }
+  .rec-remover:hover{ color:var(--red-ink); border-color:var(--red); }
+
+  /* ---------- Vendas sem cobrança (painel de topo) ---------- */
+  .rec-vsc{ margin-bottom:20px; }
+  .rec-vsc h2{ margin:0; font-size:16px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rec-vsc h2 small{ font-weight:500; color:var(--muted); font-size:12px; }
+  .rec-vsc-cobertura{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .rec-vsc-cobertura b{ color:var(--ink); font-weight:600; }
+  .rec-vsc-totais{ display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:14px; }
+  .rec-vsc-totais .rec-total.h3{ border-color:var(--red); border-width:2px; }
+  .rec-vsc-totais .rec-total.h3 .v{ color:var(--red-ink); }
+  .rec-vsc-totais .rec-total.h1 .v, .rec-vsc-totais .rec-total.h2 .v{ color:var(--amber); }
+  .rec-vsc-totais .rec-total.h3.zero .v{ color:var(--green); }
+  .rec-vsc-totais .rec-total.na .v{ color:var(--muted); }
+  .rec-vsc-lista{ margin-top:18px; }
+  .rec-vsc-lista.h3 .rec-vsc-caixa{ border-left:4px solid var(--red); }
+  .rec-vsc-lista.h1 .rec-vsc-caixa, .rec-vsc-lista.h2 .rec-vsc-caixa{ border-left:4px solid var(--amber); }
+  .rec-vsc-lista.na .rec-vsc-caixa{ border-left:4px solid var(--line); }
+  .rec-vsc-caixa{ border-radius:10px; padding:12px 16px; background:var(--white); }
+  .rec-vsc-caixa table{ margin-top:4px; }
+  .rec-vsc-caixa th{ padding:6px 8px; }
+  .rec-vsc-caixa td{ padding:8px 8px; color:var(--ink); vertical-align:top; }
+  .rec-vsc-caixa .rec-vsc-ok{ color:var(--green); font-size:13px; font-weight:600; }
+  .rec-vsc-dia td{ background:var(--dough); font-weight:700; }
+  .rec-vsc-dia td small{ font-weight:500; color:var(--muted); }
+  .rec-vsc-dia .rec-vsc-bate{ color:var(--green); font-weight:700; }
+  .rec-vsc-dia .rec-vsc-nao{ color:var(--amber); font-weight:700; }
+  .rec-vsc-explica{ font-size:11.5px; color:var(--muted); }
+  .rec-vsc-explica b{ color:var(--ink); font-weight:600; }
+  .rec-vsc-nota{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .rec-memoria{
     margin:0 0 20px; padding:10px 14px; border-radius:10px;
     background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
@@ -269,7 +305,17 @@
       </div>
       <ul class="rec-ficheiros" id="listaTerminal"></ul>
     </div>
+    <div class="card glass-light rec-upload">
+      <h3>Fecho de Caixa (ZSBMS)</h3>
+      <p>Relatório "Fecho Caixa" exportado do ZSBMS em .xls (é HTML, não Excel). Só a coluna <b>Início</b> é uma contagem real: o dinheiro que entrou num dia é a abertura seguinte − a abertura do dia + saídas. Vários ficheiros acumulam; um dia repetido fica com a leitura mais recente.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inFecho" multiple accept=".xls,.htm,.html,text/html,application/vnd.ms-excel">
+      </div>
+      <ul class="rec-ficheiros" id="listaFecho"></ul>
+    </div>
   </div>
+
+  <div class="card glass-light rec-vsc" id="vsc"></div>
 
   <div class="rec-barra">
     <h2>Dias</h2>
@@ -341,13 +387,21 @@ window.addEventListener('load', function () {
 
   var NOMES_MEIO = { NU:'Numerário', OU:'Outros (OU)', CD:'Cartão débito (CD)', CC:'Cartão crédito (CC)', TB:'Transferência (TB)', MB:'Multibanco (MB)', CH:'Cheque (CH)', CO:'Consignação (CO)', CS:'Compensação (CS)', DE:'Dinheiro eletrónico (DE)', LC:'Letra (LC)', PR:'Permuta (PR)', TR:'Ticket restaurante (TR)' };
 
-  /* ---------- estado (só memória) ---------- */
+  /* ---------- estado (só memória) ----------
+     Os ficheiros são a fonte de verdade: cada um guarda o que leu (res), e
+     docs/terminal/fecho/coberturas são RECONSTRUÍDOS a partir da lista
+     (reconstruir()) a cada carregamento ou remoção. É o que permite tirar um
+     ficheiro sem perder os outros, e é o que garante que carregar um extrato
+     de uma origem nunca toca no da outra: cada origem tem o seu balde. */
   var docs = {};             // InvoiceNo → documento do SAF-T
-  var saftFicheiros = [];    // { nome, inicio, fim, novos, repetidos, erro }
+  var saftFicheiros = [];    // { nome, res:{inicio, fim, docs}, novos, repetidos, erro }
   var saftCobertura = {};    // dia 'AAAA-MM-DD' → true (StartDate..EndDate dos ficheiros)
   var terminal = {};         // origem → { nOperacao → transação }
-  var termFicheiros = [];    // { nome, origem, inicio, fim, novos, repetidos, erro }
+  var termFicheiros = [];    // { nome, origem, res:{inicio, fim, txs, avisos}, novos, repetidos, fora, erro }
   var termCobertura = {};    // origem → { dia → true }
+  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } (Fecho de Caixa do ZSBMS)
+  var fechoFicheiros = [];   // { nome, res:{inicio, fim, dias:[]}, novos, repetidos, erro }
+  var TOLERANCIA_DINHEIRO = 0.05;  // "bate à tolerância de cêntimos" na hipótese 2
   var vendasMes = {};        // mês → { dia → porPagamento } (cache do Firebase)
   var mesesComErro = {};
   var mesAtivo = '';     // '' = Todos os meses (por omissão): lista inteira, sem filtro
@@ -690,30 +744,118 @@ window.addEventListener('load', function () {
   var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
 
   /* ============================================================
-     CARREGAMENTO E ACUMULAÇÃO
+     FECHO DE CAIXA (ZSBMS)
+     .xls que é HTML em ISO-8859-1, com a tabela Data | Inicio | Entradas |
+     Saidas | Movimento | Fecho e uma linha "Total" no fim. Três decimais,
+     vírgula decimal, espaço nos milhares, "€" colado. Só a coluna Início é
+     uma contagem física; o Fecho é aritmética do POS.
+     → { inicio, fim, dias:[{dia, inicio, entradas, saidas, movimento, fecho}] }
      ============================================================ */
+  function numZs(s){
+    s = String(s == null ? '' : s).replace(/€/g, '').replace(/&euro;/g, '').replace(/\s| /g, '').trim();
+    if (!s) return null;
+    s = s.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  function parseFechoCaixa(buffer){
+    var texto;
+    try { texto = new TextDecoder('iso-8859-1').decode(buffer); } catch (e){ texto = new TextDecoder('windows-1252').decode(buffer); }
+    var doc = new DOMParser().parseFromString(texto, 'text/html');
+    var tabelas = doc.getElementsByTagName('table');
+    var alvo = null, C = null;
+    for (var t = 0; t < tabelas.length && !alvo; t++){
+      var ths = tabelas[t].getElementsByTagName('th');
+      if (!ths.length) continue;
+      var cab = [];
+      for (var i = 0; i < ths.length; i++) cab.push(normCabecalho(ths[i].textContent));
+      var c = { dia: cab.indexOf('DATA'), inicio: cab.indexOf('INICIO'), entradas: cab.indexOf('ENTRADAS'), saidas: cab.indexOf('SAIDAS'), movimento: cab.indexOf('MOVIMENTO'), fecho: cab.indexOf('FECHO') };
+      if (c.dia >= 0 && c.inicio >= 0 && c.saidas >= 0){ alvo = tabelas[t]; C = c; }
+    }
+    if (!alvo) throw new Error('Não encontrei a tabela "Data | Inicio | Entradas | Saidas | Movimento | Fecho". É mesmo o relatório Fecho Caixa do ZSBMS?');
+    var trs = alvo.getElementsByTagName('tr');
+    var dias = [];
+    for (var r = 0; r < trs.length; r++){
+      var tds = trs[r].getElementsByTagName('td');
+      if (tds.length < 2) continue;
+      var dia = normData((tds[C.dia] || {}).textContent);
+      if (!dia) continue;   // cabeçalho repetido, linha "Total", etc.
+      dias.push({
+        dia: dia,
+        inicio: numZs(tds[C.inicio].textContent),
+        entradas: C.entradas >= 0 ? numZs(tds[C.entradas].textContent) : 0,
+        saidas: numZs(tds[C.saidas].textContent),
+        movimento: C.movimento >= 0 ? numZs(tds[C.movimento].textContent) : null,
+        fecho: C.fecho >= 0 ? numZs(tds[C.fecho].textContent) : null
+      });
+    }
+    if (!dias.length) throw new Error('O relatório não tem nenhuma linha de dia.');
+    dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
+    return { inicio: dias[0].dia, fim: dias[dias.length - 1].dia, dias: dias };
+  }
+
+  /* ============================================================
+     CARREGAMENTO, ACUMULAÇÃO E REMOÇÃO
+     Cada ficheiro guarda o que leu; o estado agregado é reconstruído da
+     lista, pela ordem de carregamento (o primeiro a trazer um documento ou
+     transação é quem conta; o Fecho de Caixa é o contrário — a leitura
+     mais recente de um dia ganha, porque é a mesma tabela reexportada).
+     ============================================================ */
+  function reconstruir(){
+    docs = {}; saftCobertura = {}; terminal = {}; termCobertura = {}; fecho = {};
+    saftFicheiros.forEach(function(f){
+      if (f.erro) return;
+      f.novos = 0; f.repetidos = 0;
+      f.res.docs.forEach(function(d){
+        if (docs[d.no]){ f.repetidos++; return; }
+        docs[d.no] = d; f.novos++;
+      });
+      var dias = diasEntre(f.res.inicio, f.res.fim);
+      if (!dias.length) dias = f.res.docs.map(function(d){ return d.dia; });
+      dias.forEach(function(dia){ saftCobertura[dia] = true; });
+    });
+    termFicheiros.forEach(function(f){
+      if (f.erro) return;
+      var mapa = terminal[f.origem] || (terminal[f.origem] = {});
+      var cob = termCobertura[f.origem] || (termCobertura[f.origem] = {});
+      f.novos = 0; f.repetidos = 0;
+      f.res.txs.forEach(function(tx){
+        var chave = tx.nOp || (tx.dia + '|' + tx.horaTexto + '|' + tx.montante + '|' + tx.cartao);
+        if (mapa[chave]){ f.repetidos++; return; }
+        tx.id = f.origem + '|' + chave;
+        mapa[chave] = tx; f.novos++;
+      });
+      var dias = diasEntre(f.res.inicio, f.res.fim);
+      if (!dias.length) dias = f.res.txs.map(function(t){ return t.dia; });
+      dias.forEach(function(dia){ cob[dia] = true; });
+    });
+    fechoFicheiros.forEach(function(f){
+      if (f.erro) return;
+      f.novos = 0; f.repetidos = 0;
+      f.res.dias.forEach(function(d){
+        if (fecho[d.dia]) f.repetidos++; else f.novos++;
+        fecho[d.dia] = d;
+      });
+    });
+  }
+
+  function depoisDeCarregar(){
+    reconstruir();
+    renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
+  }
+
   document.getElementById('inSaft').addEventListener('change', function(e){
     var files = Array.prototype.slice.call(e.target.files || []);
     e.target.value = '';
     files.reduce(function(p, file){
       return p.then(function(){
         return lerFicheiroSaft(file).then(function(res){
-          var novos = 0, repetidos = 0;
-          res.docs.forEach(function(d){
-            if (docs[d.no]){ repetidos++; return; }
-            docs[d.no] = d; novos++;
-          });
-          var dias = diasEntre(res.inicio, res.fim);
-          if (!dias.length) dias = res.docs.map(function(d){ return d.dia; });
-          dias.forEach(function(dia){ saftCobertura[dia] = true; });
-          saftFicheiros.push({ nome: file.name, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos });
+          saftFicheiros.push({ nome: file.name, res: res });
         }).catch(function(err){
           saftFicheiros.push({ nome: file.name, erro: err && err.message ? err.message : String(err) });
         });
       });
-    }, Promise.resolve()).then(function(){
-      renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
-    });
+    }, Promise.resolve()).then(depoisDeCarregar);
   });
 
   document.getElementById('inTerminal').addEventListener('change', function(e){
@@ -726,42 +868,68 @@ window.addEventListener('load', function () {
           var parser = PARSERS[origem];
           if (!parser) throw new Error('Origem desconhecida: ' + origem);
           var res = parser(texto);
-          var mapa = terminal[origem] || (terminal[origem] = {});
-          var cob = termCobertura[origem] || (termCobertura[origem] = {});
-          var novos = 0, repetidos = 0;
-          res.txs.forEach(function(tx){
-            var chave = tx.nOp || (tx.dia + '|' + tx.horaTexto + '|' + tx.montante + '|' + tx.cartao);
-            if (mapa[chave]){ repetidos++; return; }
-            tx.id = origem + '|' + chave;
-            mapa[chave] = tx; novos++;
-          });
-          var dias = diasEntre(res.inicio, res.fim);
-          if (!dias.length) dias = res.txs.map(function(t){ return t.dia; });
-          dias.forEach(function(dia){ cob[dia] = true; });
           var fora = res.txs.filter(function(t){ return t.categoria !== 'valida'; }).length;
-          termFicheiros.push({ nome: file.name, origem: origem, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos, fora: fora, avisos: res.avisos || [] });
+          termFicheiros.push({ nome: file.name, origem: origem, res: res, fora: fora });
         }).catch(function(err){
           termFicheiros.push({ nome: file.name, origem: origem, erro: err && err.message ? err.message : String(err) });
         });
       });
-    }, Promise.resolve()).then(function(){
-      renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
+    }, Promise.resolve()).then(depoisDeCarregar);
+  });
+
+  document.getElementById('inFecho').addEventListener('change', function(e){
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = '';
+    files.reduce(function(p, file){
+      return p.then(function(){
+        return file.arrayBuffer().then(function(buf){
+          fechoFicheiros.push({ nome: file.name, res: parseFechoCaixa(buf) });
+        }).catch(function(err){
+          fechoFicheiros.push({ nome: file.name, erro: err && err.message ? err.message : String(err) });
+        });
+      });
+    }, Promise.resolve()).then(depoisDeCarregar);
+  });
+
+  // Remover um ficheiro: sai da lista e o estado é reconstruído dos que ficam.
+  var LISTAS = { saft: saftFicheiros, term: termFicheiros, fecho: fechoFicheiros };
+  ['listaSaft', 'listaTerminal', 'listaFecho'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', function(e){
+      var btn = e.target.closest('.rec-remover');
+      if (!btn) return;
+      var lista = LISTAS[btn.getAttribute('data-lista')];
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      if (!lista || isNaN(idx) || !lista[idx]) return;
+      lista.splice(idx, 1);
+      depoisDeCarregar();
     });
   });
 
+  function btnRemover(lista, idx){
+    return '<button type="button" class="rec-remover" data-lista="' + lista + '" data-idx="' + idx + '" title="Tirar este ficheiro da memória">remover</button>';
+  }
+  function plural(n, s, p){ return n + ' ' + (n === 1 ? s : p); }
+
   function renderFicheiros(){
     var a = document.getElementById('listaSaft');
-    a.innerHTML = saftFicheiros.map(function(f){
-      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span></li>';
-      return '<li><b>' + esc(f.nome) + '</b><span>' + (f.inicio ? fmtDia(f.inicio) + ' → ' + fmtDia(f.fim) + ' · ' : '') +
-        f.novos + ' doc' + (f.novos === 1 ? '' : 's') + (f.repetidos ? ' · ' + f.repetidos + ' repetidos ignorados' : '') + '</span></li>';
+    a.innerHTML = saftFicheiros.map(function(f, i){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('saft', i) + '</li>';
+      return '<li><b>' + esc(f.nome) + '</b><span>' + (f.res.inicio ? fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' : '') +
+        plural(f.novos, 'doc', 'docs') + (f.repetidos ? ' · ' + f.repetidos + ' repetidos ignorados' : '') + '</span>' + btnRemover('saft', i) + '</li>';
     }).join('');
     var b = document.getElementById('listaTerminal');
-    b.innerHTML = termFicheiros.map(function(f){
-      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + '</span><span class="rec-erro">' + esc(f.erro) + '</span></li>';
-      return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + ' · ' + (f.inicio ? fmtDia(f.inicio) + ' → ' + fmtDia(f.fim) + ' · ' : '') +
-        f.novos + ' transaç' + (f.novos === 1 ? 'ão' : 'ões') + (f.fora ? ' (' + f.fora + ' fora das somas)' : '') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span>' +
-        (f.avisos || []).map(function(a){ return '<span class="rec-erro">' + esc(a) + '</span>'; }).join('') + '</li>';
+    b.innerHTML = termFicheiros.map(function(f, i){
+      var origem = '<span class="rec-origem">' + esc(f.origem === 'CD' ? 'INTERCARD' : f.origem) + '</span>';
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b>' + origem + '<span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('term', i) + '</li>';
+      return '<li><b>' + esc(f.nome) + '</b>' + origem + '<span>' + (f.res.inicio ? fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' : '') +
+        plural(f.novos, 'transação', 'transações') + (f.fora ? ' (' + f.fora + ' fora das somas)' : '') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span>' +
+        (f.res.avisos || []).map(function(av){ return '<span class="rec-erro">' + esc(av) + '</span>'; }).join('') + btnRemover('term', i) + '</li>';
+    }).join('');
+    var c = document.getElementById('listaFecho');
+    c.innerHTML = fechoFicheiros.map(function(f, i){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('fecho', i) + '</li>';
+      return '<li><b>' + esc(f.nome) + '</b><span>' + fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' + plural(f.res.dias.length, 'dia', 'dias') +
+        (f.repetidos ? ' · ' + f.repetidos + ' já carregados (leitura substituída)' : '') + '</span>' + btnRemover('fecho', i) + '</li>';
     }).join('');
   }
 
@@ -1011,6 +1179,248 @@ window.addEventListener('load', function () {
   }
 
   /* ============================================================
+     VENDAS SEM COBRANÇA — painel de topo, todos os dias carregados
+     Para cada documento "só no POS" contra o extrato do meio em que foi
+     registado, corre a cascata pela ordem:
+       H1 cobrado no outro terminal — transação livre da OUTRA origem, mesmo
+          dia, mesmo valor, dentro da janela máxima de casamento.
+       H2 pago em dinheiro — ao DIA: dinheiro real na caixa (abertura
+          seguinte − abertura do dia + saídas − entradas, do Fecho de Caixa
+          do ZSBMS) contra o numerário do POS; o excedente explica os
+          documentos quando bate (à tolerância) com um único subconjunto.
+       H3 sem entrada de dinheiro — o que sobra.
+     Um documento cuja hipótese não se pode testar (falta o extrato da outra
+     origem, o Fecho de Caixa ou a abertura seguinte) vai para "não
+     testável" e não entra em nenhum total. Nunca escreve nada.
+     ============================================================ */
+  var memoMeio = {};
+  function meioCalc(dia, meio){
+    var k = dia + '|' + meio.mec;
+    return memoMeio[k] || (memoMeio[k] = calcularMeio(dia, meio));
+  }
+
+  // Dinheiro que entrou de facto na caixa num dia, pelo Fecho de Caixa.
+  function dinheiroReal(dia){
+    var f = fecho[dia];
+    if (!f) return { erro: 'sem Fecho de Caixa para ' + fmtDia(dia) };
+    var diasF = Object.keys(fecho).sort();
+    var seg = diasF[diasF.indexOf(dia) + 1];
+    if (!seg) return { erro: 'sem abertura seguinte no Fecho de Caixa (o dia ' + fmtDia(dia) + ' é o último do relatório)' };
+    if (f.inicio == null || fecho[seg].inicio == null || f.saidas == null) return { erro: 'Fecho de Caixa sem Início ou Saídas legíveis para ' + fmtDia(dia) };
+    var real = round2(fecho[seg].inicio - f.inicio + f.saidas - (f.entradas || 0));
+    var nu = null, fonteNu = '';
+    if (saftCobertura[dia]){
+      nu = round2(linhasPos(dia, 'NU').reduce(function(s, l){ return s + l.valor; }, 0)); fonteNu = 'SAF-T';
+    } else {
+      var mes = dia.slice(0, 7);
+      var fb = vendasMes[mes] && vendasMes[mes][dia] ? vendasMes[mes][dia].NU : null;
+      if (fb && fb.bruto != null){ nu = round2(fb.bruto); fonteNu = 'vendasDiario'; }
+    }
+    if (nu == null) return { erro: 'sem numerário do POS para ' + fmtDia(dia) };
+    return { real: real, nuPos: nu, fonteNu: fonteNu, excedente: round2(real - nu), aberturaDia: f.inicio, aberturaSeg: fecho[seg].inicio, diaSeg: seg, saidas: f.saidas, entradas: f.entradas || 0 };
+  }
+
+  function outroMeio(meio){
+    for (var i = 0; i < MEIOS.length; i++){ if (MEIOS[i] !== meio) return MEIOS[i]; }
+    return null;
+  }
+
+  function analisarSemCobranca(){
+    var set = {};
+    Object.keys(saftCobertura).forEach(function(d){ set[d] = true; });
+    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ set[d] = true; }); });
+    var dias = Object.keys(set).sort().reverse();
+    var out = { h1: [], h2: [], h3: [], na: [], porDia: {}, diasTotal: dias.length, diasVerificados: 0, diasNa: 0 };
+    var segMax = JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1] * 60;
+
+    dias.forEach(function(dia){
+      if (!saftCobertura[dia]){
+        out.na.push({ tipo: 'dia', dia: dia, motivo: 'sem SAF-T — não há documentos para testar' });
+        out.diasNa++;
+        return;
+      }
+      var testavel = true;
+      var restantes = [];
+      MEIOS.forEach(function(meio){
+        var r = meioCalc(dia, meio);
+        if (r.modo !== 'completo' || (!r.term.length && r.pos.length)){
+          // Sem extrato do próprio meio — ou com um extrato cujo período
+          // declarado cobre o dia mas não traz uma linha dele (exportado
+          // antes do fecho): tudo ficaria "só no POS" e seria mentira.
+          if (r.pos.length){
+            out.na.push({ tipo: 'meio', dia: dia, meio: meio, n: r.pos.length, valor: r.posSaft, motivo: (r.modo === 'completo' ? 'extrato ' + labelCurtoMeio(meio) + ' cobre o dia mas não tem nenhuma linha dele (exportado antes do fecho?)' : 'sem extrato ' + labelCurtoMeio(meio)) + ' — não se sabe quais ficaram sem cobrança' });
+            testavel = false;
+          }
+          return;
+        }
+        var orfas = r.casamento.posSemPar;
+        if (!orfas.length) return;
+        var outro = outroMeio(meio);
+        var rOutro = meioCalc(dia, outro);
+        if (!rOutro.temTerm || !rOutro.term.length){
+          var porque = !rOutro.temTerm ? 'sem extrato ' + labelCurtoMeio(outro) : 'extrato ' + labelCurtoMeio(outro) + ' sem nenhuma linha neste dia';
+          orfas.forEach(function(l){ out.na.push({ tipo: 'doc', dia: dia, linha: l, meio: meio, motivo: porque + ' — hipótese 1 não testável' }); });
+          testavel = false;
+          return;
+        }
+        // H1: só transações do outro terminal que ficaram livres no casamento dele.
+        var livres = rOutro.modo === 'completo' ? rOutro.casamento.termSemPar.slice() : transacoesTerminal(dia, outro.origem);
+        orfas.forEach(function(l){
+          var c = livres.filter(function(t){ return t.cents === l.cents && perto(l, t, segMax); })
+            .sort(function(a, b){ return Math.abs(a.hora - l.hora) - Math.abs(b.hora - l.hora); });
+          if (c.length){
+            var t = c[0];
+            livres = livres.filter(function(x){ return x !== t; });
+            out.h1.push({ dia: dia, linha: l, meio: meio, outro: outro, tx: t, delta: t.hora - l.hora, outrosCandidatos: c.length - 1 });
+          } else {
+            restantes.push({ dia: dia, linha: l, meio: meio });
+          }
+        });
+      });
+
+      if (!restantes.length){
+        if (testavel) out.diasVerificados++; else out.diasNa++;
+        return;
+      }
+      // H2 ao dia.
+      var d = dinheiroReal(dia);
+      if (d.erro){
+        restantes.forEach(function(x){ out.na.push({ tipo: 'doc', dia: x.dia, linha: x.linha, meio: x.meio, motivo: d.erro + ' — hipótese 2 não testável' }); });
+        out.diasNa++;
+        return;
+      }
+      var soma = round2(restantes.reduce(function(s, x){ return s + x.linha.valor; }, 0));
+      var ex = { dia: dia, real: d.real, nuPos: d.nuPos, fonteNu: d.fonteNu, excedente: d.excedente, aberturaDia: d.aberturaDia, aberturaSeg: d.aberturaSeg, diaSeg: d.diaSeg, saidas: d.saidas, entradas: d.entradas, soma: soma, n: restantes.length, subset: null, opcoes: 0 };
+      if (d.excedente > 0.005){
+        var opcoes = restantes.length <= 16
+          ? subconjuntos(restantes, 1, restantes.length).filter(function(sub){
+              var s = sub.reduce(function(t, x){ return t + x.linha.cents; }, 0);
+              return Math.abs(s - cents(d.excedente)) <= cents(TOLERANCIA_DINHEIRO);
+            })
+          : (Math.abs(soma - d.excedente) <= TOLERANCIA_DINHEIRO ? [restantes] : []);
+        ex.opcoes = opcoes.length;
+        if (opcoes.length === 1) ex.subset = opcoes[0];
+      }
+      restantes.forEach(function(x){
+        if (ex.subset && ex.subset.indexOf(x) >= 0) out.h2.push(x); else out.h3.push(x);
+      });
+      out.porDia[dia] = ex;
+      if (testavel) out.diasVerificados++; else out.diasNa++;
+    });
+    return out;
+  }
+
+  function vscTotal(lista){
+    return round2(lista.reduce(function(s, x){ return s + x.linha.valor; }, 0));
+  }
+  function vscCabDia(dia, itens, explica, extraCab){
+    var tot = vscTotal(itens);
+    return '<tr class="rec-vsc-dia"><td colspan="' + (extraCab ? 6 : 5) + '">' + fmtDia(dia) + ' <small>' + esc(diaSemana(dia)) + ' · ' + plural(itens.length, 'documento', 'documentos') + ' · ' + fmtEuro(tot) + '</small>' +
+      (explica ? ' <span class="rec-vsc-explica">' + explica + '</span>' : '') + '</td></tr>';
+  }
+  function vscExplicaDia(ex){
+    if (!ex) return '';
+    var formula = 'abertura ' + fmtDia(ex.diaSeg).slice(0, 5) + ' ' + fmtEuro(ex.aberturaSeg) + ' − abertura ' + fmtDia(ex.dia).slice(0, 5) + ' ' + fmtEuro(ex.aberturaDia) + ' + saídas ' + fmtEuro(ex.saidas) + (ex.entradas ? ' − entradas ' + fmtEuro(ex.entradas) : '');
+    var h = '· numerário POS <b>' + fmtEuro(ex.nuPos) + '</b> (' + esc(ex.fonteNu) + ') · dinheiro real <b>' + fmtEuro(ex.real) + '</b> <span title="' + esc(formula) + '">(' + esc(formula) + ')</span> · excedente <b>' + fmtEuroSinal(ex.excedente) + '</b> ';
+    if (ex.excedente <= 0.005) h += '<span class="rec-vsc-nao">— sem dinheiro a mais na caixa</span>';
+    else if (ex.subset && ex.subset.length === ex.n) h += '<span class="rec-vsc-bate">— bate com a soma dos ' + ex.n + ' documentos</span>';
+    else if (ex.subset) h += '<span class="rec-vsc-bate">— bate com ' + plural(ex.subset.length, 'documento', 'documentos') + ' dos ' + ex.n + '</span>';
+    else if (ex.opcoes > 1) h += '<span class="rec-vsc-nao">— ' + ex.opcoes + ' combinações batem, nenhuma escolhida</span>';
+    else h += '<span class="rec-vsc-nao">— não bate com nenhuma combinação dos documentos (soma ' + fmtEuro(ex.soma) + ')</span>';
+    return h;
+  }
+  function vscLinhaDoc(x){
+    return '<td class="num">' + fmtHora(x.linha.hora) + '</td><td>' + esc(x.linha.no) + ' <span class="rec-mono">' + esc(x.linha.tipo) + '</span></td>' + celValor(x.linha.valor) + '<td>' + esc(labelMeio(x.meio)) + ' <span class="rec-mono">' + esc(x.meio.mec) + '</span></td>';
+  }
+  function vscLista(cls, titulo, sub, itens, extraCab, extraCel, explicaPorDia, vazioTexto){
+    var h = '<div class="rec-vsc-lista ' + cls + '"><p class="rec-sec-titulo">' + titulo + ' <span class="rec-conta">' + itens.length + '</span> <span>· ' + sub + '</span></p><div class="rec-vsc-caixa">';
+    if (!itens.length) return h + '<div class="rec-vsc-ok">' + vazioTexto + '</div></div></div>';
+    var porDia = {};
+    itens.forEach(function(x){ (porDia[x.dia] || (porDia[x.dia] = [])).push(x); });
+    h += '<table><thead><tr><th>Data</th><th class="num">Hora</th><th>Documento</th><th class="num">Valor</th><th>Meio no POS</th>' + (extraCab ? '<th>' + extraCab + '</th>' : '') + '</tr></thead><tbody>';
+    Object.keys(porDia).sort().reverse().forEach(function(dia){
+      var lst = porDia[dia].sort(function(a, b){ return (a.linha.hora || 0) - (b.linha.hora || 0); });
+      h += vscCabDia(dia, lst, explicaPorDia ? explicaPorDia(dia) : '', extraCab);
+      lst.forEach(function(x){ h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td>' + vscLinhaDoc(x) + (extraCab ? '<td>' + extraCel(x) + '</td>' : '') + '</tr>'; });
+    });
+    return h + '</tbody></table></div></div>';
+  }
+
+  function renderSemCobranca(){
+    var el = document.getElementById('vsc');
+    var h = '<h2>Vendas sem cobrança <small>documentos só no POS, testados contra as três hipóteses, em todos os dias carregados</small></h2>';
+    if (!Object.keys(saftCobertura).length){
+      el.innerHTML = h + '<p class="rec-vsc-nota">Carrega o SAF-T, os extratos das duas origens e o Fecho de Caixa. Sem SAF-T não há documentos para testar.</p>';
+      return;
+    }
+    var a = analisarSemCobranca();
+    var nDocsNa = a.na.filter(function(x){ return x.tipo === 'doc'; }).length;
+    var nMeiosNa = a.na.filter(function(x){ return x.tipo === 'meio'; }).length;
+    var nDiasNa = a.na.filter(function(x){ return x.tipo === 'dia'; }).length;
+    h += '<p class="rec-vsc-cobertura"><b>' + plural(a.diasVerificados, 'dia verificado a sério', 'dias verificados a sério') + '</b> de ' + a.diasTotal + ' com dados (SAF-T + extrato das duas origens + Fecho de Caixa quando há documentos por explicar)' +
+      (a.diasNa ? ' · <b>' + a.diasNa + '</b> com pelo menos uma hipótese não testável' : '') +
+      ' · Fecho de Caixa: ' + (Object.keys(fecho).length ? plural(Object.keys(fecho).length, 'dia', 'dias') + ' carregados' : '<b>não carregado</b> (hipótese 2 fica não testável)') + '</p>';
+
+    function total(cls, k, lista, s){
+      return '<div class="rec-total ' + cls + (cls === 'h3' && !lista.length ? ' zero' : '') + '"><div class="k">' + k + '</div><div class="v num">' + fmtEuro(vscTotal(lista)) + '</div><div class="s">' + plural(lista.length, 'documento', 'documentos') + (s ? ' · ' + s : '') + '</div></div>';
+    }
+    var naValor = round2(a.na.reduce(function(s, x){ return s + (x.tipo === 'doc' ? x.linha.valor : x.tipo === 'meio' ? x.valor : 0); }, 0));
+    h += '<div class="rec-vsc-totais">' +
+      total('h3', 'H3 · Sem entrada de dinheiro', a.h3, 'a ir ver os talões') +
+      total('h1', 'H1 · Cobrado no outro terminal', a.h1, 'botão errado no POS') +
+      total('h2', 'H2 · Pago em dinheiro', a.h2, 'dinheiro a mais na caixa') +
+      '<div class="rec-total na"><div class="k">Não testável</div><div class="v num">' + fmtEuro(naValor) + '</div><div class="s">' + plural(nDocsNa, 'documento', 'documentos') + (nMeiosNa ? ' · ' + plural(nMeiosNa, 'dia/meio sem extrato', 'dias/meio sem extrato') : '') + (nDiasNa ? ' · ' + plural(nDiasNa, 'dia sem SAF-T', 'dias sem SAF-T') : '') + ' · fora dos totais</div></div>' +
+      '</div>';
+
+    var explica = function(dia){ return vscExplicaDia(a.porDia[dia]); };
+    h += vscLista('h3', 'H3 · Sem entrada de dinheiro', 'não está no outro terminal e a caixa não tem dinheiro a mais que o explique', a.h3,
+      null, null, explica, 'Nenhum documento sem entrada de dinheiro.');
+    h += vscLista('h1', 'H1 · Cobrado no outro terminal', 'mesmo valor, mesmo dia, transação livre da outra origem a ±' + Math.round(JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1]) + ' min', a.h1,
+      'Transação que a explica', function(x){
+        var t = x.tx;
+        return '<b>' + esc(labelCurtoMeio(x.outro)) + '</b> ' + fmtHora(t.hora) + ' · ' + marcaHtml(t) + ' <span class="rec-mono">' + cartaoHtml(t) + '</span> · <span class="num">' + fmtEuro(t.montante) + '</span> <span class="rec-mono">(' + (x.delta >= 0 ? '+' : '−') + fmtDelta(x.delta) + ')</span>' +
+          (x.outrosCandidatos ? ' <span class="rec-mono">· mais ' + x.outrosCandidatos + ' com o mesmo valor na janela</span>' : '');
+      }, null, 'Nenhum documento cobrado no outro terminal.');
+    h += vscLista('h2', 'H2 · Pago em dinheiro', 'o excedente de caixa do dia bate com estes documentos (tolerância ' + fmtEuro(TOLERANCIA_DINHEIRO) + ')', a.h2,
+      null, null, explica, 'Nenhum documento explicado por dinheiro a mais na caixa.');
+
+    // Não testável: docs por dia, mais as linhas de dia/meio sem dados.
+    h += '<div class="rec-vsc-lista na"><p class="rec-sec-titulo">Não testável <span class="rec-conta">' + a.na.length + '</span> <span>· falta o SAF-T, o extrato de uma das origens ou o Fecho de Caixa · fora de todos os totais</span></p><div class="rec-vsc-caixa">';
+    if (!a.na.length){
+      h += '<div class="rec-vsc-ok">Tudo o que está carregado foi testado.</div>';
+    } else {
+      h += '<table><thead><tr><th>Data</th><th class="num">Hora</th><th>Documento</th><th class="num">Valor</th><th>Meio no POS</th><th>Porquê</th></tr></thead><tbody>';
+      var porDia = {};
+      a.na.forEach(function(x){ (porDia[x.dia] || (porDia[x.dia] = [])).push(x); });
+      // Dias inteiros sem SAF-T seguidos (o extrato do Verifone traz meses
+      // inteiros) colapsam numa só linha por intervalo, senão eram centenas.
+      var diasNa = Object.keys(porDia).sort().reverse();
+      var i = 0;
+      while (i < diasNa.length){
+        var dia = diasNa[i];
+        var soDia = porDia[dia].length === 1 && porDia[dia][0].tipo === 'dia';
+        if (soDia){
+          var j = i, fim = dia;
+          while (j + 1 < diasNa.length && porDia[diasNa[j + 1]].length === 1 && porDia[diasNa[j + 1]][0].tipo === 'dia') j++;
+          var ini = diasNa[j];
+          h += '<tr><td class="rec-mono">' + (ini === fim ? fmtDia(fim) : fmtDia(ini) + ' → ' + fmtDia(fim)) + '</td><td class="num">—</td><td>—</td><td class="num">—</td><td>—</td><td class="rec-vsc-explica">' + (j > i ? plural(j - i + 1, 'dia', 'dias') + ' ' : '') + esc(porDia[dia][0].motivo) + '</td></tr>';
+          i = j + 1;
+          continue;
+        }
+        porDia[dia].sort(function(p, q){ return ((p.linha && p.linha.hora) || 0) - ((q.linha && q.linha.hora) || 0); }).forEach(function(x){
+          if (x.tipo === 'doc') h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td>' + vscLinhaDoc(x) + '<td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
+          else if (x.tipo === 'meio') h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td><td class="num">—</td><td>' + plural(x.n, 'documento', 'documentos') + ' <span class="rec-mono">' + esc(x.meio.mec) + '</span></td>' + celValor(x.valor) + '<td>' + esc(labelMeio(x.meio)) + '</td><td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
+          else h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td><td class="num">—</td><td>—</td><td class="num">—</td><td>—</td><td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
+        });
+        i++;
+      }
+      h += '</tbody></table>';
+    }
+    h += '</div></div>';
+    el.innerHTML = h;
+  }
+
+  /* ============================================================
      ZONA 1 — dias
      ============================================================ */
   function preencherSelectorMeses(){
@@ -1072,7 +1482,7 @@ window.addEventListener('load', function () {
     }
     vazio.style.display = 'none';
     ul.innerHTML = dias.map(function(dia){
-      var rs = MEIOS.map(function(m){ return calcularMeio(dia, m); });
+      var rs = MEIOS.map(function(m){ return meioCalc(dia, m); });
       return '<li class="rec-dia' + (diaAberto === dia ? ' aberto' : '') + '" data-dia="' + dia + '">' +
         '<div class="rec-dia-data">' + fmtDia(dia) + '<small>' + diaSemana(dia) + '</small></div>' +
         rs.map(chipHtml).join('') +
@@ -1307,7 +1717,7 @@ window.addEventListener('load', function () {
     var z = document.getElementById('zona2');
     if (!diaAberto){ z.innerHTML = ''; return; }
     var dia = diaAberto;
-    var rs = MEIOS.map(function(m){ return calcularMeio(dia, m); });
+    var rs = MEIOS.map(function(m){ return meioCalc(dia, m); });
     var completos = rs.filter(function(r){ return r.modo === 'completo'; });
     var cobrado = null;
     if (completos.length){
@@ -1323,6 +1733,8 @@ window.addEventListener('load', function () {
   }
 
   function renderTudo(){
+    memoMeio = {};
+    renderSemCobranca();
     renderDias();
     renderDetalhe();
   }
