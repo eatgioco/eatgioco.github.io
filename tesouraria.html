@@ -859,9 +859,15 @@
     cursor:default;
   }
 
-  .tes-cal-cell.empty{
-    border-color:transparent;
-    background:none;
+  /* Dias das semanas completas que caem fora do mês ativo: esbatidos, mas
+     com valor, escala de calor e clique iguais aos do mês. */
+  .tes-cal-cell.outro-mes{
+    background:var(--dough);
+  }
+
+  .tes-cal-cell.outro-mes:not(.dark) .tes-cal-day,
+  .tes-cal-cell.outro-mes:not(.dark) .tes-cal-amount{
+    color:var(--muted);
   }
 
   .tes-cal-cell.has-value{
@@ -3036,6 +3042,8 @@ window.addEventListener('load', function () {
 
   var mesAtivo = new Date().getMonth() + 1;
   var anoAtivo = new Date().getFullYear();
+  // Dia selecionado no calendário: chave 'AAAA-MM-DD' (nunca o número do
+  // dia — a grelha mostra dias de outros meses) ou null.
   var diaSelecionado = null;
   var tesLinhaAberta = null; // chave da linha expandida na lista detalhada, ou null
   /* ---------- Motor dos compromissos (gioco-compromissos.js) ----------
@@ -3591,8 +3599,36 @@ window.addEventListener('load', function () {
   });
 
 
-  function semanaDoDia(dia){
-    return Math.min(Math.floor((dia - 1) / 7), 4);
+  // As semanas de "Por semana" são as LINHAS do calendário mensal, sempre de
+  // segunda a domingo COMPLETAS — apanham dias do mês anterior e do seguinte,
+  // e é por isso que a soma das barras já não bate com o "Total a pagar" do
+  // mês (intencional).
+  function offsetDoMes(ano, mes){
+    var primeiro = new Date(ano, mes - 1, 1).getDay();
+    return (primeiro + 6) % 7;   // 0 = mês começa à segunda
+  }
+
+  // Chave de dia local 'AAAA-MM-DD'. É a identidade de um dia em todo o
+  // calendário (agrupamentos, célula, dia selecionado): as linhas da grelha
+  // apanham dias de outros meses, e aí o número do dia sozinho é ambíguo.
+  function chaveDia(d){
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  // Conjunto de trabalho do calendário e das barras "Por semana": as semanas
+  // são de segunda a domingo COMPLETAS, por isso a grelha entra pelo mês
+  // anterior e pelo seguinte. O itensDoMes() filtra estritamente por mês, daí
+  // as três chamadas. O "Total a pagar" e a lista de pendentes continuam a
+  // usar só o mês ativo — a soma das barras já não bate com o total, e é
+  // intencional.
+  function itensGrelha(ano, mes){
+    var antesMes = mes === 1 ? 12 : mes - 1;
+    var antesAno = mes === 1 ? ano - 1 : ano;
+    var depoisMes = mes === 12 ? 1 : mes + 1;
+    var depoisAno = mes === 12 ? ano + 1 : ano;
+    return itensDoMes(antesAno, antesMes)
+      .concat(itensDoMes(ano, mes))
+      .concat(itensDoMes(depoisAno, depoisMes));
   }
 
   // Os pedidos de pagamento contam sempre como variáveis: não há ligação
@@ -3623,26 +3659,37 @@ window.addEventListener('load', function () {
 
   function renderTesSemanas(itensTodos){
     var itens = itensTodos.filter(function(i){ return !i.pago; });
-    var nSemanas = Math.ceil(diasNoMes(anoAtivo, mesAtivo) / 7);
-    var totais = [];
-    var i;
-    for (i = 0; i < nSemanas; i++) totais.push(0);
+    var offset = offsetDoMes(anoAtivo, mesAtivo);
+    var nSemanas = Math.ceil((offset + diasNoMes(anoAtivo, mesAtivo)) / 7);
 
+    var porDia = {};
     itens.forEach(function(it){
-      var idx = Math.min(semanaDoDia(it.dia), nSemanas - 1);
-      totais[idx] += it.montante;
+      if (!it.prazoDate) return;
+      var k = chaveDia(it.prazoDate);
+      porDia[k] = (porDia[k] || 0) + it.montante;
     });
 
-    var max = Math.max.apply(null, totais.concat([0]));
+    var semanas = [];
+    var r, j;
+    for (r = 0; r < nSemanas; r++){
+      var ini = new Date(anoAtivo, mesAtivo - 1, 1 - offset + r * 7);
+      var fim = new Date(anoAtivo, mesAtivo - 1, 1 - offset + r * 7 + 6);
+      var total = 0;
+      for (j = 0; j < 7; j++){
+        var d = new Date(anoAtivo, mesAtivo - 1, 1 - offset + r * 7 + j);
+        total += porDia[chaveDia(d)] || 0;
+      }
+      semanas.push({ ini: ini, fim: fim, total: total });
+    }
 
-    tesSemanasEl.innerHTML = totais.map(function(v, idx){
-      var ini = idx * 7 + 1;
-      var fim = Math.min(ini + 6, diasNoMes(anoAtivo, mesAtivo));
-      var pct = max > 0 ? (v / max) * 100 : 0;
+    var max = Math.max.apply(null, semanas.map(function(s){ return s.total; }).concat([0]));
+
+    tesSemanasEl.innerHTML = semanas.map(function(s, idx){
+      var pct = max > 0 ? (s.total / max) * 100 : 0;
       return '<div class="tes-week">' +
-        '<span class="tes-week-label">Semana ' + (idx + 1) + ' · ' + ini + '–' + fim + '</span>' +
+        '<span class="tes-week-label">Semana ' + (idx + 1) + ' · ' + s.ini.getDate() + '–' + s.fim.getDate() + '</span>' +
         '<span class="tes-week-track"><span class="tes-week-fill" style="width:' + pct.toFixed(1) + '%;"></span></span>' +
-        '<span class="tes-week-value">' + formatEuro(v) + '</span>' +
+        '<span class="tes-week-value">' + formatEuro(s.total) + '</span>' +
         '</div>';
     }).join('');
   }
@@ -3652,44 +3699,53 @@ window.addEventListener('load', function () {
   // com itens mas pendente=0 fica verde ("está tudo tratado"), distinto da
   // escala normal; um dia sem nenhum item fica sem destaque.
   function renderTesCalendario(itens){
-    var nd = diasNoMes(anoAtivo, mesAtivo);
     var porDiaPendente = {};
     var porDiaTotal = {};
 
     itens.forEach(function(it){
-      porDiaTotal[it.dia] = (porDiaTotal[it.dia] || 0) + it.montante;
-      if (!it.pago) porDiaPendente[it.dia] = (porDiaPendente[it.dia] || 0) + it.montante;
+      if (!it.prazoDate) return;
+      var k = chaveDia(it.prazoDate);
+      porDiaTotal[k] = (porDiaTotal[k] || 0) + it.montante;
+      if (!it.pago) porDiaPendente[k] = (porDiaPendente[k] || 0) + it.montante;
     });
 
+    // Semana começa à segunda-feira (getDay(): 0 = domingo). As linhas são
+    // sempre de 7 dias: a primeira entra pelo mês anterior e a última pelo
+    // seguinte, em vez de deixar células vazias.
+    var offset = offsetDoMes(anoAtivo, mesAtivo);
+    var nSemanas = Math.ceil((offset + diasNoMes(anoAtivo, mesAtivo)) / 7);
+    var nCelulas = nSemanas * 7;
+
+    var chaveHoje = chaveDia(hojeMeiaNoite());
+
+    // A escala de calor cobre todos os dias VISÍVEIS, incluindo os de fora do
+    // mês — senão um dia de fora podia pintar mais escuro que o máximo.
     var max = 0;
-    Object.keys(porDiaPendente).forEach(function(d){ if (porDiaPendente[d] > max) max = porDiaPendente[d]; });
-
-    // Semana começa à segunda-feira (getDay(): 0 = domingo).
-    var primeiro = new Date(anoAtivo, mesAtivo - 1, 1).getDay();
-    var offset = (primeiro + 6) % 7;
-
-    var hoje = hojeMeiaNoite();
-    var ehMesCorrente = (hoje.getFullYear() === anoAtivo && hoje.getMonth() + 1 === mesAtivo);
-
-    var html = DOW_PT.map(function(d){ return '<div class="tes-cal-dow">' + d + '</div>'; }).join('');
-
-    var i;
-    for (i = 0; i < offset; i++){
-      html += '<div class="tes-cal-cell empty"></div>';
+    var i, d, k;
+    for (i = 0; i < nCelulas; i++){
+      d = new Date(anoAtivo, mesAtivo - 1, 1 - offset + i);
+      k = chaveDia(d);
+      if ((porDiaPendente[k] || 0) > max) max = porDiaPendente[k];
     }
 
-    for (i = 1; i <= nd; i++){
-      var temItens = porDiaTotal[i] !== undefined;
-      var pendente = porDiaPendente[i] || 0;
+    var html = DOW_PT.map(function(x){ return '<div class="tes-cal-dow">' + x + '</div>'; }).join('');
+
+    for (i = 0; i < nCelulas; i++){
+      d = new Date(anoAtivo, mesAtivo - 1, 1 - offset + i);
+      k = chaveDia(d);
+      var temItens = porDiaTotal[k] !== undefined;
+      var pendente = porDiaPendente[k] || 0;
       var tudoPago = temItens && pendente === 0;
 
       var classes = 'tes-cal-cell';
       var style = '';
       var valorMostrado = 0;
 
+      if (d.getMonth() + 1 !== mesAtivo || d.getFullYear() !== anoAtivo) classes += ' outro-mes';
+
       if (tudoPago){
         classes += ' has-value pago-total';
-        valorMostrado = porDiaTotal[i];
+        valorMostrado = porDiaTotal[k];
       } else if (pendente > 0){
         classes += ' has-value';
         var ratio = max > 0 ? pendente / max : 0;
@@ -3699,11 +3755,11 @@ window.addEventListener('load', function () {
         valorMostrado = pendente;
       }
 
-      if (ehMesCorrente && i === hoje.getDate()) classes += ' hoje';
-      if (diaSelecionado === i) classes += ' selected';
+      if (k === chaveHoje) classes += ' hoje';
+      if (diaSelecionado === k) classes += ' selected';
 
-      html += '<div class="' + classes + '" data-dia="' + i + '"' + style + '>' +
-        '<span class="tes-cal-day">' + i + '</span>' +
+      html += '<div class="' + classes + '" data-dia="' + k + '"' + style + '>' +
+        '<span class="tes-cal-day">' + d.getDate() + '</span>' +
         (temItens ? '<span class="tes-cal-amount">' + (tudoPago ? '✓ ' : '') + formatEuro(valorMostrado) + '</span>' : '') +
         '</div>';
     }
@@ -3729,7 +3785,7 @@ window.addEventListener('load', function () {
       if (dia && /^\d{4}-\d{2}-\d{2}$/.test(dia)){
         var a = parseInt(dia.slice(0, 4), 10), m = parseInt(dia.slice(5, 7), 10), d = parseInt(dia.slice(8, 10), 10);
         if (m >= 1 && m <= 12 && d >= 1 && d <= 31){
-          anoAtivo = a; mesAtivo = m; diaSelecionado = d;
+          anoAtivo = a; mesAtivo = m; diaSelecionado = dia;
           var chave = qs.get('chave');
           if (chave) tesDiaLinhaAberta = chave;
         }
@@ -3748,10 +3804,12 @@ window.addEventListener('load', function () {
       return;
     }
 
-    var doDia = itens.filter(function(it){ return it.dia === diaSelecionado; });
+    var doDia = itens.filter(function(it){ return it.prazoDate && chaveDia(it.prazoDate) === diaSelecionado; });
 
     tesDiaDetalhe.style.display = 'block';
-    tesDiaTitulo.textContent = pad2(diaSelecionado) + ' de ' + MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
+    // Com o mês por extenso: a lista pode ser de um dia de fora do mês ativo.
+    tesDiaTitulo.textContent = diaSelecionado.slice(8, 10) + ' de ' +
+      MESES_PT[parseInt(diaSelecionado.slice(5, 7), 10) - 1] + ' ' + diaSelecionado.slice(0, 4);
 
     if (doDia.length === 0){
       tesDiaLista.innerHTML = '<p class="tes-empty">Nada a pagar neste dia.</p>';
@@ -3793,8 +3851,8 @@ window.addEventListener('load', function () {
 
   tesCalendarioEl.addEventListener('click', function(e){
     var cell = e.target.closest('.tes-cal-cell');
-    if (!cell || cell.classList.contains('empty')) return;
-    var dia = parseInt(cell.getAttribute('data-dia'), 10);
+    if (!cell) return;
+    var dia = cell.getAttribute('data-dia');
     diaSelecionado = (diaSelecionado === dia) ? null : dia;
     tesDiaLinhaAberta = null;
     renderTesouraria();
@@ -4152,12 +4210,15 @@ window.addEventListener('load', function () {
   function renderTesouraria(){
     recalcularReconciliacao();
     var itens = itensDoMes(anoAtivo, mesAtivo);
-    itensTesourariaAtual = itens;
+    // O calendário e as barras trabalham com semanas completas, logo com os
+    // dias vizinhos dos outros meses; o total e a lista de pendentes não.
+    var itensDaGrelha = itensGrelha(anoAtivo, mesAtivo);
+    itensTesourariaAtual = itensDaGrelha;
     tesMesLabel.textContent = MESES_PT[mesAtivo - 1] + ' ' + anoAtivo;
     renderTesTotal(itens);
-    renderTesSemanas(itens);
-    renderTesCalendario(itens);
-    renderTesDiaDetalhe(itens);
+    renderTesSemanas(itensDaGrelha);
+    renderTesCalendario(itensDaGrelha);
+    renderTesDiaDetalhe(itensDaGrelha);
     renderTesPendentes();
     renderCompromissos();
     renderAnalise();
