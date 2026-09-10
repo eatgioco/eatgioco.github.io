@@ -624,9 +624,9 @@
 
   .mov-row.contagem{
     border-color:var(--sky, var(--line));
-    cursor:pointer;
   }
 
+  .contagem-cabecalho{ cursor:pointer; }
   .mov-row.contagem .mov-top{ align-items:center; }
 
   .contagem-chevron{
@@ -2692,19 +2692,26 @@
     var dif = contagemDiferencaInfo(c, opts.isEarliest);
     var chevronIcon = aberta ? 'i-chevron-down' : 'i-chevron-right';
 
-    var html = '<div class="mov-row contagem" onclick="toggleContagemDetalhe(\'' + id + '\')">';
-    html += '  <div class="mov-top">';
-    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
-    html += '    <div style="display:flex;align-items:center;gap:8px;">';
-    html += '      <span class="mov-valor num">' + formatEUR(c.total) + '</span>';
-    html += '      <svg class="icon contagem-chevron" width="16" height="16" aria-hidden="true"><use href="#' + chevronIcon + '"/></svg>';
+    // Só o cabeçalho (resumo colapsado) é clicável — nunca a linha inteira:
+    // com o detalhe aberto, a área de detalhe passa a dominar visualmente a
+    // linha, e um clique no "centro" da linha (p.ex. para fechar) caía lá
+    // dentro. Sem onclick no detalhe, esse clique não faz nada (não é uma
+    // zona de toggle) em vez de ficar preso a meio por um stopPropagation.
+    var html = '<div class="mov-row contagem">';
+    html += '  <div class="contagem-cabecalho" onclick="toggleContagemDetalhe(\'' + id + '\')">';
+    html += '    <div class="mov-top">';
+    html += '      <div class="mov-tipo-hora"><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
+    html += '      <div style="display:flex;align-items:center;gap:8px;">';
+    html += '        <span class="mov-valor num">' + formatEUR(c.total) + '</span>';
+    html += '        <svg class="icon contagem-chevron" width="16" height="16" aria-hidden="true"><use href="#' + chevronIcon + '"/></svg>';
+    html += '      </div>';
     html += '    </div>';
+    html += '    <p class="mov-motivo">Contagem de caixa</p>';
+    html += '    <div class="mov-meta"><span class="mov-pessoa">' + escapeHtml(c.pessoa || '') + '</span></div>';
     html += '  </div>';
-    html += '  <p class="mov-motivo">Contagem de caixa</p>';
-    html += '  <div class="mov-meta"><span class="mov-pessoa">' + escapeHtml(c.pessoa || '') + '</span></div>';
 
     if (aberta){
-      html += '  <div class="contagem-detalhe" onclick="event.stopPropagation()">';
+      html += '  <div class="contagem-detalhe">';
       html += contagemDenomHtml(c);
       html += '    <p class="contagem-diferenca-line ' + dif.classe + '">' + dif.texto + '</p>';
       html += '    <p class="mov-pessoa">Autor: ' + escapeHtml(c.pessoa || '—') + ' · ' + formatDataHora(c.dataHora) + '</p>';
