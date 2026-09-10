@@ -61,21 +61,30 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
   três vistas, do painel lateral e do modal); as peças de telemóvel (`.mob-bar`,
   `.mob-bg`, `.mob-sheet`, `.fab`, `.cal-camadas-btn`) nascem `display:none` fora da
   media query, para nunca aparecerem em desktop por descuido. O que existe abaixo de
-  768px: a `.cal-bar`, a legenda e a vista Semana desaparecem; uma **barra de datas
-  sticky** (`.mob-bar`: mês + ano, botão de camadas, Hoje; faixa com os 7 dias da
-  semana de `dataRef`, ou o mês inteiro quando expandida pelo puxador / pelo título /
-  por arrasto vertical; swipe horizontal = semana ou mês; hoje = pílula `--red`,
-  seleccionado = anel `--ink`; estado em `localStorage 'calendario.mob.faixa'`) e o
-  selector **Agenda / Dia / Mês**. `vistaEfetiva()` traduz a vista guardada
-  (`'semana'` → `'agenda'` no telemóvel, `'agenda'` → `'mes'` no computador) sem tocar
+  768px: a `.cal-bar`, a legenda e a vista Semana desaparecem; o cabeçalho é uma
+  **cópia estrutural do Outlook mobile** (`.mob-bar`, sticky): linha 1 = mês + ano com
+  chevron (toca para abrir/fechar o mês), ícone de camadas, ícone de vistas (abre um
+  menu curto Agenda / Dia / Mês com visto na activa — não há segmented control) e Hoje;
+  linha 2 = iniciais dos dias. Nas vistas Agenda e Dia segue-se a faixa com os 7 dias
+  da semana de `dataRef` (hoje = círculo cheio `--red`; seleccionado = contorno `--ink`;
+  pontinho quando o dia tem itens — só na faixa, nunca nas células do mês) e o puxador
+  fino. A faixa e a grelha do mês são o MESMO componente em dois estados, nunca os dois
+  ao mesmo tempo: arrastar o puxador/faixa para baixo abre o mês (= `setVista('mes')`),
+  arrastar as iniciais ou a grelha para cima volta à vista anterior (`vistaAntesMes`);
+  na vista Mês não há faixa nem puxador. `vistaEfetiva()` traduz a vista guardada
   na guardada. A **Agenda** (por omissão ao telemóvel) é uma lista contínua a partir de
   `dataRef` só com os dias que têm itens, cabeçalhos sticky, linhas do MESMO
   `itemDiaHtml()`/`pagDiaHtml()` em modo `{agenda:true}` (hora + duração, ponto de 8px
   da camada, título, segunda linha), a crescer 30 dias de cada vez com um
   IntersectionObserver (tecto 366; `datasVisiveis()` é a única definição do intervalo,
-  partilhada pela fonte de pagamentos e pela camada Outlook). O **Mês** enche a altura
-  que sobra do ecrã (`ajustarAlturaMes()`), com 2 chips de texto por célula e "+N"; o
-  **Dia** é a grelha horária numa coluna, a abrir 1 h antes da hora actual em hoje.
+  partilhada pela fonte de pagamentos e pela camada Outlook). O **Mês** é a grelha do
+  Outlook: sem cartões nem margens, só linhas de 1px `--line`, exactamente as semanas
+  que o mês ocupa (5 ou 6, `--nlinhas`), a encher a altura que sobra do ecrã
+  (`ajustarAlturaMes()`), "1 Set" no dia 1, coluna do dia seleccionado com fundo subtil
+  de alto a baixo, chips de altura fixa (16px) numa linha com ellipsis — os que não
+  cabem por inteiro na célula ficam `.escondido` pelo JS, nunca cortados, e NÃO há
+  "+N"; o **Dia** é a grelha horária numa coluna, a abrir 1 h antes da hora actual
+  em hoje.
   O painel do dia abre em bottom sheet (`renderPainelDia()` tal e qual), os `giocoModal`
   passam a ecrã inteiro e o `#calCamadas` (os toggles das camadas) é MOVIDO para o
   `<body>` ao abrir como folha e devolvido à barra ao fechar: são os mesmos elementos e

@@ -282,7 +282,7 @@
      >=768px a página fica byte a byte o que era: nem barra de datas, nem
      bottom sheets, nem botão flutuante, nem vista Agenda.
      ====================================================================== */
-  .mob-bar, .mob-bg, .mob-sheet, .mob-sheet-cab, .fab, .cal-camadas-btn{ display:none; }
+  .mob-bar, .mob-bg, .mob-sheet, .mob-sheet-cab, .fab, .cal-camadas-btn, .mob-menu{ display:none; }
   /* Wrapper dos toggles de camadas: em desktop é a linha de chips de sempre
      (o gap:10px do antigo .cal-dir, para o espaçamento não mudar). */
   .cal-camadas{ display:flex; align-items:center; gap:10px; }
@@ -304,73 +304,95 @@
     .cal-bar, .cal-legenda{ display:none; }
     .page-subtitle{ display:none; }
 
-    /* ---------- Barra de datas sticky ---------- */
+    /* ---------- Cabeçalho (cópia estrutural do Outlook mobile) ----------
+       Linha 1: mês + ano grande com chevron; à direita camadas, vistas, Hoje.
+       Linha 2: iniciais dos dias. Nas vistas Agenda e Dia segue-se a faixa com
+       os números da semana e o puxador fino; na vista Mês NÃO há faixa nem
+       puxador — a grelha do mês É a faixa expandida (mesmo componente, dois
+       estados, nunca os dois ao mesmo tempo). */
     .mob-bar{
       display:block; position:sticky; top:0; z-index:40;
-      /* Sangra até às margens do .main (16px no shell-mobile) para a barra
-         ir de lado a lado e o conteúdo passar por baixo sem se ver. */
-      margin:6px -16px 10px; padding:6px 12px 0;
+      margin:6px -16px 0; padding:4px 12px 0;
       background:var(--dough); color:var(--ink);
       border-bottom:1px solid var(--line);
     }
-    .mob-l1{ display:flex; align-items:center; gap:8px; min-height:44px; }
+    .mob-l1{ position:relative; display:flex; align-items:center; gap:6px; min-height:48px; }
     .mob-titulo{
       flex:1; min-width:0; display:inline-flex; align-items:center; gap:4px;
       background:none; border:none; padding:0 4px; min-height:44px; cursor:pointer;
-      font-family:'Inter',sans-serif; font-size:19px; font-weight:700; color:var(--ink);
+      font-family:'Inter',sans-serif; font-size:20px; font-weight:700; color:var(--ink);
       text-align:left;
     }
     .mob-titulo span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .mob-titulo .icon{ width:18px; height:18px; flex-shrink:0; color:var(--muted); transition:transform .18s ease; }
-    .mob-bar.expandida .mob-titulo .icon{ transform:rotate(180deg); }
-    .mob-l1-dir{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .mob-titulo .icon{ width:20px; height:20px; flex-shrink:0; color:var(--ink); transition:transform .18s ease; }
+    .mob-bar.vista-mes .mob-titulo .icon{ transform:rotate(180deg); }
+    .mob-l1-dir{ display:flex; align-items:center; gap:2px; flex-shrink:0; }
     .cal-camadas-btn{
       display:inline-flex; align-items:center; justify-content:center;
-      width:44px; height:44px; padding:0; flex-shrink:0;
-      background:var(--white); color:var(--ink);
-      border:1.5px solid var(--line); border-radius:100px; cursor:pointer;
+      width:40px; height:44px; padding:0; flex-shrink:0;
+      background:none; color:var(--ink);
+      border:none; border-radius:100px; cursor:pointer;
     }
-    .cal-camadas-btn[aria-expanded="true"]{ border-color:var(--red); color:var(--red-ink); }
-    .mob-hoje{ min-height:44px; padding:9px 16px; }
+    .cal-camadas-btn .icon{ width:20px; height:20px; }
+    .cal-camadas-btn[aria-expanded="true"]{ color:var(--red-ink); background:var(--white); }
+    .mob-hoje{ min-height:40px; padding:8px 12px; font-size:12px; }
+    /* Menu de vistas: popover curto por baixo do ícone. */
+    .mob-menu{
+      display:block; position:absolute; right:0; top:calc(100% + 2px); z-index:45;
+      min-width:180px; padding:6px;
+      background:var(--white); color:var(--ink);
+      border:1px solid var(--line); border-radius:12px;
+      box-shadow:0 12px 30px rgba(0,0,0,0.18);
+    }
+    .mob-menu[hidden]{ display:none; }
+    .mob-menu button{
+      display:flex; align-items:center; justify-content:space-between; width:100%;
+      min-height:44px; padding:0 12px; background:none; border:none; border-radius:8px;
+      font-family:'Inter',sans-serif; font-size:14px; font-weight:500; color:var(--ink); cursor:pointer; text-align:left;
+    }
+    .mob-menu button i{ font-style:normal; color:var(--red-ink); visibility:hidden; }
+    .mob-menu button.active{ font-weight:700; }
+    .mob-menu button.active i{ visibility:visible; }
 
-    /* Faixa: cabeçalho de iniciais + 1 linha (semana) ou 5–6 linhas (mês). */
-    .mob-faixa{ touch-action:none; -webkit-user-select:none; user-select:none; padding:2px 0 0; }
-    .mob-faixa-cab, .mob-faixa-linha{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:2px; }
-    .mob-faixa-cab span{ text-align:center; font-size:10.5px; font-weight:700; letter-spacing:.06em; color:var(--muted); padding:2px 0; }
+    /* Iniciais (linha 2) — as mesmas para a faixa e para a grelha do mês. */
+    .mob-iniciais{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); }
+    .mob-iniciais span{ text-align:center; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:2px 0 4px; }
+
+    /* Faixa da semana corrente (Agenda / Dia). */
+    .mob-faixa{ touch-action:none; -webkit-user-select:none; user-select:none; }
+    .mob-faixa-linha{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); }
     .mob-dia{
-      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-      min-height:44px; padding:2px 0; background:none; border:none; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+      min-height:44px; padding:0; background:none; border:none; cursor:pointer;
       font-family:'Inter',sans-serif; color:var(--ink);
     }
     .mob-dia b{
       display:inline-flex; align-items:center; justify-content:center;
       width:32px; height:32px; border-radius:50%;
-      font-size:15px; font-weight:600; line-height:1;
-      box-sizing:border-box;
+      font-size:15px; font-weight:500; line-height:1; box-sizing:border-box;
     }
-    .mob-dia.fora b{ color:var(--muted); opacity:.55; }
-    /* Seleccionado: contorno --ink. Hoje: pílula --red com número branco.
-       Hoje E seleccionado: pílula vermelha com o anel por fora. */
-    .mob-dia.sel b{ box-shadow:inset 0 0 0 2px var(--ink); }
-    .mob-dia.hoje b{ background:var(--red); color:var(--on-red); box-shadow:none; }
-    .mob-dia.hoje.sel b{ box-shadow:0 0 0 2px var(--dough), 0 0 0 4px var(--ink); }
-    /* Ponto de 4px: o dia tem pelo menos um item nas camadas activas. */
+    .mob-dia.fora b{ color:var(--muted); }
+    /* Seleccionado (não sendo hoje): círculo de contorno --ink. Hoje: círculo
+       cheio --red com número branco. */
+    .mob-dia.sel b{ box-shadow:inset 0 0 0 1.5px var(--ink); }
+    .mob-dia.hoje b{ background:var(--red); color:var(--on-red); box-shadow:none; font-weight:600; }
+    /* Pontinho fino por baixo do número: o dia tem conteúdo. Só aqui, nunca
+       dentro das células do mês. */
     .mob-dia i{ width:4px; height:4px; border-radius:50%; background:var(--muted); opacity:0; }
     .mob-dia.tem i{ opacity:1; }
     .mob-dia.hoje.tem i{ background:var(--red); }
-
-    /* Puxador: toque alterna, arrasto para baixo expande, para cima colapsa. */
+    /* Puxador fino centrado: arrastar para baixo abre o mês (= vista Mês). */
     .mob-puxador{
       display:flex; align-items:center; justify-content:center;
-      width:100%; height:26px; margin:0; padding:0;
+      width:100%; height:18px; margin:0; padding:0;
       background:none; border:none; cursor:grab; touch-action:none;
     }
-    .mob-puxador span{ width:40px; height:4px; border-radius:2px; background:var(--line); }
+    .mob-puxador span{ width:36px; height:4px; border-radius:2px; background:var(--line); }
     .mob-puxador:active span{ background:var(--muted); }
-
-    /* Selector de vistas: segmentado a toda a largura (a mesma .seg local). */
-    .mob-seg{ display:flex; width:100%; margin:0 0 8px; }
-    .mob-seg button{ flex:1 1 0; min-width:0; min-height:44px; font-size:13px; }
+    .mob-bar.vista-mes .mob-faixa, .mob-bar.vista-mes .mob-puxador{ display:none; }
+    .mob-bar.vista-mes{ padding-bottom:0; }
+    /* O segmented control de desktop não existe em telemóvel. */
+    .mob-seg{ display:none; }
 
     .cal-vista{ padding:10px; }
     /* A vista Agenda tem cabeçalhos de dia sticky: o overflow:hidden do
@@ -410,26 +432,43 @@
       box-shadow:inset 0 0 0 1.5px var(--red); text-decoration:line-through;
     }
 
-    /* ---------- Vista Mês: chips de texto, altura do ecrã ---------- */
+    /* ---------- Vista Mês: grelha do Outlook ----------
+       Sem cartões, sem raio, sem margens: só linhas de 1px em --line. Ocupa
+       toda a altura entre o cabeçalho e o fundo (ajustarAlturaMes); as
+       semanas dividem-na por igual e só se desenham as que o mês ocupa. */
     .mes-layout{ display:block; }
     .mes-grelha-wrap{ min-width:0; }
-    /* O painel lateral não existe em telemóvel: o dia abre em bottom sheet. */
     .mes-layout .dia-painel{ display:none; }
-    .mes-cab{ gap:2px; margin-bottom:2px; }
-    .mes-cab div{ font-size:9.5px; letter-spacing:.04em; padding:0 0 2px; }
-    /* A altura é escrita pelo JS (ajustarAlturaMes) = o que sobra do ecrã;
-       as 6 linhas partilham-na em partes iguais e as células cortam o que
-       não cabe. grid-template-rows:auto é só o fallback antes do JS. */
-    .mes-grelha{ gap:2px; grid-template-rows:repeat(6, minmax(0,1fr)); }
-    .mes-cel{ padding:3px 2px 2px; gap:2px; border-width:1px; border-radius:6px; min-height:0; }
-    .mes-cel.fds{ background:var(--white); }
-    .mes-cel.col-sel{ background:rgba(20,20,20,0.06); }
-    [data-theme="dark"] .mes-cel.col-sel{ background:rgba(255,255,255,0.07); }
-    .mes-cel.sel{ box-shadow:inset 0 0 0 2px var(--ink); }
-    .mes-num{ font-size:12px; padding:1px 5px; line-height:16px; }
-    .mes-cel .ev-chip{ height:16px; line-height:16px; font-size:10px; padding:0 4px; border-radius:4px; }
+    /* O cabeçalho de iniciais da grelha é o da barra (linha 2). */
+    .mes-cab{ display:none; }
+    /* A vista deixa de ser cartão: a grelha encosta às margens do ecrã. */
+    .cal-vista.vista-mes{ padding:0; margin:0 -16px; background:none; border:none; box-shadow:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    .cal-vista.vista-mes::before{ display:none; }
+    .mes-grelha{ gap:0; grid-template-rows:repeat(var(--nlinhas, 5), minmax(0,1fr)); border-top:1px solid var(--line); }
+    .mes-cel{
+      padding:2px 2px 0; gap:2px; min-height:0;
+      border:none; border-right:1px solid var(--line); border-bottom:1px solid var(--line); border-radius:0;
+      background:transparent; overflow:hidden; transition:none;
+    }
+    .mes-cel:nth-child(7n){ border-right:none; }
+    .mes-cel:hover{ border-color:var(--line); }
+    .mes-cel.fds{ background:transparent; }
+    /* Dias de outro mês: número e chips esbatidos, sem fundo diferente. */
+    .mes-cel.fora{ opacity:1; }
+    .mes-cel.fora .mes-num{ color:var(--muted); opacity:.6; }
+    .mes-cel.fora .ev-chip{ opacity:.45; }
+    /* Coluna do dia seleccionado: fundo subtil de alto a baixo. */
+    .mes-cel.col-sel{ background:rgba(20,20,20,0.07); }
+    [data-theme="dark"] .mes-cel.col-sel{ background:rgba(255,255,255,0.08); }
+    .mes-cel.sel{ box-shadow:none; }
+    .mes-num{ align-self:flex-start; font-size:12px; font-weight:500; padding:1px 5px; line-height:16px; white-space:nowrap; }
+    /* Chips: altura fixa, uma linha, ellipsis, encostados às margens da
+       célula. Os que não cabem por inteiro ficam display:none (JS), nunca
+       cortados a meio. */
+    .mes-cel .ev-chip{ height:16px; line-height:16px; font-size:10px; padding:0 4px; border-radius:3px; flex-shrink:0; }
     .mes-cel .ev-chip .num, .mes-cel .ev-chip .icon{ display:none; }
-    .mes-cel .mes-mais{ font-size:10px; padding:0 4px; line-height:14px; }
+    .mes-cel .ev-chip.escondido{ display:none; }
+    .mes-cel .mes-mais{ display:none; }
 
     /* ---------- Vista Dia: uma coluna, "Todo o dia" no topo ---------- */
     .dia-layout{ display:block; }
@@ -626,22 +665,26 @@
            puxador e o selector Agenda / Dia / Mês. -->
       <div class="mob-bar" id="mobBar">
         <div class="mob-l1">
-          <button type="button" class="mob-titulo" id="mobTitulo" aria-expanded="false" title="Mostrar ou esconder o mês inteiro">
+          <button type="button" class="mob-titulo" id="mobTitulo" aria-expanded="false" title="Mês inteiro / vista anterior">
             <span id="mobTituloTxt">—</span>
             <svg class="icon" width="18" height="18"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="mob-l1-dir">
             <button type="button" class="cal-camadas-btn" id="btnCamadas" title="Camadas" aria-label="Camadas" aria-expanded="false"><svg class="icon" width="16" height="16"><use href="#i-sliders"/></svg></button>
+            <button type="button" class="cal-camadas-btn" id="btnVistas" title="Vista" aria-label="Vista" aria-expanded="false" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-calendar"/></svg></button>
             <button type="button" class="btn mob-hoje" id="mobHoje" title="Hoje">Hoje</button>
           </div>
+          <!-- Menu curto de vistas (atrás do ícone), com visto na activa. -->
+          <div class="mob-menu" id="mobMenu" role="menu" aria-label="Vista" hidden>
+            <button type="button" role="menuitemradio" data-vista="agenda"><span>Agenda</span><i>✓</i></button>
+            <button type="button" role="menuitemradio" data-vista="dia"><span>Dia</span><i>✓</i></button>
+            <button type="button" role="menuitemradio" data-vista="mes"><span>Mês</span><i>✓</i></button>
+          </div>
         </div>
+        <!-- Iniciais dos dias: são o cabeçalho da faixa E da grelha do mês (um só). -->
+        <div class="mob-iniciais" id="mobIniciais" aria-hidden="true"></div>
         <div class="mob-faixa" id="mobFaixa"></div>
-        <button type="button" class="mob-puxador" id="mobPuxador" aria-label="Expandir ou colapsar a faixa de datas" title="Mês inteiro / semana"><span></span></button>
-        <div class="seg mob-seg" id="mobSeg" role="group" aria-label="Vista">
-          <button type="button" data-vista="agenda">Agenda</button>
-          <button type="button" data-vista="dia">Dia</button>
-          <button type="button" data-vista="mes">Mês</button>
-        </div>
+        <button type="button" class="mob-puxador" id="mobPuxador" aria-label="Abrir o mês inteiro" title="Mês inteiro"><span></span></button>
       </div>
 
       <div class="panel glass-light cal-bar" id="calBar">
@@ -1182,15 +1225,15 @@
     semData.hidden = nSem === 0;
     semData.textContent = nSem + ' sem data';
     // Os dois selectores (desktop e telemóvel) reflectem a vista EFECTIVA.
-    var botoes = document.querySelectorAll('#segVista button, #mobSeg button');
+    var botoes = document.querySelectorAll('#segVista button');
     for (var i = 0; i < botoes.length; i++) botoes[i].classList.toggle('active', botoes[i].getAttribute('data-vista') === vista);
     vistaEl.classList.toggle('vista-mes', vista === 'mes');
     vistaEl.classList.toggle('vista-agenda', vista === 'agenda');
+    renderFaixa();   // antes da vista: no Mês esconde a faixa e a grelha mede a altura certa
     if (vista === 'mes') renderMes();
     else if (vista === 'semana') renderGrelhaHoraria(semanaDe(estado.dataRef));
     else if (vista === 'agenda') renderAgenda();
     else renderDia();
-    renderFaixa();
     atualizarSheetDia();
     var btnCam = document.getElementById('btnCamadas');
     if (btnCam) btnCam.setAttribute('aria-expanded', camadasAbertas() ? 'true' : 'false');
@@ -1324,17 +1367,18 @@
      mais, uma terceira linha "+N" (em desktop 3 chips, ou 2 + "+N mais"). A
      coluna do dia seleccionado (o da faixa de datas) leva .col-sel. Ambas as
      coisas só quando ehMobile(): o DOM de desktop fica exactamente o mesmo. */
-  var MAX_CHIPS_MES_MOBILE = 2;
   function renderMes() {
     var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref), mob = ehMobile();
     var dias = monthGrid(parseInt(anoDe(ref), 10), mes);
+    // Telemóvel: só as semanas que o mês ocupa (5 ou 6), nunca 6 à força.
+    if (mob && mesDe(dias[35]) !== mes) dias = dias.slice(0, 35);
     // A seleção sobrevive à mudança de mês só enquanto o dia continuar na grelha.
     if (estado.diaSelecionado && dias.indexOf(estado.diaSelecionado) < 0) estado.diaSelecionado = null;
     var sel = estado.diaSelecionado;
     var colSel = mob ? (parseISO(ref).getDay() + 6) % 7 : -1;
     var html = '<div class="mes-layout"><div class="mes-grelha-wrap"><div class="mes-cab">';
     DIAS_CURTOS.forEach(function (d) { html += '<div>' + d + '</div>'; });
-    html += '</div><div class="mes-grelha">';
+    html += '</div><div class="mes-grelha" style="--nlinhas:' + (dias.length / 7) + '">';
     dias.forEach(function (iso, i) {
       var cls = 'mes-cel';
       if (i % 7 >= 5) cls += ' fds';
@@ -1344,12 +1388,16 @@
       if (i % 7 === colSel) cls += ' col-sel';
       var evs = eventosDoDia(iso);
       html += '<div class="' + cls + '" data-dia="' + iso + '">';
-      html += '<span class="mes-num num" data-dia-num="' + iso + '">' + diaDe(iso) + '</span>';
+      // Telemóvel: o dia 1 escreve-se "1 Set", como no Outlook.
+      var rotulo = (mob && diaDe(iso) === 1) ? '1 ' + escapeHtml(mesCurto(iso)) : diaDe(iso);
+      html += '<span class="mes-num num" data-dia-num="' + iso + '">' + rotulo + '</span>';
       var visiveis;
-      if (mob) visiveis = Math.min(MAX_CHIPS_MES_MOBILE, evs.length);
+      // Telemóvel: todos os chips no DOM; ajustarAlturaMes() esconde os que
+      // não cabem por inteiro na célula. Sem "+N" (o Outlook não o tem).
+      if (mob) visiveis = evs.length;
       else visiveis = evs.length > MAX_CHIPS_MES ? MAX_CHIPS_MES - 1 : evs.length;
       for (var k = 0; k < visiveis; k++) html += chipHtml(evs[k]);
-      if (evs.length > visiveis) html += '<button type="button" class="mes-mais" data-mais="' + iso + '">+' + (evs.length - visiveis) + (mob ? '' : ' mais') + '</button>';
+      if (!mob && evs.length > visiveis) html += '<button type="button" class="mes-mais" data-mais="' + iso + '">+' + (evs.length - visiveis) + ' mais</button>';
       html += '</div>';
     });
     html += '</div></div>';
@@ -1367,9 +1415,20 @@
     if (!g) return;
     if (!ehMobile()) { g.style.removeProperty('height'); return; }
     var topo = g.getBoundingClientRect().top;
-    var fundo = (document.body.classList.contains('shell-touch') ? 64 : 12) + 16;
+    var fundo = document.body.classList.contains('shell-touch') ? 64 : 8;
     var alto = Math.floor(window.innerHeight - topo - fundo);
     g.style.height = Math.max(300, alto) + 'px';
+    // Chips: mostra os que cabem POR INTEIRO na altura real da célula; os
+    // restantes ficam escondidos — nunca um chip cortado ao meio.
+    var cels = g.querySelectorAll('.mes-cel');
+    for (var i = 0; i < cels.length; i++) {
+      var cel = cels[i], chips = cel.querySelectorAll('.ev-chip');
+      if (!chips.length) continue;
+      var num = cel.querySelector('.mes-num');
+      var livre = cel.clientHeight - 2 - (num ? num.offsetHeight + 2 : 0);
+      var cabem = Math.max(0, Math.floor((livre + 2) / (16 + 2)));
+      for (var k = 0; k < chips.length; k++) chips[k].classList.toggle('escondido', k >= cabem);
+    }
   }
 
   /* ---------- Vista Agenda (telemóvel) ----------
@@ -1453,80 +1512,67 @@
     if (ehMobile()) abrirSheetDia(iso);
   }
 
-  /* ---------- Faixa de datas (telemóvel) ----------
-     A peça central da navegação ao telemóvel: 7 dias da semana de dataRef
-     (colapsada) ou o mês inteiro de dataRef (expandida). Hoje = pílula
-     --red; seleccionado (= dataRef) = anel --ink; ponto quando o dia tem
-     itens nas camadas activas. Tocar num dia muda dataRef e a vista activa
-     acompanha. O estado expandida/colapsada persiste em localStorage. */
+  /* ---------- Cabeçalho de telemóvel (cópia estrutural do Outlook) ----------
+     Linha 1 (mês + ano, camadas, vistas, Hoje), linha 2 (iniciais) e, nas
+     vistas Agenda e Dia, a faixa com os 7 dias da semana de dataRef e o
+     puxador. A faixa e a grelha do mês são o MESMO componente em dois
+     estados: arrastar o puxador para baixo abre o mês (= vista Mês), arrastar
+     o cabeçalho ou a grelha para cima volta à vista anterior. Hoje = círculo
+     cheio --red; seleccionado (= dataRef) = contorno --ink; pontinho quando o
+     dia tem itens nas camadas activas. */
   var faixaEl = document.getElementById('mobFaixa');
   var mobBarEl = document.getElementById('mobBar');
-  var faixaExpandida = false;
-  try { faixaExpandida = localStorage.getItem('calendario.mob.faixa') === '1'; } catch (e) {}
-  function setFaixaExpandida(on) {
-    faixaExpandida = !!on;
-    try { localStorage.setItem('calendario.mob.faixa', faixaExpandida ? '1' : '0'); } catch (e) {}
-    renderFaixa();
-    if (vistaEfetiva() === 'mes') ajustarAlturaMes();
-  }
+  var vistaAntesMes = 'agenda';   // para onde "fechar o mês" volta
   var INICIAIS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+  document.getElementById('mobIniciais').innerHTML = INICIAIS.map(function (l) { return '<span>' + l + '</span>'; }).join('');
   function renderFaixa() {
     if (!faixaEl || !ehMobile()) return;
-    var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
-    var dias;
-    if (faixaExpandida) {
-      dias = monthGrid(parseInt(anoDe(ref), 10), mes);
-      // A 6.ª linha só quando tem pelo menos um dia do mês.
-      if (mesDe(dias[35]) !== mes) dias = dias.slice(0, 35);
-    } else dias = semanaDe(ref);
-    var html = '<div class="mob-faixa-cab" aria-hidden="true">';
-    INICIAIS.forEach(function (l) { html += '<span>' + l + '</span>'; });
-    html += '</div>';
-    for (var i = 0; i < dias.length; i += 7) {
-      html += '<div class="mob-faixa-linha">';
-      for (var k = i; k < i + 7; k++) {
-        var iso = dias[k], cls = 'mob-dia';
-        if (iso === hoje) cls += ' hoje';
-        if (iso === ref) cls += ' sel';
-        if (faixaExpandida && mesDe(iso) !== mes) cls += ' fora';
-        if (eventosDoDia(iso).length) cls += ' tem';
-        html += '<button type="button" class="' + cls + '" data-faixa-dia="' + iso + '" aria-label="' + escapeHtml(tituloDia(iso)) + '"' + (iso === ref ? ' aria-current="date"' : '') + '><b class="num">' + diaDe(iso) + '</b><i></i></button>';
-      }
-      html += '</div>';
-    }
-    faixaEl.innerHTML = html;
+    var ref = estado.dataRef, hoje = hojeISO(), vista = vistaEfetiva();
+    mobBarEl.classList.toggle('vista-mes', vista === 'mes');
+    if (vista !== 'mes') vistaAntesMes = vista;
+    var html = '<div class="mob-faixa-linha">';
+    semanaDe(ref).forEach(function (iso) {
+      var cls = 'mob-dia';
+      if (iso === hoje) cls += ' hoje';
+      else if (iso === ref) cls += ' sel';
+      if (mesDe(iso) !== mesDe(ref)) cls += ' fora';
+      if (eventosDoDia(iso).length) cls += ' tem';
+      html += '<button type="button" class="' + cls + '" data-faixa-dia="' + iso + '" aria-label="' + escapeHtml(tituloDia(iso)) + '"' + (iso === ref ? ' aria-current="date"' : '') + '><b class="num">' + diaDe(iso) + '</b><i></i></button>';
+    });
+    faixaEl.innerHTML = html + '</div>';
     document.getElementById('mobTituloTxt').textContent = mesLongo(ref) + ' ' + anoDe(ref);
-    document.getElementById('mobTitulo').setAttribute('aria-expanded', faixaExpandida ? 'true' : 'false');
-    mobBarEl.classList.toggle('expandida', faixaExpandida);
+    document.getElementById('mobTitulo').setAttribute('aria-expanded', vista === 'mes' ? 'true' : 'false');
+    var itens = document.querySelectorAll('#mobMenu button');
+    for (var i = 0; i < itens.length; i++) itens[i].classList.toggle('active', itens[i].getAttribute('data-vista') === vista);
     // Os cabeçalhos sticky da Agenda e a grelha do Dia dependem da altura da barra.
     document.documentElement.style.setProperty('--mob-bar-h', mobBarEl.offsetHeight + 'px');
   }
-  // Swipe horizontal na faixa: uma semana (colapsada) ou um mês (expandida).
-  function navegarFaixa(dir) {
-    setDataRef(faixaExpandida ? addMonths(estado.dataRef, dir) : addDays(estado.dataRef, 7 * dir));
-  }
-  /* Gestos: swipe horizontal na faixa navega; arrastar para baixo (faixa ou
-     puxador) expande, para cima colapsa; toque no puxador ou no título
-     alterna. Pointer events cobrem toque, rato e caneta. Depois de um gesto
-     o click que o browser dispara a seguir é ignorado (gestoAte). */
+  function abrirMes() { if (vistaEfetiva() !== 'mes') setVista('mes'); }
+  function fecharMes() { if (vistaEfetiva() === 'mes') setVista(vistaAntesMes === 'mes' ? 'agenda' : vistaAntesMes); }
+  // Swipe horizontal na faixa: uma semana.
+  function navegarFaixa(dir) { setDataRef(addDays(estado.dataRef, 7 * dir)); }
+  /* Gestos (pointer events: toque, rato, caneta). Depois de um gesto o click
+     que o browser dispara a seguir é ignorado (gestoAte). */
   var gestoAte = 0;
-  function tocarDiaFaixa(iso) {
-    // Na vista Mês tocar num dia da faixa também abre o painel do dia (folha).
-    if (vistaEfetiva() === 'mes') { selecionarDia(iso); return; }
-    setDataRef(iso);
-  }
+  function tocarDiaFaixa(iso) { setDataRef(iso); }
   /* O toque num dia é resolvido AQUI, no pointerup, e não no click: com o
      ponteiro capturado o browser retarget-a o click para o elemento que
      capturou (a faixa), e o botão do dia nunca era encontrado. O handler de
-     click fica só para o teclado (Enter/Espaço não geram pointer events). */
-  function ligarGestosFaixa(alvo, aoTocar) {
+     click fica só para o teclado (Enter/Espaço não geram pointer events).
+     opts: { horizontal: swipe navega a semana, baixo: abre o mês,
+             cima: fecha o mês, aoTocar: toque simples } */
+  function ligarGestos(alvo, opts) {
     if (!alvo) return;
     var x0 = 0, y0 = 0, activo = false, alvoToque = null;
     alvo.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.target.closest && e.target.closest('.ev-chip, .mob-l1-dir, .mob-menu')) return;
+      if (opts.soMes && vistaEfetiva() !== 'mes') return;
       activo = true; x0 = e.clientX; y0 = e.clientY;
       alvoToque = e.target.closest ? e.target.closest('[data-faixa-dia]') : null;
-      try { alvo.setPointerCapture(e.pointerId); } catch (err) {}
+      // Sem captura na vista (semCaptura): capturar retargetava o click das
+      // células e dos chips para o contentor e partia os toques normais.
+      if (!opts.semCaptura) { try { alvo.setPointerCapture(e.pointerId); } catch (err) {} }
     });
     function largar(e) {
       if (!activo) return;
@@ -1534,18 +1580,24 @@
       var dx = e.clientX - x0, dy = e.clientY - y0;
       var horizontal = Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2;
       var vertical = Math.abs(dy) > 36 && Math.abs(dy) > Math.abs(dx) * 1.2;
-      gestoAte = performance.now() + 400;
-      if (horizontal) { navegarFaixa(dx < 0 ? 1 : -1); return; }
-      if (vertical) { setFaixaExpandida(dy > 0); return; }
+      if (horizontal && opts.horizontal) { gestoAte = performance.now() + 400; navegarFaixa(dx < 0 ? 1 : -1); return; }
+      if (vertical) {
+        if (dy > 0 && opts.baixo) { gestoAte = performance.now() + 400; abrirMes(); }
+        else if (dy < 0 && opts.cima) { gestoAte = performance.now() + 400; fecharMes(); }
+        return;
+      }
       if (Math.abs(dx) > 10 || Math.abs(dy) > 10) return;   // arrasto curto: nada
-      if (alvoToque) tocarDiaFaixa(alvoToque.getAttribute('data-faixa-dia'));
-      else if (aoTocar) aoTocar();
+      if (alvoToque) { gestoAte = performance.now() + 400; tocarDiaFaixa(alvoToque.getAttribute('data-faixa-dia')); }
+      else if (opts.aoTocar) { gestoAte = performance.now() + 400; opts.aoTocar(); }
     }
     alvo.addEventListener('pointerup', largar);
     alvo.addEventListener('pointercancel', function () { activo = false; alvoToque = null; });
   }
-  ligarGestosFaixa(faixaEl, null);
-  ligarGestosFaixa(document.getElementById('mobPuxador'), function () { setFaixaExpandida(!faixaExpandida); });
+  ligarGestos(faixaEl, { horizontal: true, baixo: true });
+  ligarGestos(document.getElementById('mobPuxador'), { baixo: true, cima: true, aoTocar: abrirMes });
+  ligarGestos(document.getElementById('mobIniciais'), { baixo: true, cima: true });
+  // Na vista Mês, arrastar a grelha para cima fecha o mês (volta à vista anterior).
+  ligarGestos(vistaEl, { cima: true, soMes: true, semCaptura: true });
   if (faixaEl) faixaEl.addEventListener('click', function (e) {
     if (performance.now() < gestoAte) return;   // já tratado no pointerup
     var b = e.target.closest('[data-faixa-dia]');
@@ -1553,14 +1605,30 @@
   });
   document.getElementById('mobPuxador').addEventListener('click', function () {
     if (performance.now() < gestoAte) return;
-    setFaixaExpandida(!faixaExpandida);
+    abrirMes();
   });
-  document.getElementById('mobTitulo').addEventListener('click', function () { setFaixaExpandida(!faixaExpandida); });
-  document.getElementById('mobHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
-  document.getElementById('mobSeg').addEventListener('click', function (e) {
+  document.getElementById('mobTitulo').addEventListener('click', function () {
+    if (vistaEfetiva() === 'mes') fecharMes(); else abrirMes();
+  });
+  /* Menu de vistas: atrás do ícone, fecha ao escolher ou ao tocar fora. */
+  var mobMenu = document.getElementById('mobMenu');
+  var btnVistas = document.getElementById('btnVistas');
+  function fecharMenuVistas() { mobMenu.hidden = true; btnVistas.setAttribute('aria-expanded', 'false'); }
+  btnVistas.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var abrir = mobMenu.hidden;
+    mobMenu.hidden = !abrir;
+    btnVistas.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  });
+  mobMenu.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-vista]');
-    if (b) setVista(b.getAttribute('data-vista'));
+    if (!b) return;
+    e.stopPropagation();
+    fecharMenuVistas();
+    setVista(b.getAttribute('data-vista'));
   });
+  document.addEventListener('click', function (e) { if (!mobMenu.hidden && !e.target.closest('#mobMenu')) fecharMenuVistas(); });
+  document.getElementById('mobHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
   function fecharPainelDia() {
     if (sheetDiaAberta()) { fecharSheetDia(); return; }
     if (estado.diaSelecionado) { estado.diaSelecionado = null; render(); }
