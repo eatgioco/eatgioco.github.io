@@ -190,6 +190,7 @@
   .rec-outros-fb b{ color:var(--ink); font-weight:600; }
 
   .rec-status-a td{ color:var(--muted); text-decoration:line-through; }
+  .rec-status-x td{ background:var(--amber-bg); }
 </style>
 </head>
 <body>
@@ -258,11 +259,11 @@
     </div>
     <div class="card glass-light rec-upload">
       <h3>Extrato do terminal</h3>
-      <p>CSV de movimentos do TPA. Escolhe a origem antes de carregar. Vários ficheiros acumulam; a mesma operação repetida entre ficheiros conta uma vez.</p>
+      <p>CSV de movimentos do TPA: ABANCA (ponto-e-vírgula, com preâmbulo) ou INTERCARD/Verifone (exportação de transações, campos entre aspas). Escolhe a origem antes de carregar. Vários ficheiros acumulam; a mesma operação repetida entre ficheiros conta uma vez.</p>
       <div class="rec-upload-row">
         <select id="selOrigem" aria-label="Origem do extrato">
           <option value="ABANCA">ABANCA</option>
-          <option value="CD" disabled>CD — parser por implementar</option>
+          <option value="CD">INTERCARD (Verifone) — CD</option>
         </select>
         <input type="file" id="inTerminal" multiple accept=".csv,text/csv,text/plain">
       </div>
@@ -317,13 +318,26 @@ window.addEventListener('load', function () {
 
   // Meios de pagamento do POS que têm terminal do lado de lá.
   // OU = TPA ABANCA (código literal no PaymentMechanism, confirmado num
-  // SAF-T real). CD fica rotulado "CD" até se saber o que é depois de 27/08.
+  // SAF-T real). CD = terminal INTERCARD/Verifone (confirmado pelo extrato:
+  // 06/09 soma 182,90 € de ambos os lados) — rotula-se "INTERCARD" quando há
+  // extrato Verifone carregado, "CD" enquanto não há.
   var MEIOS = [
     { mec:'OU', origem:'ABANCA', label:'TPA ABANCA', labelCurto:'ABANCA' },
-    { mec:'CD', origem:'CD',     label:'CD',         labelCurto:'CD' }
+    { mec:'CD', origem:'CD',     label:'CD',         labelCurto:'CD', labelComExtrato:'TPA INTERCARD', labelCurtoComExtrato:'INTERCARD' }
   ];
   var MEIO_POR_MEC = {};
   MEIOS.forEach(function(m){ MEIO_POR_MEC[m.mec] = m; });
+  function temExtrato(origem){ return !!(terminal[origem] && Object.keys(terminal[origem]).length); }
+  function labelMeio(meio){ return meio.labelComExtrato && temExtrato(meio.origem) ? meio.labelComExtrato : meio.label; }
+  function labelCurtoMeio(meio){ return meio.labelCurtoComExtrato && temExtrato(meio.origem) ? meio.labelCurtoComExtrato : meio.labelCurto; }
+
+  // Estados do Verifone. Só os válidos entram no casamento e nas somas; os
+  // conhecidos-excluídos e os desconhecidos aparecem numa lista própria por
+  // dia (uma recusa seguida de nova tentativa explica duas linhas próximas
+  // com o mesmo valor). Desconhecido nunca é ignorado em silêncio.
+  var INTERCARD_STATUS_VALIDO = { 'SALE SETTLED':true, 'SALE AUTHORISED':true };
+  var INTERCARD_STATUS_EXCLUIDO = { 'SALE DECLINED':true, 'CANCEL DECLINED':true, 'CANCEL REJECTED':true };
+  var INTERCARD_FUSO_ESPERADO = '+01:00';
 
   var NOMES_MEIO = { NU:'Numerário', OU:'Outros (OU)', CD:'Cartão débito (CD)', CC:'Cartão crédito (CC)', TB:'Transferência (TB)', MB:'Multibanco (MB)', CH:'Cheque (CH)', CO:'Consignação (CO)', CS:'Compensação (CS)', DE:'Dinheiro eletrónico (DE)', LC:'Letra (LC)', PR:'Permuta (PR)', TR:'Ticket restaurante (TR)' };
 
@@ -569,6 +583,7 @@ window.addEventListener('load', function () {
         dia: dia,
         hora: horaParaSeg(f[C.hora]),
         horaTexto: (f[C.hora] || '').trim(),
+        categoria: 'valida',
         tipo: (f[C.tipo] || '').trim(),
         marca: (f[C.marca] || '').trim(),
         cartao: (f[C.cartao] || '').trim(),
@@ -580,12 +595,96 @@ window.addEventListener('load', function () {
       });
     }
     if (!txs.length) throw new Error('O CSV não tem nenhuma linha de movimento.');
-    return { inicio: inicio, fim: fim, txs: txs };
+    return { inicio: inicio, fim: fim, txs: txs, avisos: [] };
   }
 
-  // Sem ficheiro de exemplo não se inventam colunas.
-  function parseIntercard(){
-    throw new Error('Parser por implementar — falta o ficheiro de exemplo');
+  // CSV com todos os campos entre aspas (RFC 4180): aspas duplicadas dentro
+  // do campo, vírgulas e quebras de linha dentro de aspas.
+  function parseCsvAspas(texto, sep){
+    var linhas = [], linha = [], campo = '', i = 0, n = texto.length, dentro = false;
+    while (i < n){
+      var ch = texto[i];
+      if (dentro){
+        if (ch === '"'){
+          if (texto[i + 1] === '"'){ campo += '"'; i += 2; continue; }
+          dentro = false; i++; continue;
+        }
+        campo += ch; i++; continue;
+      }
+      if (ch === '"'){ dentro = true; i++; continue; }
+      if (ch === sep){ linha.push(campo); campo = ''; i++; continue; }
+      if (ch === '\r'){ i++; continue; }
+      if (ch === '\n'){ linha.push(campo); linhas.push(linha); linha = []; campo = ''; i++; continue; }
+      campo += ch; i++;
+    }
+    if (campo !== '' || linha.length){ linha.push(campo); linhas.push(linha); }
+    return linhas;
+  }
+
+  // INTERCARD / Verifone: UTF-8 com BOM, vírgula, campos entre aspas, decimal
+  // com PONTO, cabeçalho na 1.ª linha, 100+ colunas — só as que interessam,
+  // por NOME. Hora local (created_at_*), nunca convertida para UTC: o
+  // SystemEntryDate do SAF-T também é local. Sem comissão por transação
+  // (débito mensal): comissao fica null, nunca 0.
+  // → { inicio, fim, txs, avisos:[] }
+  function parseIntercard(texto){
+    texto = texto.replace(/^\uFEFF/, '');
+    var linhas = parseCsvAspas(texto, ',');
+    if (!linhas.length) throw new Error('CSV vazio.');
+    var cab = linhas[0].map(function(c){ return c.trim(); });
+    function col(nome){ return cab.indexOf(nome); }
+    var C = {
+      dia: col('created_at_date'), hora: col('created_at_time'), fuso: col('created_at_timezone'),
+      montante: col('Curr.amount'), status: col('status'), marca: col('Product'), metodo: col('payment_method'),
+      cartao: col('masked_card_number'), auth: col('authorisation_code'), id: col('_id'),
+      lote: col('batch_id'), liquidacao: col('settlement_date'), fee: col('payment_processing_fee_amount'), moeda: col('Curr.currency')
+    };
+    var obrig = ['dia','hora','montante','status','id'];
+    var nomes = { dia:'created_at_date', hora:'created_at_time', montante:'Curr.amount', status:'status', id:'_id' };
+    for (var o = 0; o < obrig.length; o++){
+      if (C[obrig[o]] < 0) throw new Error('Falta a coluna "' + nomes[obrig[o]] + '" no cabeçalho. É mesmo a exportação de transações do Verifone?');
+    }
+    var txs = [], fusos = {}, comFee = 0;
+    for (var r = 1; r < linhas.length; r++){
+      var f = linhas[r];
+      if (f.length < 2 || !f.join('').trim()) continue;
+      var dia = normData(f[C.dia]);
+      var montante = parseFloat(String(f[C.montante] || '').trim());
+      if (!dia || isNaN(montante)) continue;
+      var status = (f[C.status] || '').trim();
+      var fuso = C.fuso >= 0 ? (f[C.fuso] || '').trim() : '';
+      if (fuso && fuso !== INTERCARD_FUSO_ESPERADO) fusos[fuso] = (fusos[fuso] || 0) + 1;
+      var fee = C.fee >= 0 ? String(f[C.fee] || '').trim() : '';
+      if (fee) comFee++;
+      var liq = C.liquidacao >= 0 ? normData(f[C.liquidacao]) : null;
+      txs.push({
+        nOp: (f[C.id] || '').trim(),
+        dia: dia,
+        hora: horaParaSeg(f[C.hora]),
+        horaTexto: (f[C.hora] || '').trim(),
+        fuso: fuso,
+        tipo: status,
+        categoria: INTERCARD_STATUS_VALIDO[status] ? 'valida' : (INTERCARD_STATUS_EXCLUIDO[status] ? 'excluida' : 'desconhecida'),
+        marca: C.marca >= 0 ? (f[C.marca] || '').trim() : '',
+        metodo: C.metodo >= 0 ? (f[C.metodo] || '').trim() : '',
+        cartao: C.cartao >= 0 ? (f[C.cartao] || '').trim() : '',
+        autorizacao: C.auth >= 0 ? (f[C.auth] || '').trim() : '',
+        montante: montante,
+        comissao: fee ? parseFloat(fee) : null,
+        taxaInterc: null,
+        moeda: C.moeda >= 0 ? (f[C.moeda] || '').trim() : 'EUR',
+        liquidacao: liq || '',
+        lote: C.lote >= 0 ? (f[C.lote] || '').trim() : ''
+      });
+    }
+    if (!txs.length) throw new Error('O CSV não tem nenhuma linha de transação.');
+    var dias = txs.map(function(t){ return t.dia; }).sort();
+    var avisos = [];
+    Object.keys(fusos).forEach(function(z){ avisos.push(fusos[z] + ' linha' + (fusos[z] === 1 ? '' : 's') + ' com fuso ' + z + ' (esperado ' + INTERCARD_FUSO_ESPERADO + ') — a hora foi usada tal como está'); });
+    if (comFee) avisos.push(comFee + ' linha' + (comFee === 1 ? '' : 's') + ' com comissão por transação preenchida — o Verifone costuma cobrar por débito mensal');
+    var desconhecidas = txs.filter(function(t){ return t.categoria === 'desconhecida'; }).length;
+    if (desconhecidas) avisos.push(desconhecidas + ' linha' + (desconhecidas === 1 ? '' : 's') + ' com estado não reconhecido (fora das somas, listadas no dia)');
+    return { inicio: dias[0], fim: dias[dias.length - 1], txs: txs, avisos: avisos };
   }
 
   var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
@@ -639,7 +738,8 @@ window.addEventListener('load', function () {
           var dias = diasEntre(res.inicio, res.fim);
           if (!dias.length) dias = res.txs.map(function(t){ return t.dia; });
           dias.forEach(function(dia){ cob[dia] = true; });
-          termFicheiros.push({ nome: file.name, origem: origem, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos });
+          var fora = res.txs.filter(function(t){ return t.categoria !== 'valida'; }).length;
+          termFicheiros.push({ nome: file.name, origem: origem, inicio: res.inicio, fim: res.fim, novos: novos, repetidos: repetidos, fora: fora, avisos: res.avisos || [] });
         }).catch(function(err){
           termFicheiros.push({ nome: file.name, origem: origem, erro: err && err.message ? err.message : String(err) });
         });
@@ -660,7 +760,8 @@ window.addEventListener('load', function () {
     b.innerHTML = termFicheiros.map(function(f){
       if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + '</span><span class="rec-erro">' + esc(f.erro) + '</span></li>';
       return '<li><b>' + esc(f.nome) + '</b><span>' + esc(f.origem) + ' · ' + (f.inicio ? fmtDia(f.inicio) + ' → ' + fmtDia(f.fim) + ' · ' : '') +
-        f.novos + ' transaç' + (f.novos === 1 ? 'ão' : 'ões') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span></li>';
+        f.novos + ' transaç' + (f.novos === 1 ? 'ão' : 'ões') + (f.fora ? ' (' + f.fora + ' fora das somas)' : '') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span>' +
+        (f.avisos || []).map(function(a){ return '<span class="rec-erro">' + esc(a) + '</span>'; }).join('') + '</li>';
     }).join('');
   }
 
@@ -726,8 +827,16 @@ window.addEventListener('load', function () {
   function transacoesTerminal(dia, origem){
     var mapa = terminal[origem] || {};
     return Object.keys(mapa).map(function(k){ return mapa[k]; })
-      .filter(function(t){ return t.dia === dia; })
+      .filter(function(t){ return t.dia === dia && t.categoria === 'valida'; })
       .map(function(t){ t.cents = cents(t.montante); return t; })
+      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+  }
+  // Recusadas, canceladas e estados não reconhecidos: fora das somas e do
+  // casamento, mas sempre listadas.
+  function transacoesForaSoma(dia, origem){
+    var mapa = terminal[origem] || {};
+    return Object.keys(mapa).map(function(k){ return mapa[k]; })
+      .filter(function(t){ return t.dia === dia && t.categoria !== 'valida'; })
       .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
   }
 
@@ -844,13 +953,14 @@ window.addEventListener('load', function () {
     var temSaft = !!saftCobertura[dia];
     var term = temTerm ? transacoesTerminal(dia, meio.origem) : [];
     var pos = temSaft ? linhasPos(dia, meio.mec) : [];
-    var termBruto = 0, comissao = 0;
-    term.forEach(function(t){ termBruto += t.montante; comissao += t.comissao; });
-    termBruto = round2(termBruto); comissao = round2(comissao);
+    var termBruto = 0, comissao = 0, temComissao = false;
+    term.forEach(function(t){ termBruto += t.montante; if (t.comissao != null){ comissao += t.comissao; temComissao = true; } });
+    termBruto = round2(termBruto); comissao = temComissao ? round2(comissao) : null;
     var posSaft = round2(pos.reduce(function(s, l){ return s + l.valor; }, 0));
     var r = {
       meio: meio, dia: dia, fb: fb, temTerm: temTerm, temSaft: temSaft,
-      term: term, pos: pos, termBruto: termBruto, comissao: comissao, liquido: round2(termBruto + comissao),
+      term: term, pos: pos, termBruto: termBruto, comissao: comissao, liquido: round2(termBruto + (comissao || 0)),
+      foraSoma: temTerm ? transacoesForaSoma(dia, meio.origem) : [],
       posSaft: posSaft, anulados: temSaft ? docsAnulados(dia) : []
     };
     if (temTerm && temSaft){
@@ -942,7 +1052,7 @@ window.addEventListener('load', function () {
   }
 
   function chipHtml(r){
-    return '<span class="rec-ind"><span class="rec-ind-label">' + esc(r.meio.labelCurto) + '</span>' +
+    return '<span class="rec-ind"><span class="rec-ind-label">' + esc(labelCurtoMeio(r.meio)) + '</span>' +
       '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span>' +
       (r.sub ? '<span class="rec-chip-sub">' + esc(r.sub) + '</span>' : '') + '</span>';
   }
@@ -994,9 +1104,20 @@ window.addEventListener('load', function () {
   function linhaPosHtml(l){
     return '<td class="num">' + fmtHora(l.hora) + '</td><td>' + esc(l.no) + ' <span class="rec-mono">' + esc(l.tipo) + '</span></td>' + celValor(l.valor);
   }
+  function liquidacaoTexto(t){
+    if (t.liquidacao) return fmtDia(t.liquidacao);
+    if (t.lote) return 'lote ' + t.lote;
+    return '—';
+  }
+  function marcaHtml(t){
+    return esc(t.marca || '—') + (t.metodo && t.metodo !== t.marca ? ' <span class="rec-mono">' + esc(t.metodo) + '</span>' : '');
+  }
+  function cartaoHtml(t){
+    return esc(t.cartao || '—') + (t.autorizacao ? ' <span class="rec-mono">aut. ' + esc(t.autorizacao) + '</span>' : '');
+  }
   function linhaTermHtml(t){
-    return '<td class="num">' + fmtHora(t.hora) + '</td><td>' + esc(t.tipo) + '</td><td>' + esc(t.marca) + '</td><td class="rec-mono">' + esc(t.cartao) + '</td>' +
-      celValor(t.montante) + celValor(t.comissao) + '<td class="rec-mono">' + (t.liquidacao ? esc(fmtDia(t.liquidacao)) : '—') + '</td>';
+    return '<td class="num">' + fmtHora(t.hora) + '</td><td>' + esc(t.tipo) + '</td><td>' + marcaHtml(t) + '</td><td class="rec-mono">' + cartaoHtml(t) + '</td>' +
+      celValor(t.montante) + (t.comissao == null ? '<td class="num rec-mono">—</td>' : celValor(t.comissao)) + '<td class="rec-mono">' + esc(liquidacaoTexto(t)) + '</td>';
   }
   var TH_TERM = '<th class="num">Hora</th><th>Tipo</th><th>Marca</th><th>Cartão</th><th class="num">Montante</th><th class="num">Comissão</th><th>Liquidação</th>';
   var TH_POS = '<th class="num">Hora</th><th>Documento</th><th class="num">Valor</th>';
@@ -1021,12 +1142,24 @@ window.addEventListener('load', function () {
     return '<div class="rec-totais">' +
       '<div class="rec-total"><div class="k">POS · ' + esc(r.meio.mec) + '</div><div class="v num">' + fmtEuro(posValor) + '</div><div class="s">' + esc(posSub) + '</div>' + fbAviso + '</div>' +
       '<div class="rec-total"><div class="k">Terminal bruto</div><div class="v num">' + (r.temTerm ? fmtEuro(r.termBruto) : '—') + '</div><div class="s">' + (r.temTerm ? r.term.length + ' transações' : 'sem extrato') + '</div></div>' +
-      '<div class="rec-total"><div class="k">Comissão</div><div class="v num">' + (r.temTerm ? fmtEuro(r.comissao) : '—') + '</div></div>' +
-      '<div class="rec-total"><div class="k">Líquido</div><div class="v num">' + (r.temTerm ? fmtEuro(r.liquido) : '—') + '</div><div class="s">bruto + comissão</div></div>' +
+      '<div class="rec-total"><div class="k">Comissão</div><div class="v num">' + (r.temTerm && r.comissao != null ? fmtEuro(r.comissao) : '—') + '</div>' + (r.temTerm && r.comissao == null && r.term.length ? '<div class="s">sem comissão por transação (débito mensal)</div>' : '') + '</div>' +
+      '<div class="rec-total"><div class="k">Líquido</div><div class="v num">' + (r.temTerm ? fmtEuro(r.liquido) : '—') + '</div><div class="s">' + (r.comissao == null ? 'igual ao bruto' : 'bruto + comissão') + '</div></div>' +
       '<div class="rec-total' + difCls + '"><div class="k">Diferença POS − terminal</div><div class="v num">' + (dif == null ? '—' : fmtEuroSinal(dif)) + '</div></div>' +
       '<div class="rec-total' + (r.modo === 'completo' && r.cobradoAMais ? ' aviso' : '') + '"><div class="k">Cobrado a mais</div><div class="v num">' + (r.modo === 'completo' ? fmtEuroSinal(r.cobradoAMais) : '—') + '</div><div class="s">' + (r.modo === 'completo' ? (r.casamento.alterados.length + ' com valor alterado') : 'precisa de SAF-T e extrato') + '</div></div>' +
       '<div class="rec-total' + (r.modo === 'completo' ? (r.semPar ? ' bad' : ' ok') : '') + '"><div class="k">Linhas sem par</div><div class="v num">' + (r.modo === 'completo' ? r.semPar : '—') + '</div><div class="s">' + (r.modo === 'completo' ? 'órfãs + ambíguas' : 'precisa de SAF-T e extrato') + '</div></div>' +
       '</div>';
+  }
+
+  function foraSomaHtml(r){
+    if (!r.foraSoma || !r.foraSoma.length) return '';
+    var desc = r.foraSoma.filter(function(t){ return t.categoria === 'desconhecida'; }).length;
+    return '<div class="rec-sec"><p class="rec-sec-titulo">Recusadas e canceladas no terminal <span class="rec-conta">' + r.foraSoma.length + '</span> <span>· fora das somas e do casamento</span>' +
+      (desc ? '<span class="rec-motivo">· ' + desc + ' com estado não reconhecido</span>' : '') + '</p>' +
+      '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Estado</th><th>Marca</th><th>Cartão</th><th class="num">Valor</th><th>Liquidação</th></tr></thead><tbody>' +
+      r.foraSoma.map(function(t){
+        var est = t.categoria === 'desconhecida' ? '<span class="rec-motivo">estado não reconhecido: ' + esc(t.tipo || '(vazio)') + '</span>' : esc(t.tipo);
+        return '<tr' + (t.categoria === 'desconhecida' ? ' class="rec-status-x"' : '') + '><td class="num">' + fmtHora(t.hora) + '</td><td>' + est + '</td><td>' + marcaHtml(t) + '</td><td class="rec-mono">' + cartaoHtml(t) + '</td>' + celValor(t.montante) + '<td class="rec-mono">' + esc(liquidacaoTexto(t)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
   }
 
   function anuladosHtml(r){
@@ -1040,15 +1173,11 @@ window.addEventListener('load', function () {
   }
 
   function blocoMeioHtml(r){
-    var h = '<div class="card glass-light rec-bloco"><h3>' + esc(r.meio.label) + ' <small>POS ' + esc(r.meio.mec) + ' ↔ extrato ' + esc(r.meio.origem) + '</small>' +
+    var h = '<div class="card glass-light rec-bloco"><h3>' + esc(labelMeio(r.meio)) + ' <small>POS ' + esc(r.meio.mec) + ' ↔ extrato ' + esc(labelCurtoMeio(r.meio)) + '</small>' +
       '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span></h3>';
 
     if (r.modo === 'nada'){
       return h + '<p class="rec-bloco-nota">Sem SAF-T, sem extrato e sem vendas importadas para este dia e meio.</p></div>';
-    }
-
-    if (r.meio.origem === 'CD' && !r.temTerm){
-      h += '<p class="rec-bloco-nota aviso">O parser do extrato CD ainda não existe (falta o ficheiro de exemplo). Aqui só se vê o lado do POS.</p>';
     }
 
     if (r.modo === 'completo'){
@@ -1077,7 +1206,7 @@ window.addEventListener('load', function () {
             '<div class="rec-ambiguo-duo"><div class="rec-ambiguo-lado"><p>POS</p><ul>' +
             g.pos.map(function(l){ return '<li><span class="num">' + fmtHora(l.hora) + '</span><span>' + esc(l.no) + '</span><span class="rec-mono">' + esc(l.tipo) + '</span></li>'; }).join('') +
             '</ul></div><div class="rec-ambiguo-lado"><p>Terminal</p><ul>' +
-            g.term.map(function(t){ return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + esc(t.marca) + '</span><span class="rec-mono">' + esc(t.cartao) + '</span><span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span></li>'; }).join('') +
+            g.term.map(function(t){ return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + marcaHtml(t) + '</span><span class="rec-mono">' + cartaoHtml(t) + '</span>' + (t.comissao == null ? '' : '<span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span>') + '</li>'; }).join('') +
             '</ul></div></div></div>';
         });
         h += '</div>';
@@ -1089,9 +1218,9 @@ window.addEventListener('load', function () {
           '<div class="rec-alterados"><table><thead><tr><th>Estado</th>' + TH_POS + '<th class="rec-lado">Terminal</th><th class="num">Cobrado</th><th class="num">Diferença</th><th>Liquidação</th></tr></thead><tbody>' +
           c.alterados.map(function(x){
             var parc = '<ul class="rec-parcelas">' + x.terms.map(function(t){
-              return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + esc(t.marca) + '</span><span class="rec-mono">' + esc(t.cartao) + '</span><span class="num">' + fmtEuro(t.montante) + '</span><span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span></li>';
+              return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + marcaHtml(t) + '</span><span class="rec-mono">' + cartaoHtml(t) + '</span><span class="num">' + fmtEuro(t.montante) + '</span>' + (t.comissao == null ? '' : '<span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span>') + '</li>';
             }).join('') + '</ul>';
-            var liq = x.terms.map(function(t){ return t.liquidacao ? fmtDia(t.liquidacao) : '—'; }).filter(function(v, i, a){ return a.indexOf(v) === i; }).join(', ');
+            var liq = x.terms.map(liquidacaoTexto).filter(function(v, i, a){ return a.indexOf(v) === i; }).join(', ');
             return '<tr><td class="rec-tipo">' + (x.tipo === 'dividida' ? 'dividida em ' + x.terms.length : 'valor alterado') + '</td>' + linhaPosHtml(x.pos) +
               '<td class="rec-lado">' + parc + '</td><td class="num">' + fmtEuro(x.termValor) + '</td><td class="num' + (x.diff < 0 ? ' rec-neg' : '') + '"><b>' + fmtEuroSinal(x.diff) + '</b></td><td class="rec-mono">' + esc(liq) + '</td></tr>';
           }).join('') + '</tbody></table></div></div>';
@@ -1111,6 +1240,7 @@ window.addEventListener('load', function () {
       h += '</div>';
 
       h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
+      h += foraSomaHtml(r);
       h += anuladosHtml(r);
       return h + '</div>';
     }
@@ -1120,11 +1250,12 @@ window.addEventListener('load', function () {
       h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
       h += '<div class="rec-sec"><p class="rec-sec-titulo">Transações do terminal <span class="rec-conta">' + r.term.length + '</span></p>' +
         '<table class="rec-lista"><thead><tr>' + TH_TERM + '</tr></thead><tbody>' + r.term.map(function(t){ return '<tr>' + linhaTermHtml(t) + '</tr>'; }).join('') + '</tbody></table></div>';
+      h += foraSomaHtml(r);
       return h + '</div>';
     }
 
     // so-pos: há POS (SAF-T ou agregado) mas não há extrato.
-    h += '<p class="rec-bloco-nota">Sem extrato ' + esc(r.meio.origem) + ' para este dia. Carrega-o em cima para casar linha a linha.</p>';
+    h += '<p class="rec-bloco-nota">Sem extrato ' + esc(labelCurtoMeio(r.meio)) + ' para este dia. Carrega-o em cima para casar linha a linha.</p>';
     h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
     if (r.temSaft){
       h += '<div class="rec-sec"><p class="rec-sec-titulo">Documentos do POS · ' + esc(r.meio.mec) + ' <span class="rec-conta">' + r.pos.length + '</span></p>' +
@@ -1183,7 +1314,7 @@ window.addEventListener('load', function () {
       var total = round2(completos.reduce(function(t, r){ return t + r.cobradoAMais; }, 0));
       var n = completos.reduce(function(t, r){ return t + r.casamento.alterados.length; }, 0);
       cobrado = '<p class="rec-cobrado' + (total ? '' : ' zero') + '">Cobrado a mais do que faturado: <b class="num">' + fmtEuroSinal(total) + '</b>' +
-        (n ? ' <span class="rec-legenda">· ' + n + ' venda' + (n === 1 ? '' : 's') + ' com valor alterado no terminal (' + completos.map(function(r){ return r.meio.labelCurto; }).join(', ') + ')</span>' : '') + '</p>';
+        (n ? ' <span class="rec-legenda">· ' + n + ' venda' + (n === 1 ? '' : 's') + ' com valor alterado no terminal (' + completos.map(function(r){ return labelCurtoMeio(r.meio); }).join(', ') + ')</span>' : '') + '</p>';
     }
     z.innerHTML = '<div class="rec-barra"><h2>' + fmtDia(dia) + ' <small class="rec-legenda">' + esc(diaSemana(dia)) + '</small></h2></div>' +
       (cobrado || '') +
