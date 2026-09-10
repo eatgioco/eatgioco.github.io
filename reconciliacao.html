@@ -29,24 +29,26 @@
 
 <style>
   /* ============================================================
-     reconciliacao.html — página PRIVADA, em dois cartões.
-     1 "Onde está o erro": só com o Firebase (vendasDiario, créditos de
-       contasBancarias, caixaMovimentos, cofreMovimentos, caixaContagens),
-       diz que dias não fazem match e em quanto — TPA ABANCA, TPA VERIFONE
-       e CAIXA. Sem ficheiros.
-     2 "Investigar": SAF-T, extratos dos dois terminais e Fecho de Caixa /
-       Listagem de Sessões do ZSBMS, transação a transação, com a cascata
-       das hipóteses para os documentos sem cobrança.
-     Tudo no browser: nada é escrito no Firebase, em nó nenhum. Os nomes
-     visíveis são só POS, TPA ABANCA, TPA VERIFONE e CAIXA.
+     reconciliacao.html — página PRIVADA, em dois cartões (redesenho de
+     10 Set/2026).
+     A — "Reconciliações Base": sem ficheiros, só vendasDiario e
+         contasBancarias. Δ cru (sem repor comissão), Δ%, estado
+         OK/A Menos/A Mais/Ambíguo. Escreve descartes.
+     B — "Não Reconciliados Detalhe": SAF-T + extratos dos dois
+         terminais + Fecho de Caixa ZS, documento a documento, só para os
+         dias "A Menos" do cartão A. Escreve resoluções.
+     MUDANÇA DE PRINCÍPIO (Set/2026): a página deixa de ser só-leitura —
+     escreve reconciliacaoDescartes/ e reconciliacaoResolvidos/. Os
+     ficheiros carregados continuam só em memória, nunca gravados.
+     A reconciliação da CAIXA (contagens do OS) NÃO vive aqui — foi
+     removida desta página; fica confinada ao caixa.html.
+     Nomes visíveis: só POS, TPA ABANCA, TPA VERIFONE, CAIXA.
      Prefixo rec- em todas as classes próprias.
      ============================================================ */
   body{ -webkit-font-smoothing:antialiased; }
 
   main{ margin:0; padding:24px 0 80px; }
 
-  /* Volta ao dashboard privado. Pílula neutra, no vocabulário do shell
-     (igual à da conta-bancaria.html). */
   .back-link{
     display:inline-block; margin-bottom:18px; padding:7px 14px;
     border:1px solid var(--line); border-radius:100px;
@@ -63,62 +65,101 @@
   .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
   .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
 
-  /* O ::before do .glass-light pinta por cima do conteúdo estático. */
   .card > *{ position:relative; z-index:1; }
 
-
-  /* ---------- Cartão 1: Onde está o erro (sem uploads) ---------- */
+  /* ---------- Cartões (cabeçalho comum) ---------- */
   .rec-cartao-titulo{ margin:28px 0 12px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
   .rec-cartao-titulo h2{ margin:0; font-size:20px; font-weight:700; color:var(--ink); }
   .rec-cartao-titulo .rec-num{ font-size:12px; font-weight:700; color:var(--on-red); background:var(--red); border-radius:100px; padding:3px 9px; }
   .rec-cartao-titulo p{ margin:0; font-size:12.5px; color:var(--muted); }
-  .rec-tri{ margin-bottom:20px; }
-  .rec-tri-topo{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:12px; align-items:stretch; }
-  .rec-tri-head{ padding:16px 18px; border-radius:12px; background:var(--white); border:2px solid var(--red); }
-  .rec-tri-head.zero{ border-color:var(--green); }
-  .rec-tri-head .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  .rec-tri-head .v{ font-size:32px; font-weight:700; color:var(--red-ink); margin-top:4px; line-height:1.1; }
-  .rec-tri-head.zero .v{ color:var(--green); }
-  .rec-tri-head .s{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.45; }
-  .rec-tri-head .s b{ color:var(--ink); font-weight:600; }
-  .rec-tri-tipo{ padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
-  .rec-tri-tipo .k{ font-size:11px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.04em; }
-  .rec-tri-tipo .v{ font-size:18px; font-weight:700; margin-top:4px; color:var(--red-ink); }
-  .rec-tri-tipo.zero .v{ color:var(--green); }
-  .rec-tri-tipo.na .v{ color:var(--muted); font-size:14px; }
-  .rec-tri-tipo .s{ font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.45; }
-  .rec-tri-tipo .s b{ color:var(--ink); font-weight:600; }
-  .rec-tri-lista{ margin-top:16px; }
-  .rec-tri-lista table td{ color:var(--ink); padding:8px 8px; vertical-align:top; }
-  .rec-tri-lista table th{ padding:6px 8px; }
-  .rec-tri-lista table td:nth-child(2), .rec-tri-lista table td:nth-child(3){ white-space:nowrap; }
-  .rec-tri-tag{ display:inline-block; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap; }
-  .rec-tri-tag.erro{ background:var(--red); color:var(--on-red); }
-  .rec-tri-tag.aMais{ background:var(--amber-bg); color:var(--amber); }
-  .rec-tri-tag.ok{ background:var(--green-bg); color:var(--green); }
-  .rec-tri-tag.aguarda, .rec-tri-tag.semVenda, .rec-tri-tag.na{ background:transparent; color:var(--muted); border:1px solid var(--line); }
-  .rec-tri-detalhe{ font-size:11.5px; color:var(--muted); line-height:1.45; }
-  .rec-tri-detalhe b{ color:var(--ink); font-weight:600; }
-  .rec-tri-nota{ margin:10px 0 0; font-size:12px; color:var(--muted); line-height:1.5; }
-  .rec-tri-nota b{ color:var(--ink); font-weight:600; }
-  .rec-tri-mais{
-    margin-top:10px; padding:5px 12px; border-radius:100px; cursor:pointer;
-    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
-    background:transparent; color:var(--muted); border:1px solid var(--line);
-  }
-  .rec-tri-mais:hover{ color:var(--ink); border-color:var(--red); }
-  tr.rec-tri-ok td{ color:var(--muted); }
 
-  /* ---------- Uploads ---------- */
-  .rec-uploads{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px; }
-  .rec-upload h3{ margin:0 0 6px; font-size:14.5px; font-weight:700; color:var(--ink); }
-  .rec-upload p{ margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.5; }
-  .rec-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .rec-upload input[type=file]{ font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); max-width:100%; }
-  .rec-upload select{
+  /* ---------- Cartão A ---------- */
+  .rec-a-topo{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:16px; }
+  .rec-a-head{ padding:16px 18px; border-radius:12px; background:var(--white); border:2px solid var(--red); }
+  .rec-a-head.zero{ border-color:var(--green); }
+  .rec-a-head .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .rec-a-head .v{ font-size:32px; font-weight:700; color:var(--red-ink); margin-top:4px; line-height:1.1; }
+  .rec-a-head.zero .v{ color:var(--green); }
+  .rec-a-head .s{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.45; }
+  .rec-a-tipo{ padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
+  .rec-a-tipo .k{ font-size:11px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.04em; }
+  .rec-a-tipo .v{ font-size:20px; font-weight:700; margin-top:4px; color:var(--red-ink); }
+  .rec-a-tipo.zero .v{ color:var(--green); }
+  .rec-a-tipo .s{ font-size:11.5px; color:var(--muted); margin-top:3px; }
+
+  .rec-nota-comissao{
+    margin:0 0 16px; padding:10px 14px; border-radius:10px;
+    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
+  }
+
+  .rec-a-barra{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .rec-a-barra select{
     font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
     background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
   }
+  .rec-a-barra .spacer{ flex:1; }
+  .rec-a-legenda{ font-size:11.5px; color:var(--muted); }
+
+  .rec-a-tabela th{ padding:6px 8px; }
+  .rec-a-tabela td{ padding:9px 8px; color:var(--ink); vertical-align:top; }
+  .rec-a-tag{ display:inline-block; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .rec-a-tag.ok{ background:var(--green-bg); color:var(--green); }
+  .rec-a-tag.aMenos{ background:var(--red); color:var(--on-red); }
+  .rec-a-tag.aMais{ background:var(--amber-bg); color:var(--amber); }
+  .rec-a-tag.ambiguo{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .rec-a-descartar{
+    padding:4px 11px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
+  }
+  .rec-a-descartar:hover{ color:var(--red-ink); border-color:var(--red); }
+  .rec-a-reativar{
+    padding:3px 10px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
+  }
+  .rec-a-reativar:hover{ color:var(--ink); border-color:var(--red); }
+  .rec-a-descartados{ margin-top:14px; padding:5px 12px; border-radius:100px; cursor:pointer; display:inline-block;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .rec-a-descartados:hover{ color:var(--ink); border-color:var(--red); }
+  .rec-a-desc-lista{ margin-top:12px; }
+  .rec-a-desc-lista td{ color:var(--muted); }
+  .rec-a-desc-lista .rec-a-motivo{ color:var(--ink); }
+  .rec-vazio{ padding:28px 16px; color:var(--muted); font-size:13px; text-align:center; }
+
+  /* Formulário inline de descarte/resolução (motivo + confirmar) */
+  .rec-inline-form{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .rec-inline-form[hidden]{ display:none; }
+  .rec-inline-form input[type=text]{
+    font-family:'Inter',sans-serif; font-size:12px; padding:5px 9px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+    min-width:180px; flex:1;
+  }
+  .rec-inline-form button{
+    padding:5px 12px; border-radius:8px; cursor:pointer; white-space:nowrap;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700;
+    background:var(--red); color:var(--on-red); border:none;
+  }
+  .rec-inline-form button:disabled{ opacity:.5; cursor:default; }
+  .rec-inline-form .cancelar{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+
+  td.num, th.num{ text-align:right; white-space:nowrap; }
+  .rec-neg{ color:var(--red-ink); font-weight:700; }
+  .rec-mono{ color:var(--muted); font-size:11.5px; }
+
+  /* ---------- Cartão B ---------- */
+  .rec-memoria{
+    margin:0 0 20px; padding:10px 14px; border-radius:10px;
+    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
+  }
+  .rec-uploads{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px; }
+  .rec-upload h3{ margin:0 0 6px; font-size:14.5px; font-weight:700; color:var(--ink); }
+  .rec-upload p{ margin:0 0 10px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .rec-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rec-upload input[type=file]{ font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); max-width:100%; }
+  .rec-faltam{ margin:10px 0 0; font-size:11.5px; color:var(--red-ink); line-height:1.5; }
+  .rec-faltam b{ font-weight:700; }
+  .rec-faltam.ok{ color:var(--green); }
   .rec-ficheiros{ list-style:none; margin:12px 0 0; padding:0; font-size:12px; color:var(--ink); }
   .rec-ficheiros li{ padding:5px 0; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; }
   .rec-ficheiros li b{ font-weight:600; word-break:break-all; }
@@ -132,52 +173,13 @@
   }
   .rec-remover:hover{ color:var(--red-ink); border-color:var(--red); }
 
-  /* ---------- Vendas sem cobrança (painel de topo) ---------- */
-  .rec-vsc{ margin-bottom:20px; }
-  .rec-vsc h2{ margin:0; font-size:16px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .rec-vsc h2 small{ font-weight:500; color:var(--muted); font-size:12px; }
-  .rec-vsc-cobertura{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
-  .rec-vsc-cobertura b{ color:var(--ink); font-weight:600; }
-  .rec-vsc-totais{ display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:14px; }
-  .rec-vsc-totais .rec-total.h3{ border-color:var(--red); border-width:2px; }
-  .rec-vsc-totais .rec-total.h3 .v{ color:var(--red-ink); }
-  .rec-vsc-totais .rec-total.h1 .v, .rec-vsc-totais .rec-total.h2 .v{ color:var(--amber); }
-  .rec-vsc-totais .rec-total.h3.zero .v{ color:var(--green); }
-  .rec-vsc-totais .rec-total.na .v{ color:var(--muted); }
-  .rec-vsc-lista{ margin-top:18px; }
-  .rec-vsc-lista.h3 .rec-vsc-caixa{ border-left:4px solid var(--red); }
-  .rec-vsc-lista.h1 .rec-vsc-caixa, .rec-vsc-lista.h2 .rec-vsc-caixa{ border-left:4px solid var(--amber); }
-  .rec-vsc-lista.na .rec-vsc-caixa{ border-left:4px solid var(--line); }
-  .rec-vsc-caixa{ border-radius:10px; padding:12px 16px; background:var(--white); }
-  .rec-vsc-caixa table{ margin-top:4px; }
-  .rec-vsc-caixa th{ padding:6px 8px; }
-  .rec-vsc-caixa td{ padding:8px 8px; color:var(--ink); vertical-align:top; }
-  .rec-vsc-caixa .rec-vsc-ok{ color:var(--green); font-size:13px; font-weight:600; }
-  .rec-vsc-dia td{ background:var(--dough); font-weight:700; }
-  .rec-vsc-dia td small{ font-weight:500; color:var(--muted); }
-  .rec-vsc-dia .rec-vsc-bate{ color:var(--green); font-weight:700; }
-  .rec-vsc-dia .rec-vsc-nao{ color:var(--amber); font-weight:700; }
-  .rec-vsc-explica{ font-size:11.5px; color:var(--muted); }
-  .rec-vsc-explica b{ color:var(--ink); font-weight:600; }
-  .rec-vsc-nota{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
-  .rec-memoria{
-    margin:0 0 20px; padding:10px 14px; border-radius:10px;
-    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
-  }
-
-  /* ---------- Zona 1: lista de dias ---------- */
-  .rec-barra{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
-  .rec-barra h2{ margin:0; font-size:16px; font-weight:700; color:var(--ink); }
-  .rec-barra .spacer{ flex:1; }
-  .rec-barra select{
-    font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
-    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
-  }
-  .rec-legenda{ font-size:11.5px; color:var(--muted); }
+  .rec-b-topo{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .rec-b-total{ font-size:13px; color:var(--muted); }
+  .rec-b-total b{ color:var(--ink); font-weight:700; }
 
   .rec-dias{ list-style:none; margin:0; padding:0; }
   .rec-dia{
-    display:grid; grid-template-columns:170px 1fr 1fr 32px; align-items:center; gap:12px;
+    display:grid; grid-template-columns:170px 1fr 32px; align-items:center; gap:12px;
     padding:12px 16px; border-radius:12px; cursor:pointer; color:var(--ink);
     border:1px solid transparent; transition:border-color .12s ease;
   }
@@ -186,95 +188,27 @@
   .rec-dia + .rec-dia{ margin-top:4px; }
   .rec-dia-data{ font-weight:700; font-size:13.5px; }
   .rec-dia-data small{ display:block; font-weight:500; color:var(--muted); font-size:11.5px; }
+  .rec-dia-resumo{ font-size:12.5px; color:var(--muted); }
+  .rec-dia-resumo b{ color:var(--red-ink); font-weight:700; }
+  .rec-dia-resumo.zero b{ color:var(--green); }
   .rec-dia-seta{ color:var(--muted); text-align:right; }
 
-  /* Indicador por meio: label | chip, com o texto secundário por baixo do
-     chip — nunca ao lado, senão empurrava a coluna seguinte para fora. */
-  .rec-ind{ display:grid; grid-template-columns:96px minmax(0,1fr); align-items:center; column-gap:8px; row-gap:2px; font-size:12.5px; min-width:0; }
-  .rec-ind-label{ color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; grid-row:1 / span 2; }
-  .rec-chip{
-    display:inline-block; padding:4px 11px; border-radius:100px; font-size:12px; font-weight:700;
-    border:1px solid transparent; white-space:nowrap; justify-self:start; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+  .rec-detalhe-dia{ padding:6px 16px 18px; }
+  .rec-vsc-caixa{ border-radius:10px; padding:12px 16px; background:var(--white); margin-top:4px; }
+  .rec-vsc-caixa table td{ padding:8px 8px; color:var(--ink); vertical-align:top; }
+  .rec-vsc-caixa table th{ padding:6px 8px; }
+  .rec-artigos{ font-size:11.5px; color:var(--muted); line-height:1.5; }
+  .rec-artigos b{ color:var(--ink); font-weight:600; }
+  .rec-b-resolver{
+    padding:4px 11px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
   }
-  .rec-chip.ok{ background:var(--green-bg); color:var(--green); }
-  .rec-chip.bad{ background:var(--red); color:var(--on-red); }
-  .rec-chip.na{ background:transparent; color:var(--muted); border-color:var(--line); font-weight:600; }
-  .rec-chip-sub{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; grid-column:2; }
-
-  .rec-vazio{ padding:28px 16px; color:var(--muted); font-size:13px; text-align:center; }
-
-  /* ---------- Zona 2: detalhe ---------- */
-  .rec-detalhe{ margin-top:16px; display:grid; gap:16px; }
-  .rec-bloco h3{ margin:0; font-size:15px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .rec-bloco h3 small{ font-weight:500; color:var(--muted); font-size:12px; }
-  .rec-bloco-nota{ margin:8px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
-  .rec-bloco-nota.aviso{ color:var(--amber); }
-
-  .rec-sec{ margin-top:20px; }
-  .rec-sec-titulo{
-    margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
-    display:flex; align-items:center; gap:8px;
-  }
-  .rec-sec-titulo .rec-conta{ color:var(--ink); font-weight:700; }
-
-  /* Sem par: em destaque, no topo. */
-  .rec-orfas{ border-left:4px solid var(--red); border-radius:10px; padding:12px 16px; background:var(--white); }
-  .rec-orfas.ok{ border-left-color:var(--green); color:var(--green); font-size:13px; font-weight:600; }
-  .rec-orfas table{ margin-top:6px; }
-  .rec-orfas th{ padding:6px 8px; }
-  .rec-orfas td{ padding:9px 8px; }
-  .rec-motivo{ font-weight:700; color:var(--red-ink); white-space:nowrap; }
-  .rec-proximas{ font-size:11.5px; color:var(--muted); }
-
-  .rec-ambiguo{ margin-top:12px; padding:10px 12px; border:1px dashed var(--line); border-radius:10px; }
-  .rec-ambiguo-titulo{ font-size:12.5px; font-weight:700; color:var(--ink); margin:0 0 8px; }
-  .rec-ambiguo-duo{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .rec-ambiguo-lado p{ margin:0 0 4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
-  .rec-ambiguo-lado ul{ list-style:none; margin:0; padding:0; font-size:12.5px; }
-  .rec-ambiguo-lado li{ padding:5px 0; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; color:var(--ink); }
-
-  /* Casadas: lado a lado. */
-  .rec-pares th.rec-lado, .rec-pares td.rec-lado{ border-left:2px solid var(--line); }
-  .rec-pares td{ padding:9px 8px; color:var(--ink); }
-  .rec-pares th{ padding:6px 8px; }
-  .rec-pares .rec-delta{ color:var(--muted); font-size:11.5px; white-space:nowrap; }
-  .rec-pares .rec-delta.longe{ color:var(--amber); font-weight:600; }
-
-  td.num, th.num{ text-align:right; white-space:nowrap; }
-  .rec-neg{ color:var(--red-ink); font-weight:700; }
-  .rec-mono{ color:var(--muted); font-size:11.5px; }
-
-  /* Totais */
-  .rec-totais{ display:grid; grid-template-columns:repeat(7, 1fr); gap:10px; margin-top:8px; }
-  .rec-total{ padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
-  .rec-total .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  .rec-total .v{ font-size:18px; font-weight:700; color:var(--ink); margin-top:4px; }
-  .rec-total .s{ font-size:11px; color:var(--muted); margin-top:2px; }
-  .rec-total.bad{ border-color:var(--red); }
-  .rec-total.bad .v{ color:var(--red-ink); }
-  .rec-total.ok .v{ color:var(--green); }
-  .rec-total.aviso{ border-color:var(--amber); }
-  .rec-total.aviso .v{ color:var(--amber); }
-
-  /* Valor alterado no terminal: casado, mas com diferença — âmbar. */
-  .rec-alterados{ border-left:4px solid var(--amber); border-radius:10px; padding:12px 16px; background:var(--white); }
-  .rec-alterados th{ padding:6px 8px; }
-  .rec-alterados td{ padding:9px 8px; color:var(--ink); vertical-align:top; }
-  .rec-alterados .rec-tipo{ font-weight:700; color:var(--amber); white-space:nowrap; }
-  .rec-alterados .rec-parcelas{ list-style:none; margin:0; padding:0; }
-  .rec-alterados .rec-parcelas li{ display:flex; gap:10px; flex-wrap:wrap; padding:2px 0; }
-  .rec-cobrado{ font-size:13px; font-weight:600; color:var(--ink); margin:4px 0 0; }
-  .rec-cobrado b{ font-weight:700; color:var(--amber); }
-  .rec-cobrado.zero b{ color:var(--green); }
-
-  .rec-lista td{ color:var(--ink); padding:9px 8px; }
-  .rec-lista th{ padding:6px 8px; }
-
-  .rec-outros-fb{ margin:0 0 10px; font-size:12.5px; color:var(--muted); }
-  .rec-outros-fb b{ color:var(--ink); font-weight:600; }
-
-  .rec-status-a td{ color:var(--muted); text-decoration:line-through; }
-  .rec-status-x td{ background:var(--amber-bg); }
+  .rec-b-resolver:hover{ color:var(--green); border-color:var(--green); }
+  tr.rec-resolvida td{ opacity:.55; }
+  .rec-resolvida-razao{ font-size:11.5px; color:var(--green); font-style:italic; }
+  .rec-b-vazio-dia{ padding:14px; color:var(--green); font-size:13px; text-align:center; }
+  .rec-b-nota{ font-size:11.5px; color:var(--muted); margin:10px 0 0; }
 </style>
 </head>
 <body>
@@ -314,10 +248,8 @@
         </div>
       </div>
 
-      <p class="page-subtitle">Primeiro onde está o erro (só com o que já está no Firebase), depois porquê (com os ficheiros). Só leitura: nada é gravado.</p>
+      <p class="page-subtitle">Primeiro onde está o erro (só com o que já está no Firebase), depois porquê (com os ficheiros). Descartes e resoluções ficam gravados.</p>
 
-      <!-- Sem sessão anónima a página não lê nada. Escondido até falhar;
-           ver autenticarEContinuar() mais abaixo. -->
       <div id="authErro">
         <div class="auth-box card glass-light">
           <h2>Sem ligação ao Firebase</h2>
@@ -327,16 +259,15 @@
       </div>
 
 <main>
-  <!-- Único caminho de volta ao dashboard privado (não está na nav pública). -->
   <a class="back-link" href="mrn-dashboard.html">← Dashboard</a>
 
-  <!-- ============ CARTÃO 1 — Onde está o erro (sem uploads) ============ -->
-  <div class="rec-cartao-titulo"><span class="rec-num">1</span><h2>Onde está o erro</h2><p>Só com o que já está no Firebase: vendas por dia, créditos do banco, caixa e cofre. Sem ficheiros.</p></div>
-  <div class="card glass-light rec-tri" id="triagem"><div class="rec-vazio">A carregar…</div></div>
+  <!-- ============ CARTÃO A — Reconciliações Base (sem ficheiros) ============ -->
+  <div class="rec-cartao-titulo"><span class="rec-num">A</span><h2>Reconciliações Base</h2><p>Só com o que já está no Firebase: vendas por dia e créditos do banco. Sem ficheiros.</p></div>
+  <div class="card glass-light" id="cartaoA"><div class="rec-vazio">A carregar…</div></div>
 
-  <!-- ============ CARTÃO 2 — Investigar (ficheiros) ============ -->
-  <div class="rec-cartao-titulo"><span class="rec-num">2</span><h2>Investigar</h2><p>Carrega os ficheiros do dia (ou do período) para saber porquê, documento a documento.</p></div>
-  <p class="rec-memoria">Os ficheiros são lidos só neste separador e ficam em memória: ao recarregar a página perde-se tudo e é preciso voltar a escolhê-los. Cada ficheiro novo acumula, nunca substitui os anteriores. Nada é enviado para o Firebase nem para serviço nenhum.</p>
+  <!-- ============ CARTÃO B — Não Reconciliados Detalhe ============ -->
+  <div class="rec-cartao-titulo"><span class="rec-num">B</span><h2>Não Reconciliados Detalhe</h2><p>Carrega os ficheiros dos dias "A Menos" para saber porquê, talão a talão.</p></div>
+  <p class="rec-memoria">Os ficheiros são lidos só neste separador e ficam em memória: ao recarregar a página perde-se tudo e é preciso voltar a escolhê-los. Cada ficheiro novo acumula, nunca substitui os anteriores. Só os descartes e as resoluções são gravados no Firebase.</p>
 
   <div class="rec-uploads">
     <div class="card glass-light rec-upload">
@@ -345,49 +276,46 @@
       <div class="rec-upload-row">
         <input type="file" id="inSaft" multiple accept=".zip,.xml,application/zip,text/xml">
       </div>
+      <div class="rec-faltam" id="faltaSaft"></div>
       <ul class="rec-ficheiros" id="listaSaft"></ul>
     </div>
     <div class="card glass-light rec-upload">
-      <h3>Extrato TPA ABANCA</h3>
+      <h3>TPA ABANCA</h3>
       <p>CSV de movimentos do TPA da ABANCA (ponto-e-vírgula, com preâmbulo). Vários ficheiros acumulam; a mesma operação repetida conta uma vez.</p>
       <div class="rec-upload-row">
         <input type="file" id="inAbanca" multiple accept=".csv,text/csv,text/plain">
       </div>
+      <div class="rec-faltam" id="faltaAbanca"></div>
       <ul class="rec-ficheiros" id="listaAbanca"></ul>
     </div>
     <div class="card glass-light rec-upload">
-      <h3>Extrato TPA VERIFONE</h3>
+      <h3>TPA VERIFONE</h3>
       <p>Exportação de transações do portal Verifone (CSV, campos entre aspas). Vários ficheiros acumulam; a mesma transação repetida conta uma vez.</p>
       <div class="rec-upload-row">
         <input type="file" id="inVerifone" multiple accept=".csv,text/csv,text/plain">
       </div>
+      <div class="rec-faltam" id="faltaVerifone"></div>
       <ul class="rec-ficheiros" id="listaVerifone"></ul>
     </div>
     <div class="card glass-light rec-upload">
-      <h3>Fecho de Caixa (ZSBMS)</h3>
-      <p>Relatórios do ZSBMS em .xls (é HTML, não Excel): o <b>Fecho de Caixa</b> (Data / Início / Entradas / Saídas) e, para as sessões que não coincidem com o dia, a <b>Listagem de Sessões</b>. Ambos aqui; o tipo é detectado pelo cabeçalho.</p>
+      <h3>Fecho de Caixa ZS</h3>
+      <p>Relatórios do ZSBMS em .xls (é HTML, não Excel): o <b>Fecho de Caixa</b> (Data / Início / Entradas / Saídas) e, quando não coincide com o dia, a <b>Listagem de Sessões</b>. Ambos aqui; o tipo é detectado pelo cabeçalho. Não entra no casamento — fica só como registo.</p>
       <div class="rec-upload-row">
         <input type="file" id="inFecho" multiple accept=".xls,.htm,.html,text/html,application/vnd.ms-excel">
       </div>
+      <div class="rec-faltam" id="faltaFecho"></div>
       <ul class="rec-ficheiros" id="listaFecho"></ul>
     </div>
   </div>
 
-  <div class="card glass-light rec-vsc" id="vsc"></div>
-
-  <div class="rec-barra">
-    <h2>Dias</h2>
-    <select id="selMes" aria-label="Mês"></select>
-    <span class="rec-legenda" id="legenda">Verde bate · vermelho com o nº de linhas sem par · cinzento sem ficheiros para o dia.</span>
-    <div class="spacer"></div>
+  <div class="rec-b-topo">
+    <h2 style="margin:0;font-size:16px;font-weight:700;color:var(--ink)">Dias a investigar</h2>
+    <span class="rec-b-total" id="bTotal"></span>
   </div>
-
-  <div class="card glass-light" id="zona1">
-    <ul class="rec-dias" id="listaDias"></ul>
-    <div class="rec-vazio" id="diasVazio">A carregar…</div>
+  <div class="card glass-light" id="cartaoB">
+    <ul class="rec-dias" id="listaDiasB"></ul>
+    <div class="rec-vazio" id="diasBVazio">A carregar…</div>
   </div>
-
-  <div class="rec-detalhe" id="zona2"></div>
 </main>
 
     </div>
@@ -398,22 +326,56 @@
 window.addEventListener('load', function () {
 
   /* ============================================================
-     CONSTANTES DO CASAMENTO
-     Passagens sucessivas, em minutos: na 1.ª só casa quem tem o valor
-     único de ambos os lados a ±15 min; o que sobra tenta a ±60. A
-     hora do POS e a do terminal não são o mesmo relógio, daí a
-     folga. A última janela é também a que define "candidato" para
-     os ambíguos.
+     CRITÉRIOS DE ESTADO DO CARTÃO A (calibrados Set/2026)
+     O crédito bancário vem sempre um pouco abaixo do faturado por causa da
+     comissão do terminal — isto é normal, não é erro, e o Δ deste cartão
+     NUNCA o desconta (é cru: Faturado POS − Creditado Banco). Por isso o
+     estado não usa um limiar fixo em euros: usa a percentagem do Δ sobre
+     o faturado (Δ%), com uma banda "OK" por TPA calibrada na comissão
+     observada nos dados reais:
+       TPA ABANCA  — comissão observada 0,53%–0,83% no extrato 27/08–05/09
+         (ver creditosBanco()/COMISSAO_OBSERVADA). Banda OK: −0,3% a 1,2%
+         (a comissão típica mais folga de arredondamento e picos de mix
+         de cartões).
+       TPA VERIFONE — o crédito é BRUTO (a comissão é debitada à parte,
+         mensalmente): 73 de 87 dias bateram ao cêntimo com vendasDiario.
+         Banda OK: −0,3% a 0,3%.
+     Δ% acima da banda → A Menos (falta dinheiro além da comissão típica).
+     Δ% abaixo da banda → A Mais (o banco creditou mais do que o
+     faturado — inclui a "gorjeta" arredondada no terminal).
+     Quando a atribuição crédito↔dia não resolve 1:1 (uma componente com
+     vários dias E vários créditos, sem correspondência clara entre eles —
+     ver atribuirCreditos()/emparelhar) → Ambíguo, seja qual for o Δ%: o
+     número não é de confiança nenhuma das bandas.
+     Dias ainda dentro da janela de espera do banco (o crédito pode chegar
+     amanhã) e dias anteriores ao início do extrato ficam de fora dos
+     quatro estados — "não verificável ainda" — e não entram na lista.
      ============================================================ */
-  var JANELAS_MINUTOS = [2, 15, 60];
+  var BANDA_OK = {
+    OU: { min: -0.3, max: 1.2 },   // TPA ABANCA
+    CD: { min: -0.3, max: 0.3 }    // TPA VERIFONE
+  };
 
-  // "Valor alterado no terminal": linha do POS e linha do terminal a ±2 min
-  // com valores DIFERENTES, quando nenhuma das duas tem candidato exacto.
-  // É a gorjeta acrescentada no terminal (arredonda ao euro) — acontece
-  // todos os dias. Conta dividida: N transações do terminal a ±2 min cuja
-  // soma bate com UM documento do POS, com tolerância de cêntimos por
-  // parcela para o arredondamento da divisão (128,60 ÷ 3 → 3 × 42,89).
-  var JANELA_ALTERADO_MINUTOS = 2;
+  /* ============================================================
+     CASAMENTO DO CARTÃO B — ordem exacta (spec do Manel, Set/2026):
+       1. Valor exacto, atribuição GLOBAL por menor distância temporal,
+          ±60 min: gera todos os pares (documento, transação) com o mesmo
+          valor, ordena por distância crescente, atribui saltando os já
+          usados. Nunca greedy por documento em ordem cronológica.
+       2. Valor alterado no terminal (gorjeta): ±3 min, valores diferentes,
+          só quando sobra exactamente 1 candidato de cada lado. Corre SÓ
+          sobre o que sobrou do passo 1.
+       3. Conta dividida: N transações em ±5 min cuja soma bate com um
+          documento, tolerância 5 cêntimos por parcela. Corre SÓ sobre o
+          que sobrou do passo 1 (não do 2 — os dois partem do mesmo
+          resíduo, como o Manel especificou).
+       4. O que sobra dos passos 1–3, confirmado que também não existe no
+          extrato do OUTRO terminal com o mesmo valor (±60 min): venda sem
+          cobrança.
+     ============================================================ */
+  var JANELA_GLOBAL_MIN = 60;
+  var JANELA_ALTERADO_MIN = 3;
+  var JANELA_DIVIDIDA_MIN = 5;
   var TOLERANCIA_DIVISAO_CENTS_POR_PARCELA = 5;
   var MAX_PARCELAS_DIVISAO = 6;
 
@@ -421,88 +383,54 @@ window.addEventListener('load', function () {
   var PRIMEIRO_MES = '2026-05';
 
   /* ============================================================
-     TERMINAIS
-     Nomes visíveis em toda a interface: POS, TPA ABANCA, TPA VERIFONE,
-     CAIXA. Os códigos do SAF-T (OU, CD, NU) e os descritivos bancários
-     (INTERCARD, FECHO TPA) são chaves internas e nunca aparecem.
+     TERMINAIS — nomes visíveis: POS, TPA ABANCA, TPA VERIFONE, CAIXA.
+     Os códigos do SAF-T (OU, CD) e os descritivos bancários (INTERCARD,
+     FECHO TPA) são chaves internas e nunca aparecem.
        OU = TPA ABANCA   (código literal no PaymentMechanism)
        CD = TPA VERIFONE (terminal INTERCARD/Verifone)
-     Regras de crédito bancário (medidas nos dados reais, Set/2026):
-       TPA ABANCA — um crédito "FECHO TPA" por dia, booking_date = o próprio
-         dia, valor = bruto do terminal − TSC/RSC desse dia (confirmado ao
-         cêntimo nos 10 dias do extrato 27/08–05/09). A taxa varia com o mix
-         de cartões: 0,532 %–0,829 % no extrato, média 0,744 %. O bruto do
-         terminal é por isso reconstruído como um INTERVALO
-         [crédito/(1−0,50 %), crédito/(1−0,85 %)] (as taxas observadas com
-         ~0,03 pp de margem) e só se acusa erro quando o POS fica fora dele.
-         Sem esta margem o pior dia limpo (30/08) desviava 1,78 € (0,19 %) e
-         acendia; com ela, nenhum dos 10 dias do extrato acende sem motivo.
-       TPA VERIFONE — créditos "INTERCARD" BRUTOS (a comissão é debitada à
-         parte, mensalmente), um por dia de POS, com 0 a 5 dias de atraso
-         (sexta/sábado/domingo caem juntos à segunda). 73 dos 87 dias com
-         banco batem ao cêntimo com vendasDiario, logo o limiar é 0: qualquer
-         cêntimo de diferença é sinal, não ruído. Os dias que não batem ou
-         são troca de dia à meia-noite (01/08+02/08 somam certo) — resolvida
-         pelas componentes do resíduo — ou gorjeta arredondada no terminal
-         (crédito > POS: "cobrado a mais", informativo).
      ============================================================ */
   var MEIOS = [
     { mec:'OU', origem:'ABANCA', label:'TPA ABANCA',   labelCurto:'TPA ABANCA',
-      creditoRegex:/^FECHO TPA/i, janelaBanco:0, comissao:{ min:0.0050, max:0.0085 }, comissaoObservada:'0,53 %–0,83 % (27/08–05/09)' },
+      creditoRegex:/^FECHO TPA/i, janelaBanco:0, comissaoObservada:'0,53 %–0,83 % (27/08–05/09)' },
     { mec:'CD', origem:'CD',     label:'TPA VERIFONE', labelCurto:'TPA VERIFONE',
-      creditoRegex:/INTERCARD/i,  janelaBanco:5, comissao:null }
+      creditoRegex:/INTERCARD/i,  janelaBanco:5, comissaoObservada:'0 % (crédito bruto, 73 de 87 dias ao cêntimo)' }
   ];
   var MEIO_POR_MEC = {};
   MEIOS.forEach(function(m){ MEIO_POR_MEC[m.mec] = m; });
   var ORIGEM_LABEL = { ABANCA:'TPA ABANCA', CD:'TPA VERIFONE' };
-  function temExtrato(origem){ return !!(terminal[origem] && Object.keys(terminal[origem]).length); }
   function labelMeio(meio){ return meio.label; }
   function labelCurtoMeio(meio){ return meio.labelCurto; }
+  function outroMeio(meio){ for (var i = 0; i < MEIOS.length; i++){ if (MEIOS[i] !== meio) return MEIOS[i]; } return null; }
 
-  // Caixa: a contagem física é exacta — qualquer diferença acima de 5 cêntimos
-  // (arredondamentos de troco) conta.
-  var TOLERANCIA_CAIXA = 0.05;
-
-  // Estados do Verifone. Só os válidos entram no casamento e nas somas; os
-  // conhecidos-excluídos e os desconhecidos aparecem numa lista própria por
-  // dia (uma recusa seguida de nova tentativa explica duas linhas próximas
-  // com o mesmo valor). Desconhecido nunca é ignorado em silêncio.
   var INTERCARD_STATUS_VALIDO = { 'SALE SETTLED':true, 'SALE AUTHORISED':true };
   var INTERCARD_STATUS_EXCLUIDO = { 'SALE DECLINED':true, 'CANCEL DECLINED':true, 'CANCEL REJECTED':true };
   var INTERCARD_FUSO_ESPERADO = '+01:00';
 
-  // Nomes dos meios do SAF-T para a interface — sem códigos à vista.
   var NOMES_MEIO = { NU:'CAIXA (numerário)', OU:'TPA ABANCA', CD:'TPA VERIFONE', CC:'Cartão crédito', TB:'Transferência', MB:'Multibanco', CH:'Cheque', CO:'Consignação', CS:'Compensação', DE:'Dinheiro eletrónico', LC:'Letra', PR:'Permuta', TR:'Ticket restaurante' };
-  function nomeMeio(mec){ return mec ? (NOMES_MEIO[mec] || mec) : 'sem meio'; }
 
-  /* ---------- estado (só memória) ----------
-     Os ficheiros são a fonte de verdade: cada um guarda o que leu (res), e
-     docs/terminal/fecho/coberturas são RECONSTRUÍDOS a partir da lista
-     (reconstruir()) a cada carregamento ou remoção. É o que permite tirar um
-     ficheiro sem perder os outros, e é o que garante que carregar um extrato
-     de uma origem nunca toca no da outra: cada origem tem o seu balde. */
+  /* ---------- estado (só memória para ficheiros; Firebase à parte) ---------- */
   var docs = {};             // InvoiceNo → documento do SAF-T
   var saftFicheiros = [];    // { nome, res:{inicio, fim, docs}, novos, repetidos, erro }
-  var saftCobertura = {};    // dia 'AAAA-MM-DD' → true (StartDate..EndDate dos ficheiros)
+  var saftCobertura = {};    // dia 'AAAA-MM-DD' → true
   var terminal = {};         // origem → { nOperacao → transação }
   var termFicheiros = [];    // { nome, origem, res:{inicio, fim, txs, avisos}, novos, repetidos, fora, erro }
   var termCobertura = {};    // origem → { dia → true }
-  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } (Fecho de Caixa do ZSBMS)
+  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } — só registo, não entra no casamento
   var fechoFicheiros = [];   // { nome, tipo:'fecho'|'sessoes', res, novos, repetidos, erro }
-  var sessoes = [];          // Listagem de Sessões do ZSBMS: [{ abertura:Date, fecho:Date|null, operador }]
-  // Só leitura do Firebase (cartão 1): snapshots once(), nunca escritos.
+  var sessoes = [];          // Listagem de Sessões — só registo
+
   var banco = { abanca:{}, revolut:{} };   // contasBancarias/{conta}/movimentos
-  var caixaMovs = {};        // caixaMovimentos
-  var cofreMovs = {};        // cofreMovimentos
-  var contagensOS = {};      // caixaContagens
-  var baseCarregada = false; // os cinco nós acima já responderam (com ou sem erro)
-  var baseErros = [];
-  var mostrarOkTriagem = false;
-  var TOLERANCIA_DINHEIRO = TOLERANCIA_CAIXA;  // "bate à tolerância de cêntimos" na hipótese 2
-  var vendasMes = {};        // mês → { dia → porPagamento } (cache do Firebase)
+  var vendasMes = {};        // mês → { dia → porPagamento }
   var mesesComErro = {};
-  var mesAtivo = '';     // '' = Todos os meses (por omissão): lista inteira, sem filtro
-  var diaAberto = null;
+  var baseCarregada = false;
+  var baseErros = [];
+
+  var descartes = {};        // reconciliacaoDescartes/{chave} → registo
+  var resolvidos = {};       // reconciliacaoResolvidos/{chave} → registo
+
+  var filtroA = 'naoReconciliados';   // 'naoReconciliados' | '' (todos os meses) | 'AAAA-MM'
+  var mostrarDescartados = false;
+  var diaAbertoB = null;
   var db = null;
 
   /* ---------- helpers ---------- */
@@ -520,6 +448,10 @@ window.addEventListener('load', function () {
     return (neg ? '−' : '') + s + ' €';
   }
   function fmtEuroSinal(n){ return (n > 0 ? '+' : '') + fmtEuro(n); }
+  function fmtPct(n){
+    if (n == null || isNaN(n)) return '—';
+    return (n > 0 ? '+' : '') + n.toFixed(2).replace('.', ',') + ' %';
+  }
   function fmtHora(seg){
     if (seg == null || isNaN(seg)) return '—';
     var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
@@ -536,6 +468,11 @@ window.addEventListener('load', function () {
   function fmtDia(iso){
     var p = iso.split('-');
     return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function fmtDias(dias){
+    if (!dias.length) return '—';
+    if (dias.length === 1) return fmtDia(dias[0]);
+    return fmtDia(dias[0]).slice(0, 5) + ' → ' + fmtDia(dias[dias.length - 1]);
   }
   function diaSemana(iso){
     var d = new Date(iso + 'T12:00:00');
@@ -570,7 +507,6 @@ window.addEventListener('load', function () {
     if (m > 12){ m = 1; a++; }
     return a + '-' + pad2(m);
   }
-  // "35,91" → 35.91 ; "1.234,56" → 1234.56 ; "-0,16" → -0.16
   function numPt(s){
     s = String(s == null ? '' : s).trim();
     if (!s) return null;
@@ -588,9 +524,14 @@ window.addEventListener('load', function () {
     if ((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) return m[3] + '-' + m[2] + '-' + m[1];
     return null;
   }
+  function plural(n, s, p){ return n + ' ' + (n === 1 ? s : p); }
+  function perto(a, b, seg){ return a.hora != null && b.hora != null && Math.abs(a.hora - b.hora) <= seg; }
 
   /* ============================================================
-     SAF-T (mesmo padrão do vendas.html: ZIP → XML Windows-1252 → DOM)
+     SAF-T (mesmo padrão do vendas.html: ZIP → XML Windows-1252 → DOM).
+     Set/2026: cada Invoice passa a trazer também `linhas` (artigos, de
+     <Line><ProductDescription>/<Quantity>) — precisos para identificar a
+     venda sem cobrança nas câmaras (Cartão B).
      ============================================================ */
   function kid(el, name){
     if (!el) return null;
@@ -645,7 +586,7 @@ window.addEventListener('load', function () {
     return texto;
   }
 
-  // → { inicio, fim, docs:[{no, tipo, dia, entrada, hora, status, gross, pagamentos:[{mec, valor}]}] }
+  // → { inicio, fim, docs:[{no, tipo, dia, entrada, hora, status, gross, pagamentos:[{mec, valor}], linhas:[{descricao, quantidade}]}] }
   function parseSaft(xmlText){
     var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('O XML não é válido. Confirma que é o SAF-T exportado do ZoneSoft.');
@@ -677,9 +618,16 @@ window.addEventListener('load', function () {
         var valor = numPt(txt(pags[p], 'PaymentAmount'));
         pagamentos.push({ mec: mec || '', valor: valor == null ? 0 : valor });
       }
+      var linhasXml = kids(inv, 'Line');
+      var linhas = [];
+      for (var li = 0; li < linhasXml.length; li++){
+        var desc = txt(linhasXml[li], 'ProductDescription') || txt(linhasXml[li], 'Description');
+        if (!desc) continue;
+        linhas.push({ descricao: desc, quantidade: numPt(txt(linhasXml[li], 'Quantity')) });
+      }
       var hm = entrada.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
       var hora = hm ? parseInt(hm[1], 10) * 3600 + parseInt(hm[2], 10) * 60 + (hm[3] ? parseInt(hm[3], 10) : 0) : null;
-      out.push({ no: no || ('sem-numero-' + i), tipo: txt(inv, 'InvoiceType') || '?', dia: dia, entrada: entrada, hora: hora, status: st, gross: gross, pagamentos: pagamentos });
+      out.push({ no: no || ('sem-numero-' + i), tipo: txt(inv, 'InvoiceType') || '?', dia: dia, entrada: entrada, hora: hora, status: st, gross: gross, pagamentos: pagamentos, linhas: linhas });
     }
     return { inicio: inicio, fim: fim, docs: out };
   }
@@ -692,9 +640,6 @@ window.addEventListener('load', function () {
       .normalize('NFD').replace(/[̀-ͯ]/g, '');
   }
 
-  // ABANCA: UTF-8 com BOM, CRLF, ";", vírgula decimal. Preâmbulo até à
-  // linha que começa por "ESTABELECIMENTO;NOME ESTABELECIMENTO".
-  // → { inicio, fim, txs:[{nOp, dia, hora, tipo, marca, cartao, montante, comissao, taxaInterc, moeda, liquidacao}] }
   function parseAbanca(texto){
     texto = texto.replace(/^﻿/, '');
     var linhas = texto.split(/\r?\n/);
@@ -753,13 +698,6 @@ window.addEventListener('load', function () {
     return { inicio: cob.inicio, fim: cob.fim, txs: txs, avisos: [] };
   }
 
-  // Cobertura de dias de um extrato: o período declarado no ficheiro (a ABANCA
-  // exporta com o filtro que se pediu, p. ex. 2025-09-05 → 2026-12-01) cortado
-  // ao intervalo [1.ª transação, hoje] — antes da 1.ª transação e no futuro não
-  // há nada que se possa dizer "sem linhas". Sem período declarado, é o das
-  // transações. Entre a última transação e hoje o período declarado vale: um
-  // dia dentro dele sem linha nenhuma é "extrato sem linhas" (exportado antes
-  // do fecho), não "sem extrato".
   function coberturaExtrato(inicio, fim, txs){
     var dias = txs.map(function(t){ return t.dia; }).sort();
     var hoje = diaLocal(new Date());
@@ -769,8 +707,6 @@ window.addEventListener('load', function () {
     return { inicio: ini, fim: f };
   }
 
-  // CSV com todos os campos entre aspas (RFC 4180): aspas duplicadas dentro
-  // do campo, vírgulas e quebras de linha dentro de aspas.
   function parseCsvAspas(texto, sep){
     var linhas = [], linha = [], campo = '', i = 0, n = texto.length, dentro = false;
     while (i < n){
@@ -792,14 +728,8 @@ window.addEventListener('load', function () {
     return linhas;
   }
 
-  // INTERCARD / Verifone: UTF-8 com BOM, vírgula, campos entre aspas, decimal
-  // com PONTO, cabeçalho na 1.ª linha, 100+ colunas — só as que interessam,
-  // por NOME. Hora local (created_at_*), nunca convertida para UTC: o
-  // SystemEntryDate do SAF-T também é local. Sem comissão por transação
-  // (débito mensal): comissao fica null, nunca 0.
-  // → { inicio, fim, txs, avisos:[] }
   function parseIntercard(texto){
-    texto = texto.replace(/^\uFEFF/, '');
+    texto = texto.replace(/^﻿/, '');
     var linhas = parseCsvAspas(texto, ',');
     if (!linhas.length) throw new Error('CSV vazio.');
     var cab = linhas[0].map(function(c){ return c.trim(); });
@@ -854,22 +784,18 @@ window.addEventListener('load', function () {
     Object.keys(fusos).forEach(function(z){ avisos.push(fusos[z] + ' linha' + (fusos[z] === 1 ? '' : 's') + ' com fuso ' + z + ' (esperado ' + INTERCARD_FUSO_ESPERADO + ') — a hora foi usada tal como está'); });
     if (comFee) avisos.push(comFee + ' linha' + (comFee === 1 ? '' : 's') + ' com comissão por transação preenchida — o Verifone costuma cobrar por débito mensal');
     var desconhecidas = txs.filter(function(t){ return t.categoria === 'desconhecida'; }).length;
-    if (desconhecidas) avisos.push(desconhecidas + ' linha' + (desconhecidas === 1 ? '' : 's') + ' com estado não reconhecido (fora das somas, listadas no dia)');
+    if (desconhecidas) avisos.push(desconhecidas + ' linha' + (desconhecidas === 1 ? '' : 's') + ' com estado não reconhecido (fora das somas)');
     return { inicio: dias[0], fim: dias[dias.length - 1], txs: txs, avisos: avisos };
   }
 
   var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
 
   /* ============================================================
-     FECHO DE CAIXA (ZSBMS)
-     .xls que é HTML em ISO-8859-1, com a tabela Data | Inicio | Entradas |
-     Saidas | Movimento | Fecho e uma linha "Total" no fim. Três decimais,
-     vírgula decimal, espaço nos milhares, "€" colado. Só a coluna Início é
-     uma contagem física; o Fecho é aritmética do POS.
-     → { inicio, fim, dias:[{dia, inicio, entradas, saidas, movimento, fecho}] }
+     FECHO DE CAIXA (ZSBMS) — só registo neste cartão, não entra no
+     casamento (a reconciliação da caixa saiu desta página).
      ============================================================ */
   function numZs(s){
-    s = String(s == null ? '' : s).replace(/€/g, '').replace(/&euro;/g, '').replace(/\s| /g, '').trim();
+    s = String(s == null ? '' : s).replace(/€/g, '').replace(/&euro;/g, '').replace(/\s| /g, '').trim();
     if (!s) return null;
     s = s.replace(/\./g, '').replace(',', '.');
     var n = parseFloat(s);
@@ -890,7 +816,6 @@ window.addEventListener('load', function () {
     for (var j = 0; j < tds.length; j++) cab.push(normCabecalho(tds[j].textContent));
     return cab;
   }
-  // → { inicio, fim, dias } ou null quando o documento não tem esta tabela.
   function parseFechoCaixaDoc(doc){
     var tabelas = doc.getElementsByTagName('table');
     var alvo = null, C = null;
@@ -906,7 +831,7 @@ window.addEventListener('load', function () {
       var tds = trs[r].getElementsByTagName('td');
       if (tds.length < 2) continue;
       var dia = normData((tds[C.dia] || {}).textContent);
-      if (!dia) continue;   // cabeçalho repetido, linha "Total", etc.
+      if (!dia) continue;
       dias.push({
         dia: dia,
         inicio: numZs(tds[C.inicio].textContent),
@@ -920,16 +845,6 @@ window.addEventListener('load', function () {
     dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
     return { inicio: dias[0].dia, fim: dias[dias.length - 1].dia, dias: dias };
   }
-
-  /* Listagem de Sessões de Caixa (ZSBMS): por sessão, data/hora de abertura e
-     de fecho. É o que permite atribuir cada documento e cada contagem à
-     SESSÃO certa — a de 08/09 abriu a 07/09 às 23:06, e por dia de calendário
-     nada batia. O formato exacto do export ainda não foi visto por este
-     código, por isso a leitura é pelo CABEÇALHO: uma tabela com uma coluna
-     de abertura e uma de fecho (ou "Data abertura" + "Hora abertura" em
-     colunas separadas), valores "dd-mm-aaaa hh:mm[:ss]", "dd/mm/aaaa hh:mm"
-     ou ISO. Se não encontrar, o erro lista os cabeçalhos que viu, para se
-     ajustar aqui. → { inicio, fim, sessoes:[{abertura, fecho, operador}] } ou null. */
   function dataHoraZs(texto){
     var t = String(texto || '').trim(), m;
     if ((m = t.match(/(\d{2})[-\/.](\d{2})[-\/.](\d{4})[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/)))
@@ -978,12 +893,10 @@ window.addEventListener('load', function () {
     }
     return vistos.length ? { erroCabecalhos: vistos } : null;
   }
-
-  // Um input para os dois relatórios: decide pelo cabeçalho da tabela.
   function parseZsbms(buffer){
     var doc = lerHtmlZsbms(buffer);
-    var fecho = parseFechoCaixaDoc(doc);
-    if (fecho) return { tipo: 'fecho', res: fecho };
+    var fechoRes = parseFechoCaixaDoc(doc);
+    if (fechoRes) return { tipo: 'fecho', res: fechoRes };
     var ses = parseSessoesDoc(doc);
     if (ses && !ses.erroCabecalhos) return { tipo: 'sessoes', res: ses };
     var vistos = ses && ses.erroCabecalhos ? ' Cabeçalhos encontrados: ' + ses.erroCabecalhos.map(function(v){ return '[' + v + ']'; }).join(' ') : ' O ficheiro não tem tabelas com cabeçalho.';
@@ -991,15 +904,11 @@ window.addEventListener('load', function () {
   }
 
   /* ============================================================
-     CARREGAMENTO, ACUMULAÇÃO E REMOÇÃO
-     Cada ficheiro guarda o que leu; o estado agregado é reconstruído da
-     lista, pela ordem de carregamento (o primeiro a trazer um documento ou
-     transação é quem conta; o Fecho de Caixa é o contrário — a leitura
-     mais recente de um dia ganha, porque é a mesma tabela reexportada).
+     CARREGAMENTO, ACUMULAÇÃO E REMOÇÃO DE FICHEIROS
      ============================================================ */
   function reconstruir(){
     docs = {}; saftCobertura = {}; terminal = {}; termCobertura = {}; fecho = {};
-    memoCaixa = null;
+    memoMeio = {};
     saftFicheiros.forEach(function(f){
       if (f.erro) return;
       f.novos = 0; f.repetidos = 0;
@@ -1066,7 +975,6 @@ window.addEventListener('load', function () {
     }, Promise.resolve()).then(depoisDeCarregar);
   });
 
-  // Um input por origem: cada extrato vai para o seu balde e nunca toca no outro.
   function ligarInputTerminal(id, origem){
     document.getElementById(id).addEventListener('change', function(e){
       var files = Array.prototype.slice.call(e.target.files || []);
@@ -1104,7 +1012,6 @@ window.addEventListener('load', function () {
     }, Promise.resolve()).then(depoisDeCarregar);
   });
 
-  // Remover um ficheiro: sai da lista e o estado é reconstruído dos que ficam.
   var LISTAS = { saft: saftFicheiros, term: termFicheiros, fecho: fechoFicheiros };
   ['listaSaft', 'listaAbanca', 'listaVerifone', 'listaFecho'].forEach(function(id){
     document.getElementById(id).addEventListener('click', function(e){
@@ -1121,7 +1028,6 @@ window.addEventListener('load', function () {
   function btnRemover(lista, idx){
     return '<button type="button" class="rec-remover" data-lista="' + lista + '" data-idx="' + idx + '" title="Tirar este ficheiro da memória">remover</button>';
   }
-  function plural(n, s, p){ return n + ' ' + (n === 1 ? s : p); }
 
   function renderFicheiros(){
     var a = document.getElementById('listaSaft');
@@ -1151,10 +1057,22 @@ window.addEventListener('load', function () {
       return '<li><b>' + esc(f.nome) + '</b><span class="rec-origem">Fecho de Caixa</span><span>' + fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' + plural(f.res.dias.length, 'dia', 'dias') +
         (f.repetidos ? ' · ' + f.repetidos + ' já carregados (leitura substituída)' : '') + '</span>' + btnRemover('fecho', i) + '</li>';
     }).join('');
+
+    var faltas = diasFaltamCartaoB();
+    function faltaHtml(id, dias){
+      var el = document.getElementById(id);
+      if (!dias.length){ el.className = 'rec-faltam ok'; el.textContent = dias === null ? '' : 'Nada em falta.'; return; }
+      el.className = 'rec-faltam';
+      el.innerHTML = '<b>' + dias.length + '</b> dia' + (dias.length === 1 ? '' : 's') + ' A Menos ainda sem ficheiro: ' + dias.slice(0, 12).map(fmtDia).join(', ') + (dias.length > 12 ? '…' : '');
+    }
+    faltaHtml('faltaSaft', faltas.saft);
+    faltaHtml('faltaAbanca', faltas.abanca);
+    faltaHtml('faltaVerifone', faltas.verifone);
+    faltaHtml('faltaFecho', faltas.fecho);
   }
 
   /* ============================================================
-     FIREBASE — leitura do agregado diário (modo degradado)
+     FIREBASE — vendasDiario e contasBancarias (Cartão A)
      ============================================================ */
   function carregarMes(mes){
     if (vendasMes[mes] || !db) return Promise.resolve();
@@ -1172,9 +1090,6 @@ window.addEventListener('load', function () {
       vendasMes[mes] = vendasMes[mes] || {};
     });
   }
-
-  // Meses do selector: do primeiro mês com vendas até hoje, mais os que
-  // vierem nos ficheiros carregados.
   function listaMeses(){
     var meses = {};
     var m = PRIMEIRO_MES, hoje = mesDeHoje(), guard = 0;
@@ -1183,15 +1098,9 @@ window.addEventListener('load', function () {
     Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
     return Object.keys(meses).sort().reverse();
   }
-
-  // O cartão 1 precisa sempre do histórico inteiro: carregam-se todos os
-  // meses (os já em cache resolvem logo), seja qual for o filtro da lista.
   function carregarAtivo(){
     return Promise.all(listaMeses().map(carregarMes));
   }
-
-  // Os nós do cartão 1, uma vez cada (once), só leitura. Um nó que não exista
-  // ainda (cofreMovimentos, caixaContagens) responde null e é estado válido.
   function carregarBase(){
     if (!db) return Promise.resolve();
     function le(caminho, poe){
@@ -1202,16 +1111,14 @@ window.addEventListener('load', function () {
     return Promise.all([
       le('contasBancarias/abanca/movimentos', function(v){ banco.abanca = v; }),
       le('contasBancarias/revolut/movimentos', function(v){ banco.revolut = v; }),
-      le('caixaMovimentos', function(v){ caixaMovs = v; }),
-      le('cofreMovimentos', function(v){ cofreMovs = v; }),
-      le('caixaContagens', function(v){ contagensOS = v; })
+      le('reconciliacaoDescartes', function(v){ descartes = v; }),
+      le('reconciliacaoResolvidos', function(v){ resolvidos = v; })
     ]).then(function(){ baseCarregada = true; });
   }
 
   /* ============================================================
-     CASAMENTO (por dia e por meio)
+     LINHAS DO POS / TERMINAL, por dia e meio
      ============================================================ */
-  // Linhas de pagamento do POS de um dia e meio (uma por <Payment>, nunca o GrossTotal).
   function linhasPos(dia, mec){
     var out = [];
     Object.keys(docs).forEach(function(no){
@@ -1225,11 +1132,6 @@ window.addEventListener('load', function () {
     out.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
     return out;
   }
-  function docsAnulados(dia){
-    return Object.keys(docs).map(function(no){ return docs[no]; })
-      .filter(function(d){ return d.dia === dia && d.status === 'A'; })
-      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
-  }
   function transacoesTerminal(dia, origem){
     var mapa = terminal[origem] || {};
     return Object.keys(mapa).map(function(k){ return mapa[k]; })
@@ -1237,327 +1139,11 @@ window.addEventListener('load', function () {
       .map(function(t){ t.cents = cents(t.montante); return t; })
       .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
   }
-  // Recusadas, canceladas e estados não reconhecidos: fora das somas e do
-  // casamento, mas sempre listadas.
-  function transacoesForaSoma(dia, origem){
-    var mapa = terminal[origem] || {};
-    return Object.keys(mapa).map(function(k){ return mapa[k]; })
-      .filter(function(t){ return t.dia === dia && t.categoria !== 'valida'; })
-      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
-  }
-
-  function candidatos(item, lista, janelaSeg){
-    return lista.filter(function(o){
-      return o.cents === item.cents && item.hora != null && o.hora != null && Math.abs(o.hora - item.hora) <= janelaSeg;
-    });
-  }
-
-  // → { pares, posSemPar, termSemPar, ambiguos:[{cents, valor, pos:[], term:[]}] }
-  function casar(pos, term){
-    var livresA = pos.slice(), livresB = term.slice();
-    var pares = [];
-    JANELAS_MINUTOS.forEach(function(min){
-      var seg = min * 60;
-      var candA = {}, candB = {};
-      livresA.forEach(function(a){ candA[a.id] = candidatos(a, livresB, seg); });
-      livresB.forEach(function(b){ candB[b.id] = candidatos(b, livresA, seg); });
-      var casadosA = {}, casadosB = {};
-      livresA.forEach(function(a){
-        var ca = candA[a.id];
-        if (ca.length !== 1) return;
-        var b = ca[0];
-        if (candB[b.id].length !== 1) return;
-        pares.push({ pos: a, term: b, delta: b.hora - a.hora, janela: min });
-        casadosA[a.id] = true; casadosB[b.id] = true;
-      });
-      livresA = livresA.filter(function(a){ return !casadosA[a.id]; });
-      livresB = livresB.filter(function(b){ return !casadosB[b.id]; });
-    });
-    var segMax = JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1] * 60;
-    var posSemPar = [], termSemPar = [];
-    var ambPorCents = {};
-    livresA.forEach(function(a){
-      var c = candidatos(a, livresB, segMax);
-      if (!c.length){ posSemPar.push(a); return; }
-      var g = ambPorCents[a.cents] || (ambPorCents[a.cents] = { cents: a.cents, valor: a.valor, pos: [], term: [], _p: {}, _t: {} });
-      if (!g._p[a.id]){ g.pos.push(a); g._p[a.id] = true; }
-      c.forEach(function(b){ if (!g._t[b.id]){ g.term.push(b); g._t[b.id] = true; } });
-    });
-    livresB.forEach(function(b){
-      var c = candidatos(b, livresA, segMax);
-      if (!c.length){ termSemPar.push(b); return; }
-      var g = ambPorCents[b.cents] || (ambPorCents[b.cents] = { cents: b.cents, valor: b.montante, pos: [], term: [], _p: {}, _t: {} });
-      if (!g._t[b.id]){ g.term.push(b); g._t[b.id] = true; }
-      c.forEach(function(a){ if (!g._p[a.id]){ g.pos.push(a); g._p[a.id] = true; } });
-    });
-    var ambiguos = Object.keys(ambPorCents).map(function(k){
-      var g = ambPorCents[k];
-      g.pos.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
-      g.term.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
-      return { cents: g.cents, valor: g.valor, pos: g.pos, term: g.term };
-    }).sort(function(a, b){ return (a.pos[0] || a.term[0]).hora - (b.pos[0] || b.term[0]).hora; });
-    pares.sort(function(a, b){ return (a.pos.hora || 0) - (b.pos.hora || 0); });
-    var alt = detectarAlterados(posSemPar, termSemPar);
-    return { pares: pares, posSemPar: alt.posSemPar, termSemPar: alt.termSemPar, alterados: alt.alterados, ambiguos: ambiguos, segMax: segMax };
-  }
-
-  // Só recebe órfãs (sem candidato exacto de nenhum lado). Primeiro a
-  // conta dividida (mais específica), depois o 1:1 — em ambos só casa
-  // quando a leitura é única; o resto fica órfão.
-  function perto(a, b, seg){ return a.hora != null && b.hora != null && Math.abs(a.hora - b.hora) <= seg; }
-  function subconjuntos(lista, min, max){
-    var out = [];
-    (function rec(i, atual){
-      if (atual.length >= min && atual.length <= max) out.push(atual.slice());
-      if (atual.length >= max) return;
-      for (var j = i; j < lista.length; j++){ atual.push(lista[j]); rec(j + 1, atual); atual.pop(); }
-    })(0, []);
-    return out;
-  }
-  function detectarAlterados(posOrf, termOrf){
-    var seg = JANELA_ALTERADO_MINUTOS * 60;
-    var livresA = posOrf.slice(), livresB = termOrf.slice();
-    var alterados = [];
-    // (1) conta dividida: 1 documento ↔ N transações
-    livresA.slice().forEach(function(a){
-      var cand = livresB.filter(function(b){ return perto(a, b, seg); });
-      if (cand.length < 2) return;
-      var opcoes = subconjuntos(cand, 2, Math.min(MAX_PARCELAS_DIVISAO, cand.length)).filter(function(sub){
-        var soma = sub.reduce(function(t, b){ return t + b.cents; }, 0);
-        return Math.abs(soma - a.cents) <= sub.length * TOLERANCIA_DIVISAO_CENTS_POR_PARCELA;
-      });
-      if (opcoes.length !== 1) return;
-      var sub = opcoes[0];
-      var soma = round2(sub.reduce(function(t, b){ return t + b.montante; }, 0));
-      alterados.push({ tipo:'dividida', pos:a, terms:sub, termValor:soma, diff: round2(soma - a.valor), delta: sub[0].hora - a.hora });
-      livresA = livresA.filter(function(x){ return x !== a; });
-      livresB = livresB.filter(function(b){ return sub.indexOf(b) < 0; });
-    });
-    // (2) 1:1 com valor diferente, único de ambos os lados a ±2 min
-    var candA = {}, candB = {};
-    livresA.forEach(function(a){ candA[a.id] = livresB.filter(function(b){ return perto(a, b, seg); }); });
-    livresB.forEach(function(b){ candB[b.id] = livresA.filter(function(a){ return perto(a, b, seg); }); });
-    var usadosA = {}, usadosB = {};
-    livresA.forEach(function(a){
-      if (candA[a.id].length !== 1) return;
-      var b = candA[a.id][0];
-      if (candB[b.id].length !== 1) return;
-      alterados.push({ tipo:'alterado', pos:a, terms:[b], termValor:b.montante, diff: round2(b.montante - a.valor), delta: b.hora - a.hora });
-      usadosA[a.id] = true; usadosB[b.id] = true;
-    });
-    livresA = livresA.filter(function(a){ return !usadosA[a.id]; });
-    livresB = livresB.filter(function(b){ return !usadosB[b.id]; });
-    alterados.sort(function(x, y){ return (x.pos.hora || 0) - (y.pos.hora || 0); });
-    return { alterados: alterados, posSemPar: livresA, termSemPar: livresB };
-  }
-
-  // Estado de um dia para um meio. Nunca escreve; recalcula sempre.
-  function calcularMeio(dia, meio){
-    var mes = dia.slice(0, 7);
-    var fb = vendasMes[mes] && vendasMes[mes][dia] ? vendasMes[mes][dia][meio.mec] : null;
-    var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
-    var temSaft = !!saftCobertura[dia];
-    var term = temTerm ? transacoesTerminal(dia, meio.origem) : [];
-    var pos = temSaft ? linhasPos(dia, meio.mec) : [];
-    var termBruto = 0, comissao = 0, temComissao = false;
-    term.forEach(function(t){ termBruto += t.montante; if (t.comissao != null){ comissao += t.comissao; temComissao = true; } });
-    termBruto = round2(termBruto); comissao = temComissao ? round2(comissao) : null;
-    var posSaft = round2(pos.reduce(function(s, l){ return s + l.valor; }, 0));
-    var r = {
-      meio: meio, dia: dia, fb: fb, temTerm: temTerm, temSaft: temSaft,
-      term: term, pos: pos, termBruto: termBruto, comissao: comissao, liquido: round2(termBruto + (comissao || 0)),
-      foraSoma: temTerm ? transacoesForaSoma(dia, meio.origem) : [],
-      posSaft: posSaft, anulados: temSaft ? docsAnulados(dia) : []
-    };
-    if (temTerm && temSaft){
-      r.modo = 'completo';
-      r.casamento = casar(pos, term);
-      var c = r.casamento;
-      var nAmb = c.ambiguos.reduce(function(s, g){ return s + g.pos.length + g.term.length; }, 0);
-      r.semPar = c.posSemPar.length + c.termSemPar.length + nAmb;
-      r.diferenca = round2(posSaft - termBruto);
-      r.cobradoAMais = round2(c.alterados.reduce(function(t, x){ return t + x.diff; }, 0));
-      r.estado = r.semPar === 0 ? 'ok' : 'bad';
-      r.texto = r.semPar === 0 ? '✓ bate' : r.semPar + ' sem par';
-      r.sub = (r.semPar === 0 ? pos.length + ' linhas' : 'Δ ' + fmtEuroSinal(r.diferenca)) +
-        (c.alterados.length ? ' · a mais ' + fmtEuroSinal(r.cobradoAMais) : '');
-    } else if (temTerm && !term.length && fb && fb.bruto != null){
-      // O período declarado no CSV cobre o dia mas não há uma linha dele
-      // (visto num extrato real: período 07–09 com movimentos só de 07).
-      // Sem SAF-T, um Δ igual ao total do POS seria ruído; fica cinzento
-      // e explícito. Com SAF-T carregado o casamento corre na mesma.
-      r.modo = 'degradado';
-      r.diferenca = round2(fb.bruto - termBruto);
-      r.estado = 'na';
-      r.texto = 'extrato sem linhas';
-      r.sub = '0 transações no período · POS ' + fmtEuro(fb.bruto);
-    } else if (temTerm && fb && fb.bruto != null){
-      r.modo = 'degradado';
-      r.diferenca = round2(fb.bruto - termBruto);
-      r.estado = Math.abs(r.diferenca) < 0.005 ? 'ok' : 'bad';
-      r.texto = r.estado === 'ok' ? '✓ bate ao dia' : 'Δ ' + fmtEuroSinal(r.diferenca);
-      r.sub = 'sem SAF-T';
-    } else if (temTerm){
-      r.modo = 'degradado';
-      r.estado = 'na';
-      r.texto = 'sem POS';
-      r.sub = term.length + ' no terminal';
-    } else if (temSaft || (fb && fb.bruto != null)){
-      r.modo = 'so-pos';
-      r.estado = 'na';
-      r.texto = 'sem extrato';
-      r.sub = temSaft ? pos.length + ' no POS' : fmtEuro(fb.bruto) + ' no POS';
-    } else {
-      r.modo = 'nada';
-      r.estado = 'na';
-      r.texto = 'sem dados';
-      r.sub = '';
-    }
-    return r;
-  }
 
   /* ============================================================
-     CAIXA — contagens físicas e intervalos entre contagens
-     Duas fontes, UMA só conta (a mesma função serve as duas):
-       · ZSBMS (cartão 2): a coluna Início do Fecho de Caixa é a contagem
-         física de cada abertura; Saídas/Entradas do POS por sessão; a hora
-         da abertura vem da Listagem de Sessões quando está carregada, senão
-         é 00:00 do dia (aproximação assinalada — a sessão de 08/09 abriu a
-         07/09 às 23:06).
-       · OS (futuro, sem ficheiro): caixaContagens (total) + caixaMovimentos.
-     Entre duas contagens consecutivas:
-       dinheiro real = contagem seguinte − contagem
-                       + saídas POS − entradas POS      (Fecho de Caixa)
-                       + saídas OS − entradas OS         (caixaMovimentos:
-                         depósitos, cofre, compras, devoluções)
-     e compara-se com o numerário do POS no mesmo intervalo: pelo SAF-T à
-     hora quando cobre todos os dias tocados; senão vendasDiario por dia de
-     calendário, atribuindo cada dia ao intervalo que contém o seu meio-dia.
-     Nunca escreve nada.
-     ============================================================ */
-  var memoCaixa = null;
-
-  function sessaoDoDia(d){
-    for (var i = 0; i < sessoes.length; i++){ if (sessoes[i].fecho && diaLocal(sessoes[i].fecho) === d) return sessoes[i]; }
-    for (var j = 0; j < sessoes.length; j++){ if (diaLocal(sessoes[j].abertura) === d) return sessoes[j]; }
-    return null;
-  }
-
-  // → { fonte:'zsbms'|'os'|null, lista:[{quando, aprox, valor, dia, saidasPos, entradasPos, quem}] }
-  function contagensFisicas(){
-    var diasF = Object.keys(fecho).sort();
-    if (diasF.length){
-      return { fonte: 'zsbms', lista: diasF.filter(function(d){ return fecho[d].inicio != null; }).map(function(d){
-        var f = fecho[d], ses = sessaoDoDia(d);
-        return { quando: ses ? ses.abertura : new Date(d + 'T00:00:00'), aprox: !ses, valor: f.inicio, dia: d, saidasPos: f.saidas || 0, entradasPos: f.entradas || 0, quem: (ses && ses.operador) || '' };
-      }) };
-    }
-    var ids = Object.keys(contagensOS);
-    if (ids.length){
-      var lista = ids.map(function(id){
-        var c = contagensOS[id] || {}; var q = new Date(c.dataHora);
-        return { quando: q, aprox: false, valor: typeof c.total === 'number' ? c.total : null, dia: isNaN(q.getTime()) ? null : diaLocal(q), saidasPos: 0, entradasPos: 0, quem: c.pessoa || '' };
-      }).filter(function(x){ return x.dia && x.valor != null; }).sort(function(a, b){ return a.quando - b.quando; });
-      return { fonte: 'os', lista: lista };
-    }
-    return { fonte: null, lista: [] };
-  }
-
-  // Movimentos registados no OS entre duas contagens. Saída = dinheiro que saiu
-  // da caixa (numa saída acertada, o troco devolvido já voltou); entrada = que
-  // entrou. Uma entrada no cofre "da caixa" sem par em caixaMovimentos conta
-  // como saída (rede de segurança para um par que falhou a meio).
-  function movimentosOsEntre(ini, fim){
-    var saidas = 0, entradas = 0, n = 0, lista = [];
-    Object.keys(caixaMovs).forEach(function(id){
-      var m = caixaMovs[id]; if (!m) return;
-      var t = new Date(m.dataHora); if (isNaN(t.getTime()) || t < ini || t >= fim) return;
-      var v = Number(m.valor) || 0;
-      if (m.tipo === 'saida'){ var sv = m.estado === 'acertado' ? round2(v - (Number(m.valorDevolvido) || 0)) : v; saidas += sv; lista.push({ t: t, texto: '− ' + fmtEuro(sv) + ' ' + (m.motivo || 'saída') }); n++; }
-      else if (m.tipo === 'entrada'){ entradas += v; lista.push({ t: t, texto: '+ ' + fmtEuro(v) + ' ' + (m.motivo || 'entrada') }); n++; }
-    });
-    var pares = {};
-    Object.keys(caixaMovs).forEach(function(id){ var m = caixaMovs[id]; if (m && m.transferenciaId) pares[m.transferenciaId] = true; });
-    Object.keys(cofreMovs).forEach(function(id){
-      var m = cofreMovs[id]; if (!m || m.tipo !== 'entrada' || !m.transferenciaId || pares[m.transferenciaId]) return;
-      var t = new Date(m.dataHora); if (isNaN(t.getTime()) || t < ini || t >= fim) return;
-      var v = Number(m.valor) || 0; saidas += v; n++; lista.push({ t: t, texto: '− ' + fmtEuro(v) + ' para o cofre (par em falta na caixa)' });
-    });
-    lista.sort(function(a, b){ return a.t - b.t; });
-    return { saidas: round2(saidas), entradas: round2(entradas), n: n, lista: lista };
-  }
-
-  // Numerário do POS entre duas datas-hora. Sem SAF-T, um dia de calendário
-  // pertence ao intervalo que contém o meio do horário de loja (17:30): uma
-  // contagem às 12:03 ou às 22:48 não arrasta o dia inteiro para o lado errado.
-  function numerarioPosEntre(ini, fim){
-    var dias = [], d = new Date(ini.getTime()); d.setHours(17, 30, 0, 0); if (d < ini) d.setDate(d.getDate() + 1);
-    while (d < fim){ dias.push(diaLocal(d)); d.setDate(d.getDate() + 1); }
-    var tocados = [], t = new Date(ini.getTime()); t.setHours(12, 0, 0, 0);
-    var fimT = new Date(fim.getTime() - 1); fimT.setHours(12, 0, 0, 0);
-    while (t <= fimT){ tocados.push(diaLocal(t)); t.setDate(t.getDate() + 1); }
-    var saftCobre = tocados.length > 0 && tocados.every(function(x){ return saftCobertura[x]; });
-    if (saftCobre){
-      var soma = 0, n = 0;
-      Object.keys(docs).forEach(function(no){
-        var dd = docs[no]; if (dd.status === 'A' || dd.hora == null) return;
-        var q = new Date(dd.dia + 'T00:00:00'); q.setSeconds(dd.hora);
-        if (q < ini || q >= fim) return;
-        dd.pagamentos.forEach(function(p){ if (p.mec === 'NU'){ soma += p.valor; n++; } });
-      });
-      return { nu: round2(soma), fonte: 'SAF-T', dias: dias, n: n, exacto: true };
-    }
-    if (!dias.length) return { nu: 0, fonte: 'sem dia de venda no intervalo', dias: [], exacto: false };
-    var soma2 = 0;
-    for (var i = 0; i < dias.length; i++){
-      var mes = dias[i].slice(0, 7); var fb = vendasMes[mes] && vendasMes[mes][dias[i]];
-      if (!fb) return { nu: null, fonte: 'sem vendasDiario para ' + fmtDia(dias[i]), dias: dias };
-      soma2 += (fb.NU && fb.NU.bruto) || 0;
-    }
-    return { nu: round2(soma2), fonte: 'vendasDiario', dias: dias, exacto: false };
-  }
-
-  // Contagem feita a meio do horário de loja (12h–23h): sem SAF-T não se sabe
-  // quanto do numerário do dia é de antes e de depois. Uma contagem nos 15 min
-  // a seguir à abertura ou antes do fecho passa, marcada como aproximada.
-  function meioDoDia(q){ var h = q.getHours() + q.getMinutes() / 60; return h >= 12.25 && h < 22.75; }
-  function bordaDoDia(q){ var h = q.getHours() + q.getMinutes() / 60; return (h >= 12 && h < 12.25) || (h >= 22.75 && h < 23); }
-
-  // → { fonte, itens:[{id, ini, fim, saidasPos, entradasPos, os, real, nu, fonteNu, dias, aprox, estado, diff, motivo}], soUma }
-  function intervalosCaixa(){
-    if (memoCaixa) return memoCaixa;
-    var cf = contagensFisicas();
-    var out = { fonte: cf.fonte, itens: [], soUma: cf.lista.length === 1 };
-    for (var i = 0; i + 1 < cf.lista.length; i++){
-      var a = cf.lista[i], b = cf.lista[i + 1];
-      var os = movimentosOsEntre(a.quando, b.quando);
-      var nu = numerarioPosEntre(a.quando, b.quando);
-      var real = round2(b.valor - a.valor + a.saidasPos - a.entradasPos + os.saidas - os.entradas);
-      var it = { id: String(a.quando.getTime()), ini: a, fim: b, saidasPos: a.saidasPos, entradasPos: a.entradasPos, os: os, real: real, nu: nu.nu, fonteNu: nu.fonte, dias: nu.dias, aprox: a.aprox || b.aprox, borda: !nu.exacto && (bordaDoDia(a.quando) || bordaDoDia(b.quando)) };
-      if (nu.nu == null){ it.estado = 'na'; it.motivo = nu.fonte; }
-      else if (!nu.exacto && (meioDoDia(a.quando) || meioDoDia(b.quando))){ it.estado = 'na'; it.motivo = 'contagem a meio do dia sem SAF-T — não se sabe quanto numerário do POS é de antes e de depois'; }
-      else { it.diff = round2(real - nu.nu); it.estado = it.diff < -TOLERANCIA_CAIXA ? 'erro' : (it.diff > TOLERANCIA_CAIXA ? 'aMais' : 'ok'); }
-      out.itens.push(it);
-    }
-    memoCaixa = out;
-    return out;
-  }
-  function intervaloDe(dia, hora){
-    var q = new Date(dia + 'T00:00:00'); q.setSeconds(hora || 0);
-    var iv = intervalosCaixa().itens;
-    for (var i = 0; i < iv.length; i++){ if (q >= iv[i].ini.quando && q < iv[i].fim.quando) return iv[i]; }
-    return null;
-  }
-
-  /* ============================================================
-     CARTÃO 1 — TRIAGEM DE CARTÃO (vendasDiario × créditos bancários)
-     Para cada terminal: (1) passagem exacta dia a dia — um crédito (ou o
-     grupo de créditos do mesmo dia) na janela do terminal cujo bruto
-     reconstruído bate com o POS do dia; (2) o resíduo é agrupado em
-     COMPONENTES (dias e créditos ligados pela janela) e compara-se a soma de
-     cada componente — é a "janela deslizante", mas só onde há dúvida, para
-     os dias que batem ao cêntimo não diluírem o erro dos que não batem.
-     Regras de reconstrução do bruto em MEIOS (cabeçalho). Só leitura.
+     CARTÃO A — atribuição de créditos do banco a dias de POS
+     (algoritmo de atribuição verbatim do que já existia; a diferença é
+     só na classificação final — ver classificarItemA acima).
      ============================================================ */
   function creditosBanco(meio){
     var out = [];
@@ -1575,7 +1161,6 @@ window.addEventListener('load', function () {
     out.sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : (a.key < b.key ? -1 : 1)); });
     return out;
   }
-  // Primeiro e último booking_date em qualquer conta (qualquer indicador).
   function limitesBanco(contas){
     var min = null, max = null;
     (contas || Object.keys(banco)).forEach(function(conta){
@@ -1589,15 +1174,11 @@ window.addEventListener('load', function () {
     });
     return min ? { min: min, max: max } : null;
   }
-  function brutoEstimado(meio, c){
-    if (!meio.comissao) return { min: c, max: c };
-    return { min: Math.round(c / (1 - meio.comissao.min)), max: Math.round(c / (1 - meio.comissao.max)) };
-  }
-  function compararTerminal(meio, posC, credC){
-    var e = brutoEstimado(meio, credC);
-    if (posC > e.max) return { estado: 'erro', diff: (e.max - posC) / 100, est: e };
-    if (posC < e.min) return { estado: 'aMais', diff: (e.min - posC) / 100, est: e };
-    return { estado: 'ok', diff: 0, est: e };
+  // Usado só como HEURÍSTICA de atribuição (agrupar créditos aos dias certos,
+  // ver comps/emparelhar abaixo) — nunca para classificar o resultado final,
+  // que é sempre o Δ cru (ver classificarItemA).
+  function custoAtribuicao(posC, credC){
+    return Math.abs(posC - credC) / 100;
   }
   function posDiaCents(dia, mec){
     var mes = dia.slice(0, 7);
@@ -1605,50 +1186,36 @@ window.addEventListener('load', function () {
     return fb && fb.bruto != null ? cents(fb.bruto) : null;
   }
 
-  function triagemCartao(meio){
+  function atribuirCreditos(meio){
     var creds = creditosBanco(meio), usado = {};
     var contasDoMeio = creds.map(function(c){ return c.conta; }).filter(function(v, i, a){ return a.indexOf(v) === i; });
     var lim = limitesBanco(contasDoMeio.length ? contasDoMeio : null);
-    var res = { meio: meio, itens: [], diasVerificados: 0, diasAguardar: 0, erro: 0, nErro: 0, aMais: 0, nAMais: 0, semBanco: !lim, lim: lim };
+    var res = { meio: meio, itens: [], semBanco: !lim, lim: lim };
     if (!lim) return res;
     var dias = [];
     var j = meio.janelaBanco;
     var desde = addDias(lim.min, -j);
     Object.keys(vendasMes).forEach(function(m){ Object.keys(vendasMes[m]).forEach(function(d){ var c = posDiaCents(d, meio.mec); if (c && d >= desde) dias.push({ dia: d, cents: c }); }); });
     dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
-    function item(diasI, credsI, r){
+    function item(diasI, credsI){
       var pos = diasI.reduce(function(t, x){ return t + x.cents; }, 0), cred = credsI.reduce(function(t, c){ return t + c.cents; }, 0);
-      return { meio: meio, dias: diasI.map(function(x){ return x.dia; }), pos: pos / 100, creditos: credsI, credito: cred / 100,
-               est: r.est ? { min: r.est.min / 100, max: r.est.max / 100 } : null, estado: r.estado, diff: r.diff };
+      return { meio: meio, dias: diasI.map(function(x){ return x.dia; }), pos: pos / 100, creditos: credsI, credito: cred / 100 };
     }
     var restam = [];
     dias.forEach(function(x){
       var fim = addDias(x.dia, j), cand = [];
       creds.forEach(function(c, i){ if (!usado[i] && c.dia >= x.dia && c.dia <= fim) cand.push(i); });
+      // atribuição rápida: um único candidato exacto ao cêntimo.
       for (var k = 0; k < cand.length; k++){
-        var r = compararTerminal(meio, x.cents, creds[cand[k]].cents);
-        if (r.estado === 'ok'){ usado[cand[k]] = true; res.itens.push(item([x], [creds[cand[k]]], r)); return; }
-      }
-      var porDia = {};
-      cand.forEach(function(i){ (porDia[creds[i].dia] || (porDia[creds[i].dia] = [])).push(i); });
-      var diasG = Object.keys(porDia).sort();
-      for (var g = 0; g < diasG.length; g++){
-        var grp = porDia[diasG[g]]; if (grp.length < 2) continue;
-        var soma = grp.reduce(function(t, i){ return t + creds[i].cents; }, 0);
-        var r2 = compararTerminal(meio, x.cents, soma);
-        if (r2.estado === 'ok'){ grp.forEach(function(i){ usado[i] = true; }); res.itens.push(item([x], grp.map(function(i){ return creds[i]; }), r2)); return; }
+        if (creds[cand[k]].cents === x.cents){ usado[cand[k]] = true; res.itens.push(item([x], [creds[cand[k]]])); return; }
       }
       restam.push(x);
     });
-    // Dias anteriores ao início do banco que não bateram exactos: o crédito
-    // deles pode simplesmente não existir nos dados — não testável, e fora
-    // das componentes (senão arrastavam os dias seguintes).
     restam = restam.filter(function(x){
       if (x.dia >= lim.min) return true;
-      var it = item([x], [], { estado: 'na', diff: 0, est: null }); it.antesBanco = true; res.itens.push(it);
+      var it = item([x], []); it.antesBanco = true; res.itens.push(it);
       return false;
     });
-    // Componentes no resíduo (union-find simples).
     var livres = []; creds.forEach(function(c, i){ if (!usado[i]) livres.push(i); });
     var pai = {};
     function raiz(n){ while (pai[n] !== n){ pai[n] = pai[pai[n]]; n = pai[n]; } return n; }
@@ -1662,18 +1229,12 @@ window.addEventListener('load', function () {
     var comps = {};
     restam.forEach(function(x, di){ var r = raiz('d' + di); (comps[r] || (comps[r] = { dias: [], creds: [] })).dias.push(x); });
     livres.forEach(function(i){ var r = raiz('c' + i); (comps[r] || (comps[r] = { dias: [], creds: [] })).creds.push(creds[i]); });
-    // Permutações (para os créditos do mesmo dia, que não têm ordem).
     function permutacoes(arr){
       if (arr.length <= 1) return [arr.slice()];
       var out = [];
       arr.forEach(function(x, i){ permutacoes(arr.slice(0, i).concat(arr.slice(i + 1))).forEach(function(r){ out.push([x].concat(r)); }); });
       return out;
     }
-    // Um crédito do VERIFONE é um dia de POS: numa componente com tantos dias
-    // como créditos, emparelha-se 1:1 por ordem (créditos do mesmo dia na
-    // ordem que minimiza a soma das diferenças) e dois dias seguidos com
-    // diferenças que se anulam são a mesma venda a atravessar a meia-noite —
-    // somam-se num só item. Só quando os números não batem se compara a soma.
     function emparelhar(diasC, credsC){
       var grupos = [], i = 0;
       while (i < credsC.length){ var j2 = i; while (j2 + 1 < credsC.length && credsC[j2 + 1].dia === credsC[i].dia) j2++; grupos.push(credsC.slice(i, j2 + 1)); i = j2 + 1; }
@@ -1687,19 +1248,18 @@ window.addEventListener('load', function () {
       var melhor = null, melhorCusto = Infinity;
       ordens.forEach(function(o){
         var custo = 0;
-        for (var q = 0; q < diasC.length; q++){ custo += Math.abs(compararTerminal(meio, diasC[q].cents, o[q].cents).diff); }
+        for (var q = 0; q < diasC.length; q++){ custo += custoAtribuicao(diasC[q].cents, o[q].cents); }
         if (custo < melhorCusto){ melhorCusto = custo; melhor = o; }
       });
-      var pares = diasC.map(function(x, q){ return { dia: x, cred: melhor[q], r: compararTerminal(meio, x.cents, melhor[q].cents) }; });
+      var pares = diasC.map(function(x, q){ return { dia: x, cred: melhor[q], diff: (x.cents - melhor[q].cents) / 100 }; });
       var out = [];
       for (var q = 0; q < pares.length; q++){
         var pq = pares[q];
-        if (q + 1 < pares.length && pq.r.diff !== 0 && Math.abs(pq.r.diff + pares[q + 1].r.diff) < 0.005){
-          var soma = compararTerminal(meio, pq.dia.cents + pares[q + 1].dia.cents, pq.cred.cents + pares[q + 1].cred.cents);
-          out.push(item([pq.dia, pares[q + 1].dia], [pq.cred, pares[q + 1].cred], soma)); q++;
+        if (q + 1 < pares.length && pq.diff !== 0 && Math.abs(pq.diff + pares[q + 1].diff) < 0.005){
+          out.push(item([pq.dia, pares[q + 1].dia], [pq.cred, pares[q + 1].cred])); q++;
           continue;
         }
-        out.push(item([pq.dia], [pq.cred], pq.r));
+        out.push(item([pq.dia], [pq.cred]));
       }
       return out;
     }
@@ -1707,698 +1267,542 @@ window.addEventListener('load', function () {
       var c = comps[k];
       c.dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
       c.creds.sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : 0); });
-      var posSum = c.dias.reduce(function(t, x){ return t + x.cents; }, 0), credSum = c.creds.reduce(function(t, x){ return t + x.cents; }, 0);
-      var r;
       if (!c.creds.length){
         var ultimo = c.dias[c.dias.length - 1].dia;
-        r = addDias(ultimo, j) > lim.max ? { estado: 'aguarda', diff: 0, est: null }
-          : (c.dias[0].dia < lim.min ? { estado: 'na', diff: 0, est: null, antesBanco: true } : { estado: 'erro', diff: -posSum / 100, est: null, semCredito: true });
-      } else if (!c.dias.length){
-        r = { estado: 'semVenda', diff: credSum / 100, est: null };
-      } else if (c.dias.length === c.creds.length && c.dias.length > 1){
+        var it = item(c.dias, []);
+        if (addDias(ultimo, j) > (lim.max)){ it.aguarda = true; }
+        else if (c.dias[0].dia < lim.min){ it.antesBanco = true; }
+        else { it.semCredito = true; }
+        res.itens.push(it);
+        return;
+      }
+      if (!c.dias.length){ res.itens.push(item([], c.creds)); return; }
+      if (c.dias.length === c.creds.length && c.dias.length > 1){
         emparelhar(c.dias, c.creds).forEach(function(it){ res.itens.push(it); });
         return;
-      } else {
-        r = compararTerminal(meio, posSum, credSum);
       }
-      var it = item(c.dias, c.creds, r); it.semCredito = !!r.semCredito; it.antesBanco = !!r.antesBanco;
-      res.itens.push(it);
+      res.itens.push(item(c.dias, c.creds));
     });
     res.itens.sort(function(a, b){ var da = a.dias.length ? a.dias[a.dias.length - 1] : a.creditos[0].dia, db2 = b.dias.length ? b.dias[b.dias.length - 1] : b.creditos[0].dia; return da < db2 ? 1 : (da > db2 ? -1 : 0); });
-    res.itens.forEach(function(it){
-      if (it.estado === 'aguarda') res.diasAguardar += it.dias.length;
-      else if (it.estado !== 'na' && it.dias.length) res.diasVerificados += it.dias.length;
-      if (it.estado === 'erro'){ res.erro = round2(res.erro - it.diff); res.nErro += it.dias.length; }
-      if (it.estado === 'aMais'){ res.aMais = round2(res.aMais + it.diff); res.nAMais += it.dias.length; }
-    });
     return res;
   }
 
-  function fmtDias(dias){
-    if (!dias.length) return '—';
-    if (dias.length === 1) return fmtDia(dias[0]);
-    return fmtDia(dias[0]).slice(0, 5) + ' → ' + fmtDia(dias[dias.length - 1]);
-  }
-  var ESTADO_TRI = { erro: 'por cobrar', aMais: 'cobrado a mais', ok: 'bate', aguarda: 'aguarda banco', semVenda: 'crédito sem venda', na: 'não testável' };
-  function tagTri(estado){ return '<span class="rec-tri-tag ' + estado + '">' + ESTADO_TRI[estado] + '</span>'; }
-
-  function detalheCartao(it){
-    var m = it.meio;
-    var creds = it.creditos.length ? plural(it.creditos.length, 'crédito', 'créditos') + ' ' + it.creditos.map(function(c){ return fmtDia(c.dia).slice(0, 5); }).filter(function(v, i, a){ return a.indexOf(v) === i; }).join(', ') : 'nenhum crédito';
-    var h = 'POS <b>' + fmtEuro(it.pos) + '</b>';
-    if (it.antesBanco) return h + ' · sem crédito exacto, e o banco só começa a ' + fmtDia(limitesBanco(it.creditos.length ? [it.creditos[0].conta] : null).min) + ' — não testável';
-    if (it.estado === 'aguarda') return h + ' · o crédito ainda não chegou (banco lido até ' + fmtDia(limitesBanco().max) + (m.janelaBanco ? ', janela de ' + m.janelaBanco + ' dias' : '') + ')';
-    if (it.estado === 'semVenda') return 'banco <b>' + fmtEuro(it.credito) + '</b> (' + creds + ') sem venda ' + m.label + ' no POS na janela';
-    h += ' · banco <b>' + fmtEuro(it.credito) + '</b> (' + creds + ')';
-    if (m.comissao && it.est) h += ' · bruto estimado ' + fmtEuro(it.est.min) + '–' + fmtEuro(it.est.max) + ' (comissão ' + (m.comissao.min * 100).toFixed(2).replace('.', ',') + '–' + (m.comissao.max * 100).toFixed(2).replace('.', ',') + ' %)';
-    if (it.semCredito) h += ' · <b>nenhum crédito na janela</b>';
-    if (it.dias.length > 1) h += ' · ' + it.dias.length + ' dias somados (créditos a atravessar dias)';
-    return h;
-  }
-  function detalheCaixa(it){
-    var h = 'contagem ' + fmtDataHora(it.ini.quando) + ' <b>' + fmtEuro(it.ini.valor) + '</b> → ' + fmtDataHora(it.fim.quando) + ' <b>' + fmtEuro(it.fim.valor) + '</b>';
-    if (it.saidasPos || it.entradasPos) h += ' · POS saídas ' + fmtEuro(it.saidasPos) + (it.entradasPos ? ' entradas ' + fmtEuro(it.entradasPos) : '');
-    if (it.os.n) h += ' · OS ' + (it.os.saidas ? '−' + fmtEuro(it.os.saidas) : '') + (it.os.entradas ? ' +' + fmtEuro(it.os.entradas) : '') + ' (' + plural(it.os.n, 'movimento', 'movimentos') + ')';
-    if (it.estado === 'na') return h + ' · <b>' + esc(it.motivo) + '</b>';
-    h += ' · dinheiro real <b>' + fmtEuro(it.real) + '</b> · numerário POS <b>' + fmtEuro(it.nu) + '</b> (' + esc(it.fonteNu) + ')';
-    if (it.aprox) h += ' · sessão aproximada ao dia (sem Listagem de Sessões)';
-    if (it.borda) h += ' · contagem à abertura/fecho sem SAF-T (aproximado)';
-    return h;
+  function classificarItemA(meio, it){
+    if (it.antesBanco || it.aguarda) return 'naoVerificavel';
+    if (!it.dias.length && it.creditos.length) return 'aMais';           // crédito sem venda correspondente
+    if (it.semCredito) return 'aMenos';                                    // sem crédito nenhum, janela já passou
+    if (it.dias.length > 1 && it.creditos.length > 1) return 'ambiguo';    // componente que não resolveu 1:1
+    if (!it.pos) return it.credito ? 'aMais' : 'naoVerificavel';
+    var deltaPct = (it.pos - it.credito) / it.pos * 100;
+    var banda = BANDA_OK[meio.mec] || { min: -0.3, max: 0.3 };
+    if (deltaPct > banda.max) return 'aMenos';
+    if (deltaPct < banda.min) return 'aMais';
+    return 'ok';
   }
 
-  function renderTriagem(){
-    var el = document.getElementById('triagem');
-    if (!db){ el.innerHTML = '<div class="rec-vazio">A ligar ao Firebase…</div>'; return; }
-    if (!baseCarregada){ el.innerHTML = '<div class="rec-vazio">A ler vendas, banco e caixa…</div>'; return; }
-    var tA = triagemCartao(MEIO_POR_MEC.OU), tV = triagemCartao(MEIO_POR_MEC.CD), cx = intervalosCaixa();
-    var cxErro = 0, cxN = 0, cxAMais = 0, cxVer = 0, cxNa = 0;
-    cx.itens.forEach(function(it){
-      if (it.estado === 'na'){ cxNa++; return; }
-      cxVer++;
-      if (it.estado === 'erro'){ cxErro = round2(cxErro - it.diff); cxN++; }
-      else if (it.estado === 'aMais') cxAMais = round2(cxAMais + it.diff);
-    });
-    var totalErro = round2(tA.erro + tV.erro + cxErro), nErro = tA.nErro + tV.nErro + cxN;
-    var totalAMais = round2(tA.aMais + tV.aMais + cxAMais);
-    var diasVer = tA.diasVerificados + tV.diasVerificados + cxVer;
+  function chaveDescarteItem(meio, it){
+    var diaChave = it.dias.length ? it.dias.join('_') : (it.creditos.length ? it.creditos[0].dia : 'sem-data');
+    return diaChave + '~' + meio.mec;
+  }
 
-    var linhas = [];
-    [tA, tV].forEach(function(t){
-      t.itens.forEach(function(it){
-        var ord = it.dias.length ? it.dias[it.dias.length - 1] : it.creditos[0].dia;
-        linhas.push({ ord: ord, data: it.dias.length ? fmtDias(it.dias) : fmtDia(it.creditos[0].dia), tipo: t.meio.label, estado: it.estado, diff: it.estado === 'na' ? null : it.diff, detalhe: detalheCartao(it) });
+  var memoA = null;
+  function calcularCartaoA(){
+    if (memoA) return memoA;
+    var out = { OU: null, CD: null };
+    MEIOS.forEach(function(meio){
+      var r = atribuirCreditos(meio);
+      r.itens.forEach(function(it){
+        it.estado = classificarItemA(meio, it);
+        it.chave = chaveDescarteItem(meio, it);
+        var d = descartes[chaveFirebase(it.chave)];
+        it.descartado = !!(d && d.anulado !== true);
       });
+      out[meio.mec] = r;
     });
-    cx.itens.forEach(function(it){
-      var ord = it.dias.length ? it.dias[it.dias.length - 1] : diaLocal(it.fim.quando);
-      var data = it.dias.length ? fmtDias(it.dias) : fmtDataHora(it.ini.quando) + ' → ' + fmtDataHora(it.fim.quando);
-      linhas.push({ ord: ord, data: data, tipo: 'CAIXA', estado: it.estado, diff: it.estado === 'na' ? null : it.diff, detalhe: detalheCaixa(it) });
-    });
-    linhas.sort(function(a, b){ return a.ord < b.ord ? 1 : (a.ord > b.ord ? -1 : (a.tipo < b.tipo ? -1 : 1)); });
-    var visiveis = linhas.filter(function(l){ return mostrarOkTriagem || l.estado !== 'ok'; });
-    var nOk = linhas.length - linhas.filter(function(l){ return l.estado !== 'ok'; }).length;
-
-    var lim = limitesBanco();
-    function tile(cls, k, t, extra){
-      var na = t.semBanco;
-      return '<div class="rec-tri-tipo' + (na ? ' na' : (t.nErro ? '' : ' zero')) + '"><div class="k">' + k + '</div>' +
-        '<div class="v num">' + (na ? 'sem banco' : fmtEuro(t.erro)) + '</div>' +
-        '<div class="s">' + (na ? 'contasBancarias sem movimentos' : plural(t.nErro, 'dia com erro', 'dias com erro') + ' em <b>' + t.diasVerificados + '</b> verificados' + (t.diasAguardar ? ' · ' + t.diasAguardar + ' a aguardar banco' : '') + (t.aMais ? ' · cobrado a mais ' + fmtEuro(t.aMais) : '')) + extra + '</div></div>';
-    }
-    var h = '<div class="rec-tri-topo">' +
-      '<div class="rec-tri-head' + (nErro ? '' : ' zero') + '"><div class="k">Por cobrar / em falta</div><div class="v num">' + fmtEuro(totalErro) + '</div>' +
-        '<div class="s"><b>' + plural(nErro, 'dia com erro', 'dias com erro') + '</b> em ' + diasVer + ' verificados · cobrado a mais (gorjeta no terminal) ' + fmtEuro(totalAMais) +
-        (lim ? ' · banco lido até <b>' + fmtDia(lim.max) + '</b>' : '') + '</div></div>' +
-      tile('', 'TPA ABANCA', tA, '') +
-      tile('', 'TPA VERIFONE', tV, '') +
-      '<div class="rec-tri-tipo' + (!cx.fonte ? ' na' : (cxN ? '' : ' zero')) + '"><div class="k">CAIXA</div><div class="v num">' + (cx.fonte ? fmtEuro(cxErro) : 'sem contagens') + '</div><div class="s">' +
-        (cx.fonte ? plural(cxN, 'intervalo com erro', 'intervalos com erro') + ' em <b>' + cxVer + '</b> verificados' + (cxNa ? ' · ' + cxNa + ' não testáveis' : '') + (cxAMais ? ' · dinheiro a mais ' + fmtEuro(cxAMais) : '') + ' · fonte ' + (cx.fonte === 'zsbms' ? 'Fecho de Caixa (ZSBMS)' : 'contagens do OS')
-                 : (cx.soUma ? 'só uma contagem: precisa de duas para comparar' : 'carrega o Fecho de Caixa no cartão 2, ou conta a caixa no caixa.html')) + '</div></div>' +
-      '</div>';
-
-    h += '<div class="rec-tri-lista">';
-    if (!visiveis.length){
-      h += '<div class="rec-vazio">' + (linhas.length ? 'Nenhum dia com erro. ' + plural(nOk, 'dia bate', 'dias batem') + '.' : 'Sem dias para comparar: sem vendas ou sem banco.') + '</div>';
-    } else {
-      h += '<table><thead><tr><th>Data</th><th>Tipo</th><th>Estado</th><th class="num">Diferença</th><th>Detalhe</th></tr></thead><tbody>' +
-        visiveis.map(function(l){
-          return '<tr' + (l.estado === 'ok' ? ' class="rec-tri-ok"' : '') + '><td class="rec-mono" style="white-space:nowrap">' + esc(l.data) + '</td><td><b>' + esc(l.tipo) + '</b></td><td>' + tagTri(l.estado) + '</td>' +
-            '<td class="num' + (l.diff != null && l.diff < 0 ? ' rec-neg' : '') + '">' + (l.diff == null || l.estado === 'aguarda' || l.estado === 'na' ? '—' : (l.estado === 'ok' ? '0,00 €' : fmtEuroSinal(l.diff))) + '</td><td class="rec-tri-detalhe">' + l.detalhe + '</td></tr>';
-        }).join('') + '</tbody></table>';
-    }
-    if (nOk) h += '<button type="button" class="rec-tri-mais" id="triToggleOk">' + (mostrarOkTriagem ? 'Esconder os ' + nOk + ' que batem' : 'Mostrar os ' + nOk + ' que batem') + '</button>';
-    h += '</div>';
-    h += '<p class="rec-tri-nota"><b>Como se decide.</b> TPA ABANCA: o crédito FECHO TPA cai no próprio dia já sem a comissão; o bruto do terminal é reconstruído como intervalo com comissão 0,50–0,85 % (observado 0,53–0,83 % em 10 dias de extrato) e só acusa quando o POS fica fora dele. ' +
-      'TPA VERIFONE: créditos brutos, 0–5 dias depois; 73 dos 87 dias batem ao cêntimo, por isso qualquer cêntimo conta; dias que se atravessam à meia-noite são somados. ' +
-      'CAIXA: dinheiro real entre duas contagens (contagem seguinte − contagem + saídas − entradas, do POS e do OS) contra o numerário do POS, tolerância ' + fmtEuro(TOLERANCIA_CAIXA) + '. ' +
-      '"Cobrado a mais" é o crédito acima do POS — a gorjeta arredondada no terminal — e não entra no total. Uma gorjeta pode esconder uma venda por cobrar do mesmo dia: só o cartão 2 separa as duas.' +
-      (baseErros.length ? ' <span class="rec-erro">Não consegui ler: ' + esc(baseErros.join('; ')) + '</span>' : '') + '</p>';
-    el.innerHTML = h;
-    var btn = document.getElementById('triToggleOk');
-    if (btn) btn.addEventListener('click', function(){ mostrarOkTriagem = !mostrarOkTriagem; renderTriagem(); });
+    memoA = out;
+    return out;
   }
+  // Chaves de nó do Firebase não podem ter '.', '#', '$', '[', ']' — a chave
+  // já só usa dígitos, '-', '_' e '~', por isso passa tal e qual.
+  function chaveFirebase(k){ return k; }
 
   /* ============================================================
-     VENDAS SEM COBRANÇA — painel de topo, todos os dias carregados
-     Para cada documento "só no POS" contra o extrato do meio em que foi
-     registado, corre a cascata pela ordem:
-       H1 cobrado no outro terminal — transação livre da OUTRA origem, mesmo
-          dia, mesmo valor, dentro da janela máxima de casamento.
-       H2 pago em dinheiro — ao DIA: dinheiro real na caixa (abertura
-          seguinte − abertura do dia + saídas − entradas, do Fecho de Caixa
-          do ZSBMS) contra o numerário do POS; o excedente explica os
-          documentos quando bate (à tolerância) com um único subconjunto.
-       H3 sem entrada de dinheiro — o que sobra.
-     Um documento cuja hipótese não se pode testar (falta o extrato da outra
-     origem, o Fecho de Caixa ou a abertura seguinte) vai para "não
-     testável" e não entra em nenhum total. Nunca escreve nada.
+     CARTÃO B — casamento por dia (SAF-T ↔ extrato), pela ordem exacta da
+     spec: 1) global por menor distância ±60 min; 2) valor alterado ±3 min
+     (1 candidato de cada lado); 3) conta dividida ±5 min (tolerância 5
+     cêntimos por parcela) — 2 e 3 correm só sobre o resíduo do passo 1;
+     4) o que sobra, confirmado que não está no OUTRO terminal.
      ============================================================ */
+  function casarGlobal(pos, term, janelaSeg){
+    var pares = [];
+    pos.forEach(function(p){
+      term.forEach(function(t){
+        if (p.cents === t.cents && p.hora != null && t.hora != null && Math.abs(t.hora - p.hora) <= janelaSeg){
+          pares.push({ pos: p, term: t, delta: Math.abs(t.hora - p.hora) });
+        }
+      });
+    });
+    pares.sort(function(a, b){ return a.delta - b.delta; });
+    var usadoP = {}, usadoT = {};
+    pares.forEach(function(pr){
+      if (usadoP[pr.pos.id] || usadoT[pr.term.id]) return;
+      usadoP[pr.pos.id] = true; usadoT[pr.term.id] = true;
+    });
+    return {
+      posLivre: pos.filter(function(p){ return !usadoP[p.id]; }),
+      termLivre: term.filter(function(t){ return !usadoT[t.id]; })
+    };
+  }
+  function casarAlterado(posOrf, termOrf, janelaSeg){
+    var candA = {}, candB = {};
+    posOrf.forEach(function(a){ candA[a.id] = termOrf.filter(function(b){ return perto(a, b, janelaSeg); }); });
+    termOrf.forEach(function(b){ candB[b.id] = posOrf.filter(function(a){ return perto(a, b, janelaSeg); }); });
+    var usadosA = {}, usadosB = {};
+    posOrf.forEach(function(a){
+      if (candA[a.id].length !== 1) return;
+      var b = candA[a.id][0];
+      if (candB[b.id].length !== 1) return;
+      usadosA[a.id] = true; usadosB[b.id] = true;
+    });
+    return {
+      posLivre: posOrf.filter(function(a){ return !usadosA[a.id]; }),
+      termLivre: termOrf.filter(function(b){ return !usadosB[b.id]; })
+    };
+  }
+  function subconjuntos(lista, min, max){
+    var out = [];
+    (function rec(i, atual){
+      if (atual.length >= min && atual.length <= max) out.push(atual.slice());
+      if (atual.length >= max) return;
+      for (var j = i; j < lista.length; j++){ atual.push(lista[j]); rec(j + 1, atual); atual.pop(); }
+    })(0, []);
+    return out;
+  }
+  function casarDividida(posOrf, termOrf, janelaSeg){
+    var livresA = posOrf.slice(), livresB = termOrf.slice();
+    livresA.slice().forEach(function(a){
+      var cand = livresB.filter(function(b){ return perto(a, b, janelaSeg); });
+      if (cand.length < 2) return;
+      var opcoes = subconjuntos(cand, 2, Math.min(MAX_PARCELAS_DIVISAO, cand.length)).filter(function(sub){
+        var soma = sub.reduce(function(t, b){ return t + b.cents; }, 0);
+        return Math.abs(soma - a.cents) <= sub.length * TOLERANCIA_DIVISAO_CENTS_POR_PARCELA;
+      });
+      if (opcoes.length !== 1) return;
+      var sub = opcoes[0];
+      livresA = livresA.filter(function(x){ return x !== a; });
+      livresB = livresB.filter(function(b){ return sub.indexOf(b) < 0; });
+    });
+    return { posLivre: livresA, termLivre: livresB };
+  }
+
   var memoMeio = {};
-  function meioCalc(dia, meio){
+  // Resultado do casamento de um dia/meio: { estado:'sem-saft'|'sem-extrato'|'ok', posOrfas, termOrfas }
+  function casarDiaMeio(dia, meio){
     var k = dia + '|' + meio.mec;
-    return memoMeio[k] || (memoMeio[k] = calcularMeio(dia, meio));
+    if (memoMeio[k]) return memoMeio[k];
+    var temSaft = !!saftCobertura[dia];
+    var pos = temSaft ? linhasPos(dia, meio.mec) : [];
+    if (!temSaft || !pos.length){
+      return (memoMeio[k] = { estado: temSaft ? 'ok' : 'sem-saft', posOrfas: pos, termOrfas: [] });
+    }
+    var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
+    if (!temTerm){
+      return (memoMeio[k] = { estado: 'sem-extrato', posOrfas: pos, termOrfas: [] });
+    }
+    var term = transacoesTerminal(dia, meio.origem);
+    var p1 = casarGlobal(pos, term, JANELA_GLOBAL_MIN * 60);
+    var p2 = casarAlterado(p1.posLivre, p1.termLivre, JANELA_ALTERADO_MIN * 60);
+    var p3 = casarDividida(p2.posLivre, p2.termLivre, JANELA_DIVIDIDA_MIN * 60);
+    return (memoMeio[k] = { estado: 'ok', posOrfas: p3.posLivre, termOrfas: p3.termLivre });
   }
 
-  function outroMeio(meio){
-    for (var i = 0; i < MEIOS.length; i++){ if (MEIOS[i] !== meio) return MEIOS[i]; }
-    return null;
+  // → [{ dia, linha, meio }] — vendas sem cobrança confirmadas (passo 4).
+  function vendasSemCobrancaDoDia(dia){
+    var resPorMeio = {};
+    MEIOS.forEach(function(meio){ resPorMeio[meio.mec] = casarDiaMeio(dia, meio); });
+    var out = [];
+    MEIOS.forEach(function(meio){
+      var r = resPorMeio[meio.mec];
+      if (r.estado !== 'ok' || !r.posOrfas.length) return;
+      var outro = outroMeio(meio);
+      var rOutro = resPorMeio[outro.mec];
+      var termLivreOutro = rOutro.estado === 'ok' ? rOutro.termOrfas : [];
+      var seg = JANELA_GLOBAL_MIN * 60;
+      r.posOrfas.forEach(function(l){
+        var explicadoNoOutro = termLivreOutro.some(function(t){ return t.cents === l.cents && perto(l, t, seg); });
+        if (!explicadoNoOutro) out.push({ dia: dia, linha: l, meio: meio });
+      });
+    });
+    out.sort(function(a, b){ return (a.linha.hora || 0) - (b.linha.hora || 0); });
+    return out;
+  }
+  function motivoNaoTestavelDia(dia){
+    if (!saftCobertura[dia]) return 'sem SAF-T deste dia';
+    var faltam = [];
+    MEIOS.forEach(function(meio){
+      var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
+      if (!temTerm) faltam.push(labelCurtoMeio(meio));
+    });
+    return faltam.length ? 'sem extrato ' + faltam.join(' e ') : null;
   }
 
-  function analisarSemCobranca(){
-    var set = {};
-    Object.keys(saftCobertura).forEach(function(d){ set[d] = true; });
-    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ set[d] = true; }); });
-    var dias = Object.keys(set).sort().reverse();
-    var out = { h1: [], h2: [], h3: [], na: [], porIv: {}, diasTotal: dias.length, diasVerificados: 0, diasNa: 0 };
-    var segMax = JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1] * 60;
-
-    dias.forEach(function(dia){
-      if (!saftCobertura[dia]){
-        out.na.push({ tipo: 'dia', dia: dia, motivo: 'sem SAF-T — não há documentos para testar' });
-        out.diasNa++;
-        return;
-      }
-      var testavel = true;
-      var restantes = [];
-      MEIOS.forEach(function(meio){
-        var r = meioCalc(dia, meio);
-        if (r.modo !== 'completo' || (!r.term.length && r.pos.length)){
-          // Sem extrato do próprio meio — ou com um extrato cujo período
-          // declarado cobre o dia mas não traz uma linha dele (exportado
-          // antes do fecho): tudo ficaria "só no POS" e seria mentira.
-          if (r.pos.length){
-            out.na.push({ tipo: 'meio', dia: dia, meio: meio, n: r.pos.length, valor: r.posSaft, motivo: (r.modo === 'completo' ? 'extrato ' + labelCurtoMeio(meio) + ' cobre o dia mas não tem nenhuma linha dele (exportado antes do fecho?)' : 'sem extrato ' + labelCurtoMeio(meio)) + ' — não se sabe quais ficaram sem cobrança' });
-            testavel = false;
-          }
-          return;
-        }
-        var orfas = r.casamento.posSemPar;
-        if (!orfas.length) return;
-        var outro = outroMeio(meio);
-        var rOutro = meioCalc(dia, outro);
-        if (!rOutro.temTerm || !rOutro.term.length){
-          var porque = !rOutro.temTerm ? 'sem extrato ' + labelCurtoMeio(outro) : 'extrato ' + labelCurtoMeio(outro) + ' sem nenhuma linha neste dia';
-          orfas.forEach(function(l){ out.na.push({ tipo: 'doc', dia: dia, linha: l, meio: meio, motivo: porque + ' — hipótese 1 não testável' }); });
-          testavel = false;
-          return;
-        }
-        // H1: só transações do outro terminal que ficaram livres no casamento dele.
-        var livres = rOutro.modo === 'completo' ? rOutro.casamento.termSemPar.slice() : transacoesTerminal(dia, outro.origem);
-        orfas.forEach(function(l){
-          var c = livres.filter(function(t){ return t.cents === l.cents && perto(l, t, segMax); })
-            .sort(function(a, b){ return Math.abs(a.hora - l.hora) - Math.abs(b.hora - l.hora); });
-          if (c.length){
-            var t = c[0];
-            livres = livres.filter(function(x){ return x !== t; });
-            out.h1.push({ dia: dia, linha: l, meio: meio, outro: outro, tx: t, delta: t.hora - l.hora, outrosCandidatos: c.length - 1 });
-          } else {
-            restantes.push({ dia: dia, linha: l, meio: meio });
-          }
-        });
+  /* ---------- dias "A Menos" do Cartão A (o que o Cartão B investiga) ---------- */
+  function diasAMenosPorMeio(){
+    var out = {};
+    var a = calcularCartaoA();
+    MEIOS.forEach(function(meio){
+      var r = a[meio.mec];
+      if (!r || r.semBanco) return;
+      r.itens.forEach(function(it){
+        if (it.estado !== 'aMenos' || it.descartado) return;
+        it.dias.forEach(function(d){ (out[d] || (out[d] = [])).push(meio); });
       });
-
-      if (!restantes.length){
-        if (testavel) out.diasVerificados++; else out.diasNa++;
-        return;
-      }
-      // H2 por sessão de caixa: cada documento vai para o intervalo entre as
-      // duas contagens que contém a sua hora (a mesma conta do cartão 1).
-      var porIv = {}, semIv = [];
-      restantes.forEach(function(x){
-        var iv = intervaloDe(x.dia, x.linha.hora);
-        if (!iv){ semIv.push(x); return; }
-        x.iv = iv;
-        (porIv[iv.id] || (porIv[iv.id] = { iv: iv, itens: [] })).itens.push(x);
-      });
-      var motivoSem = intervalosCaixa().fonte ? 'sem contagem de caixa a seguir a este documento (falta a abertura seguinte)' : 'sem Fecho de Caixa nem contagens do OS';
-      semIv.forEach(function(x){ out.na.push({ tipo: 'doc', dia: x.dia, linha: x.linha, meio: x.meio, motivo: motivoSem + ' — hipótese 2 não testável' }); });
-      var algumNa = semIv.length > 0;
-      Object.keys(porIv).forEach(function(k){
-        var g = porIv[k], iv = g.iv;
-        if (iv.estado === 'na'){
-          g.itens.forEach(function(x){ out.na.push({ tipo: 'doc', dia: x.dia, linha: x.linha, meio: x.meio, motivo: iv.motivo + ' — hipótese 2 não testável' }); });
-          algumNa = true; return;
-        }
-        var soma = round2(g.itens.reduce(function(t, x){ return t + x.linha.valor; }, 0));
-        var ex = { iv: iv, soma: soma, n: g.itens.length, subset: null, opcoes: 0 };
-        if (iv.diff > 0.005){
-          var opcoes = g.itens.length <= 16
-            ? subconjuntos(g.itens, 1, g.itens.length).filter(function(sub){
-                var sc = sub.reduce(function(t, x){ return t + x.linha.cents; }, 0);
-                return Math.abs(sc - cents(iv.diff)) <= cents(TOLERANCIA_DINHEIRO);
-              })
-            : (Math.abs(soma - iv.diff) <= TOLERANCIA_DINHEIRO ? [g.itens] : []);
-          ex.opcoes = opcoes.length;
-          if (opcoes.length === 1) ex.subset = opcoes[0];
-        }
-        g.itens.forEach(function(x){ if (ex.subset && ex.subset.indexOf(x) >= 0) out.h2.push(x); else out.h3.push(x); });
-        out.porIv[k] = ex;
-      });
-      if (algumNa) testavel = false;
-      if (testavel) out.diasVerificados++; else out.diasNa++;
     });
     return out;
   }
-
-  function vscTotal(lista){
-    return round2(lista.reduce(function(s, x){ return s + x.linha.valor; }, 0));
-  }
-  function vscCabDia(dia, itens, explica, extraCab){
-    var tot = vscTotal(itens);
-    return '<tr class="rec-vsc-dia"><td colspan="' + (extraCab ? 6 : 5) + '">' + fmtDia(dia) + ' <small>' + esc(diaSemana(dia)) + ' · ' + plural(itens.length, 'documento', 'documentos') + ' · ' + fmtEuro(tot) + '</small>' +
-      (explica ? ' <span class="rec-vsc-explica">' + explica + '</span>' : '') + '</td></tr>';
-  }
-  function vscExplicaIv(ex){
-    var iv = ex.iv;
-    var formula = 'contagem ' + fmtDataHora(iv.fim.quando) + ' ' + fmtEuro(iv.fim.valor) + ' − contagem ' + fmtDataHora(iv.ini.quando) + ' ' + fmtEuro(iv.ini.valor) +
-      (iv.saidasPos ? ' + saídas POS ' + fmtEuro(iv.saidasPos) : '') + (iv.entradasPos ? ' − entradas POS ' + fmtEuro(iv.entradasPos) : '') +
-      (iv.os.saidas ? ' + saídas OS ' + fmtEuro(iv.os.saidas) : '') + (iv.os.entradas ? ' − entradas OS ' + fmtEuro(iv.os.entradas) : '');
-    var h = '· numerário POS <b>' + fmtEuro(iv.nu) + '</b> (' + esc(iv.fonteNu) + ') · dinheiro real <b>' + fmtEuro(iv.real) + '</b> <span title="' + esc(formula) + '">(' + esc(formula) + ')</span> · excedente <b>' + fmtEuroSinal(iv.diff) + '</b> ';
-    if (iv.aprox) h += '<span>· sessão aproximada ao dia </span>';
-    if (iv.diff <= 0.005) h += '<span class="rec-vsc-nao">— sem dinheiro a mais na caixa</span>';
-    else if (ex.subset && ex.subset.length === ex.n) h += '<span class="rec-vsc-bate">— bate com a soma dos ' + ex.n + ' documentos</span>';
-    else if (ex.subset) h += '<span class="rec-vsc-bate">— bate com ' + plural(ex.subset.length, 'documento', 'documentos') + ' dos ' + ex.n + '</span>';
-    else if (ex.opcoes > 1) h += '<span class="rec-vsc-nao">— ' + ex.opcoes + ' combinações batem, nenhuma escolhida</span>';
-    else h += '<span class="rec-vsc-nao">— não bate com nenhuma combinação dos documentos (soma ' + fmtEuro(ex.soma) + ')</span>';
-    return h;
-  }
-  function vscLinhaDoc(x){
-    return '<td class="num">' + fmtHora(x.linha.hora) + '</td><td>' + esc(x.linha.no) + ' <span class="rec-mono">' + esc(x.linha.tipo) + '</span></td>' + celValor(x.linha.valor) + '<td>' + esc(labelMeio(x.meio)) + '</td>';
-  }
-  function vscLista(cls, titulo, sub, itens, extraCab, extraCel, explicaPorDia, vazioTexto){
-    var h = '<div class="rec-vsc-lista ' + cls + '"><p class="rec-sec-titulo">' + titulo + ' <span class="rec-conta">' + itens.length + '</span> <span>· ' + sub + '</span></p><div class="rec-vsc-caixa">';
-    if (!itens.length) return h + '<div class="rec-vsc-ok">' + vazioTexto + '</div></div></div>';
-    var porDia = {};
-    itens.forEach(function(x){ (porDia[x.dia] || (porDia[x.dia] = [])).push(x); });
-    h += '<table><thead><tr><th>Data</th><th class="num">Hora</th><th>Documento</th><th class="num">Valor</th><th>Meio no POS</th>' + (extraCab ? '<th>' + extraCab + '</th>' : '') + '</tr></thead><tbody>';
-    Object.keys(porDia).sort().reverse().forEach(function(dia){
-      var lst = porDia[dia].sort(function(a, b){ return (a.linha.hora || 0) - (b.linha.hora || 0); });
-      h += vscCabDia(dia, lst, explicaPorDia ? explicaPorDia(dia, lst) : '', extraCab);
-      lst.forEach(function(x){ h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td>' + vscLinhaDoc(x) + (extraCab ? '<td>' + extraCel(x) + '</td>' : '') + '</tr>'; });
-    });
-    return h + '</tbody></table></div></div>';
-  }
-
-  function renderSemCobranca(){
-    var el = document.getElementById('vsc');
-    var h = '<h2>Vendas sem cobrança <small>documentos do POS sem par no terminal, testados contra as três hipóteses, em todos os dias carregados</small></h2>';
-    if (!Object.keys(saftCobertura).length){
-      el.innerHTML = h + '<p class="rec-vsc-nota">Carrega o SAF-T, os extratos TPA ABANCA e TPA VERIFONE e o Fecho de Caixa. Sem SAF-T não há documentos para testar.</p>';
-      return;
-    }
-    var a = analisarSemCobranca();
-    var nDocsNa = a.na.filter(function(x){ return x.tipo === 'doc'; }).length;
-    var nMeiosNa = a.na.filter(function(x){ return x.tipo === 'meio'; }).length;
-    var nDiasNa = a.na.filter(function(x){ return x.tipo === 'dia'; }).length;
-    h += '<p class="rec-vsc-cobertura"><b>' + plural(a.diasVerificados, 'dia verificado a sério', 'dias verificados a sério') + '</b> de ' + a.diasTotal + ' com dados (SAF-T + extratos TPA ABANCA e TPA VERIFONE + Fecho de Caixa quando há documentos por explicar)' +
-      (a.diasNa ? ' · <b>' + a.diasNa + '</b> com pelo menos uma hipótese não testável' : '') +
-      ' · Fecho de Caixa: ' + (Object.keys(fecho).length ? plural(Object.keys(fecho).length, 'dia', 'dias') + ' carregados' + (sessoes.length ? ' · ' + plural(sessoes.length, 'sessão', 'sessões') : ' · <b>sem Listagem de Sessões</b> (sessões aproximadas ao dia)') : '<b>não carregado</b> (hipótese 2 fica não testável)') + '</p>';
-
-    function total(cls, k, lista, s){
-      return '<div class="rec-total ' + cls + (cls === 'h3' && !lista.length ? ' zero' : '') + '"><div class="k">' + k + '</div><div class="v num">' + fmtEuro(vscTotal(lista)) + '</div><div class="s">' + plural(lista.length, 'documento', 'documentos') + (s ? ' · ' + s : '') + '</div></div>';
-    }
-    var naValor = round2(a.na.reduce(function(s, x){ return s + (x.tipo === 'doc' ? x.linha.valor : x.tipo === 'meio' ? x.valor : 0); }, 0));
-    h += '<div class="rec-vsc-totais">' +
-      total('h3', 'H3 · Sem entrada de dinheiro', a.h3, 'a ir ver os talões') +
-      total('h1', 'H1 · Cobrado no outro terminal', a.h1, 'botão errado no POS') +
-      total('h2', 'H2 · Pago em dinheiro', a.h2, 'dinheiro a mais na caixa') +
-      '<div class="rec-total na"><div class="k">Não testável</div><div class="v num">' + fmtEuro(naValor) + '</div><div class="s">' + plural(nDocsNa, 'documento', 'documentos') + (nMeiosNa ? ' · ' + plural(nMeiosNa, 'dia/meio sem extrato', 'dias/meio sem extrato') : '') + (nDiasNa ? ' · ' + plural(nDiasNa, 'dia sem SAF-T', 'dias sem SAF-T') : '') + ' · fora dos totais</div></div>' +
-      '</div>';
-
-    var explica = function(dia, itens){
-      var vistos = {}, out = [];
-      itens.forEach(function(x){ if (x.iv && !vistos[x.iv.id] && a.porIv[x.iv.id]){ vistos[x.iv.id] = true; out.push(vscExplicaIv(a.porIv[x.iv.id])); } });
-      return out.join('<br>');
-    };
-    h += vscLista('h3', 'H3 · Sem entrada de dinheiro', 'não está no outro terminal e a caixa não tem dinheiro a mais que o explique', a.h3,
-      null, null, explica, 'Nenhum documento sem entrada de dinheiro.');
-    h += vscLista('h1', 'H1 · Cobrado no outro terminal', 'mesmo valor, mesmo dia, transação livre da outra origem a ±' + Math.round(JANELAS_MINUTOS[JANELAS_MINUTOS.length - 1]) + ' min', a.h1,
-      'Transação que a explica', function(x){
-        var t = x.tx;
-        return '<b>' + esc(labelCurtoMeio(x.outro)) + '</b> ' + fmtHora(t.hora) + ' · ' + marcaHtml(t) + ' <span class="rec-mono">' + cartaoHtml(t) + '</span> · <span class="num">' + fmtEuro(t.montante) + '</span> <span class="rec-mono">(' + (x.delta >= 0 ? '+' : '−') + fmtDelta(x.delta) + ')</span>' +
-          (x.outrosCandidatos ? ' <span class="rec-mono">· mais ' + x.outrosCandidatos + ' com o mesmo valor na janela</span>' : '');
-      }, null, 'Nenhum documento cobrado no outro terminal.');
-    h += vscLista('h2', 'H2 · Pago em dinheiro', 'o excedente de caixa do dia bate com estes documentos (tolerância ' + fmtEuro(TOLERANCIA_DINHEIRO) + ')', a.h2,
-      null, null, explica, 'Nenhum documento explicado por dinheiro a mais na caixa.');
-
-    // Não testável: docs por dia, mais as linhas de dia/meio sem dados.
-    h += '<div class="rec-vsc-lista na"><p class="rec-sec-titulo">Não testável <span class="rec-conta">' + a.na.length + '</span> <span>· falta o SAF-T, o extrato de uma das origens ou o Fecho de Caixa · fora de todos os totais</span></p><div class="rec-vsc-caixa">';
-    if (!a.na.length){
-      h += '<div class="rec-vsc-ok">Tudo o que está carregado foi testado.</div>';
-    } else {
-      h += '<table><thead><tr><th>Data</th><th class="num">Hora</th><th>Documento</th><th class="num">Valor</th><th>Meio no POS</th><th>Porquê</th></tr></thead><tbody>';
-      var porDia = {};
-      a.na.forEach(function(x){ (porDia[x.dia] || (porDia[x.dia] = [])).push(x); });
-      // Dias inteiros sem SAF-T seguidos (o extrato do Verifone traz meses
-      // inteiros) colapsam numa só linha por intervalo, senão eram centenas.
-      var diasNa = Object.keys(porDia).sort().reverse();
-      var i = 0;
-      while (i < diasNa.length){
-        var dia = diasNa[i];
-        var soDia = porDia[dia].length === 1 && porDia[dia][0].tipo === 'dia';
-        if (soDia){
-          var j = i, fim = dia;
-          while (j + 1 < diasNa.length && porDia[diasNa[j + 1]].length === 1 && porDia[diasNa[j + 1]][0].tipo === 'dia') j++;
-          var ini = diasNa[j];
-          h += '<tr><td class="rec-mono">' + (ini === fim ? fmtDia(fim) : fmtDia(ini) + ' → ' + fmtDia(fim)) + '</td><td class="num">—</td><td>—</td><td class="num">—</td><td>—</td><td class="rec-vsc-explica">' + (j > i ? plural(j - i + 1, 'dia', 'dias') + ' ' : '') + esc(porDia[dia][0].motivo) + '</td></tr>';
-          i = j + 1;
-          continue;
-        }
-        porDia[dia].sort(function(p, q){ return ((p.linha && p.linha.hora) || 0) - ((q.linha && q.linha.hora) || 0); }).forEach(function(x){
-          if (x.tipo === 'doc') h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td>' + vscLinhaDoc(x) + '<td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
-          else if (x.tipo === 'meio') h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td><td class="num">—</td><td>' + plural(x.n, 'documento', 'documentos') + '</td>' + celValor(x.valor) + '<td>' + esc(labelMeio(x.meio)) + '</td><td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
-          else h += '<tr><td class="rec-mono">' + fmtDia(dia) + '</td><td class="num">—</td><td>—</td><td class="num">—</td><td>—</td><td class="rec-vsc-explica">' + esc(x.motivo) + '</td></tr>';
-        });
-        i++;
-      }
-      h += '</tbody></table>';
-    }
-    h += '</div></div>';
-    el.innerHTML = h;
+  function diasFaltamCartaoB(){
+    var amenos = Object.keys(diasAMenosPorMeio());
+    var pM = diasAMenosPorMeio();
+    var saft = amenos.filter(function(d){ return !saftCobertura[d]; }).sort();
+    var abanca = amenos.filter(function(d){ return pM[d].some(function(m){ return m.mec === 'OU'; }) && !(termCobertura.ABANCA && termCobertura.ABANCA[d]); }).sort();
+    var verifone = amenos.filter(function(d){ return pM[d].some(function(m){ return m.mec === 'CD'; }) && !(termCobertura.CD && termCobertura.CD[d]); }).sort();
+    var fechoF = amenos.filter(function(d){ return !fecho[d]; }).sort();
+    return { saft: saft, abanca: abanca, verifone: verifone, fecho: fechoF };
   }
 
   /* ============================================================
-     ZONA 1 — dias
+     ESCRITAS NO FIREBASE — reconciliacaoDescartes/ e
+     reconciliacaoResolvidos/. update() por caminho, nunca set() em nó
+     pai, nunca remove(): anular é sempre uma flag.
      ============================================================ */
-  function preencherSelectorMeses(){
-    var sel = document.getElementById('selMes');
-    sel.innerHTML = '<option value="">Todos os meses</option>' +
-      listaMeses().map(function(x){ return '<option value="' + x + '">' + fmtMes(x) + '</option>'; }).join('');
-    sel.value = mesAtivo;
+  function autorAtual(){
+    var el = document.getElementById('recAutor');
+    var v = el ? el.value.trim() : '';
+    if (v){ try { localStorage.setItem('reconciliacao.autor', v); } catch (e){} }
+    return v || 'Manel';
+  }
+  function nomeAutorGuardado(){
+    try { return localStorage.getItem('reconciliacao.autor') || ''; } catch (e){ return ''; }
   }
 
-  // Depois de um upload: meses novos entram no selector e, em "Todos",
-  // carregam-se também do Firebase.
-  function garantirMesesDosFicheiros(){
-    preencherSelectorMeses();
-    return carregarAtivo();
+  function descartarLinha(chave, dataTxt, motivo, autor){
+    if (!db) return Promise.resolve();
+    var registo = { data: dataTxt, motivo: motivo, autor: autor, criadoEm: new Date().toISOString() };
+    descartes[chave] = registo;
+    memoA = null;
+    return db.ref('reconciliacaoDescartes/' + chave).set(registo);
+  }
+  function reativarLinha(chave){
+    if (!db) return Promise.resolve();
+    var anuladoEm = new Date().toISOString();
+    if (descartes[chave]) descartes[chave] = Object.assign({}, descartes[chave], { anulado: true, anuladoEm: anuladoEm });
+    memoA = null;
+    return db.ref('reconciliacaoDescartes/' + chave).update({ anulado: true, anuladoEm: anuladoEm });
   }
 
-  function montarSelectorMeses(){
-    var sel = document.getElementById('selMes');
-    preencherSelectorMeses();
-    sel.addEventListener('change', function(){
-      mesAtivo = sel.value; diaAberto = null;
-      renderTudo();
-      carregarAtivo().then(renderTudo);
+  function resolverVenda(chave, dataTxt, razao, autor){
+    if (!db) return Promise.resolve();
+    var registo = { data: dataTxt, razao: razao, autor: autor, criadoEm: new Date().toISOString() };
+    resolvidos[chave] = registo;
+    return db.ref('reconciliacaoResolvidos/' + chave).set(registo);
+  }
+  function anularResolucao(chave){
+    if (!db) return Promise.resolve();
+    var anuladoEm = new Date().toISOString();
+    if (resolvidos[chave]) resolvidos[chave] = Object.assign({}, resolvidos[chave], { anulado: true, anuladoEm: anuladoEm });
+    return db.ref('reconciliacaoResolvidos/' + chave).update({ anulado: true, anuladoEm: anuladoEm });
+  }
+  function chaveVenda(linha){
+    return String(linha.no || '').replace(/\//g, '~').replace(/\s+/g, ' ').trim();
+  }
+
+  /* ============================================================
+     RENDER — CARTÃO A
+     ============================================================ */
+  function preencherSelectorA(){
+    var sel = document.getElementById('selFiltroA');
+    if (!sel) return;
+    sel.value = filtroA;
+  }
+
+  function renderCartaoA(){
+    var el = document.getElementById('cartaoA');
+    if (!db){ el.innerHTML = '<div class="rec-vazio">A ligar ao Firebase…</div>'; return; }
+    if (!baseCarregada){ el.innerHTML = '<div class="rec-vazio">A ler vendas e banco…</div>'; return; }
+
+    var a = calcularCartaoA();
+    var linhas = [];
+    MEIOS.forEach(function(meio){
+      var r = a[meio.mec];
+      if (!r || r.semBanco) return;
+      r.itens.forEach(function(it){
+        if (it.estado === 'naoVerificavel') return;
+        linhas.push({ meio: meio, it: it });
+      });
+    });
+
+    var meses = {};
+    linhas.forEach(function(l){ (l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
+    var listaM = Object.keys(meses).sort().reverse();
+
+    var totalAMenos = 0, totalAMenosOU = 0, totalAMenosCD = 0;
+    linhas.forEach(function(l){
+      if (l.it.descartado || l.it.estado !== 'aMenos') return;
+      var d = round2(l.it.pos - l.it.credito);
+      totalAMenos = round2(totalAMenos + d);
+      if (l.meio.mec === 'OU') totalAMenosOU = round2(totalAMenosOU + d); else totalAMenosCD = round2(totalAMenosCD + d);
+    });
+
+    var visiveis = linhas.filter(function(l){
+      if (l.it.descartado && !mostrarDescartados) return false;
+      if (l.it.descartado && mostrarDescartados) return true;
+      if (filtroA === 'naoReconciliados') return l.it.estado === 'aMenos';
+      if (filtroA){ var ord = l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]; return ord.some(function(d){ return d.slice(0, 7) === filtroA; }); }
+      return true;
+    });
+    visiveis.sort(function(a2, b2){
+      var da = a2.it.dias.length ? a2.it.dias[a2.it.dias.length - 1] : a2.it.creditos[0].dia;
+      var db2 = b2.it.dias.length ? b2.it.dias[b2.it.dias.length - 1] : b2.it.creditos[0].dia;
+      return da < db2 ? 1 : (da > db2 ? -1 : (a2.meio.mec < b2.meio.mec ? -1 : 1));
+    });
+
+    var nDescartados = linhas.filter(function(l){ return l.it.descartado; }).length;
+
+    var h = '<div class="rec-a-topo">' +
+      '<div class="rec-a-head' + (totalAMenos ? '' : ' zero') + '"><div class="k">A menos (total)</div><div class="v num">' + fmtEuro(totalAMenos) + '</div>' +
+      '<div class="s">soma dos Δ das linhas <b>A Menos</b>, sem descontar comissão · fora as descartadas</div></div>' +
+      '<div class="rec-a-tipo' + (totalAMenosOU ? '' : ' zero') + '"><div class="k">A menos TPA ABANCA</div><div class="v num">' + fmtEuro(totalAMenosOU) + '</div></div>' +
+      '<div class="rec-a-tipo' + (totalAMenosCD ? '' : ' zero') + '"><div class="k">A menos TPA VERIFONE</div><div class="v num">' + fmtEuro(totalAMenosCD) + '</div></div>' +
+      '</div>';
+
+    h += '<p class="rec-nota-comissao">O crédito do banco vem sempre líquido de comissão do terminal — por isso o Δ deste cartão <b>nunca</b> é o valor exacto em falta, inclui a comissão do dia. O valor exacto está no cartão B, com os extratos dos terminais.</p>';
+
+    h += '<div class="rec-a-barra"><select id="selFiltroA">' +
+      '<option value="naoReconciliados">Não Reconciliados</option>' +
+      '<option value="">Todos os meses</option>' +
+      listaM.map(function(m){ return '<option value="' + m + '">' + fmtMes(m) + '</option>'; }).join('') +
+      '</select><span class="rec-a-legenda">Comissão típica: TPA ABANCA ' + esc(MEIO_POR_MEC.OU.comissaoObservada) + ' · TPA VERIFONE ' + esc(MEIO_POR_MEC.CD.comissaoObservada) + '</span><div class="spacer"></div></div>';
+
+    h += '<div class="rec-a-tabela">';
+    if (!visiveis.length){
+      h += '<div class="rec-vazio">' + (filtroA === 'naoReconciliados' ? 'Nenhuma linha A Menos por reconciliar.' : 'Sem linhas para este filtro.') + '</div>';
+    } else {
+      h += '<table><thead><tr><th>Data</th><th>TPA</th><th class="num">Faturado POS</th><th class="num">Creditado Banco</th><th class="num">Δ</th><th class="num">Δ%</th><th>Estado</th><th></th></tr></thead><tbody>' +
+        visiveis.map(function(l){
+          var it = l.it;
+          var dataTxt = it.dias.length ? fmtDias(it.dias) : fmtDia(it.creditos[0].dia);
+          var delta = round2(it.pos - it.credito);
+          var deltaPct = it.pos ? (delta / it.pos * 100) : null;
+          var chave = it.chave;
+          var jaDesc = it.descartado;
+          return '<tr data-chave="' + esc(chave) + '"' + (jaDesc ? ' style="opacity:.55"' : '') + '>' +
+            '<td class="rec-mono">' + esc(dataTxt) + '</td><td><b>' + esc(labelMeio(l.meio)) + '</b></td>' +
+            '<td class="num">' + fmtEuro(it.pos) + '</td><td class="num">' + fmtEuro(it.credito) + '</td>' +
+            '<td class="num' + (delta < 0 ? '' : (delta > 0 ? ' rec-neg' : '')) + '">' + fmtEuroSinal(delta) + '</td>' +
+            '<td class="num">' + fmtPct(deltaPct) + '</td>' +
+            '<td><span class="rec-a-tag ' + it.estado + '">' + { ok:'OK', aMenos:'A Menos', aMais:'A Mais', ambiguo:'Ambíguo' }[it.estado] + '</span></td>' +
+            '<td>' + (jaDesc
+              ? '<button type="button" class="rec-a-reativar" data-acao="reativar" data-chave="' + esc(chave) + '">reactivar</button>'
+              : '<button type="button" class="rec-a-descartar" data-acao="descartar" data-chave="' + esc(chave) + '" data-data="' + esc(dataTxt) + '">descartar</button>') +
+            '<div class="rec-inline-form" data-form="' + esc(chave) + '" hidden>' +
+              '<input type="text" placeholder="Motivo" data-campo="motivo">' +
+              '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+              '<button type="button" data-confirmar="' + esc(chave) + '">Confirmar</button>' +
+              '<button type="button" class="cancelar" data-cancelar="' + esc(chave) + '">Cancelar</button>' +
+            '</div></td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    h += '</div>';
+
+    if (nDescartados){
+      h += '<div class="rec-a-descartados" id="toggleDescartados">' + (mostrarDescartados ? 'Esconder descartados' : 'Ver ' + nDescartados + ' descartado' + (nDescartados === 1 ? '' : 's')) + '</div>';
+    }
+
+    el.innerHTML = h;
+    preencherSelectorA();
+
+    var sel = document.getElementById('selFiltroA');
+    if (sel) sel.addEventListener('change', function(){ filtroA = sel.value; renderCartaoA(); });
+    var toggle = document.getElementById('toggleDescartados');
+    if (toggle) toggle.addEventListener('click', function(){ mostrarDescartados = !mostrarDescartados; renderCartaoA(); });
+
+    el.querySelectorAll('[data-acao="descartar"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-chave');
+        var form = el.querySelector('[data-form="' + CSS.escape(chave) + '"]');
+        if (form) form.hidden = false;
+        btn.hidden = true;
+      });
+    });
+    el.querySelectorAll('[data-cancelar]').forEach(function(btn){
+      btn.addEventListener('click', function(){ renderCartaoA(); });
+    });
+    el.querySelectorAll('[data-confirmar]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-confirmar');
+        var form = el.querySelector('[data-form="' + CSS.escape(chave) + '"]');
+        var motivo = form.querySelector('[data-campo="motivo"]').value.trim();
+        var autorInput = form.querySelector('[data-campo="autor"]').value.trim();
+        if (!motivo){ form.querySelector('[data-campo="motivo"]').focus(); return; }
+        var tr = el.querySelector('tr[data-chave="' + CSS.escape(chave) + '"]');
+        var dataTxt = tr ? tr.querySelector('td').textContent : '';
+        btn.disabled = true;
+        descartarLinha(chave, dataTxt, motivo, autorInput || autorAtual()).then(renderCartaoA).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui gravar o descarte: ' + (err && err.message ? err.message : err));
+        });
+      });
+    });
+    el.querySelectorAll('[data-acao="reativar"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-chave');
+        btn.disabled = true;
+        reativarLinha(chave).then(renderCartaoA).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui reactivar: ' + (err && err.message ? err.message : err));
+        });
+      });
     });
   }
 
-  // Dias a listar: união de vendasDiario, cobertura dos SAF-T e transações
-  // do terminal. Sem mês (Todos) é a lista inteira, sempre ordenada por dia,
-  // mais recente primeiro, atravessando meses — nunca paginada nem cortada.
-  function diasDoMes(mes){
-    var set = {};
-    function poe(d){ if (!mes || d.slice(0, 7) === mes) set[d] = true; }
-    Object.keys(vendasMes).forEach(function(m){ Object.keys(vendasMes[m]).forEach(poe); });
-    Object.keys(saftCobertura).forEach(poe);
-    Object.keys(terminal).forEach(function(o){
-      Object.keys(terminal[o]).forEach(function(k){ poe(terminal[o][k].dia); });
-    });
-    return Object.keys(set).sort().reverse();
-  }
+  /* ============================================================
+     RENDER — CARTÃO B
+     ============================================================ */
+  function renderDiasB(){
+    var ul = document.getElementById('listaDiasB');
+    var vazio = document.getElementById('diasBVazio');
+    var totalEl = document.getElementById('bTotal');
+    var porMeio = diasAMenosPorMeio();
+    var dias = Object.keys(porMeio).sort().reverse();
 
-  function chipHtml(r){
-    return '<span class="rec-ind"><span class="rec-ind-label">' + esc(labelCurtoMeio(r.meio)) + '</span>' +
-      '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span>' +
-      (r.sub ? '<span class="rec-chip-sub">' + esc(r.sub) + '</span>' : '') + '</span>';
-  }
-
-  function renderDias(){
-    var ul = document.getElementById('listaDias');
-    var vazio = document.getElementById('diasVazio');
-    var dias = diasDoMes(mesAtivo);
+    if (!baseCarregada){
+      ul.innerHTML = ''; vazio.style.display = ''; vazio.textContent = 'A ler o cartão A…'; totalEl.textContent = '';
+      return;
+    }
     if (!dias.length){
-      ul.innerHTML = '';
-      vazio.style.display = '';
-      var erros = Object.keys(mesesComErro);
-      vazio.textContent = (mesAtivo && mesesComErro[mesAtivo]) ? 'Não consegui ler vendasDiario/' + mesAtivo + ': ' + mesesComErro[mesAtivo]
-        : (!mesAtivo && erros.length) ? 'Não consegui ler vendasDiario/' + erros.join(', ')
-        : (!db ? 'A carregar…' : (mesAtivo ? 'Sem dias neste mês: nem vendas importadas, nem ficheiros carregados.' : 'Sem dias: nem vendas importadas, nem ficheiros carregados.'));
+      ul.innerHTML = ''; vazio.style.display = ''; vazio.textContent = 'Sem dias A Menos por investigar — o cartão A está limpo.'; totalEl.textContent = '';
       return;
     }
     vazio.style.display = 'none';
+
+    var totalPendente = 0, nPendente = 0;
+    dias.forEach(function(dia){
+      vendasSemCobrancaDoDia(dia).forEach(function(x){
+        var ch = chaveVenda(x.linha);
+        var res = resolvidos[ch];
+        if (res && res.anulado !== true) return;
+        totalPendente = round2(totalPendente + x.linha.valor); nPendente++;
+      });
+    });
+    totalEl.innerHTML = plural(dias.length, 'dia por investigar', 'dias por investigar') + ' · <b>' + plural(nPendente, 'venda sem cobrança por resolver', 'vendas sem cobrança por resolver') + '</b> · ' + fmtEuro(totalPendente);
+
     ul.innerHTML = dias.map(function(dia){
-      var rs = MEIOS.map(function(m){ return meioCalc(dia, m); });
-      return '<li class="rec-dia' + (diaAberto === dia ? ' aberto' : '') + '" data-dia="' + dia + '">' +
+      var motivo = motivoNaoTestavelDia(dia);
+      var itens = motivo ? [] : vendasSemCobrancaDoDia(dia);
+      var pendentes = itens.filter(function(x){ var r = resolvidos[chaveVenda(x.linha)]; return !(r && r.anulado !== true); });
+      var soma = round2(pendentes.reduce(function(s, x){ return s + x.linha.valor; }, 0));
+      var resumo = motivo ? ('<span>' + esc(motivo) + '</span>') : (pendentes.length ? '<b class="num">' + fmtEuro(soma) + '</b> · ' + plural(pendentes.length, 'venda', 'vendas') : '<span style="color:var(--green)">sem vendas por resolver</span>');
+      return '<li class="rec-dia' + (diaAbertoB === dia ? ' aberto' : '') + '" data-dia="' + dia + '">' +
         '<div class="rec-dia-data">' + fmtDia(dia) + '<small>' + diaSemana(dia) + '</small></div>' +
-        rs.map(chipHtml).join('') +
-        '<div class="rec-dia-seta"><svg class="icon" width="14" height="14"><use href="#i-chevron-' + (diaAberto === dia ? 'down' : 'right') + '"/></svg></div>' +
-        '</li>';
+        '<div class="rec-dia-resumo' + (pendentes.length || motivo ? '' : ' zero') + '">' + resumo + '</div>' +
+        '<div class="rec-dia-seta"><svg class="icon" width="14" height="14"><use href="#i-chevron-' + (diaAbertoB === dia ? 'down' : 'right') + '"/></svg></div>' +
+        '</li>' + (diaAbertoB === dia ? '<div class="rec-detalhe-dia">' + detalheDiaBHtml(dia, motivo, itens) + '</div>' : '');
     }).join('');
+
+    document.querySelectorAll('#listaDiasB .rec-dia').forEach(function(li){
+      li.addEventListener('click', function(){
+        var dia = li.getAttribute('data-dia');
+        diaAbertoB = diaAbertoB === dia ? null : dia;
+        renderDiasB();
+      });
+    });
+    ligarAcoesResolver();
   }
 
-  document.getElementById('listaDias').addEventListener('click', function(e){
-    var li = e.target.closest('.rec-dia');
-    if (!li) return;
-    var dia = li.getAttribute('data-dia');
-    diaAberto = diaAberto === dia ? null : dia;
-    renderTudo();
-    if (diaAberto){
-      var z = document.getElementById('zona2');
-      if (z && z.getBoundingClientRect().top > window.innerHeight - 120) z.scrollIntoView({ behavior:'smooth', block:'start' });
+  function artigosHtml(linha){
+    var ls = (linha.doc && linha.doc.linhas) || [];
+    if (!ls.length) return '<span class="rec-artigos">sem linhas de artigo no SAF-T</span>';
+    return '<span class="rec-artigos">' + ls.map(function(x){
+      return (x.quantidade != null ? esc(x.quantidade) + '× ' : '') + '<b>' + esc(x.descricao) + '</b>';
+    }).join(', ') + '</span>';
+  }
+
+  function detalheDiaBHtml(dia, motivo, itens){
+    if (motivo){
+      return '<p class="rec-b-nota">Não testável: ' + esc(motivo) + ' — carrega o ficheiro em falta acima.</p>';
     }
-  });
-
-  /* ============================================================
-     ZONA 2 — detalhe do dia
-     ============================================================ */
-  function celValor(n, opts){
-    opts = opts || {};
-    var cls = 'num' + (n < 0 ? ' rec-neg' : '');
-    return '<td class="' + cls + '">' + (opts.sinal ? fmtEuroSinal(n) : fmtEuro(n)) + '</td>';
-  }
-  function linhaPosHtml(l){
-    return '<td class="num">' + fmtHora(l.hora) + '</td><td>' + esc(l.no) + ' <span class="rec-mono">' + esc(l.tipo) + '</span></td>' + celValor(l.valor);
-  }
-  function liquidacaoTexto(t){
-    if (t.liquidacao) return fmtDia(t.liquidacao);
-    if (t.lote) return 'lote ' + t.lote;
-    return '—';
-  }
-  function marcaHtml(t){
-    return esc(t.marca || '—') + (t.metodo && t.metodo !== t.marca ? ' <span class="rec-mono">' + esc(t.metodo) + '</span>' : '');
-  }
-  function cartaoHtml(t){
-    return esc(t.cartao || '—') + (t.autorizacao ? ' <span class="rec-mono">aut. ' + esc(t.autorizacao) + '</span>' : '');
-  }
-  function linhaTermHtml(t){
-    return '<td class="num">' + fmtHora(t.hora) + '</td><td>' + esc(t.tipo) + '</td><td>' + marcaHtml(t) + '</td><td class="rec-mono">' + cartaoHtml(t) + '</td>' +
-      celValor(t.montante) + (t.comissao == null ? '<td class="num rec-mono">—</td>' : celValor(t.comissao)) + '<td class="rec-mono">' + esc(liquidacaoTexto(t)) + '</td>';
-  }
-  var TH_TERM = '<th class="num">Hora</th><th>Tipo</th><th>Marca</th><th>Cartão</th><th class="num">Montante</th><th class="num">Comissão</th><th>Liquidação</th>';
-  var TH_POS = '<th class="num">Hora</th><th>Documento</th><th class="num">Valor</th>';
-
-  function proximasHtml(item, outras, segMax, ladoNome){
-    var perto = outras.filter(function(o){ return item.hora != null && o.hora != null && Math.abs(o.hora - item.hora) <= segMax; });
-    if (!perto.length) return '<span class="rec-proximas">nada sem par do lado do ' + ladoNome + ' nos ±' + Math.round(segMax / 60) + ' min</span>';
-    return '<span class="rec-proximas">sem par do lado do ' + ladoNome + ' nos ±' + Math.round(segMax / 60) + ' min: ' +
-      perto.map(function(o){ return fmtHora(o.hora) + ' ' + fmtEuro(o.valor != null ? o.valor : o.montante); }).join(' · ') + '</span>';
-  }
-
-  function totaisHtml(r){
-    var fbBruto = r.fb && r.fb.bruto != null ? r.fb.bruto : null;
-    var posValor = r.temSaft ? r.posSaft : fbBruto;
-    var posSub = r.temSaft ? (r.pos.length + ' linhas de pagamento no SAF-T') : (fbBruto != null ? (r.fb.docs || 0) + ' docs (vendasDiario, sem SAF-T)' : 'sem dados');
-    var fbAviso = '';
-    if (r.temSaft && fbBruto != null && Math.abs(round2(fbBruto - r.posSaft)) >= 0.005){
-      fbAviso = '<div class="s">vendasDiario diz ' + fmtEuro(fbBruto) + ' — não bate com o SAF-T</div>';
+    if (!itens.length){
+      return '<div class="rec-b-vazio-dia">Nenhuma venda sem cobrança neste dia (com os ficheiros carregados).</div>';
     }
-    var dif = r.diferenca;
-    var difCls = dif == null ? '' : (Math.abs(dif) < 0.005 ? ' ok' : ' bad');
-    return '<div class="rec-totais">' +
-      '<div class="rec-total"><div class="k">POS · ' + esc(labelMeio(r.meio)) + '</div><div class="v num">' + fmtEuro(posValor) + '</div><div class="s">' + esc(posSub) + '</div>' + fbAviso + '</div>' +
-      '<div class="rec-total"><div class="k">Terminal bruto</div><div class="v num">' + (r.temTerm ? fmtEuro(r.termBruto) : '—') + '</div><div class="s">' + (r.temTerm ? r.term.length + ' transações' : 'sem extrato') + '</div></div>' +
-      '<div class="rec-total"><div class="k">Comissão</div><div class="v num">' + (r.temTerm && r.comissao != null ? fmtEuro(r.comissao) : '—') + '</div>' + (r.temTerm && r.comissao == null && r.term.length ? '<div class="s">sem comissão por transação (débito mensal)</div>' : '') + '</div>' +
-      '<div class="rec-total"><div class="k">Líquido</div><div class="v num">' + (r.temTerm ? fmtEuro(r.liquido) : '—') + '</div><div class="s">' + (r.comissao == null ? 'igual ao bruto' : 'bruto + comissão') + '</div></div>' +
-      '<div class="rec-total' + difCls + '"><div class="k">Diferença POS − terminal</div><div class="v num">' + (dif == null ? '—' : fmtEuroSinal(dif)) + '</div></div>' +
-      '<div class="rec-total' + (r.modo === 'completo' && r.cobradoAMais ? ' aviso' : '') + '"><div class="k">Cobrado a mais</div><div class="v num">' + (r.modo === 'completo' ? fmtEuroSinal(r.cobradoAMais) : '—') + '</div><div class="s">' + (r.modo === 'completo' ? (r.casamento.alterados.length + ' com valor alterado') : 'precisa de SAF-T e extrato') + '</div></div>' +
-      '<div class="rec-total' + (r.modo === 'completo' ? (r.semPar ? ' bad' : ' ok') : '') + '"><div class="k">Linhas sem par</div><div class="v num">' + (r.modo === 'completo' ? r.semPar : '—') + '</div><div class="s">' + (r.modo === 'completo' ? 'órfãs + ambíguas' : 'precisa de SAF-T e extrato') + '</div></div>' +
-      '</div>';
+    var h = '<div class="rec-vsc-caixa"><table><thead><tr><th class="num">Hora</th><th>Talão</th><th class="num">Valor</th><th>Artigos</th><th>Meio no POS</th><th></th></tr></thead><tbody>';
+    itens.forEach(function(x){
+      var ch = chaveVenda(x.linha);
+      var res = resolvidos[ch];
+      var resolvida = !!(res && res.anulado !== true);
+      h += '<tr' + (resolvida ? ' class="rec-resolvida"' : '') + ' data-venda="' + esc(ch) + '">' +
+        '<td class="num">' + fmtHora(x.linha.hora) + '</td>' +
+        '<td class="rec-mono">' + esc(x.linha.no) + '</td>' +
+        '<td class="num">' + fmtEuro(x.linha.valor) + '</td>' +
+        '<td>' + artigosHtml(x.linha) + '</td>' +
+        '<td>' + esc(labelMeio(x.meio)) + '</td>' +
+        '<td>' + (resolvida
+          ? '<span class="rec-resolvida-razao">Resolvida: ' + esc(res.razao) + ' (' + esc(res.autor || '') + ')</span>'
+          : '<button type="button" class="rec-b-resolver" data-acao="resolver" data-chave="' + esc(ch) + '">Resolvido</button>' +
+            '<div class="rec-inline-form" data-formv="' + esc(ch) + '" hidden>' +
+              '<input type="text" placeholder="Razão (ex: cliente pagou em dinheiro)" data-campo="razao">' +
+              '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+              '<button type="button" data-confirmarv="' + esc(ch) + '">Confirmar</button>' +
+              '<button type="button" class="cancelar" data-cancelarv="' + esc(ch) + '">Cancelar</button>' +
+            '</div>') +
+        '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
   }
 
-  function foraSomaHtml(r){
-    if (!r.foraSoma || !r.foraSoma.length) return '';
-    var desc = r.foraSoma.filter(function(t){ return t.categoria === 'desconhecida'; }).length;
-    return '<div class="rec-sec"><p class="rec-sec-titulo">Recusadas e canceladas no terminal <span class="rec-conta">' + r.foraSoma.length + '</span> <span>· fora das somas e do casamento</span>' +
-      (desc ? '<span class="rec-motivo">· ' + desc + ' com estado não reconhecido</span>' : '') + '</p>' +
-      '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Estado</th><th>Marca</th><th>Cartão</th><th class="num">Valor</th><th>Liquidação</th></tr></thead><tbody>' +
-      r.foraSoma.map(function(t){
-        var est = t.categoria === 'desconhecida' ? '<span class="rec-motivo">estado não reconhecido: ' + esc(t.tipo || '(vazio)') + '</span>' : esc(t.tipo);
-        return '<tr' + (t.categoria === 'desconhecida' ? ' class="rec-status-x"' : '') + '><td class="num">' + fmtHora(t.hora) + '</td><td>' + est + '</td><td>' + marcaHtml(t) + '</td><td class="rec-mono">' + cartaoHtml(t) + '</td>' + celValor(t.montante) + '<td class="rec-mono">' + esc(liquidacaoTexto(t)) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-
-  function anuladosHtml(r){
-    if (!r.anulados.length) return '';
-    return '<div class="rec-sec"><p class="rec-sec-titulo">Documentos anulados no POS <span class="rec-conta">' + r.anulados.length + '</span> <span>· fora de todas as somas</span></p>' +
-      '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Documento</th><th>Meio</th><th class="num">Valor</th></tr></thead><tbody>' +
-      r.anulados.map(function(d){
-        return '<tr class="rec-status-a"><td class="num">' + fmtHora(d.hora) + '</td><td>' + esc(d.no) + ' <span class="rec-mono">' + esc(d.tipo) + '</span></td><td>' +
-          esc(d.pagamentos.map(function(p){ return nomeMeio(p.mec); }).join(', ') || '—') + '</td><td class="num">' + fmtEuro(d.gross) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-
-  function blocoMeioHtml(r){
-    var h = '<div class="card glass-light rec-bloco"><h3>' + esc(labelMeio(r.meio)) + ' <small>documentos do POS ↔ extrato do terminal</small>' +
-      '<span class="rec-chip ' + r.estado + '">' + esc(r.texto) + '</span></h3>';
-
-    if (r.modo === 'nada'){
-      return h + '<p class="rec-bloco-nota">Sem SAF-T, sem extrato e sem vendas importadas para este dia e meio.</p></div>';
-    }
-
-    if (r.modo === 'completo'){
-      var c = r.casamento;
-      var nOrf = c.posSemPar.length + c.termSemPar.length;
-      var nAmb = c.ambiguos.reduce(function(s, g){ return s + g.pos.length + g.term.length; }, 0);
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Sem par <span class="rec-conta">' + (nOrf + nAmb) + '</span> <span>· ' + c.posSemPar.length + ' só no POS · ' + c.termSemPar.length + ' só no terminal · ' + nAmb + ' ambíguas</span></p>';
-      if (!nOrf && !nAmb){
-        h += '<div class="rec-orfas ok">Todas as linhas têm par.</div>';
-      } else {
-        h += '<div class="rec-orfas">';
-        if (c.posSemPar.length){
-          h += '<table><thead><tr><th>Motivo</th>' + TH_POS + '<th>Do outro lado</th></tr></thead><tbody>' +
-            c.posSemPar.map(function(l){
-              return '<tr><td class="rec-motivo">só no POS</td>' + linhaPosHtml(l) + '<td>' + proximasHtml(l, c.termSemPar, c.segMax, 'terminal') + '</td></tr>';
-            }).join('') + '</tbody></table>';
-        }
-        if (c.termSemPar.length){
-          h += '<table><thead><tr><th>Motivo</th>' + TH_TERM + '<th>Do outro lado</th></tr></thead><tbody>' +
-            c.termSemPar.map(function(t){
-              return '<tr><td class="rec-motivo">só no terminal</td>' + linhaTermHtml(t) + '<td>' + proximasHtml(t, c.posSemPar, c.segMax, 'POS') + '</td></tr>';
-            }).join('') + '</tbody></table>';
-        }
-        c.ambiguos.forEach(function(g){
-          h += '<div class="rec-ambiguo"><p class="rec-ambiguo-titulo">Ambíguo · ' + fmtEuro(g.valor) + ' · ' + g.pos.length + ' no POS e ' + g.term.length + ' no terminal a ±' + Math.round(c.segMax / 60) + ' min — nenhum escolhido</p>' +
-            '<div class="rec-ambiguo-duo"><div class="rec-ambiguo-lado"><p>POS</p><ul>' +
-            g.pos.map(function(l){ return '<li><span class="num">' + fmtHora(l.hora) + '</span><span>' + esc(l.no) + '</span><span class="rec-mono">' + esc(l.tipo) + '</span></li>'; }).join('') +
-            '</ul></div><div class="rec-ambiguo-lado"><p>Terminal</p><ul>' +
-            g.term.map(function(t){ return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + marcaHtml(t) + '</span><span class="rec-mono">' + cartaoHtml(t) + '</span>' + (t.comissao == null ? '' : '<span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span>') + '</li>'; }).join('') +
-            '</ul></div></div></div>';
-        });
-        h += '</div>';
-      }
-      h += '</div>';
-
-      if (c.alterados.length){
-        h += '<div class="rec-sec"><p class="rec-sec-titulo">Valor alterado no terminal <span class="rec-conta">' + c.alterados.length + '</span> <span>· mesma venda dos dois lados a ±' + JANELA_ALTERADO_MINUTOS + ' min, valor diferente · cobrado a mais ' + fmtEuroSinal(r.cobradoAMais) + '</span></p>' +
-          '<div class="rec-alterados"><table><thead><tr><th>Estado</th>' + TH_POS + '<th class="rec-lado">Terminal</th><th class="num">Cobrado</th><th class="num">Diferença</th><th>Liquidação</th></tr></thead><tbody>' +
-          c.alterados.map(function(x){
-            var parc = '<ul class="rec-parcelas">' + x.terms.map(function(t){
-              return '<li><span class="num">' + fmtHora(t.hora) + '</span><span>' + marcaHtml(t) + '</span><span class="rec-mono">' + cartaoHtml(t) + '</span><span class="num">' + fmtEuro(t.montante) + '</span>' + (t.comissao == null ? '' : '<span class="rec-mono">comissão ' + fmtEuro(t.comissao) + '</span>') + '</li>';
-            }).join('') + '</ul>';
-            var liq = x.terms.map(liquidacaoTexto).filter(function(v, i, a){ return a.indexOf(v) === i; }).join(', ');
-            return '<tr><td class="rec-tipo">' + (x.tipo === 'dividida' ? 'dividida em ' + x.terms.length : 'valor alterado') + '</td>' + linhaPosHtml(x.pos) +
-              '<td class="rec-lado">' + parc + '</td><td class="num">' + fmtEuro(x.termValor) + '</td><td class="num' + (x.diff < 0 ? ' rec-neg' : '') + '"><b>' + fmtEuroSinal(x.diff) + '</b></td><td class="rec-mono">' + esc(liq) + '</td></tr>';
-          }).join('') + '</tbody></table></div></div>';
-      }
-
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Casadas <span class="rec-conta">' + c.pares.length + '</span> <span>· valor igual, hora dentro da janela, único de ambos os lados</span></p>';
-      if (c.pares.length){
-        h += '<table class="rec-pares"><thead><tr>' + TH_POS + '<th class="rec-lado">Δ hora</th>' + TH_TERM.replace('<th class="num">Hora</th>', '<th class="num rec-lado">Hora</th>') + '</tr></thead><tbody>' +
-          c.pares.map(function(p){
-            var longe = Math.abs(p.delta) > JANELAS_MINUTOS[0] * 60;
-            return '<tr>' + linhaPosHtml(p.pos) + '<td class="rec-lado rec-delta' + (longe ? ' longe' : '') + '">' + (p.delta >= 0 ? '+' : '−') + fmtDelta(p.delta) + (longe ? ' (2.ª passagem)' : '') + '</td>' +
-              linhaTermHtml(p.term).replace('<td class="num">', '<td class="num rec-lado">') + '</tr>';
-          }).join('') + '</tbody></table>';
-      } else {
-        h += '<p class="rec-bloco-nota">Nenhuma linha casada.</p>';
-      }
-      h += '</div>';
-
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
-      h += foraSomaHtml(r);
-      h += anuladosHtml(r);
-      return h + '</div>';
-    }
-
-    if (r.modo === 'degradado'){
-      h += '<p class="rec-bloco-nota aviso">Sem SAF-T para este dia: a comparação é só ao total do dia, com o agregado de vendasDiario. O casamento linha a linha precisa do SAF-T de ' + fmtDia(r.dia) + '.</p>';
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Transações do terminal <span class="rec-conta">' + r.term.length + '</span></p>' +
-        '<table class="rec-lista"><thead><tr>' + TH_TERM + '</tr></thead><tbody>' + r.term.map(function(t){ return '<tr>' + linhaTermHtml(t) + '</tr>'; }).join('') + '</tbody></table></div>';
-      h += foraSomaHtml(r);
-      return h + '</div>';
-    }
-
-    // so-pos: há POS (SAF-T ou agregado) mas não há extrato.
-    h += '<p class="rec-bloco-nota">Sem extrato ' + esc(labelMeio(r.meio)) + ' para este dia. Carrega-o em cima para casar linha a linha.</p>';
-    h += '<div class="rec-sec"><p class="rec-sec-titulo">Totais do dia</p>' + totaisHtml(r) + '</div>';
-    if (r.temSaft){
-      h += '<div class="rec-sec"><p class="rec-sec-titulo">Documentos do POS · ' + esc(labelMeio(r.meio)) + ' <span class="rec-conta">' + r.pos.length + '</span></p>' +
-        '<table class="rec-lista"><thead><tr>' + TH_POS + '</tr></thead><tbody>' + r.pos.map(function(l){ return '<tr>' + linhaPosHtml(l) + '</tr>'; }).join('') + '</tbody></table></div>';
-    }
-    h += anuladosHtml(r);
-    return h + '</div>';
-  }
-
-  // Documentos de outros meios (NU e restantes): guardados de propósito,
-  // fora do casamento com o terminal.
-  function blocoOutrosHtml(dia){
-    var mes = dia.slice(0, 7);
-    var fb = (vendasMes[mes] && vendasMes[mes][dia]) || {};
-    var outrosFb = Object.keys(fb).filter(function(k){ return !MEIO_POR_MEC[k]; }).sort();
-    var linhas = [];
-    if (saftCobertura[dia]){
-      Object.keys(docs).forEach(function(no){
-        var d = docs[no];
-        if (d.dia !== dia || d.status === 'A') return;
-        if (!d.pagamentos.length){ linhas.push({ hora: d.hora, no: no, tipo: d.tipo, mec: '', valor: d.gross }); return; }
-        d.pagamentos.forEach(function(p){
-          if (MEIO_POR_MEC[p.mec]) return;
-          linhas.push({ hora: d.hora, no: no, tipo: d.tipo, mec: p.mec, valor: p.valor });
+  function ligarAcoesResolver(){
+    var raiz = document.getElementById('cartaoB');
+    raiz.querySelectorAll('[data-acao="resolver"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var ch = btn.getAttribute('data-chave');
+        var form = raiz.querySelector('[data-formv="' + CSS.escape(ch) + '"]');
+        if (form) form.hidden = false;
+        btn.hidden = true;
+      });
+    });
+    raiz.querySelectorAll('[data-cancelarv]').forEach(function(btn){
+      btn.addEventListener('click', function(){ renderDiasB(); });
+    });
+    raiz.querySelectorAll('[data-confirmarv]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var ch = btn.getAttribute('data-confirmarv');
+        var form = raiz.querySelector('[data-formv="' + CSS.escape(ch) + '"]');
+        var razao = form.querySelector('[data-campo="razao"]').value.trim();
+        var autorInput = form.querySelector('[data-campo="autor"]').value.trim();
+        if (!razao){ form.querySelector('[data-campo="razao"]').focus(); return; }
+        var tr = raiz.querySelector('tr[data-venda="' + CSS.escape(ch) + '"]');
+        var dataTxt = tr ? tr.children[0].textContent : '';
+        btn.disabled = true;
+        resolverVenda(ch, diaAbertoB, razao, autorInput || autorAtual()).then(renderDiasB).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui gravar a resolução: ' + (err && err.message ? err.message : err));
         });
       });
-      linhas.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
-    }
-    var total = round2(linhas.reduce(function(s, l){ return s + l.valor; }, 0));
-    var h = '<div class="card glass-light rec-bloco"><h3>Outros meios de pagamento <small>fora do casamento com o terminal</small></h3>';
-    if (outrosFb.length){
-      h += '<p class="rec-outros-fb">vendasDiario: ' + outrosFb.map(function(k){ return '<b>' + esc(nomeMeio(k)) + '</b> ' + fmtEuro(fb[k].bruto) + ' (' + (fb[k].docs || 0) + ' docs)'; }).join(' · ') + '</p>';
-    }
-    if (!saftCobertura[dia]){
-      h += '<p class="rec-bloco-nota">Sem SAF-T para este dia: não há documentos para listar.</p>';
-    } else if (!linhas.length){
-      h += '<p class="rec-bloco-nota">Nenhum documento de outros meios neste dia.</p>';
-    } else {
-      h += '<p class="rec-sec-titulo">Documentos <span class="rec-conta">' + linhas.length + '</span> <span>· ' + fmtEuro(total) + '</span></p>' +
-        '<table class="rec-lista"><thead><tr><th class="num">Hora</th><th>Documento</th><th>Meio</th><th class="num">Valor</th></tr></thead><tbody>' +
-        linhas.map(function(l){
-          return '<tr><td class="num">' + fmtHora(l.hora) + '</td><td>' + esc(l.no) + ' <span class="rec-mono">' + esc(l.tipo) + '</span></td><td>' + esc(nomeMeio(l.mec)) + '</td>' + celValor(l.valor) + '</tr>';
-        }).join('') + '</tbody></table>';
-    }
-    return h + '</div>';
+    });
   }
 
-  function renderDetalhe(){
-    var z = document.getElementById('zona2');
-    if (!diaAberto){ z.innerHTML = ''; return; }
-    var dia = diaAberto;
-    var rs = MEIOS.map(function(m){ return meioCalc(dia, m); });
-    var completos = rs.filter(function(r){ return r.modo === 'completo'; });
-    var cobrado = null;
-    if (completos.length){
-      var total = round2(completos.reduce(function(t, r){ return t + r.cobradoAMais; }, 0));
-      var n = completos.reduce(function(t, r){ return t + r.casamento.alterados.length; }, 0);
-      cobrado = '<p class="rec-cobrado' + (total ? '' : ' zero') + '">Cobrado a mais do que faturado: <b class="num">' + fmtEuroSinal(total) + '</b>' +
-        (n ? ' <span class="rec-legenda">· ' + n + ' venda' + (n === 1 ? '' : 's') + ' com valor alterado no terminal (' + completos.map(function(r){ return labelCurtoMeio(r.meio); }).join(', ') + ')</span>' : '') + '</p>';
-    }
-    z.innerHTML = '<div class="rec-barra"><h2>' + fmtDia(dia) + ' <small class="rec-legenda">' + esc(diaSemana(dia)) + '</small></h2></div>' +
-      (cobrado || '') +
-      rs.map(blocoMeioHtml).join('') +
-      blocoOutrosHtml(dia);
+  /* ============================================================
+     ORQUESTRAÇÃO
+     ============================================================ */
+  function garantirMesesDosFicheiros(){
+    return carregarAtivo();
   }
 
   function renderTudo(){
-    memoMeio = {}; memoCaixa = null;
-    renderTriagem();
-    renderSemCobranca();
-    renderDias();
-    renderDetalhe();
+    memoMeio = {}; memoA = null;
+    renderCartaoA();
+    renderFicheiros();
+    renderDiasB();
   }
 
   /* ============================================================
-     Firebase — só leitura de vendasDiario/{mês}
+     Firebase
      ============================================================ */
   firebase.initializeApp({
     apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
@@ -2412,13 +1816,6 @@ window.addEventListener('load', function () {
 
   // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
   // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
-  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
-  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
-  // para quem está ao balcão. O #authErro aparece com um botão que volta a
-  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
-  //
-  // O callback fica guardado à primeira chamada para o retry o poder repetir
-  // sem obrigar cada página a dar-lhe um nome.
   var authArrancou = false;
   var authCallback = null;
 
@@ -2448,8 +1845,6 @@ window.addEventListener('load', function () {
         resolvido = true;
         clearTimeout(timer);
         if (caixaErro) caixaErro.classList.remove('on');
-        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
-        // a página inteira por cima da que já lá estava.
         if (authArrancou) return;
         authArrancou = true;
         if (authCallback) authCallback();
@@ -2457,8 +1852,6 @@ window.addEventListener('load', function () {
       .catch(function (erro) {
         clearTimeout(timer);
         console.error('Falha na autenticação anónima:', erro);
-        // Não continuar sem sessão — evita escritas/leituras que vão
-        // falhar de qualquer forma quando as rules apertarem.
         falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
       });
   }
@@ -2473,15 +1866,12 @@ window.addEventListener('load', function () {
     });
   })();
 
-  // Os uploads não dependem do Firebase: o selector de meses nasce já,
-  // e o agregado diário chega quando a sessão anónima assentar.
-  montarSelectorMeses();
   renderTudo();
 
   autenticarEContinuar(function () {
     db = firebase.database();
     Promise.all([carregarAtivo(), carregarBase()]).then(renderTudo);
-  }); // fim de autenticarEContinuar
+  });
 
 });
 </script>
