@@ -320,26 +320,6 @@
   .ac-mais:hover{ color:var(--ink); background:var(--dough); }
   .ac-mais:disabled{ opacity:.5; cursor:not-allowed; background:transparent; color:var(--muted); }
 
-  /* Interruptor (ligar/desligar). Também usado nos toggles do painel. */
-  .cc-switch{
-    width:38px; height:21px; border-radius:100px;
-    background:var(--line);
-    border:none; padding:0;
-    position:relative; flex-shrink:0;
-    cursor:pointer;
-    transition:background .15s;
-  }
-  [data-theme="dark"] .cc-switch{ background:rgba(255,255,255,0.12); }
-  .cc-switch::after{
-    content:''; position:absolute;
-    top:3px; left:3px; width:15px; height:15px;
-    border-radius:50%; background:var(--white);
-    box-shadow:0 1px 3px rgba(0,0,0,0.25);
-    transition:left .15s;
-  }
-  .cc-switch.on{ background:var(--red); }
-  .cc-switch.on::after{ left:20px; }
-  .cc-switch:disabled{ cursor:not-allowed; opacity:.6; }
   .cc-selo-linha{ gap:6px; }
 
   .ac-aviso{
@@ -917,9 +897,9 @@
   body.shell-touch .mu-volume input[type=range]{ min-height:40px; }
   body.shell-touch .mu-pres button{ min-height:40px; padding:8px 12px; font-size:11.5px; }
   body.shell-touch .mu-fav{ min-height:42px; }
-  body.shell-touch .cc-switch{ width:44px; height:24px; }
-  body.shell-touch .cc-switch::after{ width:18px; height:18px; }
-  body.shell-touch .cc-switch.on::after{ left:23px; }
+  /* Ao toque o interruptor cresce — só as medidas do componente, pelas
+     variáveis dele. Nunca redesenhar a pílula aqui. */
+  body.shell-touch .gio-toggle{ --gt-w:44px; --gt-h:24px; --gt-knob:18px; --gt-travel:18px; }
   /* O dropdown é position:fixed com a largura do chip (JS); nunca mais largo
      do que o ecrã menos as margens. */
   body.shell-touch .ac-dd{ max-width:calc(100vw - 16px); }
@@ -973,10 +953,13 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-scan"/></svg>GIOCO · <b>Centro de controlo</b></h1>
         <div class="spacer"></div>
-        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
-          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
-          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
-        </div>
+        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
+          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
+          <span class="gio-toggle-track">
+            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
+            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
+          </span>
+        </label>
       </div>
 
       <p class="page-subtitle" id="pageSubtitle">A carregar a loja…</p>
@@ -1005,7 +988,10 @@
             <div class="cc-head">
               <h3>Ar condicionado</h3>
               <div class="sp"></div>
-              <button class="cc-switch" type="button" id="acSwitch" disabled title="Ligar / desligar" aria-label="Ligar / desligar"></button>
+              <label class="gio-toggle" title="Ligar / desligar">
+                <input type="checkbox" class="gio-toggle-input" id="acSwitch" disabled aria-label="Ligar / desligar">
+                <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+              </label>
             </div>
             <div class="cc-selo-linha">
               <span class="status warn" id="acFiltro" hidden>Limpar filtro</span>
@@ -1716,7 +1702,7 @@ window.addEventListener('load', function () {
       if (!on) {
         // Sem serviço não há nada em que confiar: dial neutro, tudo desligado.
         card.classList.remove('ac-off');
-        el.sw.classList.remove('on');
+        el.sw.checked = false;
         el.temp.innerHTML = '—<sup>°C</sup>';
         el.temp.className = 'ac-temp';
         el.estado.textContent = estado ? 'Sem resposta' : 'Sem dados';
@@ -1746,7 +1732,7 @@ window.addEventListener('load', function () {
       var livre = podeControlar();
 
       card.classList.toggle('ac-off', !ligado);
-      el.sw.classList.toggle('on', ligado);
+      el.sw.checked = ligado;
       el.sw.disabled = !livre;
 
       el.temp.innerHTML = fmtTemp(alvo) + '<sup>°C</sup>';
@@ -1857,7 +1843,7 @@ window.addEventListener('load', function () {
       if (!podeControlar()) return;
       enviar('tempAlvo', Math.min(TMAX, Math.round(Number(estado.tempAlvo) || 24) + 1));
     });
-    el.sw.addEventListener('click', function () {
+    el.sw.addEventListener('change', function () {
       if (!podeControlar()) return;
       enviar(estado.ligado ? 'desligar' : 'ligar', true);
     });
@@ -1889,7 +1875,7 @@ window.addEventListener('load', function () {
       for (var f = 0; f < FLAGS.length; f++) {
         h += '<div class="acp-toggle" data-flag-row="' + FLAGS[f].id + '">' +
              '<div class="txt"><b>' + escapar(FLAGS[f].nome) + '</b><span>' + escapar(FLAGS[f].desc) + '</span></div>' +
-             '<button type="button" class="cc-switch" data-flag="' + FLAGS[f].id + '" aria-label="' + escapar(FLAGS[f].nome) + '"></button>' +
+             window.giocoToggleHtml({ attrs: 'data-flag="' + FLAGS[f].id + '" aria-label="' + escapar(FLAGS[f].nome) + '"' }) +
              '</div>';
       }
       h += '</div>';
@@ -1922,8 +1908,13 @@ window.addEventListener('load', function () {
         if (Number(estado.ventilacao) === v) { renderPainel(); return; }
         enviar('ventilacao', v);
       });
-      body.addEventListener('click', function (ev) {
-        var b = ev.target.closest('button[data-flag]');
+      /* Os interruptores são checkboxes do componente .gio-toggle: o evento
+         é o 'change', não o 'click' — assim o teclado (espaço/enter) entra
+         pelo mesmo caminho do rato, e o clique no rótulo não conta duas
+         vezes. O comando enviado continua a ser o INVERSO do estado
+         efectivo, tal como era; o render volta a sincronizar o checked. */
+      body.addEventListener('change', function (ev) {
+        var b = ev.target.closest('input[data-flag]');
         if (!b || b.disabled) return;
         var id = b.getAttribute('data-flag');
         if (!podeControlar()) return;
@@ -1964,14 +1955,14 @@ window.addEventListener('load', function () {
         ? 'Em Auto o aparelho escolhe a ventilação. Escolhe outro preset no cartão para ajustar à mão.'
         : (preset === 'custom' ? 'Valor personalizado.' : 'Arrasta para um valor personalizado; os presets do cartão continuam disponíveis.');
 
-      var sws = b.querySelectorAll('button[data-flag]');
+      var sws = b.querySelectorAll('input[data-flag]');
       for (var j = 0; j < sws.length; j++) {
         var id = sws[j].getAttribute('data-flag');
         var val = flagEfectiva(id);
         var row = b.querySelector('[data-flag-row="' + id + '"]');
         // Sem o campo no estado (ex.: display não exposto), a linha não aparece.
         if (row) row.hidden = !on || typeof val !== 'boolean';
-        sws[j].classList.toggle('on', val === true);
+        sws[j].checked = (val === true);
         sws[j].disabled = !livre;
       }
 
@@ -2400,12 +2391,18 @@ window.addEventListener('load', function () {
       body.innerHTML = h;
       painel = { body: body };
 
+      /* Os interruptores saíram deste handler: são checkboxes do
+         componente e vêm pelo 'change' aqui em baixo. Um clique no
+         <label> deles chega cá com closest('button') a null e é ignorado. */
+      body.addEventListener('change', function (ev) {
+        var sw = ev.target.closest('input[data-flag]');
+        if (!sw || sw.disabled || !podeControlar()) return;
+        enviar(sw.getAttribute('data-flag'), !flagEfectiva(sw.getAttribute('data-flag')));
+      });
       body.addEventListener('click', function (ev) {
         var b = ev.target.closest('button');
         if (!b || b.disabled || !podeControlar()) return;
-        if (b.hasAttribute('data-flag')) {
-          enviar(b.getAttribute('data-flag'), !flagEfectiva(b.getAttribute('data-flag')));
-        } else if (b.hasAttribute('data-sleep')) {
+        if (b.hasAttribute('data-sleep')) {
           enviar('sleepTimer', parseInt(b.getAttribute('data-sleep'), 10) || 0);
         } else if (b.hasAttribute('data-pos')) {
           if (!confirmaCorte()) return;
@@ -2443,7 +2440,7 @@ window.addEventListener('load', function () {
         if (f.sec !== sec) return;
         h += '<div class="acp-toggle" data-flag-row="' + f.cmd + '">' +
              '<div class="txt"><b>' + escapar(f.nome) + '</b><span>' + escapar(f.desc) + '</span></div>' +
-             '<button type="button" class="cc-switch" data-flag="' + f.cmd + '" aria-label="' + escapar(f.nome) + '"></button>' +
+             window.giocoToggleHtml({ attrs: 'data-flag="' + f.cmd + '" aria-label="' + escapar(f.nome) + '"' }) +
              '</div>';
       });
       return h;
@@ -2526,13 +2523,13 @@ window.addEventListener('load', function () {
 
       // ---- interruptores (reprodução, som, aparelho)
       FLAGS.forEach(function (f) {
-        var sw = b.querySelector('button[data-flag="' + f.cmd + '"]');
+        var sw = b.querySelector('input[data-flag="' + f.cmd + '"]');
         var row = b.querySelector('[data-flag-row="' + f.cmd + '"]');
         var val = flagEfectiva(f.cmd);
         // Sem o campo no estado a linha nem aparece — igual ao painel do A/C.
         if (row) row.hidden = !on || val === null;
         if (!sw) return;
-        sw.classList.toggle('on', val === true);
+        sw.checked = (val === true);
         sw.disabled = !livre;
       });
 

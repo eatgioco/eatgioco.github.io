@@ -1354,10 +1354,13 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-store"/></svg>GIOCO · <b>São Bento 154</b></h1>
         <div class="spacer"></div>
-        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
-          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
-          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
-        </div>
+        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
+          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
+          <span class="gio-toggle-track">
+            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
+            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
+          </span>
+        </label>
       </div>
 
       <p class="page-subtitle">Checklists, temperaturas HACCP, pedidos e compras físicas</p>
@@ -3058,16 +3061,15 @@
     html += '</select></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-local">Local (opcional)</label><input type="text" id="equipEdit-local" value="' + escapeHtml(val(d.local)) + '" placeholder="ex: sob o balcão, junto ao P.O.S."></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-ordem">Ordem</label><input type="number" id="equipEdit-ordem" step="1" value="' + val(d.ordem) + '"></div>';
-    html += '<div class="field" style="display:flex;align-items:center;gap:8px;">';
-    html += '<input type="checkbox" id="equipEdit-ativo" style="width:18px;height:18px;accent-color:var(--red);"' + (d.ativo !== false ? ' checked' : '') + '>';
-    html += '<label class="field-label" style="margin:0;" for="equipEdit-ativo">Ativo</label>';
-    html += '</div>';
+    html += '<div class="field">' + giocoToggleHtml({
+      id: 'equipEdit-ativo', ligado: d.ativo !== false, rotulo: 'Ativo'
+    }) + '</div>';
 
     html += '<p class="equip-manage-zona-title">Temperatura</p>';
-    html += '<div class="field" style="display:flex;align-items:center;gap:8px;">';
-    html += '<input type="checkbox" id="equipEdit-registaTemperatura" style="width:18px;height:18px;accent-color:var(--red);"' + (d.registaTemperatura ? ' checked' : '') + '>';
-    html += '<label class="field-label" style="margin:0;" for="equipEdit-registaTemperatura">Regista temperatura (HACCP)</label>';
-    html += '</div>';
+    html += '<div class="field">' + giocoToggleHtml({
+      id: 'equipEdit-registaTemperatura', ligado: !!d.registaTemperatura,
+      rotulo: 'Regista temperatura (HACCP)'
+    }) + '</div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-tipo">Tipo</label><select id="equipEdit-tipo" onchange="onEquipTipoChange()">';
     Object.keys(EQUIP_TIPO_LABELS).forEach(function(t){
       html += '<option value="' + t + '"' + (d.tipo === t ? ' selected' : '') + '>' + EQUIP_TIPO_LABELS[t] + '</option>';

@@ -1566,20 +1566,6 @@
     font-style:italic;
   }
 
-  .check-row{
-    display:flex;
-    align-items:center;
-    gap:8px;
-  }
-
-  .check-row input{
-    width:auto;
-  }
-
-  .check-row label{
-    font-size:13px;
-  }
-
   /* ======================================================================
      Fase 3 — camada do design system
      ======================================================================
@@ -1832,10 +1818,13 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-receipt"/></svg>GIOCO · <b>Tesouraria</b></h1>
         <div class="spacer"></div>
-        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
-          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
-          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
-        </div>
+        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
+          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
+          <span class="gio-toggle-track">
+            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
+            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
+          </span>
+        </label>
       </div>
 
       <p class="page-subtitle">Compromissos fixos, calendário de saídas e TSU</p>
@@ -2049,9 +2038,10 @@
            dos recibos do mês anterior. Dia, método, IBAN e notas continuam a
            ser o que o utilizador configurar. -->
       <div class="field" id="cfDerivaTsuField" style="display:none;">
-        <label class="ativo-toggle" style="margin:0;">
-          <input type="checkbox" id="cfDerivaTsu">
-          É a Segurança Social (TSU) — valor derivado dos recibos
+        <label class="gio-toggle">
+          <input type="checkbox" class="gio-toggle-input" id="cfDerivaTsu">
+          <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          <span class="gio-toggle-txt">É a Segurança Social (TSU) — valor derivado dos recibos</span>
         </label>
         <span class="field-hint">34,75% sobre a soma dos totais sujeitos de todos os recibos do mês anterior, arredondado uma só vez no agregado. Inclui os 11% já retidos ao trabalhador.</span>
       </div>
@@ -2123,10 +2113,11 @@
         <span class="field-hint">Nenhum selecionado = todos os meses</span>
       </div>
       <div class="field full">
-        <div class="check-row">
-          <input type="checkbox" id="cfAtivo">
-          <label for="cfAtivo">Ativo (conta para os totais e para o calendário)</label>
-        </div>
+        <label class="gio-toggle">
+          <input type="checkbox" class="gio-toggle-input" id="cfAtivo">
+          <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
+          <span class="gio-toggle-txt">Ativo (conta para os totais e para o calendário)</span>
+        </label>
       </div>
       <div class="field full">
         <label class="field-label">Notas</label>
