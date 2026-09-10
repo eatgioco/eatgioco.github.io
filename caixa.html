@@ -599,6 +599,79 @@
     font-size:13px;
   }
 
+  /* ---------- Movimentos: agrupamento por dia + linhas de contagem ---------- */
+  .dia-grupo{ margin-top:18px; }
+  .dia-grupo:first-child{ margin-top:0; }
+
+  .dia-cabecalho{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin:0 0 8px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .dia-cabecalho .dia-count{
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .mov-row.contagem{
+    border-color:var(--sky, var(--line));
+    cursor:pointer;
+  }
+
+  .mov-row.contagem .mov-top{ align-items:center; }
+
+  .contagem-chevron{
+    width:16px; height:16px;
+    flex:none;
+    color:var(--muted);
+  }
+
+  .contagem-detalhe{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+    cursor:default;
+  }
+
+  .contagem-denom-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(120px,100%), 1fr));
+    gap:6px 14px;
+    margin-bottom:10px;
+  }
+
+  .contagem-denom-item{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .contagem-denom-item.zero{ opacity:.45; }
+
+  .contagem-denom-item .num{ color:var(--ink); }
+
+  .contagem-diferenca-line{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    margin:6px 0;
+  }
+
+  .contagem-diferenca-line.positiva{ color:var(--green); }
+  .contagem-diferenca-line.negativa{ color:var(--red-ink); }
+  .contagem-diferenca-line.neutra{ color:var(--muted); }
+
   /* ---------- Contar caixa (grelha tátil) ---------- */
   .denom-toolbar{
     display:flex;
@@ -1132,6 +1205,12 @@
     <div class="tool-bloco" data-grupo="caixa" data-tool="movimentos" hidden>
       <div class="listing-section">
         <p class="section-title">Todos os movimentos</p>
+
+        <div class="filter-tabs" id="modoListaTabs" style="margin-bottom:10px;">
+          <button type="button" class="filter-tab active" data-modo="tudo">Tudo</button>
+          <button type="button" class="filter-tab" data-modo="contagens">Só contagens</button>
+        </div>
+
         <div class="filter-tabs">
           <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
           <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
@@ -1140,7 +1219,7 @@
         </div>
 
         <div class="filter-extra">
-          <input type="month" id="mesFiltroInput" style="display:none;">
+          <select id="mesFiltroInput" style="display:none;"></select>
           <select id="motivoFiltroSelect">
             <option value="">Todos os motivos</option>
             <option value="Compra">Compra</option>
@@ -1821,15 +1900,19 @@
 
   var allMovs = {};
   var activeFilter = 'hoje';
+  var modoLista = 'tudo'; // 'tudo' | 'contagens' — toggle acima dos filter-tabs
   var mesFiltroInput = document.getElementById('mesFiltroInput');
   var motivoFiltroSelect = document.getElementById('motivoFiltroSelect');
   var filterSummaryEl = document.getElementById('filterSummary');
-  // valor default do mês = mês atual, formato YYYY-MM
-  (function(){
+  // valor default do mês = mês corrente, formato YYYY-MM (o dropdown real é
+  // populado por popularMesFiltro(), a partir dos meses com registos — este
+  // valor só garante que o mês corrente fica seleccionado por omissão mesmo
+  // sem nenhum registo ainda nele).
+  var mesAtualYm = (function(){
     var d = new Date();
-    var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    mesFiltroInput.value = ym;
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   })();
+  var mesFiltroSelecionado = mesAtualYm;
   var formState = { tipo: null, troco: null };
 
   var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
@@ -2079,17 +2162,30 @@
     });
   });
 
-  document.querySelectorAll('.filter-tab').forEach(function(btn){
+  document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      modoLista = btn.getAttribute('data-modo');
+      document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      motivoFiltroSelect.style.display = (modoLista === 'contagens') ? 'none' : '';
+      renderList();
+    });
+  });
+
+  document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeFilter = btn.getAttribute('data-filter');
       mesFiltroInput.style.display = (activeFilter === 'mes') ? 'inline-block' : 'none';
-      document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
       renderList();
     });
   });
 
-  mesFiltroInput.addEventListener('change', renderList);
+  mesFiltroInput.addEventListener('change', function(){
+    mesFiltroSelecionado = mesFiltroInput.value;
+    renderList();
+  });
   motivoFiltroSelect.addEventListener('change', renderList);
 
   // ---------- Devolver Troco ----------
@@ -2523,42 +2619,204 @@
     pendingListEl.innerHTML = html;
   }
 
+  // ---------- Listagem completa (Set/2026: agrupada por dia, com toggle
+  // Tudo/Só contagens — dá profundidade à vista de movimentos juntando as
+  // contagens físicas de caixaContagens no mesmo histórico. Tudo leitura;
+  // caixaContagens nunca é editado/apagado a partir daqui). ----------
+
+  // Chave de dia em hora LOCAL (mesma base de isToday/isWithinLast7Days —
+  // nunca a fatia UTC do ISO, que desalinhava a meia-noite).
+  function dayKeyLocal(input){
+    var d = (input instanceof Date) ? input : new Date(input);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function diaLabel(iso){
+    var chave = dayKeyLocal(iso);
+    if (chave === dayKeyLocal(new Date())) return 'Hoje';
+    var ontemD = new Date();
+    ontemD.setDate(ontemD.getDate() - 1);
+    if (chave === dayKeyLocal(ontemD)) return 'Ontem';
+    var d = new Date(iso);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  }
+
+  // A mais antiga de TODO o nó (nunca só da página filtrada) — é a única sem
+  // base de cálculo para "esperado" (ver contagemDiferencaInfo).
+  function earliestContagemId(){
+    var ids = Object.keys(allContagens);
+    if (!ids.length) return null;
+    ids.sort(function(a, b){ return new Date(allContagens[a].dataHora) - new Date(allContagens[b].dataHora); });
+    return ids[0];
+  }
+
+  // Diferença já vem calculada NO REGISTO (total − esperado no momento da
+  // contagem, contra a contagem anterior + movimentos entre as duas — ver
+  // CLAUDE.md/gioco-caixa.js) — não recalcular. Sem `esperado` (a mais
+  // antiga do nó, ou um registo antigo anómalo) não há base nenhuma: "—",
+  // nunca 0, mesmo que `diferenca` tenha ficado gravada como total − 0.
+  function contagemDiferencaInfo(c, isEarliest){
+    var temBase = !isEarliest && typeof c.esperado === 'number';
+    if (!temBase) return { texto: '—', classe: 'neutra' };
+    var dif = (typeof c.diferenca === 'number') ? c.diferenca : round2((parseFloat(c.total) || 0) - c.esperado);
+    var classe = dif > 0 ? 'positiva' : (dif < 0 ? 'negativa' : 'neutra');
+    var texto = dif === 0 ? 'Diferença: 0,00 €' : ('Diferença: ' + (dif > 0 ? '+' : '−') + formatEUR(Math.abs(dif)));
+    return { texto: texto, classe: classe };
+  }
+
+  function contagemDenomHtml(c){
+    var denom = c.denominacoes || {};
+    var html = '<div class="contagem-denom-grid">';
+    DENOMINACOES.forEach(function(d){
+      var chaveNo = d.chaveDb || d.chave;
+      var q = parseInt(denom[chaveNo], 10);
+      if (isNaN(q)) q = 0;
+      var label = d.tipo === 'nota' ? (d.valor + '€') : formatMoedaLabel(d.valor);
+      html += '<div class="contagem-denom-item' + (q === 0 ? ' zero' : '') + '"><span>' + label + '</span><span class="num">×' + q + ' = ' + formatEUR(round2(q * d.valor)) + '</span></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Uma contagem aberta de cada vez por id — estado de UI, não de dados.
+  var contagensAbertas = {};
+
+  function toggleContagemDetalhe(id){
+    contagensAbertas[id] = !contagensAbertas[id];
+    renderList();
+  }
+  window.toggleContagemDetalhe = toggleContagemDetalhe;
+
+  function contagemCardHtml(id, c, opts){
+    var aberta = !!contagensAbertas[id];
+    var dif = contagemDiferencaInfo(c, opts.isEarliest);
+    var chevronIcon = aberta ? 'i-chevron-down' : 'i-chevron-right';
+
+    var html = '<div class="mov-row contagem" onclick="toggleContagemDetalhe(\'' + id + '\')">';
+    html += '  <div class="mov-top">';
+    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
+    html += '    <div style="display:flex;align-items:center;gap:8px;">';
+    html += '      <span class="mov-valor num">' + formatEUR(c.total) + '</span>';
+    html += '      <svg class="icon contagem-chevron" width="16" height="16" aria-hidden="true"><use href="#' + chevronIcon + '"/></svg>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '  <p class="mov-motivo">Contagem de caixa</p>';
+    html += '  <div class="mov-meta"><span class="mov-pessoa">' + escapeHtml(c.pessoa || '') + '</span></div>';
+
+    if (aberta){
+      html += '  <div class="contagem-detalhe" onclick="event.stopPropagation()">';
+      html += contagemDenomHtml(c);
+      html += '    <p class="contagem-diferenca-line ' + dif.classe + '">' + dif.texto + '</p>';
+      html += '    <p class="mov-pessoa">Autor: ' + escapeHtml(c.pessoa || '—') + ' · ' + formatDataHora(c.dataHora) + '</p>';
+      if (c.motivoDiferenca){
+        html += '    <p class="notas-txt">Porquê: ' + escapeHtml(c.motivoDiferenca) + '</p>';
+      }
+      if (c.notas){
+        html += '    <p class="notas-txt">' + escapeHtml(c.notas) + '</p>';
+      }
+      html += '  </div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // Meses com registos reais (movimentos OU contagens) + o mês corrente
+  // sempre presente, para o filtro "Mês" ter sempre uma opção seleccionada.
+  var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  function popularMesFiltro(){
+    var metas = {};
+    Object.keys(allMovs).forEach(function(id){
+      var ym = (allMovs[id].dataHora || '').slice(0, 7);
+      if (ym) metas[ym] = true;
+    });
+    Object.keys(allContagens).forEach(function(id){
+      var ym = (allContagens[id].dataHora || '').slice(0, 7);
+      if (ym) metas[ym] = true;
+    });
+    metas[mesAtualYm] = true;
+
+    var meses = Object.keys(metas).sort().reverse();
+    var html = '<option value="">Todos os meses</option>';
+    meses.forEach(function(ym){
+      var partes = ym.split('-');
+      var label = (MESES_PT[parseInt(partes[1], 10) - 1] || ym) + ' ' + partes[0];
+      html += '<option value="' + ym + '"' + (ym === mesFiltroSelecionado ? ' selected' : '') + '>' + label + '</option>';
+    });
+    mesFiltroInput.innerHTML = html;
+    if (mesFiltroInput.value !== mesFiltroSelecionado){
+      mesFiltroSelecionado = mesAtualYm;
+      mesFiltroInput.value = mesAtualYm;
+    }
+  }
+
   // ---------- Listagem completa ----------
   function renderList(){
+    popularMesFiltro();
     var filtro = motivoFiltroSelect.value;
-    var ids = Object.keys(allMovs).filter(function(id){
-      var m = allMovs[id];
-      var passaPeriodo = true;
-      if (activeFilter === 'hoje') passaPeriodo = isToday(m.dataHora);
-      else if (activeFilter === '7dias') passaPeriodo = isWithinLast7Days(m.dataHora);
-      else if (activeFilter === 'mes'){
+
+    function passaPeriodo(dataHora){
+      if (activeFilter === 'hoje') return isToday(dataHora);
+      if (activeFilter === '7dias') return isWithinLast7Days(dataHora);
+      if (activeFilter === 'mes'){
         var ym = mesFiltroInput.value;
-        passaPeriodo = !!ym && (m.dataHora || '').slice(0, 7) === ym;
+        return !ym || (dataHora || '').slice(0, 7) === ym;
       }
-      if (!passaPeriodo) return false;
+      return true; // 'tudo'
+    }
+
+    var movIds = (modoLista === 'contagens') ? [] : Object.keys(allMovs).filter(function(id){
+      var m = allMovs[id];
+      if (!passaPeriodo(m.dataHora)) return false;
       if (filtro === '__semFatura') return m.semFatura === true;
       if (filtro === '__trocoNaoConferiu') return m.trocoConfere === false;
       return motivoCorrespondeFiltro(m.motivo, filtro);
     });
 
-    ids.sort(function(a, b){
-      return new Date(allMovs[b].dataHora) - new Date(allMovs[a].dataHora);
+    var contagemIds = Object.keys(allContagens).filter(function(id){
+      return passaPeriodo(allContagens[id].dataHora);
     });
 
-    if (ids.length === 0){
+    var entradas = [];
+    movIds.forEach(function(id){ entradas.push({ tipo: 'mov', id: id, dataHora: allMovs[id].dataHora }); });
+    contagemIds.forEach(function(id){ entradas.push({ tipo: 'contagem', id: id, dataHora: allContagens[id].dataHora }); });
+    entradas.sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+
+    if (entradas.length === 0){
       filterSummaryEl.textContent = '';
-      movListEl.innerHTML = '<div class="empty-state">Sem movimentos neste período.</div>';
+      var msgVazio = (modoLista === 'contagens') ? 'Sem contagens registadas neste período.' : 'Sem movimentos neste período.';
+      movListEl.innerHTML = '<div class="empty-state">' + msgVazio + '</div>';
       return;
     }
 
+    var earliestId = earliestContagemId();
     var html = '';
-    var totalValor = 0;
-    ids.forEach(function(id){
-      html += movCardHtml(id, allMovs[id], { comAcao: false, soHora: activeFilter === 'hoje' });
-      totalValor += allMovs[id].valor;
+    var totalValorMovs = 0;
+    var diaAtual = null;
+    entradas.forEach(function(entrada){
+      var chaveDia = dayKeyLocal(entrada.dataHora);
+      if (chaveDia !== diaAtual){
+        if (diaAtual !== null) html += '</div>';
+        diaAtual = chaveDia;
+        html += '<div class="dia-grupo"><p class="dia-cabecalho">' + diaLabel(entrada.dataHora) + '</p>';
+      }
+      if (entrada.tipo === 'mov'){
+        html += movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje' });
+        totalValorMovs += allMovs[entrada.id].valor;
+      } else {
+        html += contagemCardHtml(entrada.id, allContagens[entrada.id], { isEarliest: entrada.id === earliestId });
+      }
     });
+    html += '</div>';
 
-    filterSummaryEl.textContent = ids.length + (ids.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValor);
+    var resumoPartes = [];
+    if (modoLista !== 'contagens'){
+      resumoPartes.push(movIds.length + (movIds.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValorMovs));
+    }
+    if (contagemIds.length > 0 || modoLista === 'contagens'){
+      resumoPartes.push(contagemIds.length + (contagemIds.length === 1 ? ' contagem' : ' contagens'));
+    }
+    filterSummaryEl.textContent = resumoPartes.join(' · ');
     movListEl.innerHTML = html;
   }
 
@@ -2583,6 +2841,7 @@
   contagensRef.on('value', function(snapshot){
     allContagens = snapshot.val() || {};
     renderSaldosVivos();
+    renderList();
     if (contagemState) atualizarContagemTotais();
   });
 
