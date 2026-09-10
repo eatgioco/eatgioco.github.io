@@ -5,25 +5,53 @@
    e pelo mrn-dashboard.html (cartão Posição Financeira). Nunca reimplementar
    por página — ver CLAUDE.md, nós caixaContagens e cofreMovimentos.
 
-   ultimaContagem(contagens)         → a contagem mais recente por dataHora, ou null
+   dataHoraValida(iso)               → string ISO parseável por new Date(), só isso.
+                                       Fonte ÚNICA desta validação — caixa.html delega
+                                       aqui em vez de manter a sua própria cópia.
+   ultimaContagem(contagens)         → a contagem mais recente por dataHora, ou null.
+                                       Um registo com dataHora inválida (ex.: 'ontem')
+                                       é tratado como inexistente — nunca vira âncora
+                                       só por new Date(invalida) > x dar sempre false.
+   contagensInvalidas(contagens)     → ids de contagens com dataHora inválida, para a
+                                       página avisar que ficaram fora do cálculo.
    saldoVivoCaixa(contagens, movs)   → total da última contagem + caixaMovimentos
                                        posteriores (entrada +valor; saída 'acertado'
                                        −(valor − valorDevolvido); saída 'aberto' −valor).
-                                       null SEM contagem nenhuma — não é 0.
+                                       null SEM contagem nenhuma — não é 0. Movimentos
+                                       com dataHora inválida continuam excluídos da
+                                       soma (ver movimentosInvalidos, mesma condição).
+   movimentosInvalidos(contagens, movs) → ids de caixaMovimentos com dataHora inválida
+                                       que saldoVivoCaixa excluiu em silêncio da soma —
+                                       chamar ao lado de saldoVivoCaixa para avisar na UI;
+                                       [] sem contagem (nada foi calculado, nada foi excluído).
    saldoCofre(cofreMovs)             → soma CUMULATIVA entradas − saídas de toda a história
 */
 (function(){
   function round2(n){ return Math.round(n * 100) / 100; }
+
+  function dataHoraValida(iso){
+    return typeof iso === 'string' && !!iso && !isNaN(new Date(iso).getTime());
+  }
 
   function ultimaContagem(contagens){
     var all = contagens || {};
     var melhor = null;
     Object.keys(all).forEach(function(id){
       var c = all[id];
-      if (!c || !c.dataHora) return;
+      if (!c || !dataHoraValida(c.dataHora)) return;
       if (!melhor || new Date(c.dataHora) > new Date(melhor.dataHora)) melhor = c;
     });
     return melhor;
+  }
+
+  function contagensInvalidas(contagens){
+    var all = contagens || {};
+    var out = [];
+    Object.keys(all).forEach(function(id){
+      var c = all[id];
+      if (c && !dataHoraValida(c.dataHora)) out.push(id);
+    });
+    return out;
   }
 
   function saldoVivoCaixa(contagens, movs){
@@ -34,9 +62,9 @@
     var desde = new Date(contagem.dataHora).getTime();
     Object.keys(all).forEach(function(id){
       var m = all[id];
-      if (!m) return;
+      if (!m || !dataHoraValida(m.dataHora)) return;
       var t = new Date(m.dataHora).getTime();
-      if (isNaN(t) || t <= desde) return;
+      if (t <= desde) return;
       if (m.tipo === 'entrada'){
         saldo += (parseFloat(m.valor) || 0);
       } else if (m.estado === 'acertado'){
@@ -46,6 +74,18 @@
       }
     });
     return round2(saldo);
+  }
+
+  function movimentosInvalidos(contagens, movs){
+    var contagem = ultimaContagem(contagens);
+    if (!contagem) return [];
+    var all = movs || {};
+    var out = [];
+    Object.keys(all).forEach(function(id){
+      var m = all[id];
+      if (m && !dataHoraValida(m.dataHora)) out.push(id);
+    });
+    return out;
   }
 
   function saldoCofre(cofreMovs){
@@ -60,8 +100,11 @@
   }
 
   window.GiocoCaixa = {
+    dataHoraValida: dataHoraValida,
     ultimaContagem: ultimaContagem,
+    contagensInvalidas: contagensInvalidas,
     saldoVivoCaixa: saldoVivoCaixa,
+    movimentosInvalidos: movimentosInvalidos,
     saldoCofre: saldoCofre
   };
 })();

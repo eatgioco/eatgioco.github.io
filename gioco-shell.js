@@ -84,6 +84,9 @@
     '<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>',
     /* Set/2026, videochamada nos eventos do Outlook (calendario.html): */
     '<symbol id="i-video" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></symbol>',
+    /* Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html: */
+    '<symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>',
+    '<symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -107,7 +110,9 @@
     // Set/2026, reorganização caixa.html
     'coins', 'list', 'lock',
     // Set/2026, videochamada nos eventos do Outlook (calendario.html):
-    'video'
+    'video',
+    // Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html:
+    'arrow-down', 'arrow-up'
   ];
 
   function injectSprite() {
