@@ -49,6 +49,13 @@
      superfície, e o --mustard/--lime (que são fundo de selo) não servem aqui.
      O valor claro do --amber NÃO é o #B8860B que vinha do vendas.html: esse
      dava 2,89:1 sobre o --dough, abaixo do mínimo. #8A6508 dá 4,72:1. */
+  /* --gio-mov: a curva e a duração do movimento dos controlos do design
+     system. Vivia escrita à mão no knob e no ghost do .gio-toggle; foi
+     promovida a token em Set/2026, quando o .gio-seg passou a precisar
+     EXACTAMENTE do mesmo movimento — é desse movimento partilhado que os
+     dois componentes se lêem como família. Valor herdado verbatim do
+     toggle de tema: não alterar sem validação. */
+  --gio-mov:.3s cubic-bezier(.4,0,.2,1);
   --green:#1E7A46;
   --green-bg:#EEF6F1;
   --amber:#8A6508;
@@ -94,7 +101,7 @@ body{
    estava no .cc-switch do centro-de-controlo e no .pf-switch do dashboard).
 
    ADN visual herdado do toggle de tema, que é a referência: pílula, knob
-   circular que desliza, mesma curva e duração (.3s cubic-bezier(.4,0,.2,1)).
+   circular que desliza, mesma curva e duração (var(--gio-mov), partilhada com o .gio-seg).
 
    NÃO MUDA DE APARÊNCIA COM O TEMA — de propósito. As cores são literais
    fixas nos dois temas (a única excepção é a variante --theme, cujo estado
@@ -161,7 +168,7 @@ body{
      mix-blend-mode do brilho na variante --theme. Sem isto o knob do tema
      escuro perdia o brilho (medido: 109 pixeis a diferir do original). */
   transform:translateX(0);
-  transition:transform .3s cubic-bezier(.4,0,.2,1), background .3s ease;
+  transition:transform var(--gio-mov), background .3s ease;
 }
 .gio-toggle-input:checked ~ .gio-toggle-track{ background:var(--red); border-color:rgba(0,0,0,0.12); }
 .gio-toggle-input:checked ~ .gio-toggle-track .gio-toggle-knob{ transform:translateX(var(--gt-travel)); }
@@ -189,9 +196,148 @@ body{
   display:flex; align-items:center; justify-content:center;
   position:absolute; top:var(--gt-pad); left:var(--gt-pad); pointer-events:none;
   transform:translateX(var(--gt-travel)); color:#5c5c58;
-  transition:transform .3s cubic-bezier(.4,0,.2,1), color .3s ease;
+  transition:transform var(--gio-mov), color .3s ease;
 }
 .gio-toggle-input:checked ~ .gio-toggle-track .gio-toggle-ghost{ transform:translateX(0); color:#b8b2a5; }
+
+/* ===== .gio-seg — COMPONENTE OFICIAL DE ESCOLHA UMA-DE-N =====
+   O segmentado do OS: N opções todas visíveis ao mesmo tempo, uma escolhida.
+   Irmão do .gio-toggle, e a fronteira entre os dois não é o número de
+   opções — é o que se está a fazer:
+     .gio-toggle    ligar/desligar UMA propriedade que persiste.
+     .gio-seg       escolher UMA de N opções mutuamente exclusivas
+                    (filtros, modos, períodos, vistas).
+     checkbox nativo  marcar itens de uma lista, ou um campo de formulário.
+   O par Sim/Não de uma pergunta é .gio-seg, não um toggle: os dois rótulos
+   à vista SÃO a informação (ver o "Vai haver troco?" da caixa.html).
+
+   ADN PARTILHADO com o .gio-toggle, e é só isto que os faz família:
+   var(--gio-mov) no movimento do indicador (a mesma curva e duração do
+   knob), a sombra do knob (0 1px 3px rgba(0,0,0,0.25)) no indicador, o
+   raio de 100px, o :focus-visible a vermelho e o :disabled a .5.
+
+   AO CONTRÁRIO DO TOGGLE, ACOMPANHA O TEMA. O toggle é um objecto POR CIMA
+   da página e tem cores literais fixas nos dois temas; o segmentado é uma
+   SUPERFÍCIE da página — um recesso com uma pastilha lá dentro — e um
+   recesso claro sobre uma página escura não é um recesso. Daí
+   var(--dough) no contentor, var(--white) no indicador, var(--ink) na
+   opção activa e var(--muted) nas inactivas.
+
+   LARGURAS: as opções acompanham o texto (padding horizontal constante),
+   nunca uma largura fixa igual para todas — "Hoje" e "Últimos 7 dias" numa
+   grelha de colunas iguais deixavam espaço morto de um lado e apertavam o
+   outro. É por isso que o indicador NÃO é CSS: é posicionado e dimensionado
+   em JS a partir do offsetLeft/offsetWidth reais da opção activa
+   (giocoSegSync, gioco-shell.js).
+
+   UMA LINHA SÓ, SEMPRE: sem flex-wrap. Não cabendo, o contentor faz scroll
+   horizontal com snap. Quebrar para uma segunda linha parte a leitura do
+   grupo (era o defeito dos filtros da caixa.html, com o "Tudo" caído
+   sozinho na linha de baixo).
+
+   ESTRUTURA (role de tablist; o indicador é o PRIMEIRO filho e é
+   aria-hidden — é decoração, o estado vive no aria-selected das opções):
+
+     <div class="gio-seg" role="tablist" aria-label="Período">
+       <span class="gio-seg-ind" aria-hidden="true"></span>
+       <button type="button" class="gio-seg-opt" role="tab"
+               data-valor="hoje" aria-selected="true" tabindex="0">Hoje</button>
+       <button type="button" class="gio-seg-opt" role="tab"
+               data-valor="tudo" aria-selected="false" tabindex="-1">Tudo</button>
+     </div>
+
+   ÍNDICE -1 (nenhuma opção activa): indicador a opacity:0 e NENHUM
+   aria-selected="true". É estado TRANSITÓRIO DE FORMULÁRIO — um campo que
+   ainda não foi respondido, ou que foi reposto depois de gravar (o
+   Saída/Entrada da caixa.html volta a -1 a cada registo). NUNCA é válido
+   num filtro, num modo ou numa vista: aí há sempre uma escolhida, senão a
+   lista por baixo não tem estado nenhum que a explique.
+
+   MEDIDAS: duas, mesmo desenho, derivadas por variáveis — nunca duplicar as
+   regras para mudar de tamanho.
+     .gio-seg        34px de altura — a de todo o lado (filtros, modos).
+     .gio-seg--lg    42px — controlo primário, ou opções com ícone + texto,
+                     que na medida compacta ficam apertadas. */
+.gio-seg{
+  --gs-h:34px; --gs-pad:3px; --gs-px:14px; --gs-fs:12.5px;
+  position:relative;
+  display:inline-flex; vertical-align:middle; align-items:stretch;
+  max-width:100%;
+  padding:var(--gs-pad);
+  border:1px solid var(--line);
+  border-radius:100px;
+  background:var(--dough);
+  font-family:'Inter',sans-serif;
+  /* Uma linha só. O scroll é do contentor e leva snap para as opções não
+     ficarem cortadas a meio ao parar. Sem barra à vista: é uma pílula. */
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.gio-seg::-webkit-scrollbar{ display:none; }
+.gio-seg--lg{ --gs-h:42px; --gs-pad:4px; --gs-px:18px; --gs-fs:13.5px; }
+
+/* O indicador. width/transform são escritos pelo JS; aqui fica só o
+   desenho e o movimento. Enquanto não tiver sido colocado uma primeira vez
+   (data-seg-pronto), não transiciona — senão o markup acabado de injectar
+   (o motivo da retirada do cofre é regenerado a cada clique) via-se a
+   deslizar da esquerda até ao sítio certo. */
+.gio-seg-ind{
+  position:absolute; top:var(--gs-pad); left:0;
+  width:0; height:var(--gs-h);
+  border-radius:100px;
+  background:var(--white);
+  box-shadow:0 1px 3px rgba(0,0,0,0.25);
+  opacity:0;
+  pointer-events:none;
+  transform:translateX(0);
+  transition:transform var(--gio-mov), width var(--gio-mov), opacity .18s ease;
+  z-index:0;
+}
+.gio-seg:not([data-seg-pronto]) .gio-seg-ind{ transition:none; }
+
+.gio-seg-opt{
+  position:relative; z-index:1;
+  flex:0 0 auto;
+  height:var(--gs-h);
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  margin:0; padding:0 var(--gs-px);
+  border:0; background:none;
+  border-radius:100px;
+  -webkit-appearance:none; appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  font-family:inherit; font-size:var(--gs-fs); font-weight:600;
+  line-height:1; white-space:nowrap;
+  color:var(--muted);
+  cursor:pointer;
+  scroll-snap-align:start;
+  /* Só a cor transiciona. O peso da fonte fica FIXO nos dois estados de
+     propósito: mudá-lo mudava a largura da opção ao ser escolhida, e o
+     indicador — que é medido dessa largura — perseguia um alvo em
+     movimento. O contraste --muted → --ink chega para ler o estado. */
+  transition:color .18s ease;
+}
+.gio-seg-opt .icon{ width:14px; height:14px; }
+.gio-seg-opt[aria-selected="true"]{ color:var(--ink); }
+.gio-seg-opt:not([aria-selected="true"]):not(:disabled):hover{ color:var(--ink); }
+.gio-seg-opt:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
+.gio-seg-opt:disabled{ opacity:.5; cursor:not-allowed; }
+
+/* No tema escuro o indicador (--white → #1f1c17) sobre o contentor
+   (--dough → #15130f) é uma diferença pequena, e a sombra preta não se vê
+   sobre fundo escuro. O relevo passa a vir de um fio de luz no topo, como
+   já fazem os vidros do shell. */
+[data-theme="dark"] .gio-seg-ind{
+  box-shadow:0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* VARIANTE --red: indicador vermelho, texto branco por cima. É para quando
+   o segmentado É a acção em destaque do bloco, não um filtro. Um filtro em
+   vermelho compete com os botões de acção da página e passa a ler-se como
+   alerta — por isso a variante existe, mas o default é o normal. */
+.gio-seg--red .gio-seg-ind{ background:var(--red); box-shadow:0 1px 3px rgba(0,0,0,0.25); }
+.gio-seg--red .gio-seg-opt[aria-selected="true"]{ color:var(--on-red); }
 
 /* ===== LIQUID GLASS — brilho especular diagonal + rebordo em relevo + distorção subtil ===== */
 .glass{

@@ -150,46 +150,14 @@
     color:var(--muted);
   }
 
-  .tipo-toggle{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:8px;
-    margin-bottom:12px;
-  }
-
-  .tipo-btn{
-    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
-    font-size:14px;
-    font-weight:700;
-    padding:11px 8px;
-    border:1px solid var(--line);
-    background:var(--white);
-    color:var(--ink);
-    cursor:pointer;
-  }
-
-  .tipo-btn:hover{
-    background:var(--dough);
-  }
-
-  .tipo-btn.saida.active{
-    background:var(--red);
-    border-color:var(--red);
-    color:var(--on-red);
-  }
-
-  .tipo-btn.entrada.active{
-    background:var(--green);
-    border-color:var(--green);
-    color:#FFFFFF;
-  }
-
-  /* "Vai haver troco?" — mesmo desenho dos botões Saída/Entrada. */
-  .tipo-btn.troco.active{
-    background:var(--ink);
-    border-color:var(--ink);
-    color:var(--white);
-  }
+  /* Os pares Saída/Entrada e Sim/Não passaram ao .gio-seg do shell em
+     Set/2026 (com o .tipo-toggle/.tipo-btn que aqui viviam). A única coisa
+     local que sobra é a folga por baixo do grupo do tipo — o resto do
+     desenho é do componente e não se repinta por página. */
+  .tipo-seg{ margin-bottom:12px; }
+  /* Invólucro do segmentado do motivo da retirada do cofre: só a folga por
+     baixo, tal como o .tipo-seg. Zero desenho — o desenho é do componente. */
+  .seg-linha{ margin-bottom:12px; }
 
   .field{
     margin-bottom:12px;
@@ -260,28 +228,10 @@
     transform:translateY(1px);
   }
 
-  /* ---------- Filter tabs ---------- */
-  .filter-tabs{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-  }
-
-  .filter-tab{
-    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
-    font-size:12px;
-    font-weight:700;
-    padding:9px 18px;
-    border:1px solid var(--line);
-    background:var(--white);
-    color:var(--ink);
-    cursor:pointer;
-  }
-
-  .filter-tab.active{
-    background:var(--ink);
-    color:var(--white);
-  }
+  /* Os filtros (modo da listagem e período) são .gio-seg do shell desde
+     Set/2026. O .filter-tabs que aqui vivia tinha flex-wrap e era isso que
+     punha o "Tudo" caído sozinho na segunda linha em ecrã estreito; o
+     componente mantém-se numa linha só e faz scroll quando não cabe. */
 
   .filter-extra{
     display:flex;
@@ -1042,7 +992,7 @@
     color:var(--muted);
   }
 
-  .btn, .tipo-btn, .btn-small, .badge, .badge-fatura, .badge-semfatura, .btn-upload{ border-radius:100px; }
+  .btn, .btn-small, .badge, .badge-fatura, .badge-semfatura, .btn-upload{ border-radius:100px; }
   input, select, textarea,
   .summary-card, .form-card, .modal, .mov-row, .fatura-bloco, .pending-empty, .fatura-thumb{ border-radius:12px; }
   .modal{ border-radius:16px; }
@@ -1194,9 +1144,22 @@
         <div class="form-card">
           <p class="form-title">Registar movimento</p>
           <form id="movForm">
-            <div class="tipo-toggle">
-              <button type="button" class="tipo-btn saida" id="tipoSaidaBtn">− Saída</button>
-              <button type="button" class="tipo-btn entrada" id="tipoEntradaBtn">+ Entrada</button>
+            <!-- Segmentado do design system. Arranca no índice -1 (nenhuma
+                 opção activa) e volta a -1 depois de cada registo: é o
+                 estado transitório de formulário documentado no shell.
+                 Medida --lg porque leva ícone + texto, que na compacta
+                 ficava apertado; os ícones são os MESMOS das linhas de
+                 movimento (seta para baixo/cima), herdam a cor do texto e
+                 nunca substituem o rótulo — ao balcão distingue-se num
+                 relance sem depender da cor. -->
+            <div class="gio-seg gio-seg--lg tipo-seg" id="tipoSeg" role="tablist" aria-label="Tipo de movimento">
+              <span class="gio-seg-ind" aria-hidden="true"></span>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="saida" aria-selected="false" tabindex="0">
+                <svg class="icon" width="14" height="14" aria-hidden="true"><use href="#i-arrow-down"/></svg><span>Saída</span>
+              </button>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="entrada" aria-selected="false" tabindex="-1">
+                <svg class="icon" width="14" height="14" aria-hidden="true"><use href="#i-arrow-up"/></svg><span>Entrada</span>
+              </button>
             </div>
 
             <div class="field">
@@ -1219,9 +1182,10 @@
             <!-- Só em saídas Compra / Pagamento a fornecedor. Obrigatório. -->
             <div class="field" id="trocoField" style="display:none;">
               <span class="field-label">Vai haver troco?</span>
-              <div class="tipo-toggle" style="margin-bottom:0;">
-                <button type="button" class="tipo-btn troco" id="trocoSimBtn">Sim</button>
-                <button type="button" class="tipo-btn troco" id="trocoNaoBtn">Não</button>
+              <div class="gio-seg" id="trocoSeg" role="tablist" aria-label="Vai haver troco?">
+                <span class="gio-seg-ind" aria-hidden="true"></span>
+                <button type="button" class="gio-seg-opt" role="tab" data-valor="sim" aria-selected="false" tabindex="0"><span>Sim</span></button>
+                <button type="button" class="gio-seg-opt" role="tab" data-valor="nao" aria-selected="false" tabindex="-1"><span>Não</span></button>
               </div>
             </div>
 
@@ -1250,16 +1214,18 @@
       <div class="listing-section">
         <p class="section-title">Todos os movimentos</p>
 
-        <div class="filter-tabs" id="modoListaTabs" style="margin-bottom:10px;">
-          <button type="button" class="filter-tab active" data-modo="tudo">Tudo</button>
-          <button type="button" class="filter-tab" data-modo="contagens">Só contagens</button>
+        <div class="gio-seg" id="modoListaSeg" role="tablist" aria-label="Modo da listagem" style="margin-bottom:10px;">
+          <span class="gio-seg-ind" aria-hidden="true"></span>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="tudo" aria-selected="true" tabindex="0"><span>Tudo</span></button>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="contagens" aria-selected="false" tabindex="-1"><span>Só contagens</span></button>
         </div>
 
-        <div class="filter-tabs">
-          <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
-          <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
-          <button type="button" class="filter-tab" data-filter="mes">Mês</button>
-          <button type="button" class="filter-tab" data-filter="tudo">Tudo</button>
+        <div class="gio-seg" id="periodoSeg" role="tablist" aria-label="Período">
+          <span class="gio-seg-ind" aria-hidden="true"></span>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="hoje" aria-selected="true" tabindex="0"><span>Hoje</span></button>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="7dias" aria-selected="false" tabindex="-1"><span>Últimos 7 dias</span></button>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="mes" aria-selected="false" tabindex="-1"><span>Mês</span></button>
+          <button type="button" class="gio-seg-opt" role="tab" data-valor="tudo" aria-selected="false" tabindex="-1"><span>Tudo</span></button>
         </div>
 
         <div class="filter-extra">
@@ -1793,6 +1759,9 @@
     });
     document.querySelectorAll('.tool-bloco[data-grupo="' + grupo + '"]').forEach(function(b){
       b.hidden = b.getAttribute('data-tool') !== tool;
+      // Um bloco escondido não tem medidas, e o indicador dos segmentados
+      // lá dentro é medido do layout real: recolocar assim que abre.
+      if (!b.hidden) giocoSegSync(b);
     });
   }
 
@@ -1962,7 +1931,7 @@
 
   var allMovs = {};
   var activeFilter = 'hoje';
-  var modoLista = 'tudo'; // 'tudo' | 'contagens' — toggle acima dos filter-tabs
+  var modoLista = 'tudo'; // 'tudo' | 'contagens' — segmentado acima dos filtros
   var mesFiltroInput = document.getElementById('mesFiltroInput');
   var motivoFiltroSelect = document.getElementById('motivoFiltroSelect');
   var filterSummaryEl = document.getElementById('filterSummary');
@@ -1973,16 +1942,14 @@
   var mesFiltroSelecionado = null;
   var formState = { tipo: null, troco: null };
 
-  var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
-  var tipoEntradaBtn = document.getElementById('tipoEntradaBtn');
+  var tipoSeg = document.getElementById('tipoSeg');
   var valorInput = document.getElementById('valorInput');
   var motivoSelect = document.getElementById('motivoSelect');
   var motivoDetalheField = document.getElementById('motivoDetalheField');
   var motivoDetalheLabel = document.getElementById('motivoDetalheLabel');
   var motivoDetalheInput = document.getElementById('motivoDetalheInput');
   var trocoField = document.getElementById('trocoField');
-  var trocoSimBtn = document.getElementById('trocoSimBtn');
-  var trocoNaoBtn = document.getElementById('trocoNaoBtn');
+  var trocoSeg = document.getElementById('trocoSeg');
   var pessoaSelect = document.getElementById('pessoaSelect');
   var registarBtn = document.getElementById('registarBtn');
   var movForm = document.getElementById('movForm');
@@ -2094,8 +2061,9 @@
 
   function setTroco(resposta){
     formState.troco = resposta;
-    trocoSimBtn.classList.toggle('active', resposta === 'sim');
-    trocoNaoBtn.classList.toggle('active', resposta === 'nao');
+    // null → o segmentado fica sem opção activa (índice -1): a pergunta
+    // ainda não foi respondida. O estado em formState não mudou.
+    giocoSegSet(trocoSeg, resposta);
   }
 
   function onMotivoChange(){
@@ -2126,19 +2094,28 @@
 
   function selectTipo(tipo){
     formState.tipo = tipo;
-    tipoSaidaBtn.classList.toggle('active', tipo === 'saida');
-    tipoEntradaBtn.classList.toggle('active', tipo === 'entrada');
+    giocoSegSet(tipoSeg, tipo);
     populateMotivoSelect(tipo);
     validateForm();
   }
 
-  tipoSaidaBtn.addEventListener('click', function(){ selectTipo('saida'); valorInput.focus(); });
-  tipoEntradaBtn.addEventListener('click', function(){ selectTipo('entrada'); valorInput.focus(); });
+  // Delegação no contentor: o componente trata do aria-selected e do
+  // indicador, a página só lê o data-valor da opção clicada.
+  tipoSeg.addEventListener('click', function(ev){
+    var btn = ev.target.closest ? ev.target.closest('.gio-seg-opt') : null;
+    if (!btn || btn.disabled) return;
+    selectTipo(btn.getAttribute('data-valor'));
+    valorInput.focus();
+  });
   valorInput.addEventListener('input', validateForm);
   motivoSelect.addEventListener('change', onMotivoChange);
   motivoDetalheInput.addEventListener('input', validateForm);
-  trocoSimBtn.addEventListener('click', function(){ setTroco('sim'); validateForm(); });
-  trocoNaoBtn.addEventListener('click', function(){ setTroco('nao'); validateForm(); });
+  trocoSeg.addEventListener('click', function(ev){
+    var btn = ev.target.closest ? ev.target.closest('.gio-seg-opt') : null;
+    if (!btn || btn.disabled) return;
+    setTroco(btn.getAttribute('data-valor'));
+    validateForm();
+  });
 
   movForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -2213,9 +2190,8 @@
       });
     }).then(function(){
       valorInput.value = '';
+      // selectTipo(null) já devolve o segmentado ao índice -1.
       selectTipo(null);
-      tipoSaidaBtn.classList.remove('active');
-      tipoEntradaBtn.classList.remove('active');
       registarBtn.textContent = 'Registar';
       validateForm();
     }).catch(function(err){
@@ -2225,24 +2201,20 @@
     });
   });
 
-  document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      modoLista = btn.getAttribute('data-modo');
-      document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(b){ b.classList.remove('active'); });
-      btn.classList.add('active');
-      motivoFiltroSelect.style.display = (modoLista === 'contagens') ? 'none' : '';
-      renderList();
-    });
+  document.getElementById('modoListaSeg').addEventListener('click', function(ev){
+    var btn = ev.target.closest ? ev.target.closest('.gio-seg-opt') : null;
+    if (!btn || btn.disabled) return;
+    modoLista = btn.getAttribute('data-valor');
+    motivoFiltroSelect.style.display = (modoLista === 'contagens') ? 'none' : '';
+    renderList();
   });
 
-  document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      activeFilter = btn.getAttribute('data-filter');
-      mesFiltroInput.style.display = (activeFilter === 'mes') ? 'inline-block' : 'none';
-      document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(b){ b.classList.remove('active'); });
-      btn.classList.add('active');
-      renderList();
-    });
+  document.getElementById('periodoSeg').addEventListener('click', function(ev){
+    var btn = ev.target.closest ? ev.target.closest('.gio-seg-opt') : null;
+    if (!btn || btn.disabled) return;
+    activeFilter = btn.getAttribute('data-valor');
+    mesFiltroInput.style.display = (activeFilter === 'mes') ? 'inline-block' : 'none';
+    renderList();
   });
 
   mesFiltroInput.addEventListener('change', function(){
@@ -3093,6 +3065,18 @@
     return true;
   }
 
+  // O segmentado do motivo é regenerado a cada render, por isso o clique é
+  // delegado no wrapper, que é estático (antes era um onclick inline).
+  (function(){
+    var wrap = document.getElementById('retirarCofreFormWrap');
+    if (!wrap) return;
+    wrap.addEventListener('click', function(ev){
+      var btn = ev.target.closest ? ev.target.closest('#retirarMotivoSeg .gio-seg-opt') : null;
+      if (!btn || btn.disabled) return;
+      setRetirarMotivo(btn.getAttribute('data-valor'));
+    });
+  })();
+
   function setRetirarMotivo(v){
     if (!retirarCofre) return;
     retirarCofre.motivo = v;
@@ -3138,11 +3122,16 @@
     var excede = !isNaN(valor) && valor > saldo + 1e-9;
 
     var html = '<div class="acertar-form">';
-    html += '<div class="tipo-toggle" style="grid-template-columns:repeat(3,1fr);">';
-    RETIRAR_MOTIVO_OPTIONS.forEach(function(o){
-      html += '<button type="button" class="tipo-btn troco' + (st.motivo === o.value ? ' active' : '') + '" onclick="setRetirarMotivo(\'' + o.value + '\')">' + escapeHtml(o.label) + '</button>';
-    });
-    html += '</div>';
+    // Segmentado gerado: o markup é refeito a cada renderCofre(), por isso o
+    // indicador é colocado logo a seguir ao innerHTML (giocoSegSync).
+    html += '<div class="seg-linha">' + giocoSegHtml({
+      id: 'retirarMotivoSeg',
+      rotuloGrupo: 'Motivo da retirada',
+      ativa: st.motivo,
+      opcoes: RETIRAR_MOTIVO_OPTIONS.map(function(o){
+        return { valor: o.value, rotulo: escapeHtml(o.label) };
+      })
+    }) + '</div>';
 
     if (opcao && opcao.detailLabel){
       html += '<div class="field"><label class="field-label">' + escapeHtml(opcao.detailLabel) + '</label>';
@@ -3250,9 +3239,13 @@
       if (retirarCofre){
         btn.style.display = 'none';
         wrap.innerHTML = retirarCofreFormHtml(saldo);
+        // O markup é novo em cada render: colocar o indicador antes do
+        // primeiro paint, senão via-se um salto de posição.
+        giocoSegSync(wrap);
       } else {
         btn.style.display = '';
         wrap.innerHTML = '';
+        giocoSegSync(wrap);
       }
     }
     if (!retirarCofre && toolAberta.cofre === 'retirar') setTool('cofre', null);
