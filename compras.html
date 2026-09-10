@@ -885,8 +885,12 @@
 
   /* Arquivados: escondidos por omissão, visíveis com o toggle. Quando visíveis,
      o cartão fica esbatido e leva o selo — nunca desaparecem da base de dados. */
-  /* Só o que a linha precisa: a pílula é do componente .gio-toggle. */
-  .arq-toggle{ font-size:12px;color:var(--muted);white-space:nowrap; }
+  .arq-toggle{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:'Inter',sans-serif;font-size:12px;color:var(--muted);
+    white-space:nowrap;cursor:pointer;
+  }
+  .arq-toggle input{ accent-color:var(--red);cursor:pointer; }
   .ing-card.arquivado{ opacity:0.55; }
   .ing-card.arquivado:hover{ opacity:1; }
   .selo-arquivado{
@@ -1902,13 +1906,10 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-shopping-cart"/></svg>GIOCO · <b>Compras</b></h1>
         <div class="spacer"></div>
-        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
-          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
-          <span class="gio-toggle-track">
-            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
-            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
-          </span>
-        </label>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
       </div>
 
       <p class="page-subtitle">Fornecedores, ingredientes e encomendas</p>
@@ -1959,7 +1960,7 @@
   <div class="controls">
     <input type="text" class="search-input" id="ingSearchInput" placeholder="Pesquisar ingrediente por nome...">
     <button type="button" class="btn" id="btnCatManage">⚙ Categorias</button>
-    <label class="gio-toggle arq-toggle"><input type="checkbox" class="gio-toggle-input" id="ingMostrarArquivados"><span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span> <span class="gio-toggle-txt">Mostrar arquivados</span></label>
+    <label class="arq-toggle"><input type="checkbox" id="ingMostrarArquivados"> Mostrar arquivados</label>
   </div>
 
   <div class="ing-chips" id="ingCatChips"></div>

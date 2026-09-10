@@ -215,11 +215,11 @@
     try {
       document.body.setAttribute('data-theme', t);
       storeTheme(t);
-      /* O toggle de tema é o componente .gio-toggle na variante --theme:
-         LIGADO = tema claro, DESLIGADO = tema escuro. O estado vive no
-         checkbox nativo, não numa classe. */
-      var input = document.getElementById('toggleInput');
-      if (input) input.checked = (t === 'light');
+      var track = document.getElementById('toggleTrack');
+      if (track) {
+        track.classList.toggle('is-dark', t === 'dark');
+        track.classList.toggle('is-light', t === 'light');
+      }
       setIcon('knobIcon', t === 'dark' ? 'moon' : 'sun');
       setIcon('ghostIcon', t === 'dark' ? 'sun' : 'moon');
     } catch (e) { /* nunca travar o resto do script */ }
@@ -243,95 +243,12 @@
 
   function initTheme() {
     try {
-      var input = document.getElementById('toggleInput');
-      if (input && !input.getAttribute('onchange')) {
-        input.addEventListener('change', toggleThemeSwitch);
+      var track = document.getElementById('toggleTrack');
+      if (track && !track.getAttribute('onclick')) {
+        track.addEventListener('click', toggleThemeSwitch);
       }
       // Sincroniza o knob/ghost com o que já foi aplicado ao <body>.
       setTheme(document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
-    } catch (e) { /* nunca travar o resto do script */ }
-  }
-
-  /* ---------- .gio-toggle — CONTROLO BINÁRIO ----------
-     A wrapper do componente oficial de ligar/desligar (CSS em
-     gioco-shell.css). Trabalha SEMPRE por referência de elemento ou por
-     markup gerado, NUNCA por id fixo: tem de haver N por página — o
-     centro-de-controlo tem uma dúzia de flags do A/C e do Sonos.
-
-     Não há init nem estado em JS: o estado é o do <input type="checkbox">
-     nativo, e é o CSS que o desenha. Estas funções são só conveniência para
-     quem constrói HTML dinamicamente e para reflectir estado vindo do
-     Firebase. */
-
-  /* Markup do componente. Todas as opções são opcionais:
-       id          id do <input> — é sempre no input que vive o handler
-       classe      classes extra no <label>
-       grande      true → .gio-toggle--lg (64x32, a medida do toggle de tema)
-       ligado      estado inicial
-       desativado  disabled no input
-       rotulo      rótulo ao lado da pílula
-       rotuloAntes true → rótulo à esquerda (por omissão fica à direita)
-       attrs       atributos crus para o <input>: onchange, data-*,
-                   aria-label, title…
-     ATENÇÃO: 'rotulo' e 'attrs' entram como HTML, tal e qual — é o padrão
-     do resto do OS, que constrói markup por concatenação. Nunca lhes passar
-     texto vindo do utilizador sem escapar primeiro. */
-  function giocoToggleHtml(o) {
-    o = o || {};
-    var cls = 'gio-toggle' + (o.grande ? ' gio-toggle--lg' : '') + (o.classe ? ' ' + o.classe : '');
-    var txt = o.rotulo ? '<span class="gio-toggle-txt">' + o.rotulo + '</span>' : '';
-    var pilula = '<span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>';
-    return '<label class="' + cls + '">' +
-             '<input type="checkbox" class="gio-toggle-input"' +
-             (o.id ? ' id="' + o.id + '"' : '') +
-             (o.ligado ? ' checked' : '') +
-             (o.desativado ? ' disabled' : '') +
-             (o.attrs ? ' ' + o.attrs : '') + '>' +
-             (o.rotuloAntes ? txt + pilula : pilula + txt) +
-           '</label>';
-  }
-
-  /* Aplica estado a um toggle JÁ no DOM, por referência — aceita o <label>,
-     a track ou o próprio input. NÃO dispara 'change': serve para reflectir
-     estado que veio de fora (um snapshot do Firebase), não para simular um
-     clique. Passar 'desativado' como undefined deixa o disabled como está. */
-  function giocoToggleSet(el, ligado, desativado) {
-    try {
-      if (!el) return;
-      var input = (el.classList && el.classList.contains('gio-toggle-input'))
-        ? el
-        : (el.closest ? (el.closest('.gio-toggle') || el) : el);
-      if (input && !input.classList.contains('gio-toggle-input')) {
-        input = input.querySelector ? input.querySelector('.gio-toggle-input') : null;
-      }
-      if (!input) return;
-      input.checked = !!ligado;
-      if (desativado !== undefined) input.disabled = !!desativado;
-    } catch (e) { /* nunca travar o resto do script */ }
-  }
-
-  /* Um checkbox nativo responde ao ESPAÇO, nunca ao ENTER. O componente
-     substituiu botões, que respondiam aos dois — acrescenta-se o Enter para
-     não se perder um caminho de teclado que já existia. Dispara 'change'
-     para os handlers de sempre correrem exactamente como no clique.
-     Delegado no document: apanha também os toggles criados depois. */
-  function initToggleTeclado() {
-    try {
-      document.addEventListener('keydown', function (ev) {
-        try {
-          if (ev.key !== 'Enter' || ev.altKey || ev.ctrlKey || ev.metaKey) return;
-          var alvo = ev.target;
-          if (!alvo || !alvo.classList || !alvo.classList.contains('gio-toggle-input')) return;
-          if (alvo.disabled) return;
-          ev.preventDefault();
-          alvo.checked = !alvo.checked;
-          /* Os dois eventos, pela ordem do browser: há páginas que ouvem o
-             'input' (o preview da regra na resultados.html) e outras o
-             'change'. Um clique a sério dispara ambos; o Enter também tem de. */
-          alvo.dispatchEvent(new Event('input', { bubbles: true }));
-          alvo.dispatchEvent(new Event('change', { bubbles: true }));
-        } catch (e) { /* silencioso de propósito */ }
-      });
     } catch (e) { /* nunca travar o resto do script */ }
   }
 
@@ -582,7 +499,6 @@
     injectSprite();
     initSidebar();
     initTheme();
-    initToggleTeclado();
     initMenuToque();
     initShellTouch();
   }
@@ -605,8 +521,6 @@
   window.setIcon = setIcon;
   window.setTheme = setTheme;
   window.toggleThemeSwitch = toggleThemeSwitch;
-  window.giocoToggleHtml = giocoToggleHtml;
-  window.giocoToggleSet = giocoToggleSet;
   window.toggleSidebarPin = toggleSidebarPin;
   window.giocoReadStoredTheme = readStoredTheme;
   window.giocoModal = giocoModal;

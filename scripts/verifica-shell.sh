@@ -63,37 +63,19 @@ for f in *.html; do
     aviso "$f: $n emoji pictográfico(s) em markup — substituir por sprite quando houver ícone"
   fi
 
-  # 8. Toggles: o switch é do shell (.gio-toggle), nunca redesenhado por página.
-  #    (a) uma classe com "switch"/"toggle" no nome a desenhar uma PÍLULA
-  #    (border-radius de 100px/999px) é um interruptor com CSS próprio. Não
-  #    apanha um switch escondido debaixo de um nome sem relação — para isso
-  #    valem o CLAUDE.md e a revisão; apanha o caso real, que é copiar o
-  #    desenho de outra página. Sem falsos positivos hoje: o .tipo-toggle da
-  #    caixa.html (par segmentado Saída/Entrada, que NÃO é um switch) é uma
-  #    grelha sem raio de pílula e passa.
-  if grep -qE '\.[a-zA-Z0-9_-]*(switch|toggle)[a-zA-Z0-9_-]*[^{]*\{[^}]*border-radius:[^};]*(100px|999px|9999px)' "$f"; then
-    erro "$f: switch com CSS próprio — usar o componente .gio-toggle do shell"
-  fi
-  #    (b) pintar o componente por dentro é a outra forma de o duplicar.
-  #    Ajustar a MEDIDA pelas variáveis (--gt-w, --gt-h, --gt-knob, --gt-travel)
-  #    ou o alinhamento no .gio-toggle é legítimo; mexer na track ou no knob não.
-  if grep -qE '\.gio-toggle-(track|knob|ghost)[^{]*\{' "$f"; then
-    erro "$f: a página redefine o interior do .gio-toggle (track/knob/ghost)"
-  fi
-
-  # 9. Mobile: shell-mobile exige device-width e vice-topo (só coerência básica).
+  # 8. Mobile: shell-mobile exige device-width e vice-topo (só coerência básica).
   if grep -q 'shell-mobile' "$f" && ! grep -q 'width=device-width' "$f"; then
     erro "$f: shell-mobile sem viewport device-width"
   fi
 done
 
-# 10. Fuga do link privado (regra da navegação).
+# 9. Fuga do link privado (regra da navegação).
 fuga=$(grep -rln 'href=[^>]*mrn-dashboard' --include='*.html' . | grep -vE 'tesouraria.html|conta-bancaria.html|calendario.html|reconciliacao.html' || true)
 if [ -n "$fuga" ]; then
   erro "link privado mrn-dashboard fora de tesouraria/conta-bancaria/calendario/reconciliacao: $fuga"
 fi
 
-# 11. index.html tem de linkar todas as páginas públicas da nav partilhada.
+# 10. index.html tem de linkar todas as páginas públicas da nav partilhada.
 for p in receitas.html compras.html pagamentos.html vendas.html contagens.html gestao.html foodcost.html equipa.html; do
   grep -q "href=\"$p\"" index.html || erro "index.html: falta cartão/link para $p"
 done

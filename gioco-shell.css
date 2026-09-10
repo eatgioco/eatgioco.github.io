@@ -88,110 +88,20 @@ body{
 .num{font-family:'Inter',sans-serif; font-variant-numeric: tabular-nums;}
 .icon{ fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
 
-/* ===== .gio-toggle — COMPONENTE OFICIAL DE CONTROLO BINÁRIO =====
-   O único switch do OS. Qualquer controlo novo de ligar/desligar usa isto e
-   mais nada: não voltar a escrever CSS de pílula+knob por página (era o que
-   estava no .cc-switch do centro-de-controlo e no .pf-switch do dashboard).
-
-   ADN visual herdado do toggle de tema, que é a referência: pílula, knob
-   circular que desliza, mesma curva e duração (.3s cubic-bezier(.4,0,.2,1)).
-
-   NÃO MUDA DE APARÊNCIA COM O TEMA — de propósito. As cores são literais
-   fixas nos dois temas (a única excepção é a variante --theme, cujo estado
-   ESPELHA o tema e por isso acompanha-o). Um switch é o mesmo objecto no
-   claro e no escuro; ler "ligado" não pode depender do tema em que se está.
-   Foi isso que ditou o cinzento do desligado: #6b6660 é o único tom que
-   passa 3:1 contra os DOIS fundos de página (5,06:1 sobre o --dough claro,
-   3,15:1 sobre o escuro). Um desligado claro (o antigo var(--line)) dava
-   1,1:1 no tema claro — invisível. Ligado é var(--red), que já é igual nos
-   dois temas por decisão do Manel: 4,6:1 e 3,45:1. Knob branco: 5,7:1 sobre
-   o desligado, 5,2:1 sobre o vermelho.
-
-   MEDIDAS: duas, mesmo desenho, derivadas por variáveis — nunca duplicar as
-   regras para mudar de tamanho.
-     .gio-toggle            40x22, knob 16 — a de todo o lado (listas, modais,
-                            cartões, flags do centro de controlo).
-     .gio-toggle--lg        64x32, knob 24 — a medida do toggle de tema.
-
-   ESTRUTURA: o <input type="checkbox"> é SEMPRE o primeiro filho do <label>
-   (é dele que saem os seletores ~ de estado) e está escondido sem
-   display:none, para continuar focável, navegável por teclado e legível por
-   leitores de ecrã. O rótulo opcional (.gio-toggle-txt) vai antes ou depois
-   da track, e é a ordem no DOM que decide o lado — sem modificador.
-
-     <label class="gio-toggle">
-       <input type="checkbox" class="gio-toggle-input">
-       <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-       <span class="gio-toggle-txt">Rótulo</span>
-     </label>
-
-   SEM ÍCONES por omissão: o sol/lua e o .gio-toggle-ghost são do toggle de
-   tema e vivem só na variante --theme. */
-.gio-toggle{
-  --gt-w:40px; --gt-h:22px; --gt-pad:3px; --gt-knob:16px; --gt-travel:16px;
-  --gt-shadow:0 1px 4px rgba(0,0,0,0.14);
-  position:relative; display:inline-flex; align-items:center; gap:8px;
-  cursor:pointer; user-select:none;
-  font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink);
-}
-.gio-toggle--lg{
-  --gt-w:64px; --gt-h:32px; --gt-pad:4px; --gt-knob:24px; --gt-travel:32px;
-  --gt-shadow:0 4px 12px rgba(0,0,0,0.12);
-}
-/* Escondido, NUNCA display:none nem visibility:hidden — as duas tiram-no da
-   ordem de tabulação e levam o teclado e o leitor de ecrã com elas. */
-.gio-toggle-input{
-  position:absolute; width:1px; height:1px; margin:0; padding:0;
-  opacity:0; pointer-events:none;
-}
-.gio-toggle-track{
-  width:var(--gt-w); height:var(--gt-h); flex:0 0 auto;
-  border-radius:100px; position:relative;
-  background:#6b6660; border:1px solid rgba(0,0,0,0.10);
-  box-shadow:var(--gt-shadow);
-  transition:background .3s ease, border-color .3s ease;
-}
-.gio-toggle-knob{
-  width:var(--gt-knob); height:var(--gt-knob); border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  position:absolute; top:var(--gt-pad); left:var(--gt-pad); overflow:hidden;
-  background:#ffffff; color:#141414; box-shadow:0 1px 3px rgba(0,0,0,0.25);
-  /* translateX(0) explícito, e não a ausência de transform: um transform
-     não-none cria contexto de empilhamento, e é dele que depende o
-     mix-blend-mode do brilho na variante --theme. Sem isto o knob do tema
-     escuro perdia o brilho (medido: 109 pixeis a diferir do original). */
-  transform:translateX(0);
-  transition:transform .3s cubic-bezier(.4,0,.2,1), background .3s ease;
-}
-.gio-toggle-input:checked ~ .gio-toggle-track{ background:var(--red); border-color:rgba(0,0,0,0.12); }
-.gio-toggle-input:checked ~ .gio-toggle-track .gio-toggle-knob{ transform:translateX(var(--gt-travel)); }
-.gio-toggle-input:focus-visible ~ .gio-toggle-track{ outline:2px solid var(--red); outline-offset:2px; }
-.gio-toggle-input:disabled ~ .gio-toggle-track,
-.gio-toggle-input:disabled ~ .gio-toggle-txt{ opacity:.5; }
-.gio-toggle:has(.gio-toggle-input:disabled){ cursor:not-allowed; }
-.gio-toggle-txt{ line-height:1.3; }
-
-/* ===== VARIANTE --theme: o toggle de claro/escuro =====
-   É o único sítio com ícones e com .gio-toggle-ghost (o ícone do lado vazio),
-   e o único que acompanha o tema — porque o estado dele É o tema.
-   ligado (checked) = tema claro, desligado = tema escuro.
-   Valores herdados verbatim do toggle antigo: não mexer sem validação. */
-.gio-toggle--theme .gio-toggle-track{ background:#0d0d0d; border:1px solid rgba(255,255,255,0.1); }
-.gio-toggle--theme .gio-toggle-knob{ background:#2a2a28; color:#fff; box-shadow:none; }
-.gio-toggle--theme .gio-toggle-input:checked ~ .gio-toggle-track{ background:#ffffff; border:1px solid var(--line); }
-.gio-toggle--theme .gio-toggle-input:checked ~ .gio-toggle-track .gio-toggle-knob{ background:#e9e5dd; color:#141414; }
-.gio-toggle--theme .gio-toggle-knob::before{
+/* ===== THEME TOGGLE (knob desliza + ghost do lado vazio) ===== */
+.toggle-track{ width:64px; height:32px; border-radius:100px; padding:4px; position:relative; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.12); transition:background .3s ease, border-color .3s ease; }
+.toggle-track.is-dark{ background:#0d0d0d; border:1px solid rgba(255,255,255,0.1); }
+.toggle-track.is-light{ background:#ffffff; border:1px solid var(--line); }
+.toggle-knob{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:absolute; top:4px; left:4px; overflow:hidden; transition: transform .3s cubic-bezier(.4,0,.2,1), background .3s ease; }
+.toggle-track.is-dark .toggle-knob{ transform:translateX(0); background:#2a2a28; color:#fff; }
+.toggle-track.is-light .toggle-knob{ transform:translateX(32px); background:#e9e5dd; color:#141414; }
+.toggle-knob::before{
   content:''; position:absolute; inset:0; pointer-events:none; mix-blend-mode:overlay;
   background: linear-gradient(115deg, rgba(255,255,255,0.6) 10%, transparent 45%, transparent 65%, rgba(255,255,255,0.25) 100%);
 }
-.gio-toggle-ghost{
-  width:var(--gt-knob); height:var(--gt-knob); border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  position:absolute; top:var(--gt-pad); left:var(--gt-pad); pointer-events:none;
-  transform:translateX(var(--gt-travel)); color:#5c5c58;
-  transition:transform .3s cubic-bezier(.4,0,.2,1), color .3s ease;
-}
-.gio-toggle-input:checked ~ .gio-toggle-track .gio-toggle-ghost{ transform:translateX(0); color:#b8b2a5; }
+.toggle-ghost{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:absolute; top:4px; left:4px; pointer-events:none; transition: transform .3s cubic-bezier(.4,0,.2,1), color .3s ease; }
+.toggle-track.is-dark .toggle-ghost{ transform:translateX(32px); color:#5c5c58; }
+.toggle-track.is-light .toggle-ghost{ transform:translateX(0); color:#b8b2a5; }
 
 /* ===== LIQUID GLASS — brilho especular diagonal + rebordo em relevo + distorção subtil ===== */
 .glass{

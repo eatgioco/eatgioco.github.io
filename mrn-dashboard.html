@@ -280,9 +280,45 @@
     color:var(--ink);
   }
 
-  /* O rótulo vive dentro do .gio-toggle (à esquerda da pílula) e o toggle
-     ocupa a linha toda, para o clique apanhar o texto e não só a pílula. */
-  .pf-switch-row .gio-toggle{ flex:1 1 auto; justify-content:space-between; font-size:11.5px; font-weight:600; }
+  .pf-switch-row label{ cursor:pointer; }
+
+  /* Switch pequeno com tokens do shell. <button role="switch">: sem color
+     explícita o <button> herdava o preto do browser no tema escuro. */
+  .pf-switch{
+    flex:0 0 auto;
+    width:36px;
+    height:20px;
+    padding:0;
+    border-radius:100px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+    position:relative;
+    transition:background .2s ease, border-color .2s ease;
+  }
+
+  .pf-switch::after{
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--muted);
+    transition:transform .2s cubic-bezier(.4,0,.2,1), background .2s ease;
+  }
+
+  .pf-switch[aria-checked="true"]{
+    background:var(--red);
+    border-color:var(--red);
+  }
+
+  .pf-switch[aria-checked="true"]::after{
+    transform:translateX(16px);
+    background:var(--on-red);
+  }
+
+  .pf-switch:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
 
   .grid-active{
     display:grid;
@@ -2093,13 +2129,10 @@
           </div>
         </div>
 
-        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
-          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
-          <span class="gio-toggle-track">
-            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
-            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
-          </span>
-        </label>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
       </div>
 
       <p class="page-subtitle">Manel — Gestão</p>
@@ -2153,11 +2186,8 @@
         </div>
         <p class="pf-caixa-aviso">Inclui fundo de maneio — não é dinheiro disponível para gastar.</p>
         <div class="pf-switch-row">
-          <label class="gio-toggle">
-            <input type="checkbox" class="gio-toggle-input" id="pfSwitchCaixa">
-            <span class="gio-toggle-txt">Incluir caixa no total</span>
-            <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-          </label>
+          <label for="pfSwitchCaixa">Incluir caixa no total</label>
+          <button type="button" class="pf-switch" id="pfSwitchCaixa" role="switch" aria-checked="false" aria-label="Incluir caixa no total"></button>
         </div>
       </div>
     </div>
@@ -5003,7 +5033,7 @@ window.addEventListener('load', function () {
     }
     caixaLinhaEl.classList.toggle('sem-dados', caixa === null);
 
-    document.getElementById('pfSwitchCaixa').checked = pfIncluirCaixa;
+    document.getElementById('pfSwitchCaixa').setAttribute('aria-checked', pfIncluirCaixa ? 'true' : 'false');
 
     var caixaNoTotal = pfIncluirCaixa && caixa !== null;
     if (caixaNoTotal){ total += caixa; parcelas++; }
@@ -5015,7 +5045,7 @@ window.addEventListener('load', function () {
       (emFalta.length ? ' · sem dados: ' + emFalta.join(', ') : '');
   }
 
-  document.getElementById('pfSwitchCaixa').addEventListener('change', function(){
+  document.getElementById('pfSwitchCaixa').addEventListener('click', function(){
     pfIncluirCaixa = !pfIncluirCaixa;
     renderPosicaoFinanceira();
   });

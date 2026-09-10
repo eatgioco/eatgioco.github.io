@@ -290,13 +290,10 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-trending-up"/></svg>GIOCO · <b>Resultados</b></h1>
         <div class="spacer"></div>
-        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
-          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
-          <span class="gio-toggle-track">
-            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
-            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
-          </span>
-        </label>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
       </div>
 
       <p class="page-subtitle">Demonstração de resultados mensal · ótica de caixa (c/ IVA)</p>
@@ -1816,8 +1813,8 @@
       tr.innerHTML = '<td colspan="' + nCols + '"><div class="clf-form-inner">' +
         '<label>Rubrica <select data-campo="rubrica">' + opts + '</select></label>' +
         campoDespesa(despesaAtual) +
-        giocoToggleHtml({ attrs: 'data-campo="criarRegra"', ligado: !corrigir,
-                          rotulo: 'criar regra com o padrão' }) +
+        '<label><input type="checkbox" data-campo="criarRegra"' + (corrigir ? '' : ' checked') +
+          '> criar regra com o padrão</label>' +
         '<input type="text" data-campo="padrao" value="' + escapeHtml(sugerirPadrao(mov.desc)) + '">' +
         '<button type="button" class="btn-classificar" data-acao="guardar">Guardar</button>' +
         '<button type="button" class="btn-classificar" data-acao="cancelar">Cancelar</button>' +

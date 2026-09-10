@@ -1045,10 +1045,17 @@
     cursor:pointer;
   }
 
-  /* Só a folga da linha: a pílula é do componente .gio-toggle. */
   .field-checkbox{
+    display:flex;
+    align-items:center;
+    gap:8px;
     font-size:13px;
     margin-bottom:18px;
+  }
+
+  .field-checkbox input{
+    width:20px;
+    height:20px;
   }
 
   /* minmax(0,…) + min-width:0 — sem isto os input[type=date] impõem a sua
@@ -1494,10 +1501,18 @@
     flex-shrink:0;
   }
 
-  /* Só o que a linha precisa: a pílula é do componente .gio-toggle. */
   .ativo-toggle{
+    display:flex;
+    align-items:center;
+    gap:6px;
     font-size:13px;
+    cursor:pointer;
     white-space:nowrap;
+  }
+
+  .ativo-toggle input{
+    width:18px;
+    height:18px;
   }
 
   /* ---------- Aviso de cobertura mínima da célula ---------- */
@@ -2227,13 +2242,10 @@
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-users"/></svg>GIOCO · <b>Equipa</b></h1>
         <div class="spacer"></div>
-        <label class="gio-toggle gio-toggle--lg gio-toggle--theme" title="Tema claro/escuro">
-          <input type="checkbox" class="gio-toggle-input" id="toggleInput" checked onchange="toggleThemeSwitch()" aria-label="Tema claro">
-          <span class="gio-toggle-track">
-            <span class="gio-toggle-knob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></span>
-            <span class="gio-toggle-ghost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></span>
-          </span>
-        </label>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
       </div>
 
       <p class="page-subtitle">Escala, pessoas e recibos</p>
@@ -2421,10 +2433,9 @@
     <div class="modal-header">
       <h2 id="pessoaModalTitle">Nova pessoa</h2>
       <div class="modal-header-right">
-        <label class="gio-toggle ativo-toggle">
-          <input type="checkbox" class="gio-toggle-input" id="pessoaAtivo" checked>
-          <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-          <span class="gio-toggle-txt">Ativo</span>
+        <label class="ativo-toggle">
+          <input type="checkbox" id="pessoaAtivo" checked>
+          Ativo
         </label>
         <button class="modal-close" id="pessoaModalClose">×</button>
       </div>
@@ -2609,10 +2620,9 @@
     <p class="field-label" id="turnoModalData" style="margin-bottom:6px;"></p>
     <p class="turno-modal-horario" id="turnoModalHorario"></p>
 
-    <label class="gio-toggle field-checkbox">
-      <input type="checkbox" class="gio-toggle-input" id="turnoFechadoToggle">
-      <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-      <span class="gio-toggle-txt">Fechar este turno (sem serviço)</span>
+    <label class="field-checkbox">
+      <input type="checkbox" id="turnoFechadoToggle">
+      Fechar este turno (sem serviço)
     </label>
     <p class="modal-hint" id="turnoFechadoHint" style="display:none;">
       O dia todo está marcado como fechado. Para reabrir, clica no cabeçalho do dia na grelha.
@@ -2640,10 +2650,9 @@
 
     <p class="field-label" id="fecharDiaData" style="margin-bottom:16px;"></p>
 
-    <label class="gio-toggle field-checkbox">
-      <input type="checkbox" class="gio-toggle-input" id="fecharDiaToggle">
-      <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-      <span class="gio-toggle-txt">Loja fechada o dia todo</span>
+    <label class="field-checkbox">
+      <input type="checkbox" id="fecharDiaToggle">
+      Loja fechada o dia todo
     </label>
 
     <div class="modal-actions">
@@ -2664,10 +2673,9 @@
     <p class="field-label" id="fecharTurnoSemanaInfo" style="margin-bottom:6px;"></p>
     <p class="turno-modal-horario" id="fecharTurnoSemanaHorario"></p>
 
-    <label class="gio-toggle field-checkbox">
-      <input type="checkbox" class="gio-toggle-input" id="fecharTurnoSemanaToggle">
-      <span class="gio-toggle-track"><span class="gio-toggle-knob"></span></span>
-      <span class="gio-toggle-txt">Fechar este turno em todos os dias desta semana</span>
+    <label class="field-checkbox">
+      <input type="checkbox" id="fecharTurnoSemanaToggle">
+      Fechar este turno em todos os dias desta semana
     </label>
     <p class="modal-hint" id="fecharTurnoSemanaHint" style="display:none;"></p>
 
