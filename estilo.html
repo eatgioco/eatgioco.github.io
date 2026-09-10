@@ -416,6 +416,128 @@
       </div>
     </div>
 
+    <!-- ===== SEGMENTADO ===== -->
+    <div class="sg-section">
+      <h2 class="sg-h2">Segmentado — escolher uma de N</h2>
+      <p class="sg-sub">
+        <code>.gio-seg</code> é o irmão do toggle: N opções todas visíveis, uma
+        escolhida. A fronteira entre os dois não é o número de opções —
+        <b>toggle</b> liga/desliga uma propriedade que persiste,
+        <b>segmentado</b> escolhe uma de N opções mutuamente exclusivas (filtros,
+        modos, períodos, vistas), e um <b>checkbox nativo</b> marca itens de uma
+        lista ou um campo de formulário. Um Sim/Não de uma pergunta é segmentado,
+        não toggle: os dois rótulos à vista <i>são</i> a informação.
+      </p>
+      <div class="panel glass-light">
+
+        <p class="sg-lbl">Duas, três e quatro opções — medida normal. As opções acompanham o texto: nunca colunas de largura igual, que deixariam espaço morto à volta de "Mês".</p>
+        <div class="sg-row" style="margin-bottom:22px; flex-wrap:wrap">
+          <div class="gio-seg" role="tablist" aria-label="Exemplo de duas opções">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="sim" aria-selected="true" tabindex="0"><span>Sim</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="nao" aria-selected="false" tabindex="-1"><span>Não</span></button>
+          </div>
+          <div class="gio-seg" role="tablist" aria-label="Exemplo de três opções">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="d" aria-selected="false" tabindex="-1"><span>Depósito bancário</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="c" aria-selected="true" tabindex="0"><span>Devolver à caixa</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="o" aria-selected="false" tabindex="-1"><span>Outro</span></button>
+          </div>
+        </div>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div class="gio-seg" role="tablist" aria-label="Exemplo de quatro opções">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="hoje" aria-selected="true" tabindex="0"><span>Hoje</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="7d" aria-selected="false" tabindex="-1"><span>Últimos 7 dias</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="mes" aria-selected="false" tabindex="-1"><span>Mês</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="tudo" aria-selected="false" tabindex="-1"><span>Tudo</span></button>
+          </div>
+        </div>
+
+        <p class="sg-lbl">Medida grande — <code>.gio-seg--lg</code>. Controlo primário do bloco, ou opções com ícone + texto, que na compacta ficam apertadas. O ícone herda a cor do texto e <b>nunca</b> substitui o rótulo.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div class="gio-seg gio-seg--lg" role="tablist" aria-label="Exemplo com ícones">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="saida" aria-selected="true" tabindex="0">
+              <svg class="icon" width="14" height="14" aria-hidden="true"><use href="#i-arrow-down"/></svg><span>Saída</span>
+            </button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="entrada" aria-selected="false" tabindex="-1">
+              <svg class="icon" width="14" height="14" aria-hidden="true"><use href="#i-arrow-up"/></svg><span>Entrada</span>
+            </button>
+          </div>
+          <div class="gio-seg gio-seg--lg" role="tablist" aria-label="Exemplo grande com opção desactivada">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="a" aria-selected="true" tabindex="0"><span>Disponível</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="b" aria-selected="false" tabindex="-1" disabled><span>Sem dados</span></button>
+          </div>
+        </div>
+
+        <p class="sg-lbl">Variante <code>.gio-seg--red</code> — indicador vermelho, texto branco. Só quando o segmentado <b>é</b> a acção em destaque do bloco. Um filtro em vermelho compete com os botões de acção da página e passa a ler-se como alerta: por isso a variante existe, mas o normal é o default.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div class="gio-seg gio-seg--red" role="tablist" aria-label="Exemplo da variante vermelha">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="1" aria-selected="true" tabindex="0"><span>Confirmar</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="2" aria-selected="false" tabindex="-1"><span>Adiar</span></button>
+          </div>
+        </div>
+
+        <p class="sg-lbl">Índice &minus;1 — nenhuma opção activa, indicador invisível. É estado <b>transitório de formulário</b>: uma pergunta ainda por responder, ou um campo reposto depois de gravar. Nunca válido num filtro, num modo ou numa vista, onde há sempre uma escolhida.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div class="gio-seg" role="tablist" aria-label="Exemplo sem opção escolhida">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="sim" aria-selected="false" tabindex="0"><span>Sim</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="nao" aria-selected="false" tabindex="-1"><span>Não</span></button>
+          </div>
+          <span class="sg-sub" style="margin:0">por responder — o indicador aparece ao primeiro clique</span>
+        </div>
+
+        <p class="sg-lbl">Foco por teclado — <kbd>Tab</kbd> entra no grupo, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> andam entre opções (com volta ao início), <kbd>Home</kbd> e <kbd>End</kbd> vão à primeira e à última. A opção é escolhida ao ser alcançada. O contorno vermelho aparece só na navegação por teclado.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div class="gio-seg" role="tablist" aria-label="Experimenta com o Tab e as setas">
+            <span class="gio-seg-ind" aria-hidden="true"></span>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="a" aria-selected="true" tabindex="0"><span>Experimenta</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="b" aria-selected="false" tabindex="-1"><span>com o Tab</span></button>
+            <button type="button" class="gio-seg-opt" role="tab" data-valor="c" aria-selected="false" tabindex="-1"><span>e as setas</span></button>
+          </div>
+        </div>
+
+        <p class="sg-lbl">Não cabendo, uma linha só com scroll — nunca uma segunda linha. O exemplo abaixo está limitado a 260px de propósito: arrasta-o, ou escolhe a última opção pelo teclado e vê o grupo acompanhar.</p>
+        <div class="sg-row" style="margin-bottom:22px">
+          <div style="width:260px">
+            <div class="gio-seg" role="tablist" aria-label="Exemplo estreito com scroll">
+              <span class="gio-seg-ind" aria-hidden="true"></span>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="hoje" aria-selected="true" tabindex="0"><span>Hoje</span></button>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="7d" aria-selected="false" tabindex="-1"><span>Últimos 7 dias</span></button>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="mes" aria-selected="false" tabindex="-1"><span>Mês</span></button>
+              <button type="button" class="gio-seg-opt" role="tab" data-valor="tudo" aria-selected="false" tabindex="-1"><span>Tudo</span></button>
+            </div>
+          </div>
+        </div>
+
+        <p class="sg-lbl">Markup a copiar</p>
+        <pre class="sg-code">&lt;div class="gio-seg" role="tablist" aria-label="Período"&gt;
+  &lt;span class="gio-seg-ind" aria-hidden="true"&gt;&lt;/span&gt;
+  &lt;button type="button" class="gio-seg-opt" role="tab"
+          data-valor="hoje" aria-selected="true" tabindex="0"&gt;&lt;span&gt;Hoje&lt;/span&gt;&lt;/button&gt;
+  &lt;button type="button" class="gio-seg-opt" role="tab"
+          data-valor="tudo" aria-selected="false" tabindex="-1"&gt;&lt;span&gt;Tudo&lt;/span&gt;&lt;/button&gt;
+&lt;/div&gt;</pre>
+        <p class="sg-sub">
+          Em HTML gerado por JS:
+          <code>giocoSegHtml({ opcoes:[{ valor, rotulo, icone, desativada }], ativa, grande, vermelho, id, classe, rotuloGrupo })</code>.
+          Para refletir estado num grupo já no DOM: <code>giocoSegSet(el, valor)</code>
+          (<code>null</code> = índice &minus;1). Depois de qualquer <code>innerHTML</code> que
+          crie ou revele um grupo: <code>giocoSegSync(el)</code> — o indicador é medido do
+          layout real, e sem layout não há medida. Todos por referência de elemento, nunca
+          por id fixo: há sempre vários por página.
+          <br><br>
+          A página só ouve o clique e lê o <code>data-valor</code> da opção — o
+          <code>aria-selected</code> e o indicador são do componente. O estado vive no
+          <code>aria-selected</code>: nunca uma classe <code>.active</code>.
+        </p>
+      </div>
+    </div>
+
     <!-- ===== TABELA ===== -->
     <div class="sg-section">
       <h2 class="sg-h2">Painel de tabela</h2>
