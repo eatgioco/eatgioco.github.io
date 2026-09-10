@@ -326,35 +326,29 @@
 window.addEventListener('load', function () {
 
   /* ============================================================
-     CRITÉRIOS DE ESTADO DO CARTÃO A (calibrados Set/2026)
-     O crédito bancário vem sempre um pouco abaixo do faturado por causa da
-     comissão do terminal — isto é normal, não é erro, e o Δ deste cartão
-     NUNCA o desconta (é cru: Faturado POS − Creditado Banco). Por isso o
-     estado não usa um limiar fixo em euros: usa a percentagem do Δ sobre
-     o faturado (Δ%), com uma banda "OK" por TPA calibrada na comissão
-     observada nos dados reais:
-       TPA ABANCA  — comissão observada 0,53%–0,83% no extrato 27/08–05/09
-         (ver creditosBanco()/COMISSAO_OBSERVADA). Banda OK: −0,3% a 1,2%
-         (a comissão típica mais folga de arredondamento e picos de mix
-         de cartões).
-       TPA VERIFONE — o crédito é BRUTO (a comissão é debitada à parte,
-         mensalmente): 73 de 87 dias bateram ao cêntimo com vendasDiario.
-         Banda OK: −0,3% a 0,3%.
-     Δ% acima da banda → A Menos (falta dinheiro além da comissão típica).
-     Δ% abaixo da banda → A Mais (o banco creditou mais do que o
-     faturado — inclui a "gorjeta" arredondada no terminal).
-     Quando a atribuição crédito↔dia não resolve 1:1 (uma componente com
-     vários dias E vários créditos, sem correspondência clara entre eles —
-     ver atribuirCreditos()/emparelhar) → Ambíguo, seja qual for o Δ%: o
-     número não é de confiança nenhuma das bandas.
-     Dias ainda dentro da janela de espera do banco (o crédito pode chegar
-     amanhã) e dias anteriores ao início do extrato ficam de fora dos
-     quatro estados — "não verificável ainda" — e não entram na lista.
+     CRITÉRIOS DE ESTADO DO CARTÃO A (corrigidos Set/2026, a pedido do Manel)
+     Δ = Creditado Banco − Faturado POS (NUNCA o inverso): falta dinheiro
+     → Δ negativo; o banco creditou mais do que o faturado → Δ positivo.
+     É cru, sem repor comissão nenhuma — o crédito do banco vem sempre um
+     pouco abaixo do faturado por causa da comissão do terminal, e é por
+     isso que o cartão mostra ao lado do filtro a comissão típica
+     observada por TPA (COMISSAO_OBSERVADA / meio.comissaoObservada): a
+     distinção entre "isto é só a comissão" e "isto é um problema" é do
+     Manel, lendo o Δ% contra essa referência — a página NÃO decide isso
+     escondendo linhas atrás de "OK".
+     Por isso OK exige Δ EXACTO 0,00 € (à unidade do cêntimo — cents()),
+     nunca uma banda: qualquer Δ, por pequeno que seja, é A Menos (Δ<0) ou
+     A Mais (Δ>0). Ambíguo é só para o que não se consegue classificar:
+       · a atribuição crédito↔dia não resolveu 1:1 (uma componente com
+         vários dias E vários créditos sem correspondência clara — ver
+         atribuirCreditos()/emparelhar);
+       · o crédito ainda está dentro da janela de espera do banco (pode
+         chegar nos próximos dias) ou o dia é anterior ao início do
+         extrato bancário disponível — antes eram "não verificável ainda"
+         e ficavam de fora da lista por completo; agora entram como
+         Ambíguo, para que a data continue a ter as suas linhas (ver a
+         simetria de linhas por TPA em renderCartaoA).
      ============================================================ */
-  var BANDA_OK = {
-    OU: { min: -0.3, max: 1.2 },   // TPA ABANCA
-    CD: { min: -0.3, max: 0.3 }    // TPA VERIFONE
-  };
 
   /* ============================================================
      CASAMENTO DO CARTÃO B — ordem exacta (spec do Manel, Set/2026):
@@ -397,6 +391,11 @@ window.addEventListener('load', function () {
   ];
   var MEIO_POR_MEC = {};
   MEIOS.forEach(function(m){ MEIO_POR_MEC[m.mec] = m; });
+  // Ordem de exibição das duas linhas por data no cartão A: sempre ABANCA
+  // antes de VERIFONE (a ordem do array acima), nunca alfabética por 'mec'
+  // ('CD' < 'OU' inverteria a ordem à letra).
+  var MEIO_ORDEM = {};
+  MEIOS.forEach(function(m, i){ MEIO_ORDEM[m.mec] = i; });
   var ORIGEM_LABEL = { ABANCA:'TPA ABANCA', CD:'TPA VERIFONE' };
   function labelMeio(meio){ return meio.label; }
   function labelCurtoMeio(meio){ return meio.labelCurto; }
@@ -1288,16 +1287,14 @@ window.addEventListener('load', function () {
   }
 
   function classificarItemA(meio, it){
-    if (it.antesBanco || it.aguarda) return 'naoVerificavel';
-    if (!it.dias.length && it.creditos.length) return 'aMais';           // crédito sem venda correspondente
+    if (it.antesBanco || it.aguarda) return 'ambiguo';                     // banco não respondeu ainda / fora do extrato
+    if (!it.dias.length && it.creditos.length) return 'aMais';             // crédito sem venda correspondente
     if (it.semCredito) return 'aMenos';                                    // sem crédito nenhum, janela já passou
     if (it.dias.length > 1 && it.creditos.length > 1) return 'ambiguo';    // componente que não resolveu 1:1
-    if (!it.pos) return it.credito ? 'aMais' : 'naoVerificavel';
-    var deltaPct = (it.pos - it.credito) / it.pos * 100;
-    var banda = BANDA_OK[meio.mec] || { min: -0.3, max: 0.3 };
-    if (deltaPct > banda.max) return 'aMenos';
-    if (deltaPct < banda.min) return 'aMais';
-    return 'ok';
+    if (!it.pos) return it.credito ? 'aMais' : 'ok';
+    var deltaCents = cents(it.credito) - cents(it.pos);   // Δ = Banco − POS
+    if (deltaCents === 0) return 'ok';
+    return deltaCents < 0 ? 'aMenos' : 'aMais';
   }
 
   function chaveDescarteItem(meio, it){
@@ -1536,19 +1533,45 @@ window.addEventListener('load', function () {
       var r = a[meio.mec];
       if (!r || r.semBanco) return;
       r.itens.forEach(function(it){
-        if (it.estado === 'naoVerificavel') return;
         linhas.push({ meio: meio, it: it });
       });
     });
+
+    // Simetria: cada data com uma linha resolvida (incluindo Ambíguo) num
+    // TPA tem sempre a linha do outro TPA também — se o outro TPA não tem
+    // item nenhum para essa data exacta (sem vendas e sem crédito), sintetiza
+    // uma linha a zero (Δ 0, estado OK). Não mexe em datas multi-dia (itens
+    // emparelhados) — essas já cobrem as suas próprias datas nos dois lados.
+    if (MEIOS.length === 2){
+      var meioA = MEIOS[0], meioB = MEIOS[1];
+      var diasCobertos = {}; diasCobertos[meioA.mec] = {}; diasCobertos[meioB.mec] = {};
+      linhas.forEach(function(l){
+        var ds = l.it.dias.length ? l.it.dias : (l.it.creditos.length === 1 ? [l.it.creditos[0].dia] : []);
+        ds.forEach(function(d){ diasCobertos[l.meio.mec][d] = true; });
+      });
+      var todasDatas = {};
+      Object.keys(diasCobertos[meioA.mec]).forEach(function(d){ todasDatas[d] = true; });
+      Object.keys(diasCobertos[meioB.mec]).forEach(function(d){ todasDatas[d] = true; });
+      Object.keys(todasDatas).forEach(function(d){
+        [meioA, meioB].forEach(function(meio){
+          if (diasCobertos[meio.mec][d]) return;
+          linhas.push({ meio: meio, it: {
+            meio: meio, dias: [d], pos: 0, creditos: [], credito: 0,
+            estado: 'ok', chave: d + '~' + meio.mec, descartado: false, sintetico: true
+          } });
+        });
+      });
+    }
 
     var meses = {};
     linhas.forEach(function(l){ (l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
     var listaM = Object.keys(meses).sort().reverse();
 
+    // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
     var totalAMenos = 0, totalAMenosOU = 0, totalAMenosCD = 0;
     linhas.forEach(function(l){
       if (l.it.descartado || l.it.estado !== 'aMenos') return;
-      var d = round2(l.it.pos - l.it.credito);
+      var d = round2(l.it.credito - l.it.pos);
       totalAMenos = round2(totalAMenos + d);
       if (l.meio.mec === 'OU') totalAMenosOU = round2(totalAMenosOU + d); else totalAMenosCD = round2(totalAMenosCD + d);
     });
@@ -1563,7 +1586,7 @@ window.addEventListener('load', function () {
     visiveis.sort(function(a2, b2){
       var da = a2.it.dias.length ? a2.it.dias[a2.it.dias.length - 1] : a2.it.creditos[0].dia;
       var db2 = b2.it.dias.length ? b2.it.dias[b2.it.dias.length - 1] : b2.it.creditos[0].dia;
-      return da < db2 ? 1 : (da > db2 ? -1 : (a2.meio.mec < b2.meio.mec ? -1 : 1));
+      return da < db2 ? 1 : (da > db2 ? -1 : (MEIO_ORDEM[a2.meio.mec] - MEIO_ORDEM[b2.meio.mec]));
     });
 
     var nDescartados = linhas.filter(function(l){ return l.it.descartado; }).length;
@@ -1587,29 +1610,35 @@ window.addEventListener('load', function () {
     if (!visiveis.length){
       h += '<div class="rec-vazio">' + (filtroA === 'naoReconciliados' ? 'Nenhuma linha A Menos por reconciliar.' : 'Sem linhas para este filtro.') + '</div>';
     } else {
+      var ultimaData = null;
       h += '<table><thead><tr><th>Data</th><th>TPA</th><th class="num">Faturado POS</th><th class="num">Creditado Banco</th><th class="num">Δ</th><th class="num">Δ%</th><th>Estado</th><th></th></tr></thead><tbody>' +
         visiveis.map(function(l){
           var it = l.it;
           var dataTxt = it.dias.length ? fmtDias(it.dias) : fmtDia(it.creditos[0].dia);
-          var delta = round2(it.pos - it.credito);
+          // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
+          var delta = round2(it.credito - it.pos);
           var deltaPct = it.pos ? (delta / it.pos * 100) : null;
           var chave = it.chave;
           var jaDesc = it.descartado;
+          var dataMostrar = dataTxt === ultimaData ? '' : dataTxt;
+          ultimaData = dataTxt;
           return '<tr data-chave="' + esc(chave) + '"' + (jaDesc ? ' style="opacity:.55"' : '') + '>' +
-            '<td class="rec-mono">' + esc(dataTxt) + '</td><td><b>' + esc(labelMeio(l.meio)) + '</b></td>' +
+            '<td class="rec-mono">' + esc(dataMostrar) + '</td><td><b>' + esc(labelMeio(l.meio)) + '</b></td>' +
             '<td class="num">' + fmtEuro(it.pos) + '</td><td class="num">' + fmtEuro(it.credito) + '</td>' +
-            '<td class="num' + (delta < 0 ? '' : (delta > 0 ? ' rec-neg' : '')) + '">' + fmtEuroSinal(delta) + '</td>' +
+            '<td class="num' + (delta < 0 ? ' rec-neg' : '') + '">' + fmtEuroSinal(delta) + '</td>' +
             '<td class="num">' + fmtPct(deltaPct) + '</td>' +
             '<td><span class="rec-a-tag ' + it.estado + '">' + { ok:'OK', aMenos:'A Menos', aMais:'A Mais', ambiguo:'Ambíguo' }[it.estado] + '</span></td>' +
-            '<td>' + (jaDesc
-              ? '<button type="button" class="rec-a-reativar" data-acao="reativar" data-chave="' + esc(chave) + '">reactivar</button>'
-              : '<button type="button" class="rec-a-descartar" data-acao="descartar" data-chave="' + esc(chave) + '" data-data="' + esc(dataTxt) + '">descartar</button>') +
-            '<div class="rec-inline-form" data-form="' + esc(chave) + '" hidden>' +
-              '<input type="text" placeholder="Motivo" data-campo="motivo">' +
-              '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
-              '<button type="button" data-confirmar="' + esc(chave) + '">Confirmar</button>' +
-              '<button type="button" class="cancelar" data-cancelar="' + esc(chave) + '">Cancelar</button>' +
-            '</div></td></tr>';
+            '<td>' + (it.sintetico ? '' : (
+              (jaDesc
+                ? '<button type="button" class="rec-a-reativar" data-acao="reativar" data-chave="' + esc(chave) + '">reactivar</button>'
+                : '<button type="button" class="rec-a-descartar" data-acao="descartar" data-chave="' + esc(chave) + '" data-data="' + esc(dataTxt) + '">descartar</button>') +
+              '<div class="rec-inline-form" data-form="' + esc(chave) + '" hidden>' +
+                '<input type="text" placeholder="Motivo" data-campo="motivo">' +
+                '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+                '<button type="button" data-confirmar="' + esc(chave) + '">Confirmar</button>' +
+                '<button type="button" class="cancelar" data-cancelar="' + esc(chave) + '">Cancelar</button>' +
+              '</div>'
+            )) + '</td></tr>';
         }).join('') + '</tbody></table>';
     }
     h += '</div>';
