@@ -20,6 +20,7 @@
      GiocoOutlook.init();                       // idempotente; trata o retorno do redirect
      GiocoOutlook.pronto()                      // Promise: o handleRedirectPromise assentou
      GiocoOutlook.estado()                      // 'webview'|'indisponivel'|'a-verificar'|'ligado'|'desligado'
+     GiocoOutlook.erroDoRedirect()              // erro do regresso do redirect (ou null), para a página mostrar
      GiocoOutlook.diagnostico()                 // objecto para o painel de erro da pagina
      GiocoOutlook.detetarAmbiente(ua)           // PURA, exportada para teste
      GiocoOutlook.disponivel()                  // o SDK carregou?
@@ -65,6 +66,8 @@ var GiocoOutlook = (function () {
   var redirectResultado = null; // o que o regresso do redirect trouxe (ou null)
   var redirectTentado = false;  // um único loginRedirect por carregamento
   var ultimoErro = null;        // objecto INTEIRO do último erro, para o diagnóstico
+  var erroRedirect = null;      // o erro do REGRESSO do redirect (Set/2026): a página
+                                // tem de o mostrar — antes ficava só na consola
 
   /* ---------- Ambiente ----------
      PURA e exportável (recebe o UA em vez de o ir buscar), para ser testável
@@ -77,23 +80,43 @@ var GiocoOutlook = (function () {
      - Em iOS (Safari incluído) o popup é pouco fiável: ou vem bloqueado e
        reportado como cancelamento, ou a promessa nunca assenta. Vai-se
        directo a redirect.
-     - No desktop o popup funciona e continua a ser o caminho. */
-  function detetarAmbiente(ua, plataforma, toques) {
+     - No desktop o popup funciona e continua a ser o caminho.
+
+     ATENÇÃO — ecrã principal do iPhone (Set/2026): a página tem
+     apple-mobile-web-app-capable=yes, e aberta pelo ícone do ecrã principal
+     corre em modo "standalone" com um UA SEM "Safari" — exactamente o UA de
+     uma WKWebView. Era por isso que, do ícone, a camada dizia "Abre no
+     Safari" e nunca tentava o login. Standalone NÃO é uma app de terceiros:
+     é o Safari sem barra, a Microsoft aceita o login por redirect e o
+     localStorage é o do próprio atalho. `standalone` (navigator.standalone
+     ou display-mode) vence a regra do UA. */
+  function detetarAmbiente(ua, plataforma, toques, standalone) {
     ua = String(ua == null ? (navigator.userAgent || '') : ua);
     plataforma = plataforma == null ? (navigator.platform || '') : plataforma;
     toques = toques == null ? (navigator.maxTouchPoints || 0) : toques;
+    if (standalone == null) standalone = detetarStandalone();
     // iPadOS 13+ mente no UA e diz-se Macintosh: distingue-se pelo toque.
     var ios = /iPad|iPhone|iPod/.test(ua) || (plataforma === 'MacIntel' && toques > 1);
     var appEmbutida = /(FBAN|FBAV|FB_IAB|Instagram|Line\/|WhatsApp|MicroMessenger|LinkedInApp|Snapchat|TikTok)/i.test(ua);
     // Browsers de terceiros em iOS (CriOS/FxiOS/EdgiOS) têm "Safari" no UA e
-    // são browsers a sério; só a ausência de "Safari" denuncia a webview.
-    var webviewIos = ios && !/Safari/.test(ua);
+    // são browsers a sério; só a ausência de "Safari" denuncia a webview —
+    // excepto em standalone (ícone do ecrã principal), que também não a tem.
+    var webviewIos = ios && !standalone && !/Safari/.test(ua);
     return {
       ios: ios,
+      standalone: !!standalone,
       webview: !!(appEmbutida || webviewIos),
       motivo: appEmbutida ? 'app' : (webviewIos ? 'ios-webview' : null),
       ua: ua
     };
+  }
+  function detetarStandalone() {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.standalone === true) return true;
+      if (typeof window !== 'undefined' && window.matchMedia &&
+          window.matchMedia('(display-mode: standalone)').matches) return true;
+    } catch (e) { /* sem window: Node, testes */ }
+    return false;
   }
   var AMB = detetarAmbiente();
 
@@ -188,8 +211,13 @@ var GiocoOutlook = (function () {
       return r;
     })['catch'](function (e) {
       // Guardado para o painel de diagnóstico: em iOS é aqui que aparece o
-      // "state não corresponde" quando o ITP come o estado do fluxo.
+      // "state não corresponde" quando o ITP come o estado do fluxo, e é
+      // aqui que chega um redirect_uri_mismatch / consentimento recusado
+      // devolvido pela Microsoft no hash. Fica em erroRedirect() para a
+      // página o pôr no #outErro — em silêncio, o Manel via só "Ligar
+      // Outlook" outra vez, sem saber que o login tinha falhado.
       ultimoErro = e;
+      erroRedirect = e;
       console.error('[outlook] handleRedirectPromise:', e);
       return null;
     }).then(function (r) { prontoOk = true; return r; });
@@ -628,17 +656,22 @@ var GiocoOutlook = (function () {
       stack: e.stack || null,
       redirectUri: redirectUri(),
       estado: estado(),
-      ambiente: { ios: AMB.ios, webview: AMB.webview, motivo: AMB.motivo },
+      ambiente: { ios: AMB.ios, webview: AMB.webview, standalone: AMB.standalone, motivo: AMB.motivo },
       ua: AMB.ua,
       sdk: (typeof msal !== 'undefined' && msal.version) ? msal.version : 'não carregado',
       redirectTrouxeSessao: !!redirectResultado
     };
   }
 
+  /* O erro (objecto inteiro) que o regresso do redirect trouxe, ou null.
+     Só faz sentido depois de pronto(); a página lê-o UMA vez e mostra-o. */
+  function erroDoRedirect() { return erroRedirect; }
+
   return {
     init: init,
     pronto: pronto,
     estado: estado,
+    erroDoRedirect: erroDoRedirect,
     detetarAmbiente: detetarAmbiente,
     diagnostico: diagnostico,
     guardarErro: guardarErro,

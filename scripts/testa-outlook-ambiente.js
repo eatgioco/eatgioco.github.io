@@ -100,6 +100,27 @@ caso('Android Chrome normal → NÃO webview', function () {
   assert.strictEqual(a.webview, false);
 });
 
+/* ---------- Ecrã principal do iPhone (standalone) ----------
+   O UA de um atalho no ecrã principal é o MESMO da WKWebView (sem "Safari").
+   Só o 4.º argumento (navigator.standalone) os distingue — e o atalho tem
+   de poder ligar, senão o calendário no telemóvel nunca vê o Outlook. */
+
+caso('Atalho no ecrã principal (UA sem "Safari", standalone) → ios, NÃO webview', function () {
+  var a = amb(UA.iphoneWebview, 'iPhone', 5, true);
+  assert.strictEqual(a.ios, true);
+  assert.strictEqual(a.standalone, true);
+  assert.strictEqual(a.webview, false);
+  assert.strictEqual(a.motivo, null);
+});
+
+caso('Facebook iOS continua webview mesmo com standalone=true', function () {
+  assert.strictEqual(amb(UA.facebook, 'iPhone', 5, true).webview, true);
+});
+
+caso('Sem 4.º argumento e sem window → standalone false (Node)', function () {
+  assert.strictEqual(amb(UA.iphoneSafari, 'iPhone', 5).standalone, false);
+});
+
 /* ---------- Robustez ---------- */
 
 caso('UA vazio não rebenta', function () {
