@@ -60,10 +60,12 @@
    resultados.html ({conta}~{ref}); ':' também é válido.
 
    REGRAS POR ORIGEM:
-   - fatura: valor = montante, data = data da fatura, rubrica = a de
-     suppliers/{fornecedorIdEncontrado}.rubrica se for uma rubrica válida,
-     senão 'cmv'. montante null, data null ou fornecedor não encontrado →
-     porValidar. Sem data a fatura cai no mês de criadoEm (senão não tinha
+   - fatura: valor = montante, data = data da fatura, rubrica e despesa pela
+     CATEGORIA do fornecedor (suppliers/{id}/categoria, array; ver
+     categoriaFornecedor: Serviços → outros/SERVICOS, Alimentar|Bebidas|
+     Packaging → cmv/ALIMENTAR|BEBIDAS|PACKAGING, precedência Serviços >
+     Alimentar > Bebidas > Packaging). montante null, data null, fornecedor
+     não encontrado ou sem categoria → porValidar. Sem data a fatura cai no mês de criadoEm (senão não tinha
      onde viver) e o motivo diz porquê. Pagamento: pela linha do
      paymentRequests apontado por paymentRequestId (só as linhas com o mesmo
      montante; se nenhuma bater, todas) → reconciliacaoBancaria/payreq:… .
@@ -92,9 +94,13 @@
      mês, do anterior ou do seguinte (ANTI-DUPLICAÇÃO — pagamentos atravessam
      meses). Rubrica: override de classificacaoMovimentos > regra mais longa
      de classificacaoRegras > 'impostos' se o descritivo casar RE_IMPOSTO >
-     'cmv' se o movimento estiver ligado a uma linha de paymentRequests (a
-     entidade passa a ser o fornecedor da linha; prestadores → pessoal) >
-     senão rubrica null e porValidar.
+     ligado a uma linha de paymentRequests: prestadores → pessoal, senão a
+     categoria do fornecedor da linha (procurado por nome em suppliers);
+     sem ficha ou sem categoria → porValidar > senão rubrica null e
+     porValidar. 'fixos' NUNCA vem por via de fornecedor.
+   - classificacaoDespesas/{ALIMENTAR,BEBIDAS,PACKAGING,SERVICOS}: a única
+     escrita fora de custos/ — criadas por regenerar() SÓ quando faltam
+     (garantirDespesas), para o autocomplete da resultados.html.
 
    REGENERAÇÃO IDEMPOTENTE: para cada registo, set() no path determinístico.
    Se o registo existente tiver validacao.estado === 'validado', preservam-se
@@ -166,6 +172,43 @@ function giocoCustosCanonicoEngine(deps){
     return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
   }
   function idMov(conta, ref){ return conta + '~' + ref; }
+
+  /* ---------- categoria do fornecedor → rubrica + despesa ----------
+     suppliers/{id}/categoria é um ARRAY de strings ("Alimentar", "Bebidas",
+     "Packaging", "Serviços"), comparado sem acentos nem maiúsculas. Com
+     várias categorias vale a PRECEDÊNCIA FIXA Serviços > Alimentar >
+     Bebidas > Packaging (nunca porValidar por isso; fica o rasto em motivo).
+     porValidar só com array vazio/inexistente ou tudo fora dos quatro.
+     É a ÚNICA via de rubrica para custos de fornecedor — 'fixos' é
+     inatingível por aqui (só compromissosFixos). */
+  var CATEGORIAS_FORNECEDOR = [
+    { chave: 'servicos',  rubrica: 'outros', despesa: 'SERVICOS' },
+    { chave: 'alimentar', rubrica: 'cmv',    despesa: 'ALIMENTAR' },
+    { chave: 'bebidas',   rubrica: 'cmv',    despesa: 'BEBIDAS' },
+    { chave: 'packaging', rubrica: 'cmv',    despesa: 'PACKAGING' }
+  ];
+  function normCat(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+  function categoriaFornecedor(s){
+    var nome = (s && (s.nome || s.name)) || '—';
+    var lista = s && s.categoria;
+    if (typeof lista === 'string') lista = [lista];
+    if (lista && !Array.isArray(lista) && typeof lista === 'object') lista = Object.keys(lista).map(function(k){ return lista[k]; });
+    lista = Array.isArray(lista) ? lista.filter(Boolean) : [];
+    if (!lista.length) return { rubrica: null, despesa: null, motivo: 'fornecedor "' + nome + '" sem categoria' };
+    var normalizadas = lista.map(normCat), venc = null;
+    for (var i = 0; i < CATEGORIAS_FORNECEDOR.length && !venc; i++) if (normalizadas.indexOf(CATEGORIAS_FORNECEDOR[i].chave) !== -1) venc = CATEGORIAS_FORNECEDOR[i];
+    if (!venc) return { rubrica: null, despesa: null, motivo: 'fornecedor "' + nome + '" com categoria desconhecida: ' + lista.join(', ') };
+    var out = { rubrica: venc.rubrica, despesa: venc.despesa, motivo: null };
+    if (lista.length > 1) out.rasto = 'categorias ' + lista.join(', ') + ' → ' + venc.despesa;
+    return out;
+  }
+  function fornecedorPorNome(nome){
+    var sup = g('getSuppliers'), alvo = normalizar(nome);
+    if (!alvo) return null;
+    var ids = Object.keys(sup);
+    for (var i = 0; i < ids.length; i++){ var s = sup[ids[i]]; if (s && normalizar(s.nome || s.name) === alvo) return { id: ids[i], s: s }; }
+    return null;
+  }
 
   /* ---------- índices sobre os nós em memória ---------- */
   function movimentoPorId(){
@@ -260,7 +303,7 @@ function giocoCustosCanonicoEngine(deps){
       rubrica: rubricaValida(o.rubrica), despesa: o.despesa || null,
       entidade: { tipo: o.entidade.tipo, id: o.entidade.id || null, nome: o.entidade.nome || '—' },
       pagamento: o.pagamento,
-      validacao: o.motivo ? { estado: 'porValidar', motivo: o.motivo } : { estado: 'auto' }
+      validacao: o.motivo ? { estado: 'porValidar', motivo: o.motivo } : (o.rasto ? { estado: 'auto', motivo: o.rasto } : { estado: 'auto' })
     };
   }
 
@@ -276,16 +319,17 @@ function giocoCustosCanonicoEngine(deps){
       var montante = num(f.montante);
       if (montante === null || montante <= 0) motivos.push('fatura sem montante');
       var s = f.fornecedorIdEncontrado ? sup[f.fornecedorIdEncontrado] : null;
-      if (!f.fornecedorIdEncontrado) motivos.push('fornecedor não identificado');
+      var cat = s ? categoriaFornecedor(s) : { rubrica: null, despesa: null, motivo: 'fornecedor não identificado' };
+      if (cat.motivo) motivos.push(cat.motivo);
       var nome = (s && (s.nome || s.name)) || f.fornecedorTexto || '—';
       out.push(base({
         id: 'fat:' + fid, origem: 'fatura', origemRef: 'faturasProcessadas/' + fid, mes: mes,
         data: data || diaLocal(f.criadoEm) || ultimoDia(mes),
         valor: (montante !== null && montante > 0) ? montante : null,
-        rubrica: (s && rubricaValida(s.rubrica)) || 'cmv', despesa: nome,
+        rubrica: cat.rubrica, despesa: cat.despesa,
         entidade: { tipo: 'fornecedor', id: f.fornecedorIdEncontrado || null, nome: nome },
         pagamento: f.paymentRequestId ? pagamentoDePayReq(f.paymentRequestId, montante) : { estado: 'pendente', movimentoIds: [] },
-        motivo: motivos.join('; ') || null
+        motivo: motivos.join('; ') || null, rasto: cat.rasto || null
       }));
     });
     return out;
@@ -308,13 +352,20 @@ function giocoCustosCanonicoEngine(deps){
       var fidE = m.fatura && m.fatura.fornecedorIdEncontrado;
       var s = fidE ? sup[fidE] : null;
       var nome = (s && (s.nome || s.name)) || (m.fatura && m.fatura.fornecedorTexto) || m.motivo || '—';
+      // A regex de motivo (prestadores/adiantamentos → pessoal) tem prioridade
+      // sobre a categoria do fornecedor; sem prestador, a categoria manda.
+      var cat;
+      if (RE_CAIXA_PESSOAL.test(m.motivo || '')) cat = { rubrica: 'pessoal', despesa: nome, motivo: null };
+      else if (s) cat = categoriaFornecedor(s);
+      else cat = { rubrica: null, despesa: null, motivo: 'fornecedor não identificado' };
+      if (cat.motivo) motivos.push(cat.motivo);
       out.push(base({
         id: 'cxf:' + id, origem: 'faturaCaixa', origemRef: 'caixaMovimentos/' + id, mes: mes, data: data,
         valor: valor > 0 ? valor : null,
-        rubrica: RE_CAIXA_PESSOAL.test(m.motivo || '') ? 'pessoal' : 'cmv', despesa: nome,
+        rubrica: cat.rubrica, despesa: cat.despesa,
         entidade: { tipo: 'fornecedor', id: fidE || null, nome: nome },
         pagamento: { estado: 'pago', movimentoIds: [], dataPagamento: diaMov || data },
-        motivo: motivos.join('; ') || null
+        motivo: motivos.join('; ') || null, rasto: cat.rasto || null
       }));
     });
     return out;
@@ -416,20 +467,29 @@ function giocoCustosCanonicoEngine(deps){
       var cls = classificarBanco(e.conta, e.ref, m);
       var ent = { tipo: 'banco', id: null, nome: m.creditor_name || desc };
       var despesa = cls ? cls.despesa : null;
-      var motivo = null;
+      var motivo = null, rasto = null;
       if (!cls){
         var pr = linhaPayReq(recPorMov[id] || '');
         if (pr){
-          ent = { tipo: 'fornecedor', id: null, nome: pr.linha.fornecedor || desc };
-          despesa = pr.linha.fornecedor || null;
-          cls = { rubrica: RE_PRESTADOR.test(pr.linha.fornecedor || '') ? 'pessoal' : 'cmv' };
+          // Ligado a uma linha de pedido: o fornecedor da linha (por nome →
+          // suppliers) dá a rubrica pela categoria; prestadores → pessoal;
+          // sem ficha ou sem categoria → porValidar, nunca cmv cego.
+          var nomeL = pr.linha.fornecedor || '';
+          var fr = fornecedorPorNome(nomeL);
+          ent = { tipo: 'fornecedor', id: fr ? fr.id : null, nome: nomeL || desc };
+          if (RE_PRESTADOR.test(nomeL)){ cls = { rubrica: 'pessoal' }; despesa = nomeL; }
+          else {
+            var catB = fr ? categoriaFornecedor(fr.s) : { rubrica: null, despesa: null, motivo: 'fornecedor "' + (nomeL || desc) + '" sem ficha em suppliers' };
+            if (catB.rubrica){ cls = { rubrica: catB.rubrica }; despesa = catB.despesa; rasto = catB.rasto || null; }
+            else motivo = catB.motivo;
+          }
         } else motivo = 'movimento bancário sem classificação';
       }
       out.push(base({
         id: 'banco:' + id, origem: 'banco', origemRef: 'contasBancarias/' + e.conta + '/movimentos/' + e.ref, mes: mes, data: data,
         valor: Math.abs(v), rubrica: cls ? cls.rubrica : null, despesa: despesa, entidade: ent,
         pagamento: { estado: 'pago', movimentoIds: [id], dataPagamento: data },
-        motivo: motivo
+        motivo: motivo, rasto: rasto
       }));
     });
     return out;
@@ -531,13 +591,28 @@ function giocoCustosCanonicoEngine(deps){
     return passos.reduce(function(p, f){ return p.then(f); }, Promise.resolve());
   }
 
+  // classificacaoDespesas/{ALIMENTAR|BEBIDAS|PACKAGING|SERVICOS}: cria só as
+  // que faltam (set() por entrada, id = nome normalizado como na
+  // resultados.html), reaproveitando as existentes. Precisa de
+  // getClassificacaoDespesas + refDespesas; sem eles não faz nada.
+  function garantirDespesas(){
+    if (!deps.refDespesas || !deps.getClassificacaoDespesas) return Promise.resolve(0);
+    var cat = g('getClassificacaoDespesas'), n = 0, passos = [];
+    CATEGORIAS_FORNECEDOR.forEach(function(c){
+      if (cat[c.despesa]) return;
+      var reg = { nome: c.despesa, criadoEm: new Date(agora()).toISOString() };
+      passos.push(function(){ n++; cat[c.despesa] = reg; return deps.refDespesas.child(c.despesa).set(reg); });
+    });
+    return sequencial(passos).then(function(){ return n; });
+  }
+
   // Regenerar: set() por registo (só os que mudaram), update() para anular,
   // set() do _resumo. Devolve o plano com contadores.
   function regenerar(mes){
     var plano = gerar(mes);
     var ts = new Date(agora()).toISOString();
     var escritos = 0, anulados = 0;
-    var passos = [];
+    var passos = [function(){ return garantirDespesas(); }];
     plano.registos.forEach(function(r){
       if (r.__inalterado) return;
       passos.push(function(){ escritos++; return ref().child(plano.mes).child(r.id).set(limpo(r)); });
@@ -582,7 +657,8 @@ function giocoCustosCanonicoEngine(deps){
   return {
     RUBRICAS: RUBRICAS, ORIGENS: ORIGENS, TSU_TAXA_PATRONAL: TSU_TAXA_PATRONAL,
     RE_CAIXA_PESSOAL: RE_CAIXA_PESSOAL, RE_IMPOSTO: RE_IMPOSTO,
-    gerar: gerar, regenerar: regenerar, validar: validar, atualizarResumo: atualizarResumo,
+    CATEGORIAS_FORNECEDOR: CATEGORIAS_FORNECEDOR, categoriaFornecedor: categoriaFornecedor,
+    gerar: gerar, regenerar: regenerar, validar: validar, atualizarResumo: atualizarResumo, garantirDespesas: garantirDespesas,
     resumoDe: resumoDe, mesVizinho: mesVizinho, diasUteis: diasUteis, ultimoDia: ultimoDia
   };
 }

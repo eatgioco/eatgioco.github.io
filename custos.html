@@ -61,6 +61,9 @@
   .cu-kpi .k{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
   .cu-kpi .v{ font-size:22px; font-weight:700; color:var(--ink); margin-top:4px; line-height:1.15; }
   .cu-kpi .s{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .cu-kpi .dec{ margin-top:8px; display:flex; flex-direction:column; gap:2px; }
+  .cu-kpi .dec div{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); }
+  .cu-kpi .dec b{ color:var(--ink); font-weight:600; }
   .cu-kpi.total{ border:2px solid var(--red); }
   .cu-kpi.total .v{ color:var(--red-ink); font-size:28px; }
   .cu-kpi.validar{ border:2px solid var(--amber); }
@@ -95,6 +98,7 @@
   }
   .cu-btn-validar:disabled{ opacity:.45; cursor:not-allowed; }
   .cu-motivo{ font-size:11px; color:var(--amber); margin-top:2px; }
+  .cu-motivo.rasto{ color:var(--muted); }
   .cu-vazio{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
   .cu-nota{ font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.5; }
 </style>
@@ -164,6 +168,8 @@
       <option value="interno">Interno</option>
       <option value="semRubrica">Sem rubrica</option>
     </select>
+    <label for="cuFiltroDespesa">Despesa</label>
+    <select id="cuFiltroDespesa"><option value="">Todas</option></select>
     <label for="cuFiltroEstado">Estado</label>
     <select id="cuFiltroEstado">
       <option value="">Todos</option>
@@ -178,7 +184,7 @@
 
   <div class="card glass-light">
     <div id="cuLista"><div class="cu-vazio">A carregar…</div></div>
-    <p class="cu-nota">Ordem: por validar primeiro, depois por valor descendente. A rubrica vem dos fornecedores, das regras de classificação bancária ou da origem; um registo sem quem lhe saiba a rubrica fica por validar. Os movimentos bancários que já pagam uma fatura, um recibo, a TSU ou um compromisso nunca geram registo próprio.</p>
+    <p class="cu-nota">Ordem: por validar primeiro, depois por valor descendente. A rubrica dos custos de fornecedor vem só da categoria da ficha (Serviços → Outros; Alimentar, Bebidas e Packaging → CMV, com a despesa a dizer qual); a dos movimentos bancários, das regras de classificação; um registo sem quem lhe saiba a rubrica fica por validar. Os movimentos bancários que já pagam uma fatura, um recibo, a TSU ou um compromisso nunca geram registo próprio.</p>
   </div>
 </main>
 
@@ -244,7 +250,15 @@ document.addEventListener('DOMContentLoaded', function(){
     ORDEM_RUBRICAS.forEach(function(k){
       var v = resumo.porRubrica[k];
       if (v === undefined && (k === 'interno' || k === 'semRubrica')) return;
-      html += '<div class="cu-kpi glass-light"><div class="k">' + RUBRICA_NOME[k] + '</div><div class="v num">' + formatEuro(v || 0) + '</div></div>';
+      var dec = '';
+      if (k === 'cmv'){
+        // Decomposição do CMV por despesa (ALIMENTAR / BEBIDAS / PACKAGING / outras), total à vista.
+        var porDespesa = {};
+        regs.forEach(function(r){ if (r.anulado === true || r.rubrica !== 'cmv') return; var d = r.despesa || 'Sem despesa'; porDespesa[d] = (porDespesa[d] || 0) + (typeof r.valor === 'number' ? r.valor : 0); });
+        var ordem = ['ALIMENTAR', 'BEBIDAS', 'PACKAGING'].concat(Object.keys(porDespesa).filter(function(d){ return ['ALIMENTAR', 'BEBIDAS', 'PACKAGING'].indexOf(d) === -1; }).sort());
+        dec = '<div class="dec">' + ordem.filter(function(d){ return porDespesa[d] !== undefined || d === 'ALIMENTAR' || d === 'BEBIDAS' || d === 'PACKAGING'; }).map(function(d){ return '<div><span>' + escapeHtml(d.charAt(0) + d.slice(1).toLowerCase()) + '</span><b class="num">' + formatEuro(porDespesa[d] || 0) + '</b></div>'; }).join('') + '</div>';
+      }
+      html += '<div class="cu-kpi glass-light"><div class="k">' + RUBRICA_NOME[k] + '</div><div class="v num">' + formatEuro(v || 0) + '</div>' + dec + '</div>';
     });
     document.getElementById('cuKpis').innerHTML = html;
   }
@@ -261,11 +275,23 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function estadoDe(r){ return r.anulado === true ? 'anulado' : ((r.validacao && r.validacao.estado) || 'auto'); }
 
+  function preencherDespesas(){
+    var sel = document.getElementById('cuFiltroDespesa'), atual = sel.value;
+    var set = {};
+    registosDoMes().forEach(function(r){ if (r.anulado !== true) set[r.despesa || ''] = true; });
+    var lista = Object.keys(set).filter(Boolean).sort();
+    sel.innerHTML = '<option value="">Todas</option>' + lista.map(function(d){ return '<option value="' + escapeHtml(d) + '">' + escapeHtml(d) + '</option>'; }).join('') + (set[''] ? '<option value="__sem__">Sem despesa</option>' : '');
+    sel.value = (atual && (lista.indexOf(atual) !== -1 || atual === '__sem__')) ? atual : '';
+  }
+
   function renderLista(){
+    preencherDespesas();
     var fr = document.getElementById('cuFiltroRubrica').value;
+    var fd = document.getElementById('cuFiltroDespesa').value;
     var fe = document.getElementById('cuFiltroEstado').value;
     var regs = registosDoMes().filter(function(r){
       if (fr && (r.rubrica || 'semRubrica') !== fr) return false;
+      if (fd && (fd === '__sem__' ? !!r.despesa : r.despesa !== fd)) return false;
       var e = estadoDe(r);
       if (fe) return e === fe;
       return e !== 'anulado';
@@ -296,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function(){
       return '<tr class="' + e + '">' +
         '<td class="num">' + formatData(r.data) + '</td>' +
         '<td><div class="cu-ent">' + escapeHtml(ent.nome || '—') + '</div>' + (sub.length ? '<div class="cu-sub">' + escapeHtml(sub.join(' · ')) + '</div>' : '') +
-          (r.validacao && r.validacao.motivo && e === 'porValidar' ? '<div class="cu-motivo">' + escapeHtml(r.validacao.motivo) + '</div>' : '') + validar + '</td>' +
+          (r.validacao && r.validacao.motivo ? '<div class="cu-motivo' + (e === 'porValidar' ? '' : ' rasto') + '">' + escapeHtml(r.validacao.motivo) + '</div>' : '') + validar + '</td>' +
         '<td class="num" style="text-align:right;font-weight:700">' + formatEuro(r.valor) + '</td>' +
         '<td><span class="cu-rub ' + rub + '">' + RUBRICA_NOME[rub] + '</span></td>' +
         '<td>' + escapeHtml(ORIGEM_NOME[r.origem] || r.origem) + '</td>' +
@@ -351,18 +377,20 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   document.getElementById('cuMes').addEventListener('change', function(){ ligarMes(this.value); });
   document.getElementById('cuFiltroRubrica').addEventListener('change', renderLista);
+  document.getElementById('cuFiltroDespesa').addEventListener('change', renderLista);
   document.getElementById('cuFiltroEstado').addEventListener('change', renderLista);
 
   /* ---------- fontes (só leitura) ---------- */
   function carregarBase(){
     var nos = ['faturasProcessadas', 'caixaMovimentos', 'recibos', 'compromissosFixos', 'pagamentosConcluidos', 'paymentRequests',
                'contasBancarias/abanca/movimentos', 'contasBancarias/revolut/movimentos', 'reconciliacaoBancaria', 'suppliers',
-               'classificacaoRegras', 'classificacaoMovimentos', 'custos'];
+               'classificacaoRegras', 'classificacaoMovimentos', 'custos', 'classificacaoDespesas'];
     return Promise.all(nos.map(function(n){ return db.ref(n).once('value'); })).then(function(snaps){
       var v = snaps.map(function(s){ return s.val() || {}; });
       base = { faturas: v[0], caixa: v[1], recibos: v[2], compromissos: v[3], concluidos: v[4], paymentRequests: v[5],
                movimentos: { abanca: v[6], revolut: v[7] }, reconciliacao: v[8], suppliers: v[9], regras: v[10], overrides: v[11] };
       custosMes = v[12];
+      base.despesas = v[13];
       CC = giocoCustosCanonicoEngine({
         getFaturas: function(){ return base.faturas; },
         getCaixaMovimentos: function(){ return base.caixa; },
@@ -376,7 +404,9 @@ document.addEventListener('DOMContentLoaded', function(){
         getClassificacaoRegras: function(){ return base.regras; },
         getClassificacaoMovimentos: function(){ return base.overrides; },
         getCustos: function(){ return custosMes; },
-        ref: db.ref('custos')
+        getClassificacaoDespesas: function(){ return base.despesas; },
+        ref: db.ref('custos'),
+        refDespesas: db.ref('classificacaoDespesas')
       });
       window.__CC = CC;   // acesso de consola/testes
       document.getElementById('cuRegenerar').disabled = false;
