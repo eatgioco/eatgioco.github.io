@@ -799,6 +799,30 @@ custos                — NÓ CANÓNICO DOS CUSTOS (Set/2026), escrito SÓ pelo
                          movimentoIds dos registos não-banco do mês, do anterior e do
                          seguinte (gerados + já gravados) — um movimento nesse conjunto
                          nunca gera registo próprio.
+                         FALLBACK EM CASCATA (Set/2026): reconciliacaoBancaria/ está
+                         vazio antes de Set/2026, e sem ligação os movimentos que pagam
+                         recibos/compromissos/faturas duplicavam o total (Ago/2026:
+                         32.614 € em vez de ~26.000). Um DBIT sem ligação real tenta,
+                         pela ordem e parando no primeiro que resolva: N1 valor exacto
+                         contra recibos (pagamento.conta/cartao, separados) e
+                         compromissos do mês — só liga com UM alvo nesse valor;
+                         N2 nome do compromisso no descritivo E valor igual;
+                         N3 família (CARTAO/CARTOES REFEICAO → cartões; SAL/SALARIO →
+                         contas) com soma exacta de um subconjunto dos alvos livres;
+                         N4 paymentRequests a ±45 dias com montante exacto (linha ou
+                         total) → liga às faturas desse pedido, pagas na data do
+                         movimento. Ligação inferida = pagamento.inferido:true +
+                         pagamento.nivel; uma ligação real posterior substitui-a.
+                         Ambiguidade (2+ alvos/subconjuntos/pedidos) → 'banco:'
+                         porValidar com o motivo, EXCEPTO com rubrica de override ou
+                         regra (decisão humana), onde fica só como rasto. Um pedido
+                         sem fatura não consome o movimento: o 'banco:' nasce com o
+                         fornecedor da linha a dar a rubrica. Os alvos são só do MESMO
+                         mês do movimento (um salário pago no dia 1 do mês seguinte não
+                         é apanhado — a reconciliação real resolve). RE_CAIXA_PESSOAL
+                         (subash|mattia|adiantamento|prestador|prestação → pessoal)
+                         aplica-se à caixa E aos 'banco:' residuais, abaixo de override
+                         e regra.
                          IDEMPOTÊNCIA: "Regenerar mês" corre N vezes com o mesmo
                          resultado (registo igual não é reescrito). validado → o motor
                          preserva rubrica, despesa, entidade e validacao e só actualiza

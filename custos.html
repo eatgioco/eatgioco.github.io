@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function(){
       if (r.despesa && r.despesa !== ent.nome) sub.push(r.despesa);
       if (r.origemRef) sub.push(r.origemRef);
       var estadoHtml = '<span class="cu-tag ' + e + '">' + ({ auto: 'Auto', porValidar: 'Por validar', validado: 'Validado', anulado: 'Anulado' }[e] || e) + '</span> ' +
-        '<span class="cu-tag ' + (pag.estado === 'pago' ? 'pago' : 'pendente') + '" title="' + escapeHtml((pag.movimentoIds || []).join(', ')) + '">' + (pag.estado === 'pago' ? 'Pago' + (pag.dataPagamento ? ' ' + formatData(pag.dataPagamento) : '') : 'Pendente') + '</span>';
+        '<span class="cu-tag ' + (pag.estado === 'pago' ? 'pago' : 'pendente') + '" title="' + escapeHtml((pag.movimentoIds || []).join(', ')) + '">' + (pag.estado === 'pago' ? 'Pago' + (pag.dataPagamento ? ' ' + formatData(pag.dataPagamento) : '') : 'Pendente') + (pag.inferido ? ' · inferido N' + pag.nivel : '') + '</span>';
       var validar = '';
       if (e === 'porValidar'){
         validar = '<div class="cu-linha-validar" data-id="' + escapeHtml(r.id) + '">' +
