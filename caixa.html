@@ -2479,7 +2479,11 @@
       var f = st.fatura || {};
       atualizacao.fatura = {
         fornecedorTexto: f.fornecedorTexto || null,
-        fornecedorIdEncontrado: f.fornecedorTexto ? (GiocoFaturas.findMatchingSupplier(f.fornecedorTexto, allSuppliers) || null) : null,
+        fornecedorIdEncontrado: (f.fornecedorTexto || f.nif || (f.nifCandidatos && f.nifCandidatos.length))
+          ? (GiocoFaturas.findMatchingSupplier(f.fornecedorTexto, allSuppliers, { nif: f.nif || null, nifCandidatos: f.nifCandidatos || [] }) || null)
+          : null,
+        nif: f.nif || null,
+        nifCandidatos: (f.nifCandidatos && f.nifCandidatos.length) ? f.nifCandidatos : null,
         montante: (typeof f.montante === 'number') ? f.montante : null,
         referencia: f.referencia || null,
         data: f.data || null,

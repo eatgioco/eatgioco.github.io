@@ -2013,6 +2013,10 @@
           <label class="field-label">Nome *</label>
           <input type="text" id="fNome" required>
         </div>
+        <div class="field">
+          <label class="field-label">NIF</label>
+          <input type="text" id="fNif" inputmode="numeric" placeholder="9 dígitos">
+        </div>
         <div class="field full">
           <label class="field-label">Categorias *</label>
           <div class="checkbox-group" id="fCategoriaGroup">
@@ -4232,8 +4236,17 @@ window.addEventListener('load', function () {
       if (s.email) html += '<div class="card-row"><strong>Email</strong><span>' + escapeHtml(s.email) + '</span></div>';
       if (s.emailord) html += '<div class="card-row"><strong>Email enc.</strong><span>' + escapeHtml(s.emailord) + '</span></div>';
       if (s.whatsappEncomenda) html += '<div class="card-row"><strong>WhatsApp enc.</strong><span>' + escapeHtml(s.whatsappEncomenda) + '</span></div>';
+      if (s.nif) html += '<div class="card-row"><strong>NIF</strong><span>' + escapeHtml(s.nif) + '</span></div>';
       if (s.iban) html += '<div class="card-row"><strong>IBAN</strong><span>' + escapeHtml(s.iban) + '</span></div>';
       if (s.banco) html += '<div class="card-row"><strong>Banco</strong><span>' + escapeHtml(s.banco) + '</span></div>';
+      // Nomes alternativos aprendidos pela leitura de faturas (suppliers/{id}/aliases).
+      // Tirar um alias errado escreve o array sem ele — nunca remove() no nó.
+      var aliases = Array.isArray(s.aliases) ? s.aliases : [];
+      if (aliases.length) {
+        html += '<div class="card-row card-aliases" style="flex-wrap:wrap;"><span>também lido como: ' + aliases.map(function (a, i) {
+          return '<em>' + escapeHtml(a) + '</em><button type="button" class="alias-remover" data-idx="' + i + '" title="Remover este nome alternativo" aria-label="Remover alias" style="border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px;font-size:12px;">✕</button>';
+        }).join(', ') + '</span></div>';
+      }
       if (s.produtos) html += '<div class="card-products">' + escapeHtml(s.produtos) + '</div>';
       if (s.notas) html += '<div class="card-row" style="font-style:italic;">' + escapeHtml(s.notas) + '</div>';
       if (s.lastOrder && s.lastOrder.date) {
@@ -4290,6 +4303,18 @@ window.addEventListener('load', function () {
       starBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         suppliersRef.child(s.id).update({ favorito: !s.favorito });
+      });
+
+      card.querySelectorAll('.alias-remover').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var idx = parseInt(btn.getAttribute('data-idx'), 10);
+          var atuais = Array.isArray(s.aliases) ? s.aliases.slice() : [];
+          if (!(idx >= 0 && idx < atuais.length)) return;
+          if (!confirm('Remover o nome alternativo "' + atuais[idx] + '" de ' + s.nome + '?')) return;
+          atuais.splice(idx, 1);
+          suppliersRef.child(s.id).update({ aliases: atuais });
+        });
       });
 
       function tryOpenOrderModal() {
@@ -4369,6 +4394,7 @@ window.addEventListener('load', function () {
       modalTitle.textContent = "Editar Fornecedor";
       document.getElementById('supplierId').value = supplier.id;
       document.getElementById('fNome').value = supplier.nome || "";
+      document.getElementById('fNif').value = supplier.nif || "";
       var selectedCats = categoriesOf(supplier);
       document.querySelectorAll('.fCategoriaCheckbox').forEach(function (cb) {
         cb.checked = selectedCats.indexOf(cb.value) !== -1;
@@ -4431,6 +4457,7 @@ window.addEventListener('load', function () {
     }
     var data = {
       nome: document.getElementById('fNome').value.trim(),
+      nif: document.getElementById('fNif').value.trim(),
       categoria: categoria,
       contacto: document.getElementById('fContacto').value.trim(),
       telefone: document.getElementById('fTelefone').value.trim(),

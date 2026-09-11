@@ -10,14 +10,30 @@
 
    API:
      GiocoFaturas.ler(file)
-       → Promise<{ fornecedorTexto, montante, referencia, data, prazoPagamento, linhas }>
+       → Promise<{ fornecedorTexto, montante, referencia, data, prazoPagamento, linhas,
+                   nif (string|null), nifCandidatos (string[]) }>
      GiocoFaturas.analyzeInvoice(file)            → Promise<analyzeResult> (bruto do Azure)
      GiocoFaturas.fieldText / fieldDateIso / fieldAmount / extrairLinhas
      GiocoFaturas.fileToBase64 / fileToDataUrl / compressImageDataUrl
      GiocoFaturas.prepararArquivoFatura(file)     → Promise<dataUrl> (imagem comprimida ou PDF tal e qual)
      GiocoFaturas.abrirArquivoFatura(dataUrl)     → abre/descarrega o original
      GiocoFaturas.normalizeNome(s)
-     GiocoFaturas.findMatchingSupplier(vendorName, allSuppliers) → id | null
+     GiocoFaturas.NIF_PROPRIO                     → "518717186" (Tribo Poética / GIOCO — é o
+                                                    cliente em TODAS as faturas; nunca é candidato)
+     GiocoFaturas.soDigitos(s)                    → só os dígitos da string
+     GiocoFaturas.nifValido(n)                    → 9 dígitos, 1.º ∈ {1,2,3,5,6,8,9}, check digit mod 11
+     GiocoFaturas.extrairNifs(analyzeResult, fields)
+       → { nif: string|null, candidatos: string[] } — VendorTaxId primeiro; depois
+         varre analyzeResult.content (rótulo NIF/NIPC/Contribuinte/VAT/PT + 9 dígitos,
+         e por fim qualquer \b\d{9}\b), valida, exclui o NIF_PROPRIO, dedupe por ordem.
+         Sem VendorTaxId válido e com exactamente 1 candidato → esse é o nif.
+     GiocoFaturas.findMatchingSupplierDetalhe(vendorName, allSuppliers, {nif, nifCandidatos})
+       → { id, via: 'nif' | 'nome' | null }. Ordem: (1) NIF — soDigitos(supplier.nif)
+         contra nif e cada candidato, primeiro acerto ganha; (2) nome — substring do
+         nome normalizado, alargada a supplier.aliases (array de strings), o nome/alias
+         mais longo é o mais específico; (3) null.
+     GiocoFaturas.findMatchingSupplier(vendorName, allSuppliers, opcoes?) → id | null
+       (wrapper do anterior; o 3.º argumento é opcional e retrocompatível)
 */
 (function (global) {
   'use strict';
@@ -56,22 +72,108 @@
     return out.trim();
   }
 
-  // allSuppliers = objeto {id: {nome, ...}} tal como vem de suppliers/
-  function findMatchingSupplier(vendorName, allSuppliers) {
+  // ===== NIF =====
+  // NIF da GIOCO / Tribo Poética Unipessoal Lda: é o CLIENTE em todas as faturas,
+  // por isso aparece sempre no texto e nunca pode ser tomado por fornecedor.
+  var NIF_PROPRIO = "518717186";
+
+  function soDigitos(s) {
+    return String(s === null || s === undefined ? "" : s).replace(/\D+/g, "");
+  }
+
+  // Regra portuguesa: 9 dígitos, primeiro dígito ∈ {1,2,3,5,6,8,9}, check digit =
+  // 11 − (Σ d[i] × (9−i), i=0..7) mod 11, com 0 quando o resto é 0 ou 1.
+  function nifValido(n) {
+    var d = soDigitos(n);
+    if (d.length !== 9) return false;
+    if ("1235689".indexOf(d.charAt(0)) === -1) return false;
+    var soma = 0;
+    for (var i = 0; i < 8; i++) soma += parseInt(d.charAt(i), 10) * (9 - i);
+    var resto = soma % 11;
+    var check = (resto === 0 || resto === 1) ? 0 : 11 - resto;
+    return check === parseInt(d.charAt(8), 10);
+  }
+
+  // Devolve { nif, candidatos }. Ambos os inputs podem faltar (ficheiro sem texto,
+  // tenant que não devolve VendorTaxId): aí é { nif:null, candidatos:[] }.
+  function extrairNifs(analyzeResult, fields) {
+    var principal = null;
+    var vistos = {};
+    var candidatos = [];
+
+    function aceitar(bruto) {
+      var d = soDigitos(bruto);
+      if (!nifValido(d) || d === NIF_PROPRIO || vistos[d]) return null;
+      vistos[d] = true;
+      candidatos.push(d);
+      return d;
+    }
+
+    var vendorTax = aceitar(fieldText(fields, 'VendorTaxId'));
+    if (vendorTax) principal = vendorTax;
+
+    var content = analyzeResult && typeof analyzeResult.content === 'string' ? analyzeResult.content : "";
+    if (content) {
+      // (a) com rótulo — mais fiável, por isso entra primeiro na ordem
+      var reRotulo = /(?:NIF|NIPC|N\.?I\.?F|Contribuinte|VAT|PT)\s*[:.\-]?\s*((?:\d[\s.]?){9})/gi;
+      var m;
+      while ((m = reRotulo.exec(content)) !== null) aceitar(m[1]);
+      // (b) qualquer sequência de 9 dígitos isolada
+      var reSolto = /\b\d{9}\b/g;
+      while ((m = reSolto.exec(content)) !== null) aceitar(m[0]);
+    }
+
+    if (!principal && candidatos.length === 1) principal = candidatos[0];
+    return { nif: principal, candidatos: candidatos };
+  }
+
+  // allSuppliers = objeto {id: {nome, nif?, aliases?, ...}} tal como vem de suppliers/
+  // opcoes (opcional) = { nif, nifCandidatos } vindos de ler().
+  function findMatchingSupplierDetalhe(vendorName, allSuppliers, opcoes) {
     allSuppliers = allSuppliers || {};
+    opcoes = opcoes || {};
+    var ids = Object.keys(allSuppliers);
+
+    // 1) NIF: o principal primeiro, depois os candidatos pela ordem em que apareceram.
+    var nifs = [];
+    if (opcoes.nif) nifs.push(soDigitos(opcoes.nif));
+    (Array.isArray(opcoes.nifCandidatos) ? opcoes.nifCandidatos : []).forEach(function (c) {
+      var d = soDigitos(c);
+      if (d && nifs.indexOf(d) === -1) nifs.push(d);
+    });
+    for (var i = 0; i < nifs.length; i++) {
+      if (!nifs[i] || nifs[i] === NIF_PROPRIO) continue;
+      for (var j = 0; j < ids.length; j++) {
+        var sNif = soDigitos(allSuppliers[ids[j]] && allSuppliers[ids[j]].nif);
+        if (sNif && sNif === nifs[i]) return { id: ids[j], via: 'nif' };
+      }
+    }
+
+    // 2) Nome: substring do nome normalizado, também contra os aliases.
     var norm = normalizeNome(vendorName);
-    if (!norm) return null;
-    var candidates = Object.keys(allSuppliers).filter(function (id) {
-      var sNorm = normalizeNome(allSuppliers[id].nome);
-      if (!sNorm) return false;
-      return norm.indexOf(sNorm) !== -1 || sNorm.indexOf(norm) !== -1;
+    if (!norm) return { id: null, via: null };
+    var candidates = [];
+    ids.forEach(function (id) {
+      var s = allSuppliers[id] || {};
+      var nomes = [s.nome].concat(Array.isArray(s.aliases) ? s.aliases : []);
+      var melhor = 0;
+      nomes.forEach(function (nome) {
+        var sNorm = normalizeNome(nome);
+        if (!sNorm) return;
+        if (norm.indexOf(sNorm) !== -1 || sNorm.indexOf(norm) !== -1) {
+          if (sNorm.length > melhor) melhor = sNorm.length;
+        }
+      });
+      if (melhor > 0) candidates.push({ id: id, tamanho: melhor });
     });
-    if (candidates.length === 0) return null;
-    // O candidato com o nome mais longo é o match mais específico.
-    candidates.sort(function (a, b) {
-      return normalizeNome(allSuppliers[b].nome).length - normalizeNome(allSuppliers[a].nome).length;
-    });
-    return candidates[0];
+    if (candidates.length === 0) return { id: null, via: null };
+    // O candidato com o nome (ou alias) mais longo é o match mais específico.
+    candidates.sort(function (a, b) { return b.tamanho - a.tamanho; });
+    return { id: candidates[0].id, via: 'nome' };
+  }
+
+  function findMatchingSupplier(vendorName, allSuppliers, opcoes) {
+    return findMatchingSupplierDetalhe(vendorName, allSuppliers, opcoes).id;
   }
 
   function fileToBase64(file) {
@@ -243,13 +345,16 @@
     var analyzeResult = await analyzeInvoice(file);
     var doc = analyzeResult && analyzeResult.documents && analyzeResult.documents[0];
     var fields = (doc && doc.fields) || (analyzeResult && analyzeResult.fields) || {};
+    var nifs = extrairNifs(analyzeResult, fields);
     return {
       fornecedorTexto: fieldText(fields, 'VendorName'),
       montante: fieldAmount(fields, 'InvoiceTotal'),
       referencia: fieldText(fields, 'InvoiceId'),
       data: fieldDateIso(fields, 'InvoiceDate'),
       prazoPagamento: fieldDateIso(fields, 'DueDate'),
-      linhas: extrairLinhas(fields)
+      linhas: extrairLinhas(fields),
+      nif: nifs.nif,
+      nifCandidatos: nifs.candidatos
     };
   }
 
@@ -270,6 +375,11 @@
     prepararArquivoFatura: prepararArquivoFatura,
     abrirArquivoFatura: abrirArquivoFatura,
     normalizeNome: normalizeNome,
+    NIF_PROPRIO: NIF_PROPRIO,
+    soDigitos: soDigitos,
+    nifValido: nifValido,
+    extrairNifs: extrairNifs,
+    findMatchingSupplierDetalhe: findMatchingSupplierDetalhe,
     findMatchingSupplier: findMatchingSupplier
   };
 })(window);
