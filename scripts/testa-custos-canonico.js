@@ -89,7 +89,7 @@ function dataset(){
         mS: { credit_debit_indicator: 'DBIT', amount: -0.05, booking_date: '2099-01-28', remittance_information: 'TRF SALARIO PT' },
         mG: { credit_debit_indicator: 'DBIT', amount: -0.01, booking_date: '2099-02-02', remittance_information: 'RENDA TESTE' },
         mT: { credit_debit_indicator: 'DBIT', amount: -0.01, booking_date: '2099-02-10', remittance_information: 'PAG.TSU 01/2099' },
-        mH: { credit_debit_indicator: 'DBIT', amount: -0.01, booking_date: '2099-02-14', remittance_information: 'OUTRO FEV' },
+        mH: { credit_debit_indicator: 'DBIT', amount: -0.13, booking_date: '2099-02-14', remittance_information: 'OUTRO FEV' },
         // ---- cascata de inferência ----
         mP:   { credit_debit_indicator: 'DBIT', amount: -0.03, booking_date: '2099-01-30', remittance_information: 'TRF P/ ORDENADO' },        // N1 → p2.conta (0,03 único depois de fx4/fx5? não: ver ordem por data)
         mK:   { credit_debit_indicator: 'DBIT', amount: -0.04, booking_date: '2099-01-29', remittance_information: 'CARTOES REFEICAO' },        // N3 → p2.cartao + p3.cartao (0,02+0,02)
@@ -227,7 +227,7 @@ async function main(){
   assert.strictEqual(porId['rec:p1'].valor, 0.05);
   assert.strictEqual(porId['rec:p1'].pagamento.estado, 'pago');
   assert.deepStrictEqual(porId['rec:p1'].pagamento.movimentoIds, ['abanca~mS']);
-  assert.strictEqual(porId['tsu'].valor, 0.01, '23,75 % × 0,04 arredondado uma vez');
+  assert.strictEqual(porId['tsu'].valor, 0.04, '23,75 % × 0,15 (p1..p5) = 0,0356 → 0,04, arredondado uma vez');
   assert.deepStrictEqual(porId['tsu'].pagamento.movimentoIds, ['abanca~mT'], 'TSU liga ao PAG.TSU do mês seguinte');
   assert.strictEqual(porId['fixo:fx1'].pagamento.estado, 'pago');
   assert.deepStrictEqual(porId['fixo:fx1'].pagamento.movimentoIds, ['abanca~mG']);
