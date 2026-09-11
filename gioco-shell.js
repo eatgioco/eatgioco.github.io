@@ -283,6 +283,8 @@
       { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
+      /* Custos: nó canónico custos/ (competência, com IVA) — validação de rubricas. */
+      { href: 'custos.html',     icone: 'wallet',           label: 'Custos' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' },
       /* Centro de controlo: cameras, HACCP, vendas do dia e consumo por loja.

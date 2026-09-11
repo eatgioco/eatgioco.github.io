@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Custos">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Custos</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="gioco-pagamentos.js"></script>
+<script src="gioco-custos-canonico.js"></script>
+
+<style>
+  /* ============================================================
+     custos.html — o nó canónico custos/ (Set/2026).
+     Selector de mês, "Regenerar mês", totais por rubrica, contador de
+     porValidar, lista de registos (porValidar primeiro, depois valor
+     desc.) com filtros por rubrica e estado. Cada porValidar deixa
+     escolher rubrica/despesa e marcar validado. Escreve SÓ em custos/,
+     através do gioco-custos-canonico.js. Prefixo cu- nas classes próprias.
+     ============================================================ */
+  body{ -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  main{ margin:0; padding:24px 0 80px; }
+
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  .card > *{ position:relative; z-index:1; }
+
+  .cu-barra{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 18px; }
+  .cu-barra select, .cu-barra input, .cu-linha-validar select, .cu-linha-validar input{
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+  }
+  .cu-barra label{ font-size:12px; font-weight:600; color:var(--muted); }
+  .cu-barra .spacer{ flex:1; }
+  .cu-estado-regen{ font-size:12px; color:var(--muted); }
+  .cu-estado-regen.erro{ color:var(--red-ink); font-weight:600; }
+
+  .cu-kpis{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+  .cu-kpi{ border-radius:14px; padding:14px 16px; }
+  .cu-kpi .k{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .cu-kpi .v{ font-size:22px; font-weight:700; color:var(--ink); margin-top:4px; line-height:1.15; }
+  .cu-kpi .s{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .cu-kpi.total{ border:2px solid var(--red); }
+  .cu-kpi.total .v{ color:var(--red-ink); font-size:28px; }
+  .cu-kpi.validar{ border:2px solid var(--amber); }
+  .cu-kpi.validar .v{ color:var(--amber); font-size:28px; }
+  .cu-kpi.validar.zero{ border-color:var(--green); }
+  .cu-kpi.validar.zero .v{ color:var(--green); }
+
+  .cu-tabela th{ padding:6px 8px; white-space:nowrap; }
+  .cu-tabela td{ padding:9px 8px; color:var(--ink); vertical-align:top; font-size:12.5px; }
+  .cu-tabela tr.porValidar td{ background:var(--amber-bg); }
+  .cu-tabela tr.anulado td{ opacity:.5; text-decoration:line-through; }
+  .cu-ent{ font-weight:600; }
+  .cu-sub{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .cu-tag{ display:inline-block; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .cu-tag.auto{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .cu-tag.porValidar{ background:var(--amber-bg); color:var(--amber); }
+  .cu-tag.validado{ background:var(--green-bg); color:var(--green); }
+  .cu-tag.anulado{ background:var(--red); color:var(--on-red); }
+  .cu-tag.pago{ background:var(--green-bg); color:var(--green); }
+  .cu-tag.pendente{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .cu-rub{ display:inline-block; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:700; color:#141414; }
+  .cu-rub.cmv{ background:var(--lime); } .cu-rub.pessoal{ background:var(--sky); } .cu-rub.fixos{ background:var(--mustard); }
+  .cu-rub.outros{ background:var(--blush); } .cu-rub.impostos{ background:var(--navy); color:#FFFFFF; }
+  .cu-rub.interno{ background:transparent; border:1px solid var(--line); color:var(--muted); }
+  .cu-rub.semRubrica{ background:transparent; border:1px dashed var(--amber); color:var(--amber); }
+  [data-theme="dark"] .cu-rub.impostos{ color:#141414; }
+  .cu-linha-validar{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  .cu-linha-validar input{ width:150px; }
+  .cu-btn-validar{
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:100px; cursor:pointer;
+    background:var(--red); color:var(--on-red); border:none;
+  }
+  .cu-btn-validar:disabled{ opacity:.45; cursor:not-allowed; }
+  .cu-motivo{ font-size:11px; color:var(--amber); margin-top:2px; }
+  .cu-vazio{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
+  .cu-nota{ font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.5; }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>sistema interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('custos.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Equipa</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-wallet"/></svg>GIOCO · <b>Custos</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Fonte única dos custos, em ótica de competência (mês do documento) e com IVA. Cada registo é gerado das fontes com um id fixo; validar uma rubrica é uma decisão que a regeneração nunca sobrepõe.</p>
+
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main>
+  <div class="cu-barra">
+    <label for="cuMes">Mês</label>
+    <select id="cuMes"></select>
+    <button type="button" class="btn-add" id="cuRegenerar" disabled>Regenerar mês</button>
+    <span class="cu-estado-regen" id="cuEstadoRegen"></span>
+    <div class="spacer"></div>
+    <label for="cuFiltroRubrica">Rubrica</label>
+    <select id="cuFiltroRubrica">
+      <option value="">Todas</option>
+      <option value="cmv">CMV / Compras</option>
+      <option value="pessoal">Pessoal</option>
+      <option value="fixos">Fixos</option>
+      <option value="outros">Outros</option>
+      <option value="impostos">Impostos</option>
+      <option value="interno">Interno</option>
+      <option value="semRubrica">Sem rubrica</option>
+    </select>
+    <label for="cuFiltroEstado">Estado</label>
+    <select id="cuFiltroEstado">
+      <option value="">Todos</option>
+      <option value="porValidar">Por validar</option>
+      <option value="auto">Automático</option>
+      <option value="validado">Validado</option>
+      <option value="anulado">Anulados</option>
+    </select>
+  </div>
+
+  <div class="cu-kpis" id="cuKpis"></div>
+
+  <div class="card glass-light">
+    <div id="cuLista"><div class="cu-vazio">A carregar…</div></div>
+    <p class="cu-nota">Ordem: por validar primeiro, depois por valor descendente. A rubrica vem dos fornecedores, das regras de classificação bancária ou da origem; um registo sem quem lhe saiba a rubrica fica por validar. Os movimentos bancários que já pagam uma fatura, um recibo, a TSU ou um compromisso nunca geram registo próprio.</p>
+  </div>
+</main>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var RUBRICA_NOME = { cmv: 'CMV', pessoal: 'Pessoal', fixos: 'Fixos', outros: 'Outros', impostos: 'Impostos', interno: 'Interno', semRubrica: 'Sem rubrica' };
+  var ORIGEM_NOME = { fatura: 'Fatura', faturaCaixa: 'Caixa', recibo: 'Recibo', tsu: 'TSU', compromisso: 'Compromisso', banco: 'Banco', manual: 'Manual' };
+  var ORDEM_RUBRICAS = ['cmv', 'pessoal', 'fixos', 'outros', 'impostos', 'interno', 'semRubrica'];
+
+  var db = null, CC = null;
+  var base = null;               // fontes em memória (once)
+  var custosMes = {};            // custos/{mes} em memória, por mês (on)
+  var mesAtivo = mesDeHoje();
+  var listenerMes = null;
+  var ocupado = false;
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function mesDeHoje(){ var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1); }
+  function formatEuro(v){
+    if (typeof v !== 'number' || isNaN(v)) return '—';
+    return v.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+  function formatData(iso){
+    if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return '—';
+    return iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+  }
+  function escapeHtml(s){
+    return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function labelMes(mes){
+    var M = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    var p = mes.split('-'); return M[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  }
+
+  /* ---------- selector de mês: 18 meses até hoje + meses com custos/ ---------- */
+  function preencherMeses(){
+    var sel = document.getElementById('cuMes');
+    var meses = {};
+    var d = new Date(); d.setDate(1);
+    for (var i = 0; i < 18; i++){ meses[d.getFullYear() + '-' + pad2(d.getMonth() + 1)] = true; d.setMonth(d.getMonth() - 1); }
+    Object.keys(custosMes).forEach(function(m){ meses[m] = true; });
+    var lista = Object.keys(meses).sort().reverse();
+    sel.innerHTML = lista.map(function(m){ return '<option value="' + m + '"' + (m === mesAtivo ? ' selected' : '') + '>' + labelMes(m) + '</option>'; }).join('');
+  }
+
+  function registosDoMes(){
+    var n = custosMes[mesAtivo] || {};
+    return Object.keys(n).filter(function(k){ return k.charAt(0) !== '_'; }).map(function(k){ return n[k]; }).filter(Boolean);
+  }
+
+  /* ---------- KPIs ---------- */
+  function renderKpis(){
+    var regs = registosDoMes();
+    var resumo = CC ? CC.resumoDe(regs) : { porRubrica: {}, total: 0, porValidar: 0 };
+    var html = '<div class="cu-kpi glass-light total"><div class="k">Total ' + escapeHtml(labelMes(mesAtivo)) + '</div><div class="v num">' + formatEuro(resumo.total) + '</div><div class="s">' + regs.filter(function(r){ return r.anulado !== true; }).length + ' registos · sem a rubrica Interno</div></div>';
+    html += '<div class="cu-kpi glass-light validar' + (resumo.porValidar ? '' : ' zero') + '"><div class="k">Por validar</div><div class="v num">' + resumo.porValidar + '</div><div class="s">' + (resumo.porValidar ? 'registos à espera de rubrica ou confirmação' : 'nada por validar') + '</div></div>';
+    ORDEM_RUBRICAS.forEach(function(k){
+      var v = resumo.porRubrica[k];
+      if (v === undefined && (k === 'interno' || k === 'semRubrica')) return;
+      html += '<div class="cu-kpi glass-light"><div class="k">' + RUBRICA_NOME[k] + '</div><div class="v num">' + formatEuro(v || 0) + '</div></div>';
+    });
+    document.getElementById('cuKpis').innerHTML = html;
+  }
+
+  /* ---------- lista ---------- */
+  function ordenar(a, b){
+    var pa = (a.validacao && a.validacao.estado === 'porValidar' && a.anulado !== true) ? 0 : 1;
+    var pb = (b.validacao && b.validacao.estado === 'porValidar' && b.anulado !== true) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    var va = typeof a.valor === 'number' ? a.valor : -1, vb = typeof b.valor === 'number' ? b.valor : -1;
+    if (va !== vb) return vb - va;
+    return String(a.id).localeCompare(String(b.id));
+  }
+
+  function estadoDe(r){ return r.anulado === true ? 'anulado' : ((r.validacao && r.validacao.estado) || 'auto'); }
+
+  function renderLista(){
+    var fr = document.getElementById('cuFiltroRubrica').value;
+    var fe = document.getElementById('cuFiltroEstado').value;
+    var regs = registosDoMes().filter(function(r){
+      if (fr && (r.rubrica || 'semRubrica') !== fr) return false;
+      var e = estadoDe(r);
+      if (fe) return e === fe;
+      return e !== 'anulado';
+    }).sort(ordenar);
+    var host = document.getElementById('cuLista');
+    if (!regs.length){
+      var n = custosMes[mesAtivo];
+      host.innerHTML = '<div class="cu-vazio">' + (n ? 'Nenhum registo com estes filtros.' : 'Este mês ainda não foi gerado — carrega em "Regenerar mês".') + '</div>';
+      return;
+    }
+    var rows = regs.map(function(r){
+      var e = estadoDe(r);
+      var rub = r.rubrica || 'semRubrica';
+      var pag = r.pagamento || {};
+      var ent = r.entidade || {};
+      var sub = [];
+      if (r.despesa && r.despesa !== ent.nome) sub.push(r.despesa);
+      if (r.origemRef) sub.push(r.origemRef);
+      var estadoHtml = '<span class="cu-tag ' + e + '">' + ({ auto: 'Auto', porValidar: 'Por validar', validado: 'Validado', anulado: 'Anulado' }[e] || e) + '</span> ' +
+        '<span class="cu-tag ' + (pag.estado === 'pago' ? 'pago' : 'pendente') + '" title="' + escapeHtml((pag.movimentoIds || []).join(', ')) + '">' + (pag.estado === 'pago' ? 'Pago' + (pag.dataPagamento ? ' ' + formatData(pag.dataPagamento) : '') : 'Pendente') + '</span>';
+      var validar = '';
+      if (e === 'porValidar'){
+        validar = '<div class="cu-linha-validar" data-id="' + escapeHtml(r.id) + '">' +
+          '<select class="cu-val-rubrica">' + ['cmv', 'pessoal', 'fixos', 'outros', 'impostos', 'interno'].map(function(k){ return '<option value="' + k + '"' + (k === r.rubrica ? ' selected' : '') + '>' + RUBRICA_NOME[k] + '</option>'; }).join('') + '</select>' +
+          '<input class="cu-val-despesa" placeholder="Despesa (opcional)" value="' + escapeHtml(r.despesa || '') + '">' +
+          '<button type="button" class="cu-btn-validar">Validar</button></div>';
+      }
+      return '<tr class="' + e + '">' +
+        '<td class="num">' + formatData(r.data) + '</td>' +
+        '<td><div class="cu-ent">' + escapeHtml(ent.nome || '—') + '</div>' + (sub.length ? '<div class="cu-sub">' + escapeHtml(sub.join(' · ')) + '</div>' : '') +
+          (r.validacao && r.validacao.motivo && e === 'porValidar' ? '<div class="cu-motivo">' + escapeHtml(r.validacao.motivo) + '</div>' : '') + validar + '</td>' +
+        '<td class="num" style="text-align:right;font-weight:700">' + formatEuro(r.valor) + '</td>' +
+        '<td><span class="cu-rub ' + rub + '">' + RUBRICA_NOME[rub] + '</span></td>' +
+        '<td>' + escapeHtml(ORIGEM_NOME[r.origem] || r.origem) + '</td>' +
+        '<td>' + estadoHtml + '</td></tr>';
+    }).join('');
+    host.innerHTML = '<div style="overflow-x:auto"><table class="cu-tabela"><thead><tr><th>Data</th><th>Entidade</th><th style="text-align:right">Valor</th><th>Rubrica</th><th>Origem</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function renderTudo(){ renderKpis(); renderLista(); }
+
+  /* ---------- validar (escreve só em custos/) ---------- */
+  document.getElementById('cuLista').addEventListener('click', function(ev){
+    var btn = ev.target.closest('.cu-btn-validar');
+    if (!btn || !CC) return;
+    var linha = btn.closest('.cu-linha-validar');
+    var id = linha.getAttribute('data-id');
+    var rubrica = linha.querySelector('.cu-val-rubrica').value;
+    var despesa = linha.querySelector('.cu-val-despesa').value.trim();
+    btn.disabled = true;
+    CC.validar(mesAtivo, id, { rubrica: rubrica, despesa: despesa || null, validadoPor: 'Manel' })
+      .catch(function(err){ alert('Não foi possível validar: ' + (err && err.message ? err.message : err)); btn.disabled = false; });
+  });
+
+  /* ---------- regenerar ---------- */
+  document.getElementById('cuRegenerar').addEventListener('click', function(){
+    if (!CC || ocupado) return;
+    ocupado = true;
+    var btn = this, est = document.getElementById('cuEstadoRegen');
+    btn.disabled = true; est.className = 'cu-estado-regen'; est.textContent = 'A regenerar ' + labelMes(mesAtivo) + '…';
+    CC.regenerar(mesAtivo).then(function(r){
+      est.textContent = r.registos + ' registos · ' + r.escritos + ' escritos · ' + r.anulados + ' anulados · total ' + formatEuro(r.resumo.total) + ' · ' + r.resumo.porValidar + ' por validar';
+    }).catch(function(err){
+      est.className = 'cu-estado-regen erro'; est.textContent = 'Falhou: ' + (err && err.message ? err.message : err);
+      console.error('Regenerar mês:', err);
+    }).then(function(){ ocupado = false; btn.disabled = false; });
+  });
+
+  /* ---------- mês activo ---------- */
+  function ligarMes(mes){
+    if (listenerMes) listenerMes.ref.off('value', listenerMes.fn);
+    mesAtivo = mes;
+    var ref = db.ref('custos/' + mes);
+    var fn = function(snap){
+      var v = snap.val();
+      if (v) custosMes[mes] = v; else delete custosMes[mes];
+      renderTudo();
+    };
+    ref.on('value', fn);
+    listenerMes = { ref: ref, fn: fn };
+    document.getElementById('cuEstadoRegen').textContent = '';
+    renderTudo();
+  }
+  document.getElementById('cuMes').addEventListener('change', function(){ ligarMes(this.value); });
+  document.getElementById('cuFiltroRubrica').addEventListener('change', renderLista);
+  document.getElementById('cuFiltroEstado').addEventListener('change', renderLista);
+
+  /* ---------- fontes (só leitura) ---------- */
+  function carregarBase(){
+    var nos = ['faturasProcessadas', 'caixaMovimentos', 'recibos', 'compromissosFixos', 'pagamentosConcluidos', 'paymentRequests',
+               'contasBancarias/abanca/movimentos', 'contasBancarias/revolut/movimentos', 'reconciliacaoBancaria', 'suppliers',
+               'classificacaoRegras', 'classificacaoMovimentos', 'custos'];
+    return Promise.all(nos.map(function(n){ return db.ref(n).once('value'); })).then(function(snaps){
+      var v = snaps.map(function(s){ return s.val() || {}; });
+      base = { faturas: v[0], caixa: v[1], recibos: v[2], compromissos: v[3], concluidos: v[4], paymentRequests: v[5],
+               movimentos: { abanca: v[6], revolut: v[7] }, reconciliacao: v[8], suppliers: v[9], regras: v[10], overrides: v[11] };
+      custosMes = v[12];
+      CC = giocoCustosCanonicoEngine({
+        getFaturas: function(){ return base.faturas; },
+        getCaixaMovimentos: function(){ return base.caixa; },
+        getRecibos: function(){ return base.recibos; },
+        getCompromissos: function(){ return base.compromissos; },
+        getPagamentosConcluidos: function(){ return base.concluidos; },
+        getPaymentRequests: function(){ return base.paymentRequests; },
+        getMovimentos: function(){ return base.movimentos; },
+        getReconciliacao: function(){ return base.reconciliacao; },
+        getSuppliers: function(){ return base.suppliers; },
+        getClassificacaoRegras: function(){ return base.regras; },
+        getClassificacaoMovimentos: function(){ return base.overrides; },
+        getCustos: function(){ return custosMes; },
+        ref: db.ref('custos')
+      });
+      window.__CC = CC;   // acesso de consola/testes
+      document.getElementById('cuRegenerar').disabled = false;
+      preencherMeses();
+      ligarMes(document.getElementById('cuMes').value || mesAtivo);
+    });
+  }
+
+  /* ============================================================
+     Firebase
+     ============================================================ */
+  firebase.initializeApp({
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  });
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  preencherMeses();
+
+  autenticarEContinuar(function () {
+    db = firebase.database();
+    carregarBase().catch(function(err){
+      console.error('Custos: falha a carregar as fontes', err);
+      document.getElementById('cuLista').innerHTML = '<div class="cu-vazio">Não foi possível carregar as fontes: ' + escapeHtml(err && err.message ? err.message : err) + '</div>';
+    });
+  });
+});
+</script>
+</body>
+</html>
