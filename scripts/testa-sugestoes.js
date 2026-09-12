@@ -6,14 +6,14 @@ var S = require('../gioco-sugestoes.js');
 // normalizarPassos: JSON limpo
 var p = S.normalizarPassos('[{"titulo":"Definir orçamento","duracaoPrevista":60,"dependeDePasso":null},{"titulo":"Visitar espaços","duracaoPrevista":120,"dependeDePasso":0}]');
 assert.strictEqual(p.length, 2);
-assert.deepStrictEqual(p[1], { titulo: 'Visitar espaços', duracaoPrevista: 120, dependeDePasso: 0 });
+assert.deepStrictEqual(p[1], { titulo: 'Visitar espaços', duracaoPrevista: 120, local: null, dependeDePasso: 0 });
 
 // backticks à volta, duração inválida, dependência a si próprio e fora do intervalo
 p = S.normalizarPassos('```json\n[{"titulo":" A ","duracaoPrevista":"x","dependeDePasso":0},{"titulo":"B","duracaoPrevista":-5,"dependeDePasso":9},{"titulo":"C","duracaoPrevista":"45","dependeDePasso":"1"}]\n```');
 assert.deepStrictEqual(p, [
-  { titulo: 'A', duracaoPrevista: 30, dependeDePasso: null },
-  { titulo: 'B', duracaoPrevista: 30, dependeDePasso: null },
-  { titulo: 'C', duracaoPrevista: 45, dependeDePasso: 1 }
+  { titulo: 'A', duracaoPrevista: 30, local: null, dependeDePasso: null },
+  { titulo: 'B', duracaoPrevista: 30, local: null, dependeDePasso: null },
+  { titulo: 'C', duracaoPrevista: 45, local: null, dependeDePasso: 1 }
 ]);
 
 // passo sem título cai e as dependências são remapeadas para os índices finais
@@ -46,6 +46,21 @@ var pc = S.promptPassos('x', 'Já falei com o senhorio. Não sei se contrato mai
 assert.ok(pc.indexOf('FONTE PRINCIPAL') > 0 && pc.indexOf('Já falei com o senhorio') > 0 && pc.indexOf('Decidir') > 0);
 assert.ok(S.promptPassos('x', new Array(6000).join('a')).length < S.promptPassos('x').length + S.MAX_CONTEXTO + 800);
 
+// ---- Local ----
+assert.strictEqual(S.normalizarLocal(' Loja '), 'loja');
+assert.strictEqual(S.normalizarLocal('escritório'), null);
+assert.strictEqual(S.normalizarLocal(null), null);
+assert.ok(S.promptPassos('x').indexOf('"local":"loja"') > 0);
+p = S.normalizarPassos('[{"titulo":"A","duracaoPrevista":10,"local":"rua"},{"titulo":"B","duracaoPrevista":10,"local":"casa"},{"titulo":"C","duracaoPrevista":10}]');
+assert.deepStrictEqual(p.map(function (x) { return x.local; }), ['rua', null, null]);
+var pl = S.promptClassificarLocal(['Ligar ao senhorio', 'Limpar o forno']);
+assert.ok(pl.indexOf('1. Ligar ao senhorio') > 0 && pl.indexOf('2. Limpar o forno') > 0 && pl.indexOf('nunca adivinhes') > 0);
+// casa por título (ordem trocada), por posição quando o título não bate, null quando falta
+assert.deepStrictEqual(S.normalizarLocais('[{"titulo":"Limpar o forno","local":"loja"},{"titulo":"Ligar ao senhorio","local":"telefone"}]', ['Ligar ao senhorio', 'Limpar o forno']), ['telefone', 'loja']);
+assert.deepStrictEqual(S.normalizarLocais('[{"titulo":"?","local":"computador"},{"titulo":"?","local":"marte"}]', ['A', 'B', 'C']), ['computador', null, null]);
+assert.deepStrictEqual(S.normalizarLocais('```json\n[{"titulo":"A","local":null}]\n```', ['A']), [null]);
+assert.throws(function () { S.normalizarLocais('{}', ['A']); }, function (e) { return e.codigo === 'resposta'; });
+
 // ---- Atualização incremental ----
 var ABERTOS = [
   { id: 'a1', titulo: 'Visitar espaços', ordem: 2, duracaoPrevista: 120, dependeDe: null },
@@ -69,7 +84,8 @@ var alt = S.normalizarAlteracoes(JSON.stringify({
 assert.deepStrictEqual(alt.remover, [{ id: 'a2', porque: 'contrato já assinado' }]);
 assert.deepStrictEqual(alt.alterar, [{ id: 'a1', porque: 'menos espaços', duracaoPrevista: 90 }]);
 assert.strictEqual(alt.acrescentar.length, 3);
-assert.deepStrictEqual(alt.acrescentar[0], { titulo: 'Verificar extração de fumos', duracaoPrevista: 45, depoisDe: 'a1', porque: 'contexto refere fumos' });
+assert.deepStrictEqual(alt.acrescentar[0], { titulo: 'Verificar extração de fumos', duracaoPrevista: 45, depoisDe: 'a1', local: null, porque: 'contexto refere fumos' });
+assert.strictEqual(S.normalizarAlteracoes('{"acrescentar":[{"titulo":"Ir à CML","local":"rua"}]}', ABERTOS).acrescentar[0].local, 'rua');
 assert.strictEqual(alt.acrescentar[1].depoisDe, null, 'depoisDe a um passo removido cai');
 assert.strictEqual(alt.acrescentar[1].duracaoPrevista, 30);
 assert.strictEqual(alt.acrescentar[2].depoisDe, null, 'depoisDe a um concluído cai');
@@ -122,6 +138,17 @@ Promise.resolve()
       assert.strictEqual(r.modelo, 'b');
       assert.deepStrictEqual(r.alteracoes, { acrescentar: [], remover: [{ id: 'a1', porque: 'p' }], alterar: [] });
       return S.sugerirAlteracoes('Teste', { fetch: fa, modelos: ['a'] }).then(function () { throw new Error('devia falhar'); }, function (e) { assert.strictEqual(e.codigo, 'semChave'); });
+    });
+  })
+  .then(function () {
+    // classificarLocal: um pedido para N títulos, lista do mesmo tamanho; sem chave rejeita; lista vazia resolve sem rede
+    var okLoc = JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"titulo":"Ligar ao senhorio","local":"telefone"},{"titulo":"Limpar o forno","local":"loja"}]' }] } }] });
+    var fl = fetchFalso({ a: { status: 503, texto: '{}' }, b: { status: 200, texto: okLoc } });
+    return S.classificarLocal(['Ligar ao senhorio', 'Limpar o forno'], { fetch: fl, modelos: ['a', 'b'], chave: 'k' }).then(function (r) {
+      assert.deepStrictEqual(r.locais, ['telefone', 'loja']); assert.strictEqual(r.modelo, 'b'); assert.strictEqual(fl.chamadas.length, 2);
+      return S.classificarLocal(['x'], { fetch: fl, modelos: ['a'] }).then(function () { throw new Error('devia falhar'); }, function (e) { assert.strictEqual(e.codigo, 'semChave'); });
+    }).then(function () {
+      return S.classificarLocal([], { fetch: fl, chave: 'k' }).then(function (r) { assert.deepStrictEqual(r.locais, []); });
     });
   })
   .then(function () { return S.sugerirPassos('Teste', { fetch: f1, modelos: ['a', 'b'], chave: 'k' }); })

@@ -65,3 +65,29 @@ assert.strictEqual(G.dependenciasSatisfeitas({ dependeDe: { 0: 'a' } }, obrs), t
 assert.strictEqual(G.dependenciasSatisfeitas({ dependeDe: { 0: 'b' } }, obrs), false);
 
 console.log('testa-obrigacoes: OK');
+
+// ---- Local e geolocalização (Set/2026) ----
+assert.strictEqual(G.casaLocal({ local: 'loja' }, null), true);
+assert.strictEqual(G.casaLocal({ local: 'loja' }, ''), true);
+assert.strictEqual(G.casaLocal({}, 'rua'), true, 'sem local aparece em qualquer filtro');
+assert.strictEqual(G.casaLocal({ local: null }, 'rua'), true);
+assert.strictEqual(G.casaLocal({ local: 'loja' }, 'loja'), true);
+assert.strictEqual(G.casaLocal({ local: 'loja' }, 'rua'), false);
+// Rua de São Bento 154 ≈ 38.7133, -9.1533; 100 m a norte ≈ +0.0009 lat
+var LOJA = { lat: 38.7133, lng: -9.1533 };
+assert.ok(Math.abs(G.distanciaMetros(LOJA.lat, LOJA.lng, LOJA.lat + 0.0009, LOJA.lng) - 100) < 2);
+var LOCAIS = {
+  L1: { nome: 'Loja', lat: LOJA.lat, lng: LOJA.lng, raio: 150, local: 'loja' },
+  L2: { nome: 'Casa', lat: 38.7300, lng: -9.1400, raio: 100, local: 'computador' },
+  L3: { nome: 'Antiga', lat: LOJA.lat, lng: LOJA.lng, raio: 500, local: 'rua', anulado: true },
+  L4: { nome: 'Sem coords', local: 'rua' }
+};
+var m = G.localMaisProximo(LOJA.lat + 0.0009, LOJA.lng, LOCAIS);
+assert.ok(m && m.id === 'L1' && m.local === 'loja' && m.distancia === 100, 'dentro do raio → Loja (a anulada com raio maior não conta)');
+assert.strictEqual(G.localMaisProximo(LOJA.lat + 0.002, LOJA.lng, LOCAIS), null, '220 m > 150 m → fora');
+assert.strictEqual(G.localMaisProximo(NaN, 1, LOCAIS), null);
+assert.strictEqual(G.localMaisProximo(1, 1, null), null);
+// raio em falta = 150; o mais próximo ganha quando dois cobrem o ponto
+var dois = { A: { nome: 'A', lat: 0, lng: 0, local: 'loja' }, B: { nome: 'B', lat: 0.0005, lng: 0, raio: 300, local: 'rua' } };
+assert.strictEqual(G.localMaisProximo(0.0001, 0, dois).id, 'A');
+console.log('testa-obrigacoes (local/geo): OK');

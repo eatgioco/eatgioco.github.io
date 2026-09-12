@@ -37,9 +37,46 @@
                                           semPassos:[{projeto}] (ativos sem nenhum passo aberto),
                                           totalAbertas, parados:[{projeto, diasParado}] (> LIMITE_PARADO) }
    LIMITE_PARADO_DIAS = 14
+
+   LOCAL (Set/2026): campo opcional obr.local ∈ LOCAIS ('loja'|'computador'|'rua'|
+   'telefone') ou ausente/null = em qualquer sítio. ROTULO_LOCAL dá o texto.
+   casaLocal(obr, filtro)               → true se filtro é null/'' OU obr.local é null OU igual —
+                                          uma obrigação sem local aparece SEMPRE, em qualquer filtro.
+   distanciaMetros(lat1, lng1, lat2, lng2) → haversine, metros.
+   localMaisProximo(lat, lng, mrnLocais) → { id, nome, local, raio, distancia } do local de
+                                          referência (mrnLocais/, anulado !== true, lat/lng/raio
+                                          numéricos) dentro do raio MAIS PRÓXIMO, ou null. Só
+                                          cálculo entre coordenadas — sem mapas nem serviços.
 */
 (function(){
   var LIMITE_PARADO_DIAS = 14;
+  var LOCAIS = ['loja', 'computador', 'rua', 'telefone'];
+  var ROTULO_LOCAL = { loja: 'Loja', computador: 'Computador', rua: 'Rua', telefone: 'Telefone' };
+
+  function casaLocal(obr, filtro) {
+    if (!filtro) return true;
+    var l = obr && obr.local;
+    return !l || l === filtro;
+  }
+  function distanciaMetros(lat1, lng1, lat2, lng2) {
+    var R = 6371000, r = Math.PI / 180;
+    var dLat = (lat2 - lat1) * r, dLng = (lng2 - lng1) * r;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function localMaisProximo(lat, lng, mrnLocais) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !isFinite(lat) || !isFinite(lng)) return null;
+    var melhor = null;
+    Object.keys(mrnLocais || {}).forEach(function (id) {
+      var m = mrnLocais[id];
+      if (!m || m.anulado === true) return;
+      var la = Number(m.lat), lo = Number(m.lng), raio = Number(m.raio) > 0 ? Number(m.raio) : 150;
+      if (!isFinite(la) || !isFinite(lo)) return;
+      var d = distanciaMetros(lat, lng, la, lo);
+      if (d <= raio && (!melhor || d < melhor.distancia)) melhor = { id: id, nome: m.nome || '', local: LOCAIS.indexOf(m.local) >= 0 ? m.local : null, raio: raio, distancia: Math.round(d) };
+    });
+    return melhor;
+  }
   var DURACAO_DEFAULT = 30;
 
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
@@ -206,7 +243,12 @@
     diasParado: diasParado,
     grupoPrazo: grupoPrazo,
     ordenar: ordenar,
-    vistaProximaAcao: vistaProximaAcao
+    vistaProximaAcao: vistaProximaAcao,
+    LOCAIS: LOCAIS,
+    ROTULO_LOCAL: ROTULO_LOCAL,
+    casaLocal: casaLocal,
+    distanciaMetros: distanciaMetros,
+    localMaisProximo: localMaisProximo
   };
   if (typeof window !== 'undefined') window.GiocoObrigacoes = G;
   if (typeof module !== 'undefined' && module.exports) module.exports = G;
