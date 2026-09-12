@@ -28,6 +28,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-obrigacoes.js"></script>
+<script src="gioco-sugestoes.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -65,6 +66,34 @@
   .chip input{ width:56px; border:none; background:transparent; font:inherit; color:var(--ink); text-align:right; }
   .chip input:focus{ outline:none; }
   .cap-hint{ margin:10px 0 0; font-size:12px; color:var(--muted); }
+  /* Novo projeto = ação principal; a obrigação solta fica por baixo, secundária. */
+  .cap-titulo{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .cap-titulo b{ color:var(--red); }
+  .cap-solta{ margin-top:18px; padding-top:16px; border-top:1px dashed var(--line); }
+  .cap-solta input[type="text"]{ padding:10px 12px; font-size:14px; background:var(--white); }
+
+  /* ---------- Sugestão de passos (Gemini): lista editável, nunca gravada sem confirmar ---------- */
+  .sug-box{ margin-top:14px; display:none; }
+  .sug-box.on{ display:block; }
+  .sug-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .sug-head b{ color:var(--ink); }
+  .sug-erro{ margin-top:10px; padding:12px 14px; border-left:4px solid var(--red); background:var(--white); border-radius:10px; font-size:13.5px; color:var(--ink); }
+  .sug-erro b{ color:var(--red-ink); }
+  .sug-chave{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--muted); }
+  .sug-chave input{ flex:1 1 260px; min-width:0; padding:9px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--dough); font:inherit; font-size:13px; color:var(--ink); }
+  .sug-chave input:focus{ outline:none; border-color:var(--ink); }
+  .sug-lista{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+  .sug-linha{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 10px; background:var(--white); border:1px solid var(--line); border-radius:10px; }
+  .sug-linha .passo-ordem{ width:22px; }
+  .sug-linha input[type="text"]{ flex:1 1 260px; min-width:0; padding:8px 10px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; font-size:14px; color:var(--ink); }
+  .sug-linha input[type="text"]:focus, .sug-linha input[type="number"]:focus, .sug-linha select:focus{ outline:none; border-color:var(--ink); }
+  .sug-linha input[type="number"]{ width:64px; padding:8px 8px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; font-size:13px; color:var(--ink); text-align:right; }
+  .sug-linha .min{ font-size:12px; color:var(--muted); }
+  .sug-linha select{ padding:6px 8px; border:1.5px solid var(--line); border-radius:100px; background:var(--white); font:inherit; font-size:11.5px; color:var(--ink); max-width:190px; }
+  .sug-linha .b.icone{ margin-left:auto; }
+  .sug-acoes{ display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
+  .sug-spin{ display:inline-block; width:12px; height:12px; border:2px solid var(--line); border-top-color:var(--red); border-radius:50%; animation:sugspin .8s linear infinite; vertical-align:-2px; }
+  @keyframes sugspin{ to{ transform:rotate(360deg); } }
 
   /* ---------- Indicadores ---------- */
   .ind-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
@@ -154,6 +183,8 @@
   body.shell-touch .l-acoes{ flex-basis:100%; }
   body.shell-touch .b{ padding:10px 14px; font-size:13px; }
   body.shell-touch .cap-row select{ max-width:100%; }
+  body.shell-touch .sug-linha input[type="text"]{ flex-basis:100%; }
+  body.shell-touch .sug-linha select{ max-width:100%; flex:1 1 140px; }
 </style>
 </head>
 <body class="shell-mobile">
@@ -208,16 +239,24 @@
   <!-- ===== Vista principal ===== -->
   <div id="vistaPrincipal">
     <div class="card glass-light">
+      <p class="cap-titulo"><b>Novo projeto</b></p>
       <div class="cap-row">
-        <input type="text" id="capInput" placeholder="O que tens de fazer? Enter cria. Colar várias linhas cria várias." autocomplete="off">
-        <select id="capProjeto" title="Projeto"><option value="">Sem projeto</option></select>
-        <span class="chip" id="capDuracaoChip" title="Duração prevista por omissão (clica para alterar)">
-          <svg class="icon" width="13" height="13"><use href="#i-clock"/></svg>
-          <input type="number" id="capDuracao" min="1" step="5" value="30" aria-label="Duração prevista em minutos"> min
-        </span>
-        <button type="button" class="btn-add" id="capBtn">Criar</button>
+        <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo os passos" autocomplete="off">
+        <button type="button" class="btn-add" id="projCriarBtn">Criar projeto</button>
       </div>
-      <p class="cap-hint">Uma linha por item, sem campos. A duração só se pede se quiseres mudar os 30 min por omissão.</p>
+      <p class="cap-hint">Abre logo a vista do projeto com uma sugestão de passos a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
+
+      <div class="cap-solta">
+        <p class="cap-titulo">Obrigação solta</p>
+        <div class="cap-row">
+          <input type="text" id="capInput" placeholder="Uma coisa avulsa, sem projeto. Enter cria; colar várias linhas cria várias." autocomplete="off">
+          <span class="chip" id="capDuracaoChip" title="Duração prevista por omissão (clica para alterar)">
+            <svg class="icon" width="13" height="13"><use href="#i-clock"/></svg>
+            <input type="number" id="capDuracao" min="1" step="5" value="30" aria-label="Duração prevista em minutos"> min
+          </span>
+          <button type="button" class="b" id="capBtn">Criar</button>
+        </div>
+      </div>
     </div>
 
     <p class="loading-state" id="loadingState">A carregar…</p>
@@ -273,6 +312,7 @@
         <button type="button" class="b" id="projVoltar"><svg class="icon" width="14" height="14"><use href="#i-chevron-left"/></svg> Voltar</button>
         <h2 id="projNome"></h2>
         <span class="status" id="projEstado"></span>
+        <button type="button" class="b ok" id="projSugerirBtn"><svg class="icon" width="14" height="14"><use href="#i-sparkles"/></svg> Sugerir passos</button>
         <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Decompor</button>
         <button type="button" class="b" id="projConcluirBtn">Concluir projeto</button>
         <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
@@ -284,6 +324,27 @@
           <button type="button" class="btn-add" id="decomporCriar">Criar passos</button>
           <button type="button" class="b" id="decomporCancelar">Cancelar</button>
           <span id="decomporInfo"></span>
+        </div>
+      </div>
+      <!-- Sugestão automática: a resposta do modelo NUNCA é gravada directamente.
+           Vive aqui, editável, até «Criar N passos». -->
+      <div class="sug-box" id="sugBox">
+        <div class="sug-head" id="sugHead"></div>
+        <div class="sug-erro" id="sugErro" style="display:none;"></div>
+        <!-- A chave do Gemini NÃO está no repo (público; o push protection do GitHub
+             recusa-a): cola-se aqui uma vez e fica no localStorage deste browser. -->
+        <div class="sug-chave" id="sugChave" style="display:none;">
+          <input type="password" id="sugChaveInput" placeholder="Chave da API do Gemini (AI Studio)" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn-add" id="sugChaveGuardar">Guardar chave e sugerir</button>
+          <span>Fica só neste browser (localStorage) e só é enviada à API da Google.</span>
+        </div>
+        <div class="sug-lista" id="sugLista"></div>
+        <div class="sug-acoes" id="sugAcoes">
+          <button type="button" class="btn-add" id="sugCriar">Criar passos</button>
+          <button type="button" class="b" id="sugAdd"><svg class="icon" width="13" height="13"><use href="#i-plus"/></svg> Acrescentar linha</button>
+          <button type="button" class="b" id="sugRepetir">Pedir outra sugestão</button>
+          <button type="button" class="b" id="sugCancelar">Cancelar</button>
+          <span id="sugInfo"></span>
         </div>
       </div>
     </div>
@@ -428,7 +489,9 @@
   }
 
   /* ---------- Escritas ---------- */
-  function criarObrigacao(titulo, projetoId, ordem, duracao) {
+  // extra (opcional): { dependeDe:[ids], sugerida:true } — só a confirmação de
+  // uma sugestão os usa; a origem continua 'manual' porque foi o Manel a confirmar.
+  function criarObrigacao(titulo, projetoId, ordem, duracao, extra) {
     var ref = obrigacoesRef.push();
     var reg = {
       titulo: titulo,
@@ -437,20 +500,18 @@
       duracaoPrevista: duracao || G.DURACAO_DEFAULT,
       duracaoReal: null,
       prazo: null,
-      dependeDe: null,
+      dependeDe: (extra && extra.dependeDe && extra.dependeDe.length) ? extra.dependeDe : null,
       estado: 'aberta',
       origem: 'manual',
+      sugerida: (extra && extra.sugerida) ? true : null,
       criadoEm: agoraISO(),
       adiada: 0
     };
     return ref.set(reg).then(function () { return ref.key; });
   }
-  // antesDeGravar(id) corre ANTES do set(): o 'value' local dispara logo,
-  // antes de a Promise resolver, e quem quer reagir ao id novo tem de o saber já.
-  function criarProjeto(nome, antesDeGravar) {
+  function criarProjeto(nome) {
     var ref = projetosRef.push();
     var t = agoraISO();
-    if (antesDeGravar) antesDeGravar(ref.key);
     return ref.set({ nome: nome, estado: 'ativo', criadoEm: t, ultimoAvancoEm: t, anulado: false })
       .then(function () { return ref.key; });
   }
@@ -490,23 +551,46 @@
   function linhasDe(texto) {
     return String(texto || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
   }
+  // Fase 1.1: a captura cria SÓ obrigações soltas. Passos de projeto nascem na
+  // vista do projeto (Sugerir passos / Decompor) — o projeto deixou de ser um
+  // select secundário ao lado da caixa.
   function capturar(linhasColadas) {
     var input = $('capInput');
     // Um <input> de uma linha descarta os \n ao receber valor: as linhas coladas
     // chegam aqui directamente, nunca passam pelo value.
     var linhas = linhasDe(input.value).concat(linhasColadas || []);
     if (!linhas.length) return;
-    var pid = $('capProjeto').value || null;
     var dur = duracaoDefault();
-    var base = pid ? maxOrdem(pid) : null;
     input.value = '';
     var seq = Promise.resolve();
-    linhas.forEach(function (t, i) {
-      seq = seq.then(function () { return criarObrigacao(t, pid, pid ? base + i + 1 : null, dur); });
+    linhas.forEach(function (t) {
+      seq = seq.then(function () { return criarObrigacao(t, null, null, dur); });
     });
-    seq.then(function () { if (pid) return marcarAvanco(pid); }).catch(erroEscrita);
+    seq.catch(erroEscrita);
     input.focus();
   }
+  /* ---------- Novo projeto (ação principal) ----------
+     Cria, abre a vista do projeto e dispara logo a sugestão de passos. O set()
+     resolve DEPOIS de o 'value' local ter posto o projeto em projs, por isso o
+     abrirProjeto no then encontra-o. */
+  function novoProjeto() {
+    var input = $('projInput');
+    var nome = input.value.trim();
+    if (!nome) { input.focus(); return; }
+    $('projCriarBtn').disabled = true;
+    criarProjeto(nome)
+      .then(function (id) {
+        input.value = '';
+        abrirProjeto(id);
+        pedirSugestao();
+      })
+      .catch(erroEscrita)
+      .then(function () { $('projCriarBtn').disabled = false; });
+  }
+  $('projCriarBtn').addEventListener('click', novoProjeto);
+  $('projInput').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); novoProjeto(); }
+  });
   $('capBtn').addEventListener('click', function () { capturar(); });
   $('capInput').addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') { ev.preventDefault(); capturar(); }
@@ -519,31 +603,9 @@
     ev.preventDefault();
     capturar(linhasDe(txt));
   });
-  $('capProjeto').addEventListener('change', function () {
-    if (this.value !== '__novo') return;
-    var nome = prompt('Nome do novo projeto:');
-    nome = nome ? nome.trim() : '';
-    if (!nome) { this.value = ''; return; }
-    var sel = this;
-    criarProjeto(nome, function (id) { sel.dataset.pendente = id; }).catch(erroEscrita);
-  });
   $('capDuracao').addEventListener('change', function () {
     if (!(parseInt(this.value, 10) > 0)) this.value = G.DURACAO_DEFAULT;
   });
-
-  function renderSelectProjetos() {
-    var sel = $('capProjeto');
-    var atual = sel.dataset.pendente || sel.value;
-    // O pendente só se consome quando o projeto já chegou ao snapshot.
-    if (sel.dataset.pendente && projs[sel.dataset.pendente]) delete sel.dataset.pendente;
-    var html = '<option value="">Sem projeto</option>';
-    Object.keys(projs).filter(function (id) { var p = projs[id]; return p && p.estado === 'ativo' && p.anulado !== true; })
-      .sort(function (a, b) { return (projs[a].nome || '').localeCompare(projs[b].nome || ''); })
-      .forEach(function (id) { html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(projs[id].nome) + '</option>'; });
-    html += '<option value="__novo">+ Novo projeto…</option>';
-    sel.innerHTML = html;
-    sel.value = projs[atual] ? atual : '';
-  }
 
   /* ---------- Render: vista principal ---------- */
   function metaPrazo(obr, hoje) {
@@ -629,8 +691,6 @@
     $('loadingState').style.display = 'none';
     $('indRow').style.display = '';
     $('conteudo').style.display = '';
-    renderSelectProjetos();
-
     var hoje = G.hojeISO();
     var v = G.vistaProximaAcao(obrs, projs, hoje);
     var nAtivos = Object.keys(projs).filter(function (id) { var p = projs[id]; return p && p.estado === 'ativo' && p.anulado !== true; }).length;
@@ -697,6 +757,7 @@
     projetoAberto = pid;
     concluirEmCurso = null; prazoEmEdicao = null; duracaoEmEdicao = null;
     $('decomporBox').classList.remove('on');
+    fecharSugestao();
     try { history.replaceState(null, '', '?projeto=' + encodeURIComponent(pid)); } catch (e) {}
     render();
     window.scrollTo(0, 0);
@@ -725,6 +786,7 @@
     $('projSub').textContent = 'Criado ' + fmtDataHora(p.criadoEm) + ' · último avanço ' + fmtDataHora(p.ultimoAvancoEm) +
       ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
     $('projDecomporBtn').style.display = ativo ? '' : 'none';
+    $('projSugerirBtn').style.display = ativo ? '' : 'none';
     $('projConcluirBtn').style.display = ativo ? '' : 'none';
     $('projConcluirBtn').disabled = abertos.length > 0;
     $('projConcluirBtn').title = abertos.length > 0 ? 'Ainda há ' + abertos.length + ' passo(s) aberto(s): conclui-os ou anula-os primeiro' : 'Marcar o projeto como concluído';
@@ -755,7 +817,7 @@
           '<button type="button" class="b icone" data-acao="descer" title="Descer" ' + (i === passos.length - 1 ? 'disabled' : '') + '>' + icone('chevron-down', 12) + '</button>'
         : '';
       return linhaObrigacao(o, { semProjeto: true, ordem: i + 1, extra: extra, acoesExtra: acoesExtra });
-    }).join('') : '<div class="vazio">Este projeto ainda não tem passos. Usa «Decompor» para os criar de uma vez.</div>';
+    }).join('') : '<div class="vazio">Este projeto ainda não tem passos. Usa «Sugerir passos» para uma proposta automática, ou «Decompor» para os escrever à mão.</div>';
 
     var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
     if (foco) { foco.focus(); foco.select(); }
@@ -789,8 +851,168 @@
     Promise.all(escritas).catch(erroEscrita);
   }
 
+  /* ---------- Sugerir passos (decomposição automática) ----------
+     A chamada ao modelo está toda no gioco-sugestoes.js (GiocoSugestoes.sugerirPassos);
+     aqui só se mostra o resultado numa lista EDITÁVEL (texto, duração,
+     dependência, apagar, acrescentar) e só «Criar passos» grava. A caixa vive em
+     memória (sugLinhas) e re-desenha-se por inteiro a cada alteração estrutural;
+     as edições de texto/número ficam no DOM até se ler na confirmação.
+     Se a API falhar (chave, quota, rede, JSON) a caixa mostra o erro e o Decompor
+     manual continua ao lado — a página nunca depende da API. */
+  var sugLinhas = null;       // [{titulo, duracaoPrevista, dependeDePasso}] em edição, ou null
+  var sugPedido = 0;          // nº do pedido em curso: uma resposta atrasada de um pedido antigo é ignorada
+  var sugProjeto = null;      // projeto a que a sugestão pertence (mudar de projeto descarta-a)
+  var S = window.GiocoSugestoes;
+
+  function fecharSugestao() {
+    sugLinhas = null; sugProjeto = null; sugPedido++;
+    $('sugBox').classList.remove('on');
+    $('sugLista').innerHTML = '';
+    $('sugErro').style.display = 'none';
+    $('sugInfo').textContent = '';
+  }
+  function sugEstado(aCarregar, erro, pedirChave) {
+    $('sugAcoes').style.display = aCarregar ? 'none' : '';
+    $('sugCriar').style.display = (!aCarregar && sugLinhas) ? '' : 'none';
+    $('sugAdd').style.display = (!aCarregar && sugLinhas) ? '' : 'none';
+    $('sugRepetir').style.display = pedirChave ? 'none' : '';
+    var e = $('sugErro');
+    if (erro) { e.innerHTML = '<b>Sem sugestão automática.</b> ' + escapeHtml(erro) + '<br><span style="color:var(--muted);font-size:12.5px">' + (pedirChave ? 'Cola a chave abaixo, ou escreve os passos à mão com «Decompor».' : 'Podes tentar de novo ou escrever os passos à mão com «Decompor».') + '</span>'; e.style.display = ''; }
+    else e.style.display = 'none';
+    $('sugChave').style.display = pedirChave ? '' : 'none';
+    if (pedirChave) $('sugChaveInput').value = '';
+  }
+  $('sugChaveGuardar').addEventListener('click', function () {
+    if (!S.guardarChave($('sugChaveInput').value)) { $('sugChaveInput').focus(); return; }
+    pedirSugestao();
+  });
+  $('sugChaveInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); $('sugChaveGuardar').click(); } });
+  function pedirSugestao() {
+    var pid = projetoAberto; var p = projs[pid];
+    if (!p || !S) return;
+    $('decomporBox').classList.remove('on');
+    sugLinhas = null; sugProjeto = pid;
+    var meu = ++sugPedido;
+    $('sugBox').classList.add('on');
+    $('sugLista').innerHTML = '';
+    $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de passos para <b>' + escapeHtml(p.nome) + '</b>…';
+    sugEstado(true, null, false);
+    S.sugerirPassos(p.nome).then(function (r) {
+      if (meu !== sugPedido) return;
+      sugLinhas = r.passos.map(function (x) { return { titulo: x.titulo, duracaoPrevista: x.duracaoPrevista, dependeDePasso: x.dependeDePasso }; });
+      $('sugHead').innerHTML = 'Sugestão de <b>' + sugLinhas.length + ' passos</b> (' + escapeHtml(r.modelo) + ') — edita, apaga ou acrescenta; nada fica gravado até confirmares.';
+      sugEstado(false, null, false);
+      renderSugestao();
+    }, function (e) {
+      if (meu !== sugPedido) return;
+      console.error('Sugestão de passos falhou:', e);
+      $('sugHead').innerHTML = 'Sugestão para <b>' + escapeHtml(p.nome) + '</b>';
+      // Sem chave ou chave recusada: pedir a chave aqui mesmo (fica no localStorage).
+      sugEstado(false, (e && e.motivo) ? e.motivo : 'Erro inesperado ao contactar o modelo.', !!(e && (e.codigo === 'semChave' || e.codigo === 'chave')));
+    });
+  }
+  // Lê o DOM para sugLinhas (texto e duração editados, dependência escolhida).
+  function lerSugestaoDoDom() {
+    if (!sugLinhas) return;
+    var linhas = $('sugLista').querySelectorAll('.sug-linha');
+    Array.prototype.forEach.call(linhas, function (el, i) {
+      if (!sugLinhas[i]) return;
+      sugLinhas[i].titulo = el.querySelector('[data-sug="titulo"]').value.trim();
+      sugLinhas[i].duracaoPrevista = numOuNull(el.querySelector('[data-sug="dur"]').value) || G.DURACAO_DEFAULT;
+      var dep = el.querySelector('[data-sug="dep"]').value;
+      sugLinhas[i].dependeDePasso = dep === '' ? null : parseInt(dep, 10);
+    });
+  }
+  function renderSugestao() {
+    if (!sugLinhas) return;
+    $('sugLista').innerHTML = sugLinhas.map(function (l, i) {
+      var opts = '<option value="">sem dependência</option>' + sugLinhas.map(function (o, j) {
+        if (j === i) return '';
+        return '<option value="' + j + '"' + (l.dependeDePasso === j ? ' selected' : '') + '>' + escapeHtml(rotuloDep(j, o.titulo)) + '</option>';
+      }).join('');
+      return '<div class="sug-linha" data-sug-i="' + i + '">' +
+        '<span class="passo-ordem num">' + (i + 1) + '.</span>' +
+        '<input type="text" data-sug="titulo" value="' + escapeHtml(l.titulo) + '" placeholder="Título do passo" maxlength="200">' +
+        '<input type="number" data-sug="dur" min="1" step="5" value="' + l.duracaoPrevista + '" aria-label="Duração prevista em minutos"><span class="min">min</span>' +
+        '<select data-sug="dep" aria-label="Dependência">' + opts + '</select>' +
+        '<button type="button" class="b icone" data-sug-acao="apagar" title="Apagar esta linha">' + icone('x', 12) + '</button>' +
+        '</div>';
+    }).join('');
+    $('sugCriar').textContent = 'Criar ' + sugLinhas.length + (sugLinhas.length === 1 ? ' passo' : ' passos');
+    $('sugCriar').disabled = !sugLinhas.length;
+  }
+  $('sugLista').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-sug-acao="apagar"]'); if (!btn || !sugLinhas) return;
+    lerSugestaoDoDom();
+    var i = parseInt(btn.closest('[data-sug-i]').dataset.sugI, 10);
+    sugLinhas.splice(i, 1);
+    // Remapear dependências: as que apontavam para a linha apagada caem, as posteriores recuam um.
+    sugLinhas.forEach(function (l) {
+      if (l.dependeDePasso === null) return;
+      if (l.dependeDePasso === i) l.dependeDePasso = null;
+      else if (l.dependeDePasso > i) l.dependeDePasso--;
+    });
+    renderSugestao();
+  });
+  function rotuloDep(j, titulo) { return 'depende de ' + (j + 1) + '. ' + titulo.slice(0, 40) + (titulo.length > 40 ? '…' : ''); }
+  $('sugLista').addEventListener('input', function (ev) {
+    // Mudar um título reflete-se nos selects das outras linhas — retocando as
+    // <option> no sítio, NUNCA re-desenhando a lista: o change dispara ao sair do
+    // campo, e um re-desenho nesse instante trocava o elemento para onde o foco
+    // ia (o valor escrito a seguir ia parar a um input já fora do DOM).
+    var el = ev.target;
+    if (!el.dataset || el.dataset.sug !== 'titulo' || !sugLinhas) return;
+    var i = parseInt(el.closest('[data-sug-i]').dataset.sugI, 10);
+    sugLinhas[i].titulo = el.value.trim();
+    Array.prototype.forEach.call($('sugLista').querySelectorAll('option[value="' + i + '"]'), function (op) { op.textContent = rotuloDep(i, sugLinhas[i].titulo); });
+  });
+  $('sugAdd').addEventListener('click', function () {
+    if (!sugLinhas) return;
+    lerSugestaoDoDom();
+    sugLinhas.push({ titulo: '', duracaoPrevista: duracaoDefault(), dependeDePasso: null });
+    renderSugestao();
+    var ult = $('sugLista').querySelector('.sug-linha:last-child [data-sug="titulo"]');
+    if (ult) ult.focus();
+  });
+  $('sugRepetir').addEventListener('click', function () { pedirSugestao(); });
+  $('sugCancelar').addEventListener('click', fecharSugestao);
+  $('projSugerirBtn').addEventListener('click', function () { pedirSugestao(); });
+  $('sugCriar').addEventListener('click', function () {
+    var pid = projetoAberto; if (!pid || !sugLinhas || sugProjeto !== pid) return;
+    lerSugestaoDoDom();
+    var linhas = sugLinhas.filter(function (l) { return l.titulo; });
+    if (!linhas.length) { $('sugInfo').textContent = 'Todas as linhas estão vazias.'; return; }
+    if (linhas.length !== sugLinhas.length) { renderSugestao(); }
+    // Dependências: índices da lista → ids reais. Cria-se por ordem; uma
+    // dependência para trás vai já no set() inicial, uma para a frente (a lista
+    // permite) fica para um set() da folha dependeDe no fim.
+    var idxDe = []; sugLinhas.forEach(function (l, i) { if (l.titulo) idxDe[i] = linhas.indexOf(l); });
+    var base = maxOrdem(pid);
+    var ids = [];
+    var tardias = [];
+    $('sugCriar').disabled = true;
+    $('sugInfo').textContent = 'A criar ' + linhas.length + ' passos…';
+    var seq = Promise.resolve();
+    linhas.forEach(function (l, i) {
+      seq = seq.then(function () {
+        var depIdx = l.dependeDePasso === null ? null : idxDe[l.dependeDePasso];
+        var dep = (typeof depIdx === 'number' && depIdx < i) ? [ids[depIdx]] : null;
+        if (typeof depIdx === 'number' && depIdx > i) tardias.push({ de: i, para: depIdx });
+        return criarObrigacao(l.titulo, pid, base + i + 1, l.duracaoPrevista, { dependeDe: dep, sugerida: true })
+          .then(function (id) { ids.push(id); });
+      });
+    });
+    seq.then(function () {
+      return Promise.all(tardias.map(function (t) { return obrigacoesRef.child(ids[t.de]).child('dependeDe').set([ids[t.para]]); }));
+    })
+      .then(function () { return marcarAvanco(pid); })
+      .then(function () { fecharSugestao(); })
+      .catch(function (e) { erroEscrita(e); $('sugCriar').disabled = false; $('sugInfo').textContent = ''; });
+  });
+
   /* ---------- Decompor ---------- */
   $('projDecomporBtn').addEventListener('click', function () {
+    fecharSugestao();
     $('decomporBox').classList.add('on');
     $('decomporInfo').textContent = '';
     $('decomporTexto').focus();
