@@ -315,7 +315,7 @@
       </div>
 
       <details class="sec fold" id="secFechadas">
-        <summary id="sumFechadas">Concluídas e anuladas (0)</summary>
+        <summary id="sumFechadas">Obrigações e passos concluídos e anulados (0)</summary>
         <div class="lista" id="listaFechadas"></div>
       </details>
 
@@ -568,7 +568,8 @@
   }
   function anular(id) {
     var o = obrs[id]; if (!o) return;
-    if (!confirm('Anular «' + o.titulo + '»? Fica registada como anulada (nunca é apagada).')) return;
+    var oque = o.projetoId ? 'o passo' : 'a obrigação';
+    if (!confirm('Anular ' + oque + ' «' + o.titulo + '»? Fica ' + (o.projetoId ? 'registado como anulado' : 'registada como anulada') + ' (nunca se apaga).')) return;
     obrigacoesRef.child(id).update({ estado: 'anulada', anulado: true, anuladoEm: agoraISO() }).catch(erroEscrita);
   }
   function setFolha(id, campo, valor) {
@@ -693,8 +694,8 @@
     }
     if (opts.diasParado !== undefined && opts.diasParado !== null) meta.push(metaParado(opts.diasParado));
     if (obr.adiada > 0) meta.push('<span class="adiada">adiada ' + obr.adiada + '×</span>');
-    if (obr.estado === 'concluida') meta.push('<span>concluída ' + fmtDataHora(obr.concluidaEm) + '</span>');
-    if (obr.estado === 'anulada') meta.push('<span>anulada ' + fmtDataHora(obr.anuladoEm) + '</span>');
+    if (obr.estado === 'concluida') meta.push('<span>' + (obr.projetoId ? 'concluído ' : 'concluída ') + fmtDataHora(obr.concluidaEm) + '</span>');
+    if (obr.estado === 'anulada') meta.push('<span>' + (obr.projetoId ? 'anulado ' : 'anulada ') + fmtDataHora(obr.anuladoEm) + (obr.anuladoPorProjeto === true ? ' · com o projeto' : obr.anuladoPorSugestao === true ? ' · por sugestão' : '') + '</span>');
     if (opts.abertasNoProjeto > 1) meta.push('<span class="num">+' + (opts.abertasNoProjeto - 1) + ' passos abertos a seguir</span>');
 
     var acoes = '';
@@ -774,7 +775,7 @@
     var fechadas = Object.keys(obrs).map(function (id) { var o = Object.assign({}, obrs[id]); o.id = id; return o; })
       .filter(function (o) { return !G.estaAberta(o); })
       .sort(function (a, b) { return (b.concluidaEm || b.anuladoEm || '') < (a.concluidaEm || a.anuladoEm || '') ? -1 : 1; });
-    $('sumFechadas').textContent = 'Concluídas e anuladas (' + fechadas.length + ')';
+    $('sumFechadas').textContent = 'Obrigações e passos concluídos e anulados (' + fechadas.length + ')';
     $('listaFechadas').innerHTML = fechadas.map(function (o) { return linhaObrigacao(o, {}); }).join('') || '<div class="vazio">Ainda nada.</div>';
 
     var projFechados = Object.keys(projs).map(function (id) { var p = Object.assign({}, projs[id]); p.id = id; return p; })
@@ -838,7 +839,7 @@
     ta.disabled = !ativo;
     $('projConcluirBtn').style.display = ativo ? '' : 'none';
     $('projConcluirBtn').disabled = abertos.length > 0;
-    $('projConcluirBtn').title = abertos.length > 0 ? 'Ainda há ' + abertos.length + ' passo(s) aberto(s): conclui-os ou anula-os primeiro' : 'Marcar o projeto como concluído';
+    $('projConcluirBtn').title = abertos.length > 0 ? (abertos.length === 1 ? 'Ainda há 1 passo aberto: conclui-o ou anula-o primeiro' : 'Ainda há ' + abertos.length + ' passos abertos: conclui-os ou anula-os primeiro') : 'Marcar o projeto como concluído';
     $('projAnularBtn').style.display = ativo ? '' : 'none';
 
     $('nPassos').textContent = '(' + passos.length + ')';
@@ -849,7 +850,7 @@
       var chips = deps.map(function (d) {
         var dep = obrs[d];
         var feita = !dep || dep.estado === 'concluida' || dep.anulado === true || dep.estado === 'anulada';
-        return '<span class="dep-chip' + (feita ? '' : ' pendente') + '">' + (feita ? '✓ ' : '') + escapeHtml(dep ? dep.titulo : '(apagada)') +
+        return '<span class="dep-chip' + (feita ? '' : ' pendente') + '">' + (feita ? '✓ ' : '') + escapeHtml(dep ? dep.titulo : '(apagado)') +
           (aberta && ativo ? '<button type="button" data-acao="tirar-dep" data-dep="' + escapeHtml(d) + '" title="Remover dependência">✕</button>' : '') + '</span>';
       }).join('');
       var candidatos = passos.filter(function (c) { return c.id !== o.id && deps.indexOf(c.id) < 0 && G.estaAberta(c); });
@@ -859,7 +860,7 @@
         : '';
       var bloqueada = aberta && !G.dependenciasSatisfeitas(o, obrs);
       var extra = '<div class="passo-deps">' + (deps.length ? 'Depende de: ' : '') + chips + selDep +
-        (bloqueada ? '<span class="bloqueada-tag">bloqueada</span>' : '') +
+        (bloqueada ? '<span class="bloqueada-tag">bloqueado</span>' : '') +
         (prox && prox.id === o.id ? '<span class="status ok">próxima ação</span>' : '') + '</div>';
       var acoesExtra = ativo
         ? '<button type="button" class="b icone" data-acao="subir" title="Subir" ' + (i === 0 ? 'disabled' : '') + '><svg class="icon" width="12" height="12" style="transform:rotate(180deg)"><use href="#i-chevron-down"/></svg></button>' +
@@ -1293,12 +1294,30 @@
     if (!confirm('Concluir o projeto «' + p.nome + '»?')) return;
     projetosRef.child(pid).update({ estado: 'concluido', ultimoAvancoEm: agoraISO() }).catch(erroEscrita);
   });
+  // Anular um projeto anula EM CASCATA os passos ainda abertos (flag, nunca
+  // remove(); anuladoPorProjeto:true e o MESMO anuladoEm do projeto). Os passos
+  // concluídos são factos consumados e não se tocam. Ordem das escritas: primeiro
+  // os passos, o projeto por último — se um passo falhar, o projeto continua
+  // ativo e o Manel repete; nunca fica um projeto anulado com passos soltos.
   $('projAnularBtn').addEventListener('click', function () {
     var pid = projetoAberto; var p = projs[pid]; if (!p) return;
-    var nAb = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; }).length;
-    var aviso = nAb ? ' Os ' + nAb + ' passos abertos NÃO são anulados: passam para a lista de obrigações soltas até os concluíres ou anulares um a um.' : '';
-    if (!confirm('Anular o projeto «' + p.nome + '»? Fica registado como anulado (nunca é apagado).' + aviso)) return;
-    projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agoraISO() }).catch(erroEscrita);
+    var abertos = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; });
+    var n = abertos.length;
+    var msg = n
+      ? 'Anular o projeto «' + p.nome + '» e ' + (n === 1 ? 'o 1 passo aberto' : 'os ' + n + ' passos abertos') + '? Os passos já concluídos ficam como estão. Nada é apagado — fica tudo registado como anulado.'
+      : 'Anular o projeto «' + p.nome + '»? Fica registado como anulado (nunca é apagado).';
+    if (!confirm(msg)) return;
+    var agora = agoraISO();
+    $('projAnularBtn').disabled = true;
+    var seq = Promise.resolve();
+    abertos.forEach(function (o) {
+      seq = seq.then(function () {
+        return obrigacoesRef.child(o.id).update({ estado: 'anulada', anulado: true, anuladoEm: agora, anuladoPorProjeto: true });
+      });
+    });
+    seq.then(function () { return projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agora }); })
+      .catch(erroEscrita)
+      .then(function () { $('projAnularBtn').disabled = false; });
   });
 
   /* ---------- Delegação de eventos nas listas ---------- */
