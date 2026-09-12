@@ -46,6 +46,17 @@
   .card > *{ position:relative; z-index:1; }
   .card{ margin-top:18px; }
 
+  /* ---------- Cabeçalho condensado ao fazer scroll (barra fina com o título) ---------- */
+  .topo-fino{
+    position:fixed; top:0; left:0; right:0; z-index:40; display:flex; align-items:center; gap:10px;
+    padding:8px 24px; background:var(--white); border-bottom:1px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:700; color:var(--ink);
+    transform:translateY(-100%); opacity:0; transition:transform .18s ease, opacity .18s ease; pointer-events:none;
+  }
+  .topo-fino.on{ transform:none; opacity:1; pointer-events:auto; }
+  .topo-fino b{ color:var(--red); }
+  .topo-fino .n{ color:var(--muted); font-weight:500; }
+
   /* ---------- Captura ---------- */
   .cap-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .cap-row input[type="text"]{
@@ -66,11 +77,9 @@
   .chip input{ width:56px; border:none; background:transparent; font:inherit; color:var(--ink); text-align:right; }
   .chip input:focus{ outline:none; }
   .cap-hint{ margin:10px 0 0; font-size:12px; color:var(--muted); }
-  /* Novo projeto = ação principal; a obrigação solta fica por baixo, secundária. */
   .cap-titulo{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
   .cap-titulo b{ color:var(--red); }
   .cap-solta{ margin-top:18px; padding-top:16px; border-top:1px dashed var(--line); }
-  /* Contexto em texto corrido (Novo projeto e vista de projeto): vai ao modelo e fica em projetos/{id}/contexto */
   .ctx-area{
     width:100%; min-height:88px; margin-top:8px; padding:10px 12px; border:1.5px solid var(--line); border-radius:12px;
     background:var(--white); font-family:'Inter',sans-serif; font-size:13.5px; line-height:1.5; color:var(--ink); resize:vertical; box-sizing:border-box;
@@ -101,7 +110,6 @@
   .sug-linha select{ padding:6px 8px; border:1.5px solid var(--line); border-radius:100px; background:var(--white); font:inherit; font-size:11.5px; color:var(--ink); max-width:190px; }
   .sug-linha .b.icone{ margin-left:auto; }
   .sug-acoes{ display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
-  /* Atualização incremental: alterações propostas, agrupadas por tipo, com checkbox */
   .atz-grupo{ margin-top:12px; }
   .atz-grupo-t{ font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:0 0 6px; }
   .atz-item{ display:flex; gap:10px; align-items:flex-start; padding:9px 10px; background:var(--white); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; color:var(--ink); font-size:13.5px; cursor:pointer; }
@@ -122,27 +130,84 @@
   .ind .k-valor{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:26px; font-weight:700; line-height:1; }
   .ind.alerta .k-valor{ color:var(--red-ink); }
 
+  /* ---------- Toolbar de vista (uma linha, scrollável ao toque) ---------- */
+  .toolbar{ display:flex; align-items:center; gap:6px; margin-top:20px; overflow-x:auto; white-space:nowrap; padding-bottom:2px; -webkit-overflow-scrolling:touch; }
+  .tb-chip{
+    display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border:1.5px solid var(--line); border-radius:100px;
+    background:var(--white); font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer; flex-shrink:0;
+  }
+  .tb-chip:hover{ border-color:var(--ink); }
+  .tb-chip .k{ font-weight:500; color:var(--muted); }
+  .tb-ghost{
+    width:34px; height:34px; border:none; border-radius:100px; background:transparent; color:var(--muted); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .tb-ghost:hover, .tb-ghost.ativo{ background:var(--white); color:var(--ink); }
+  .tb-ghost.ativo{ box-shadow:inset 0 0 0 1.5px var(--ink); }
+  .tb-mais{
+    margin-left:auto; display:inline-flex; align-items:center; gap:2px; padding:8px 10px 8px 12px; border:none; border-radius:100px;
+    background:var(--red); color:var(--on-red); cursor:pointer; flex-shrink:0; box-shadow:0 6px 16px rgba(217,17,36,0.3);
+  }
+  .tb-mais:hover{ transform:translateY(-1px); }
+  /* Ao toque a toolbar desliza; o + primário fica colado à direita para nunca sair do ecrã. */
+  body.shell-touch .tb-mais{ position:sticky; right:0; }
+  .tb-procura{ display:none; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--muted); }
+  .tb-procura.on{ display:flex; }
+  .tb-procura input{ flex:1 1 200px; min-width:0; padding:8px 12px; border:1.5px solid var(--line); border-radius:100px; background:var(--white); font:inherit; font-size:13px; color:var(--ink); }
+  .tb-procura input:focus{ outline:none; border-color:var(--ink); }
+
+  /* ---------- Menu flutuante (⋯ da linha, chips da toolbar, +) ---------- */
+  .menu-pop{
+    position:absolute; z-index:60; min-width:190px; padding:6px; border-radius:12px; background:var(--white);
+    border:1px solid var(--line); box-shadow:0 12px 32px rgba(0,0,0,.14); display:none;
+  }
+  .menu-pop.on{ display:block; }
+  .menu-pop button, .menu-pop label{
+    display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px; border:none; border-radius:8px; background:transparent;
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:500; color:var(--ink); cursor:pointer; text-align:left;
+  }
+  .menu-pop button:hover{ background:var(--dough); }
+  .menu-pop button.perigo{ color:var(--red-ink); }
+  .menu-pop button.ativo::after{ content:'✓'; margin-left:auto; color:var(--muted); }
+  .menu-pop .sep{ height:1px; background:var(--line); margin:4px 2px; }
+  .menu-pop label input{ width:56px; padding:5px 6px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; color:var(--ink); text-align:right; }
+  .menu-pop label .b{ padding:4px 9px; }
+  .menu-pop .hint{ padding:2px 10px 6px; font-size:11.5px; color:var(--muted); }
+
   /* ---------- Secções e linhas ---------- */
   .sec{ margin-top:26px; }
   .sec-title{
-    display:flex; align-items:baseline; gap:8px; margin:0 0 10px; font-family:'Inter',sans-serif;
+    display:flex; align-items:baseline; gap:8px; margin:0 0 2px; font-family:'Inter',sans-serif;
     font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
   }
   .sec-title .n{ color:var(--ink); }
+  .sec-sub{ margin:0 0 10px; font-size:12px; color:var(--muted); }
   .lista{ display:flex; flex-direction:column; gap:8px; }
+  .lista.viva{ gap:0; }
   .linha{
-    display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px;
+    position:relative; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px 12px 12px;
     background:var(--white); border:1px solid var(--line); border-radius:12px; color:var(--ink); font-size:14px;
   }
   .linha.vencida{ border-left:4px solid var(--red); }
   .linha.hoje-prazo{ border-left:4px solid var(--amber); }
   .linha.fechada{ opacity:.65; }
   .linha.fechada .t{ text-decoration:line-through; color:var(--muted); }
+  .linha.arrastando{ opacity:.35; }
+  .linha.largar-antes{ box-shadow:0 -3px 0 0 var(--red); }
+  .linha.largar-depois{ box-shadow:0 3px 0 0 var(--red); }
   .l-main{ flex:1 1 240px; min-width:0; }
   .t{ font-weight:600; word-break:break-word; }
+  /* Edição inline: o mesmo tipo de letra e alinhamento, sem salto visual */
+  [data-edit]{ border-radius:6px; margin:-2px -4px; padding:2px 4px; cursor:text; transition:background .12s ease, box-shadow .6s ease; }
+  [data-edit]:hover{ background:var(--dough); }
+  [data-edit][contenteditable="true"]{ outline:none; background:var(--dough); box-shadow:0 0 0 1.5px var(--ink); white-space:pre-wrap; }
+  [data-edit].guardado{ box-shadow:0 0 0 1.5px var(--green); transition:box-shadow 0s; }
+  [data-edit].guardado-fade{ box-shadow:0 0 0 1.5px transparent; }
+  [data-edit].placeholder:empty::before{ content:attr(data-placeholder); color:var(--muted); font-weight:500; }
   .l-meta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; font-size:12px; color:var(--muted); }
   .l-meta .num{ font-variant-numeric:tabular-nums; }
-  .l-meta .proj{ color:var(--ink); font-weight:600; }
+  .l-meta .proj{ color:var(--ink); font-weight:600; cursor:pointer; text-decoration:underline dotted var(--line); }
+  .l-meta .proj:hover{ text-decoration-color:var(--ink); }
   .l-meta .parado{ font-weight:600; }
   .l-meta .parado.muito{ color:var(--red-ink); }
   .l-meta .prazo-late{ color:var(--red-ink); font-weight:700; }
@@ -163,7 +228,30 @@
   .b:disabled{ opacity:.5; cursor:default; }
   .b.icone{ padding:6px 8px; }
 
-  /* Concluir: pergunta inline do tempo real */
+  /* Linha viva: pega ⋮⋮ à esquerda e ⋯ no fim, só em hover (sempre visíveis ao toque) */
+  .l-grip, .l-mais{
+    width:24px; height:24px; border:none; border-radius:6px; background:transparent; color:var(--muted); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; opacity:0; transition:opacity .12s ease; flex-shrink:0; padding:0;
+  }
+  .l-grip{ cursor:grab; touch-action:none; }
+  .l-grip:active{ cursor:grabbing; }
+  .l-grip:hover, .l-mais:hover{ background:var(--dough); color:var(--ink); }
+  .linha:hover .l-grip, .linha:hover .l-mais, .q-card:hover .l-grip, .q-card:hover .l-mais, .l-mais.on{ opacity:1; }
+  body.shell-touch .l-grip, body.shell-touch .l-mais{ opacity:1; }
+  /* + fino entre linhas: insere um passo novo a seguir, já em edição */
+  .l-inserir{
+    height:10px; margin:0; border:none; background:transparent; width:100%; position:relative; cursor:pointer; opacity:0; transition:opacity .12s ease; padding:0;
+  }
+  .l-inserir::before{ content:''; position:absolute; left:34px; right:34px; top:50%; height:1px; background:var(--red); }
+  .l-inserir::after{
+    content:'+'; position:absolute; left:8px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%;
+    background:var(--red); color:var(--on-red); font-size:14px; line-height:18px; text-align:center; font-weight:700;
+  }
+  .l-inserir:hover, .l-inserir:focus{ opacity:1; outline:none; }
+  body.shell-touch .l-inserir{ opacity:.55; height:16px; }
+  .linha.temp{ border-style:dashed; }
+  .dnd-ghost{ position:fixed; z-index:70; pointer-events:none; opacity:.85; background:var(--white); border:1px solid var(--ink); border-radius:12px; padding:8px 12px; font-size:13px; font-weight:600; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
   .concluir-box{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-basis:100%; padding-top:8px; border-top:1px dashed var(--line); font-size:13px; }
   .concluir-box input{ width:70px; padding:7px 9px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; color:var(--ink); text-align:right; }
   .concluir-box input:focus{ outline:none; border-color:var(--ink); }
@@ -175,11 +263,54 @@
   details.fold summary{ cursor:pointer; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
   details.fold summary:hover{ color:var(--ink); }
 
-  /* ---------- Vista de projeto ---------- */
-  .proj-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .proj-head h2{ margin:0; font-family:'Inter',sans-serif; font-size:18px; font-weight:700; flex:1 1 200px; }
+  /* ---------- Vista Quadro: colunas horizontais com peek da seguinte ---------- */
+  .quadro{ display:flex; gap:14px; overflow-x:auto; padding:6px 0 16px; align-items:flex-start; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+  .q-col{
+    flex:0 0 280px; width:280px; border-radius:16px; padding:10px; display:flex; flex-direction:column; gap:8px; max-height:72vh;
+    background:color-mix(in srgb, var(--q-cor) 6%, transparent); scroll-snap-align:start;
+  }
+  body.shell-touch .q-col{ flex-basis:85vw; width:85vw; }
+  .q-head{ display:flex; align-items:center; gap:4px; }
+  .q-pill{ display:inline-flex; align-items:center; gap:7px; padding:4px 10px; border-radius:100px; background:var(--white); font-size:12.5px; font-weight:700; color:var(--ink); max-width:100%; }
+  .q-pill i{ width:8px; height:8px; border-radius:50%; background:var(--q-cor); flex-shrink:0; }
+  .q-pill span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .q-pill .n{ color:var(--muted); font-weight:500; }
+  .q-head .l-mais, .q-head .q-plus{ opacity:.6; }
+  .q-head .l-mais{ margin-left:auto; }
+  .q-plus{ width:24px; height:24px; border:none; border-radius:6px; background:transparent; color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+  .q-plus:hover, .q-head .l-mais:hover{ opacity:1; background:var(--white); color:var(--ink); }
+  .q-cards{ display:flex; flex-direction:column; gap:8px; overflow-y:auto; min-height:20px; }
+  .q-card{
+    position:relative; display:flex; gap:6px; align-items:flex-start; background:var(--white); border:1px solid var(--line); border-radius:12px; padding:10px 10px 10px 8px;
+    box-shadow:0 1px 1px rgba(0,0,0,.03); color:var(--ink);
+  }
+  .q-card .q-corpo{ flex:1; min-width:0; }
+  .q-card .t{ font-size:13.5px; }
+  .q-card .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .q-card .sub .proj{ cursor:pointer; text-decoration:underline dotted var(--line); }
+  .q-card.vencida{ border-left:3px solid var(--red); }
+  .q-card.arrastando{ opacity:.35; }
+  .q-card.largar-antes{ box-shadow:0 -3px 0 0 var(--red); }
+  .q-card.largar-depois{ box-shadow:0 3px 0 0 var(--red); }
+  .q-card.temp{ border-style:dashed; }
+  .q-novo{ background:transparent; border:none; border-radius:8px; padding:7px 8px; text-align:left; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:var(--q-cor); cursor:pointer; }
+  .q-novo:hover{ background:var(--white); }
+
+  /* ---------- Painel lateral de projeto ---------- */
+  .painel-fundo{ display:none; position:fixed; inset:0; z-index:45; background:rgba(20,20,20,.28); }
+  .painel-fundo.on{ display:block; }
+  .painel{
+    position:fixed; top:0; right:0; bottom:0; z-index:50; width:min(600px, 100vw); overflow-y:auto; overscroll-behavior:contain;
+    background:var(--dough); border-left:1px solid var(--line); box-shadow:-16px 0 40px rgba(0,0,0,.14);
+    padding:18px 20px 40px; transform:translateX(100%); transition:transform .22s ease; visibility:hidden;
+  }
+  .painel.on{ transform:none; visibility:visible; }
+  body.shell-touch .painel{ width:100vw; border-left:none; padding:14px 14px calc(40px + env(safe-area-inset-bottom)); }
+  .painel-head{ display:flex; align-items:flex-start; gap:10px; }
+  .painel-nome{ margin:0; flex:1 1 200px; min-width:0; font-family:'Inter',sans-serif; font-size:19px; font-weight:700; color:var(--ink); }
+  .painel-acoes{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
   .proj-sub{ margin:6px 0 0; font-size:12.5px; color:var(--muted); }
-  .passo-ordem{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:12px; font-weight:700; color:var(--red); width:26px; flex-shrink:0; }
+  .passo-ordem{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:12px; font-weight:700; color:var(--red); width:22px; flex-shrink:0; }
   .passo-deps{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:6px; font-size:12px; color:var(--muted); }
   .dep-chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:100px; background:var(--dough); border:1px solid var(--line); font-size:11.5px; color:var(--ink); }
   .dep-chip.pendente{ border-color:var(--amber); }
@@ -196,20 +327,18 @@
   .decompor-box textarea:focus{ outline:none; border-color:var(--ink); }
   .decompor-acoes{ display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
 
-  /* ---------- Local (etiqueta discreta + seletor compacto na mesma peça) ---------- */
+  /* ---------- Local ---------- */
   .local-sel{
     padding:2px 6px; border:1px solid var(--line); border-radius:100px; background:var(--dough);
     font-family:'Inter',sans-serif; font-size:11.5px; color:var(--ink); cursor:pointer; max-width:120px;
   }
   .local-sel.vazio{ color:var(--muted); border-style:dashed; }
   .local-sel:focus{ outline:none; border-color:var(--ink); }
-  /* Filtro por local (vista principal) */
-  .filtro-local{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:14px; font-size:12px; color:var(--muted); }
+  .filtro-local{ display:none; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:12px; color:var(--muted); }
+  .filtro-local.on{ display:flex; }
   .filtro-local .chip.ativo{ background:var(--ink); color:var(--white); border-color:var(--ink); }
-  /* Aviso de localização: aditivo, nunca filtra sozinho */
   .geo-aviso{ display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; padding:10px 14px; border-radius:12px; background:var(--white); border:1px solid var(--line); border-left:4px solid var(--green); font-size:13.5px; color:var(--ink); }
   .geo-aviso.on{ display:flex; }
-  /* Definições: locais de referência */
   .locais-lista{ display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .local-ref{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:var(--white); border:1px solid var(--line); border-radius:10px; font-size:13px; color:var(--ink); }
   .local-ref input[type="text"]{ flex:1 1 140px; min-width:0; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; color:var(--ink); }
@@ -229,6 +358,7 @@
   body.shell-touch .cap-row select{ max-width:100%; }
   body.shell-touch .sug-linha input[type="text"]{ flex-basis:100%; }
   body.shell-touch .sug-linha select{ max-width:100%; flex:1 1 140px; }
+  body.shell-touch .topo-fino{ padding:10px 16px; }
 </style>
 </head>
 <body class="shell-mobile">
@@ -280,172 +410,213 @@
 
 <main id="main">
 
-  <!-- ===== Vista principal ===== -->
-  <div id="vistaPrincipal">
-    <div class="card glass-light">
-      <p class="cap-titulo"><b>Novo projeto</b></p>
+  <!-- Barra fina com o título: só aparece ao fazer scroll -->
+  <div class="topo-fino" id="topoFino" aria-hidden="true"><svg class="icon" width="14" height="14"><use href="#i-clipboard-check"/></svg> GIOCO · <b>Obrigações</b> <span class="n num" id="topoFinoN"></span></div>
+
+  <div class="card glass-light">
+    <p class="cap-titulo"><b>Novo projeto</b></p>
+    <div class="cap-row">
+      <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo os passos" autocomplete="off">
+      <button type="button" class="btn-add" id="projCriarBtn">Criar projeto</button>
+    </div>
+    <textarea class="ctx-area" id="projContexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
+    <p class="cap-hint">Abre logo o painel do projeto com uma sugestão de passos a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
+
+    <div class="cap-solta">
+      <p class="cap-titulo">Obrigação solta</p>
       <div class="cap-row">
-        <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo os passos" autocomplete="off">
-        <button type="button" class="btn-add" id="projCriarBtn">Criar projeto</button>
+        <input type="text" id="capInput" placeholder="Uma coisa avulsa, sem projeto. Enter cria; colar várias linhas cria várias." autocomplete="off">
+        <span class="chip" id="capDuracaoChip" title="Duração prevista por omissão (clica para alterar)">
+          <svg class="icon" width="13" height="13"><use href="#i-clock"/></svg>
+          <input type="number" id="capDuracao" min="1" step="5" value="30" aria-label="Duração prevista em minutos"> min
+        </span>
+        <button type="button" class="b" id="capBtn">Criar</button>
       </div>
-      <textarea class="ctx-area" id="projContexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
-      <p class="cap-hint">Abre logo a vista do projeto com uma sugestão de passos a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
-
-      <div class="cap-solta">
-        <p class="cap-titulo">Obrigação solta</p>
-        <div class="cap-row">
-          <input type="text" id="capInput" placeholder="Uma coisa avulsa, sem projeto. Enter cria; colar várias linhas cria várias." autocomplete="off">
-          <span class="chip" id="capDuracaoChip" title="Duração prevista por omissão (clica para alterar)">
-            <svg class="icon" width="13" height="13"><use href="#i-clock"/></svg>
-            <input type="number" id="capDuracao" min="1" step="5" value="30" aria-label="Duração prevista em minutos"> min
-          </span>
-          <button type="button" class="b" id="capBtn">Criar</button>
-        </div>
-      </div>
-    </div>
-
-    <p class="loading-state" id="loadingState">A carregar…</p>
-
-    <div class="ind-row" id="indRow" style="display:none;">
-      <div class="ind glass-light" id="indAbertas"><div class="k-label">Obrigações abertas</div><div class="k-valor num" id="indAbertasN">0</div></div>
-      <div class="ind glass-light" id="indParados"><div class="k-label">Projetos parados há mais de 14 dias</div><div class="k-valor num" id="indParadosN">0</div></div>
-      <div class="ind glass-light" id="indProjetos"><div class="k-label">Projetos ativos</div><div class="k-valor num" id="indProjetosN">0</div></div>
-    </div>
-
-    <div id="conteudo" style="display:none;">
-      <!-- Só aparece se a posição casar com um local de referência; aplicar o filtro é SEMPRE um clique. -->
-      <div class="geo-aviso" id="geoAviso">
-        <span id="geoAvisoTexto"></span>
-        <button type="button" class="b ok" id="geoAvisoBtn">Ver só estas</button>
-      </div>
-      <div class="filtro-local" id="filtroLocal">
-        <span>Local:</span>
-        <button type="button" class="chip ativo" data-filtro-local="">Todos</button>
-        <button type="button" class="chip" data-filtro-local="loja">Loja</button>
-        <button type="button" class="chip" data-filtro-local="computador">Computador</button>
-        <button type="button" class="chip" data-filtro-local="rua">Rua</button>
-        <button type="button" class="chip" data-filtro-local="telefone">Telefone</button>
-        <span id="filtroLocalNota"></span>
-      </div>
-      <div class="sec" id="secParados" style="display:none;">
-        <p class="sec-title">Parados há mais de 14 dias <span class="n" id="nParados"></span></p>
-        <div class="lista" id="listaParados"></div>
-      </div>
-
-      <div class="sec">
-        <p class="sec-title">Próxima ação por projeto <span class="n" id="nProjetos"></span></p>
-        <div class="lista" id="listaProjetos"></div>
-      </div>
-
-      <div class="sec" id="secBloqueados" style="display:none;">
-        <p class="sec-title">Projetos com todos os passos bloqueados <span class="n" id="nBloqueados"></span></p>
-        <div class="lista" id="listaBloqueados"></div>
-      </div>
-
-      <div class="sec" id="secSemPassos" style="display:none;">
-        <p class="sec-title">Projetos sem passos abertos <span class="n" id="nSemPassos"></span></p>
-        <div class="lista" id="listaSemPassos"></div>
-      </div>
-
-      <div class="sec">
-        <p class="sec-title">Obrigações soltas <span class="n" id="nSoltas"></span></p>
-        <div class="lista" id="listaSoltas"></div>
-      </div>
-
-      <details class="sec fold" id="secFechadas">
-        <summary id="sumFechadas">Obrigações e passos concluídos e anulados (0)</summary>
-        <div class="lista" id="listaFechadas"></div>
-      </details>
-
-      <details class="sec fold" id="secProjFechados">
-        <summary id="sumProjFechados">Projetos concluídos e anulados (0)</summary>
-        <div class="lista" id="listaProjFechados"></div>
-      </details>
-
-      <!-- Locais de referência (mrnLocais/): coordenadas gravadas pelo Manel. Só distância
-           entre coordenadas — sem mapas nem serviços externos. Apagar = anulado:true. -->
-      <details class="sec fold" id="secLocais">
-        <summary>Locais de referência (<span id="nLocais">0</span>)</summary>
-        <div class="locais-lista" id="locaisLista"></div>
-        <div class="locais-novo">
-          <input type="text" id="locaisNome" placeholder="Nome (ex.: Loja, Casa)" maxlength="60">
-          <select class="sel" id="locaisTipo" aria-label="Tipo de local">
-            <option value="loja">Loja</option><option value="computador">Computador</option><option value="rua">Rua</option><option value="telefone">Telefone</option>
-          </select>
-          <button type="button" class="btn-add" id="locaisAqui">Estou aqui agora</button>
-          <span id="locaisEstado" class="locais-info"></span>
-        </div>
-        <p class="locais-info">Ao abrir a página, se estiveres dentro do raio de um destes locais aparece um aviso no topo. Nunca filtra sozinho.</p>
-      </details>
     </div>
   </div>
 
-  <!-- ===== Vista de projeto ===== -->
-  <div id="vistaProjeto" style="display:none;">
-    <div class="card glass-light">
-      <div class="proj-head">
-        <button type="button" class="b" id="projVoltar"><svg class="icon" width="14" height="14"><use href="#i-chevron-left"/></svg> Voltar</button>
-        <h2 id="projNome"></h2>
-        <span class="status" id="projEstado"></span>
-        <button type="button" class="b ok" id="projSugerirBtn"><svg class="icon" width="14" height="14"><use href="#i-sparkles"/></svg> Sugerir passos</button>
-        <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Decompor</button>
-        <button type="button" class="b" id="projConcluirBtn">Concluir projeto</button>
-        <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
-      </div>
-      <p class="proj-sub" id="projSub"></p>
-      <div class="ctx-box" id="ctxBox">
-        <div class="ctx-head">Contexto <span class="estado" id="ctxEstado"></span></div>
-        <textarea class="ctx-area" id="ctxTexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
-      </div>
-      <div class="decompor-box" id="decomporBox">
-        <textarea id="decomporTexto" placeholder="Um passo por linha. Ficam com ordem sequencial a seguir aos passos existentes e a duração por omissão."></textarea>
-        <div class="decompor-acoes">
-          <button type="button" class="btn-add" id="decomporCriar">Criar passos</button>
-          <button type="button" class="b" id="decomporCancelar">Cancelar</button>
-          <span id="decomporInfo"></span>
+  <p class="loading-state" id="loadingState">A carregar…</p>
+
+  <div class="ind-row" id="indRow" style="display:none;">
+    <div class="ind glass-light" id="indAbertas"><div class="k-label">Obrigações abertas</div><div class="k-valor num" id="indAbertasN">0</div></div>
+    <div class="ind glass-light" id="indParados"><div class="k-label">Projetos parados há mais de 14 dias</div><div class="k-valor num" id="indParadosN">0</div></div>
+    <div class="ind glass-light" id="indProjetos"><div class="k-label">Projetos ativos</div><div class="k-valor num" id="indProjetosN">0</div></div>
+  </div>
+
+  <div id="conteudo" style="display:none;">
+
+    <!-- Toolbar de vista: Lista/Quadro · Agrupado por · procurar/filtrar/ordenar · + -->
+    <div class="toolbar" id="toolbar">
+      <button type="button" class="tb-chip" id="tbVista" aria-haspopup="menu"><svg class="icon" width="14" height="14" id="tbVistaIcone"><use href="#i-list"/></svg><span id="tbVistaTxt">Lista</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <button type="button" class="tb-chip" id="tbGrupo" aria-haspopup="menu"><span class="k">Agrupado por:</span><span id="tbGrupoTxt">projeto</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <button type="button" class="tb-ghost" id="tbProcurar" title="Procurar" aria-label="Procurar"><svg class="icon" width="16" height="16"><use href="#i-search"/></svg></button>
+      <button type="button" class="tb-ghost" id="tbFiltrar" title="Filtrar por local" aria-label="Filtrar por local"><svg class="icon" width="16" height="16"><use href="#i-filter"/></svg></button>
+      <button type="button" class="tb-ghost" id="tbOrdenar" title="Ordenar" aria-label="Ordenar" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-arrow-up-down"/></svg></button>
+      <button type="button" class="tb-mais" id="tbMais" title="Novo projeto / novo passo" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-plus"/></svg><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="tb-procura" id="tbProcura">
+      <input type="search" id="procuraInput" placeholder="Procurar por título…" autocomplete="off">
+      <span id="procuraNota"></span>
+    </div>
+
+    <!-- Só aparece se a posição casar com um local de referência; aplicar o filtro é SEMPRE um clique. -->
+    <div class="geo-aviso" id="geoAviso">
+      <span id="geoAvisoTexto"></span>
+      <button type="button" class="b ok" id="geoAvisoBtn">Ver só estas</button>
+    </div>
+    <div class="filtro-local" id="filtroLocal">
+      <span>Local:</span>
+      <button type="button" class="chip ativo" data-filtro-local="">Todos</button>
+      <button type="button" class="chip" data-filtro-local="loja">Loja</button>
+      <button type="button" class="chip" data-filtro-local="computador">Computador</button>
+      <button type="button" class="chip" data-filtro-local="rua">Rua</button>
+      <button type="button" class="chip" data-filtro-local="telefone">Telefone</button>
+      <span id="filtroLocalNota"></span>
+    </div>
+
+    <!-- ===== Vista Lista (por omissão) ===== -->
+    <div id="vistaLista">
+      <div id="listaPorProjeto">
+        <div class="sec" id="secParados" style="display:none;">
+          <p class="sec-title">Parados há mais de 14 dias <span class="n" id="nParados"></span></p>
+          <p class="sec-sub">Projetos sem nenhum avanço registado há mais de duas semanas. Abre-os e conclui ou anula um passo.</p>
+          <div class="lista" id="listaParados"></div>
+        </div>
+
+        <div class="sec">
+          <p class="sec-title">Próxima ação por projeto <span class="n" id="nProjetos"></span></p>
+          <p class="sec-sub">Só o passo desbloqueado de menor ordem de cada projeto ativo. Clica no título para editar, no projeto para abrir o painel.</p>
+          <div class="lista" id="listaProjetos"></div>
+        </div>
+
+        <div class="sec" id="secBloqueados" style="display:none;">
+          <p class="sec-title">Projetos com todos os passos bloqueados <span class="n" id="nBloqueados"></span></p>
+          <p class="sec-sub">Todos os passos abertos dependem de outros ainda por concluir. Abre o projeto para desbloquear.</p>
+          <div class="lista" id="listaBloqueados"></div>
+        </div>
+
+        <div class="sec" id="secSemPassos" style="display:none;">
+          <p class="sec-title">Projetos sem passos abertos <span class="n" id="nSemPassos"></span></p>
+          <p class="sec-sub">Ou está concluído e falta marcá-lo, ou falta decompor. Nunca desaparece sozinho.</p>
+          <div class="lista" id="listaSemPassos"></div>
+        </div>
+
+        <div class="sec">
+          <p class="sec-title">Obrigações soltas <span class="n" id="nSoltas"></span></p>
+          <p class="sec-sub">Coisas avulsas, sem projeto. Passa o rato para ver a pega, o ⋯ e o + entre linhas.</p>
+          <div class="lista viva" id="listaSoltas"></div>
         </div>
       </div>
-      <!-- Sugestão automática: a resposta do modelo NUNCA é gravada directamente.
-           Vive aqui, editável, até «Criar N passos». -->
-      <div class="sug-box" id="sugBox">
-        <div class="sug-head" id="sugHead"></div>
-        <div class="sug-erro" id="sugErro" style="display:none;"></div>
-        <!-- A chave do Gemini NÃO está no repo (público; o push protection do GitHub
-             recusa-a): cola-se aqui uma vez e fica no localStorage deste browser. -->
-        <div class="sug-chave" id="sugChave" style="display:none;">
-          <input type="password" id="sugChaveInput" placeholder="Chave da API do Gemini (AI Studio)" autocomplete="off" spellcheck="false">
-          <button type="button" class="btn-add" id="sugChaveGuardar">Guardar chave e sugerir</button>
-          <span>Fica só neste browser (localStorage) e só é enviada à API da Google.</span>
-        </div>
-        <div class="sug-lista" id="sugLista"></div>
-        <div class="sug-acoes" id="sugAcoes">
-          <button type="button" class="btn-add" id="sugCriar">Criar passos</button>
-          <button type="button" class="b" id="sugAdd"><svg class="icon" width="13" height="13"><use href="#i-plus"/></svg> Acrescentar linha</button>
-          <button type="button" class="b" id="sugRepetir">Pedir outra sugestão</button>
-          <button type="button" class="b" id="sugCancelar">Cancelar</button>
-          <span id="sugInfo"></span>
-        </div>
+
+      <!-- Agrupado por local / semana: uma secção por grupo, todas as abertas, nunca menos -->
+      <div id="listaAgrupada" style="display:none;"></div>
+    </div>
+
+    <!-- ===== Vista Quadro ===== -->
+    <div id="vistaQuadro" style="display:none;">
+      <p class="sec-sub" id="quadroSub">Uma coluna por grupo. Arrasta a coluna para os lados para ver a seguinte; «+ Novo» cria no grupo.</p>
+      <div class="quadro" id="quadro"></div>
+    </div>
+
+    <details class="sec fold" id="secFechadas">
+      <summary id="sumFechadas">Obrigações e passos concluídos e anulados (0)</summary>
+      <p class="sec-sub">Histórico completo, sem limite. Nada aqui é apagado.</p>
+      <div class="lista" id="listaFechadas"></div>
+    </details>
+
+    <details class="sec fold" id="secProjFechados">
+      <summary id="sumProjFechados">Projetos concluídos e anulados (0)</summary>
+      <p class="sec-sub">Clica num projeto para ver os passos que teve.</p>
+      <div class="lista" id="listaProjFechados"></div>
+    </details>
+
+    <!-- Locais de referência (mrnLocais/): coordenadas gravadas pelo Manel. Só distância
+         entre coordenadas — sem mapas nem serviços externos. Apagar = anulado:true. -->
+    <details class="sec fold" id="secLocais">
+      <summary>Locais de referência (<span id="nLocais">0</span>)</summary>
+      <p class="sec-sub">Coordenadas que ficam só no Firebase privado. Ao abrir a página, se estiveres dentro do raio de um destes locais aparece um aviso no topo. Nunca filtra sozinho.</p>
+      <div class="locais-lista" id="locaisLista"></div>
+      <div class="locais-novo">
+        <input type="text" id="locaisNome" placeholder="Nome (ex.: Loja, Casa)" maxlength="60">
+        <select class="sel" id="locaisTipo" aria-label="Tipo de local">
+          <option value="loja">Loja</option><option value="computador">Computador</option><option value="rua">Rua</option><option value="telefone">Telefone</option>
+        </select>
+        <button type="button" class="btn-add" id="locaisAqui">Estou aqui agora</button>
+        <span id="locaisEstado" class="locais-info"></span>
       </div>
-      <!-- Atualização incremental: o modelo propõe ALTERAÇÕES aos passos que faltam.
-           Nada é gravado até «Aplicar»; cada alteração tem checkbox (ativa por omissão). -->
-      <div class="sug-box" id="atzBox">
-        <div class="sug-head" id="atzHead"></div>
-        <div class="sug-erro" id="atzErro" style="display:none;"></div>
-        <div id="atzLista"></div>
-        <div class="sug-acoes" id="atzAcoes">
-          <button type="button" class="btn-add" id="atzAplicar">Aplicar alterações</button>
-          <button type="button" class="b" id="atzRepetir">Pedir outra proposta</button>
-          <button type="button" class="b" id="atzCancelar">Cancelar</button>
-          <span id="atzInfo"></span>
-        </div>
+    </details>
+  </div>
+
+  <!-- ===== Painel lateral de projeto (full-screen ao toque) ===== -->
+  <div class="painel-fundo" id="painelFundo"></div>
+  <aside class="painel" id="painel" aria-hidden="true" role="dialog" aria-label="Projeto">
+    <div class="painel-head">
+      <h2 class="painel-nome" id="projNome" data-edit="projNome" tabindex="0" title="Clica para editar o nome"></h2>
+      <span class="status" id="projEstado"></span>
+      <button type="button" class="b icone" id="painelFechar" title="Fechar (Esc)" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>
+    </div>
+    <p class="proj-sub" id="projSub"></p>
+    <div class="painel-acoes">
+      <button type="button" class="b ok" id="projSugerirBtn"><svg class="icon" width="14" height="14"><use href="#i-sparkles"/></svg> Sugerir passos</button>
+      <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Decompor</button>
+      <button type="button" class="b" id="projConcluirBtn">Concluir projeto</button>
+      <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
+    </div>
+    <div class="ctx-box" id="ctxBox">
+      <div class="ctx-head">Contexto <span class="estado" id="ctxEstado"></span></div>
+      <textarea class="ctx-area" id="ctxTexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Guarda sozinho."></textarea>
+    </div>
+    <div class="decompor-box" id="decomporBox">
+      <textarea id="decomporTexto" placeholder="Um passo por linha. Ficam com ordem sequencial a seguir aos passos existentes e a duração por omissão."></textarea>
+      <div class="decompor-acoes">
+        <button type="button" class="btn-add" id="decomporCriar">Criar passos</button>
+        <button type="button" class="b" id="decomporCancelar">Cancelar</button>
+        <span id="decomporInfo"></span>
+      </div>
+    </div>
+    <!-- Sugestão automática: a resposta do modelo NUNCA é gravada directamente.
+         Vive aqui, editável, até «Criar N passos». -->
+    <div class="sug-box" id="sugBox">
+      <div class="sug-head" id="sugHead"></div>
+      <div class="sug-erro" id="sugErro" style="display:none;"></div>
+      <!-- A chave do Gemini NÃO está no repo (público; o push protection do GitHub
+           recusa-a): cola-se aqui uma vez e fica no localStorage deste browser. -->
+      <div class="sug-chave" id="sugChave" style="display:none;">
+        <input type="password" id="sugChaveInput" placeholder="Chave da API do Gemini (AI Studio)" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn-add" id="sugChaveGuardar">Guardar chave e sugerir</button>
+        <span>Fica só neste browser (localStorage) e só é enviada à API da Google.</span>
+      </div>
+      <div class="sug-lista" id="sugLista"></div>
+      <div class="sug-acoes" id="sugAcoes">
+        <button type="button" class="btn-add" id="sugCriar">Criar passos</button>
+        <button type="button" class="b" id="sugAdd"><svg class="icon" width="13" height="13"><use href="#i-plus"/></svg> Acrescentar linha</button>
+        <button type="button" class="b" id="sugRepetir">Pedir outra sugestão</button>
+        <button type="button" class="b" id="sugCancelar">Cancelar</button>
+        <span id="sugInfo"></span>
+      </div>
+    </div>
+    <!-- Atualização incremental: o modelo propõe ALTERAÇÕES aos passos que faltam.
+         Nada é gravado até «Aplicar»; cada alteração tem checkbox (ativa por omissão). -->
+    <div class="sug-box" id="atzBox">
+      <div class="sug-head" id="atzHead"></div>
+      <div class="sug-erro" id="atzErro" style="display:none;"></div>
+      <div id="atzLista"></div>
+      <div class="sug-acoes" id="atzAcoes">
+        <button type="button" class="btn-add" id="atzAplicar">Aplicar alterações</button>
+        <button type="button" class="b" id="atzRepetir">Pedir outra proposta</button>
+        <button type="button" class="b" id="atzCancelar">Cancelar</button>
+        <span id="atzInfo"></span>
       </div>
     </div>
 
     <div class="sec">
       <p class="sec-title">Passos <span class="n" id="nPassos"></span></p>
-      <div class="lista" id="listaPassos"></div>
+      <p class="sec-sub">Arrasta pela pega ⋮⋮ para reordenar. Clica no título para editar; o + entre linhas insere a seguir.</p>
+      <div class="lista viva" id="listaPassos"></div>
     </div>
-  </div>
+  </aside>
+
+  <div class="menu-pop" id="menuPop" role="menu"></div>
 
 </main>
 
@@ -544,10 +715,30 @@
   var obrs = {};
   var projs = {};
   var obrsCarregadas = false, projsCarregados = false;
-  var projetoAberto = null;      // id do projeto na vista de projeto
+  var projetoAberto = null;      // id do projeto no painel lateral
   var concluirEmCurso = null;    // id da obrigação com a pergunta do tempo aberta
   var prazoEmEdicao = null;      // id com o date input aberto
   var duracaoEmEdicao = null;
+
+  /* ---------- Estado da UX (Set/2026, vista Lista/Quadro ao estilo Notion) ----------
+     vista: 'lista' (por omissão) | 'quadro'; grupo: 'projeto' | 'local' | 'semana';
+     ordenacao: 'prazo' (a regra do motor) | 'titulo' | 'recente'; procura: texto.
+     Nenhum destes esconde uma aberta sem contar: procura e filtro de local mostram
+     "N fora"; um agrupamento sem grupo cria a coluna/secção "Sem projeto"/"Sem local"/
+     "Sem prazo". edicaoAtiva suspende o re-render enquanto um título está a ser
+     escrito (o snapshot chega a cada escrita e destruiria o elemento com foco);
+     novoTemp é a linha nova ainda NÃO gravada — só existe no DOM até Enter/blur. */
+  var LS_VISTA = 'obrigacoes.vista', LS_GRUPO = 'obrigacoes.grupo';
+  var vista = lerLS(LS_VISTA, 'lista'); if (vista !== 'quadro') vista = 'lista';
+  var grupo = lerLS(LS_GRUPO, 'projeto'); if (['projeto', 'local', 'semana'].indexOf(grupo) < 0) grupo = 'projeto';
+  var ordenacao = 'prazo';
+  var procura = '';
+  var filtroLocal = '';
+  var edicaoAtiva = null;   // { tipo:'titulo'|'novo'|'projNome', id }
+  var renderPendente = false;
+  var novoTemp = null;      // { projetoId, aposId, local, prazo, coluna }
+  function lerLS(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
+  function gravarLS(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -573,16 +764,19 @@
   }
   function numOuNull(v) { var n = parseInt(v, 10); return n > 0 ? n : null; }
   function projetoDe(obr) { return obr && obr.projetoId ? projs[obr.projetoId] : null; }
-  function nomeProjeto(pid) { var p = projs[pid]; return p ? p.nome : '(projeto apagado)'; }
+  function projetoAtivo(p) { return !!p && p.estado === 'ativo' && p.anulado !== true; }
   function depsDe(obr) {
     var d = obr && obr.dependeDe;
     if (!d) return [];
     return Array.isArray(d) ? d.slice() : Object.keys(d).map(function (k) { return d[k]; });
   }
+  function normTexto(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function casaProcura(obr) { return !procura || normTexto(obr.titulo).indexOf(normTexto(procura)) >= 0; }
+  function comIds(mapa) { return Object.keys(mapa).map(function (id) { var o = Object.assign({}, mapa[id]); o.id = id; return o; }); }
 
   /* ---------- Escritas ---------- */
-  // extra (opcional): { dependeDe:[ids], sugerida:true } — só a confirmação de
-  // uma sugestão os usa; a origem continua 'manual' porque foi o Manel a confirmar.
+  // extra (opcional): { dependeDe:[ids], sugerida:true, local, prazo } — só a confirmação de
+  // uma sugestão e o Duplicar os usam; a origem continua 'manual' porque foi o Manel a confirmar.
   function criarObrigacao(titulo, projetoId, ordem, duracao, extra) {
     var ref = obrigacoesRef.push();
     var reg = {
@@ -591,7 +785,7 @@
       ordem: typeof ordem === 'number' ? ordem : null,
       duracaoPrevista: duracao || G.DURACAO_DEFAULT,
       duracaoReal: null,
-      prazo: null,
+      prazo: (extra && extra.prazo) ? extra.prazo : null,
       dependeDe: (extra && extra.dependeDe && extra.dependeDe.length) ? extra.dependeDe : null,
       estado: 'aberta',
       origem: 'manual',
@@ -634,24 +828,60 @@
     console.error('Falha ao gravar:', e);
     alert('Falha ao gravar no Firebase: ' + (e && e.message ? e.message : e));
   }
+  // Título / nome editados no sítio: um update() só com esse campo no registo.
+  function gravarTitulo(id, titulo) {
+    return obrigacoesRef.child(id).update({ titulo: titulo });
+  }
+  function gravarNomeProjeto(pid, nome) {
+    return projetosRef.child(pid).update({ nome: nome });
+  }
 
   function maxOrdem(pid) {
     var m = 0;
     G.passosDoProjeto(pid, obrs).forEach(function (o) { if (typeof o.ordem === 'number' && o.ordem > m) m = o.ordem; });
     return m;
   }
+  // Ordem 1..n para a lista de ids dada (todos os passos do projeto, abertos e fechados),
+  // um set() na folha `ordem` só onde muda. É também o backfill: um passo sem ordem
+  // numérica ganha aqui a posição em que estava a ser lido.
+  function renumerar(pid, ids) {
+    var escritas = [];
+    ids.forEach(function (id, i) {
+      var o = obrs[id]; if (!o) return;
+      if (o.ordem !== i + 1) escritas.push(obrigacoesRef.child(id).child('ordem').set(i + 1));
+    });
+    return Promise.all(escritas);
+  }
+  // Insere um passo novo a seguir a `aposId` (ou no fim) e renumera os seguintes.
+  function criarPassoApos(pid, aposId, titulo, duracao, extra) {
+    var ids = G.passosDoProjeto(pid, obrs).map(function (o) { return o.id; });
+    var k = aposId ? ids.indexOf(aposId) + 1 : ids.length;
+    if (k <= 0) k = ids.length;
+    return criarObrigacao(titulo, pid, k + 1, duracao, extra).then(function (novoId) {
+      ids.splice(k, 0, novoId);
+      var escritas = [];
+      ids.forEach(function (id, i) {
+        if (id === novoId) return;
+        var o = obrs[id]; if (o && o.ordem !== i + 1) escritas.push(obrigacoesRef.child(id).child('ordem').set(i + 1));
+      });
+      return Promise.all(escritas).then(function () { return marcarAvanco(pid); }).then(function () { return novoId; });
+    });
+  }
+  function duplicar(id) {
+    var o = obrs[id]; if (!o) return;
+    var extra = { local: o.local || null, prazo: o.prazo || null };
+    var p = o.projetoId && projetoAtivo(projs[o.projetoId])
+      ? criarPassoApos(o.projetoId, id, o.titulo, o.duracaoPrevista, extra)
+      : criarObrigacao(o.titulo, null, null, o.duracaoPrevista, extra);
+    p.catch(erroEscrita);
+  }
 
   /* ---------- Captura ---------- */
   function linhasDe(texto) {
     return String(texto || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
   }
-  // Fase 1.1: a captura cria SÓ obrigações soltas. Passos de projeto nascem na
-  // vista do projeto (Sugerir passos / Decompor) — o projeto deixou de ser um
-  // select secundário ao lado da caixa.
   function capturar(linhasColadas) {
     var input = $('capInput');
-    // Um <input> de uma linha descarta os \n ao receber valor: as linhas coladas
-    // chegam aqui directamente, nunca passam pelo value.
     var linhas = linhasDe(input.value).concat(linhasColadas || []);
     if (!linhas.length) return;
     var dur = duracaoDefault();
@@ -661,10 +891,6 @@
     linhas.forEach(function (t) {
       seq = seq.then(function () { return criarObrigacao(t, null, null, dur).then(function (id) { criadas.push({ id: id, titulo: t }); }); });
     });
-    // O local NUNCA atrasa a captura: as obrigações nascem com local:null e a
-    // classificação corre a seguir, em segundo plano, num único pedido para
-    // todas as linhas. Sem chave, sem rede, quota esgotada ou JSON estranho →
-    // fica null e não se mostra erro nenhum.
     seq.then(function () { classificarLocalEmFundo(criadas); }).catch(erroEscrita);
     input.focus();
   }
@@ -674,7 +900,6 @@
       criadas.forEach(function (c, i) {
         var l = r.locais[i];
         var o = obrs[c.id];
-        // Não sobrepor uma correção manual entretanto feita, nem escrever null por cima de nada.
         if (!l || !o || o.localManual === true || o.local) return;
         obrigacoesRef.child(c.id).update({ local: l }).catch(function (e) { console.warn('local não gravado:', e); });
       });
@@ -683,10 +908,6 @@
   function gravarLocalManual(id, local) {
     obrigacoesRef.child(id).update({ local: local || null, localManual: true }).catch(erroEscrita);
   }
-  /* ---------- Novo projeto (ação principal) ----------
-     Cria, abre a vista do projeto e dispara logo a sugestão de passos. O set()
-     resolve DEPOIS de o 'value' local ter posto o projeto em projs, por isso o
-     abrirProjeto no then encontra-o. */
   function novoProjeto() {
     var input = $('projInput');
     var nome = input.value.trim();
@@ -711,8 +932,6 @@
   $('capInput').addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') { ev.preventDefault(); capturar(); }
   });
-  // Colar várias linhas: cada linha é um item. O input de uma linha achataria o
-  // texto — intercepta-se o paste e cria-se logo.
   $('capInput').addEventListener('paste', function (ev) {
     var txt = ev.clipboardData && ev.clipboardData.getData('text');
     if (!txt || txt.indexOf('\n') < 0) return;
@@ -723,7 +942,7 @@
     if (!(parseInt(this.value, 10) > 0)) this.value = G.DURACAO_DEFAULT;
   });
 
-  /* ---------- Render: vista principal ---------- */
+  /* ---------- Render: peças de linha ---------- */
   function metaPrazo(obr, hoje) {
     if (!obr.prazo) return '';
     var n = G.diasEntre(obr.prazo, hoje);
@@ -744,7 +963,17 @@
     if (g !== 0) return '';
     return G.diasEntre(obr.prazo, hoje) > 0 ? 'vencida' : 'hoje-prazo';
   }
+  function gripHtml() { return '<button type="button" class="l-grip" draggable="true" title="Arrastar para reordenar" aria-label="Arrastar"><svg class="icon" width="14" height="14"><use href="#i-grip-vertical"/></svg></button>'; }
+  function maisHtml() { return '<button type="button" class="l-mais" data-acao="menu" title="Mais opções" aria-label="Mais opções"><svg class="icon" width="16" height="16"><use href="#i-more-horizontal"/></svg></button>'; }
+  function inserirHtml(aposId, pid) {
+    return '<button type="button" class="l-inserir" data-inserir-apos="' + escapeHtml(aposId) + '" data-inserir-projeto="' + escapeHtml(pid || '') + '" title="Inserir a seguir" aria-label="Inserir a seguir"></button>';
+  }
+  function linhaTemp(pid, ordem) {
+    return '<div class="linha temp" data-temp="1">' + (ordem ? '<span class="passo-ordem num">' + ordem + '</span>' : '') +
+      '<div class="l-main"><div class="t placeholder" data-edit="novo" data-placeholder="' + (pid ? 'Novo passo — Enter grava, Esc cancela' : 'Nova obrigação — Enter grava, Esc cancela') + '"></div></div></div>';
+  }
 
+  // opts: { semProjeto, ordem, extra, acoesExtra, diasParado, abertasNoProjeto, dnd, inserir }
   function linhaObrigacao(obr, opts) {
     opts = opts || {};
     var hoje = G.hojeISO();
@@ -752,7 +981,7 @@
     var p = projetoDe(obr);
     var cls = 'linha' + (aberta ? ' ' + classePrazo(obr, hoje) : ' fechada');
     var meta = [];
-    if (p && !opts.semProjeto) meta.push('<span class="proj">' + escapeHtml(p.nome) + '</span>');
+    if (p && !opts.semProjeto) meta.push('<span class="proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(obr.projetoId) + '" title="Abrir o painel do projeto">' + escapeHtml(p.nome) + '</span>');
     else if (obr.projetoId && !p) meta.push('<span>(projeto apagado)</span>');
     if (aberta && duracaoEmEdicao === obr.id) {
       meta.push('<span><input type="number" class="inline-date" style="width:64px" min="1" step="5" value="' + escapeHtml(obr.duracaoPrevista) + '" data-duracao="' + escapeHtml(obr.id) + '" autofocus> min</span>');
@@ -767,8 +996,6 @@
     } else if (aberta) {
       meta.push('<button type="button" data-acao="editar-prazo">+ prazo</button>');
     }
-    // Local: a etiqueta É o seletor (discreta; tracejada e "local?" quando ainda não há).
-    // Só nas abertas; nas fechadas fica texto se existir.
     if (aberta) meta.push(seletorLocal(obr));
     else if (obr.local && G.ROTULO_LOCAL[obr.local]) meta.push('<span>' + G.ROTULO_LOCAL[obr.local] + '</span>');
     if (opts.diasParado !== undefined && opts.diasParado !== null) meta.push(metaParado(opts.diasParado));
@@ -778,11 +1005,7 @@
     if (opts.abertasNoProjeto > 1) meta.push('<span class="num">+' + (opts.abertasNoProjeto - 1) + ' passos abertos a seguir</span>');
 
     var acoes = '';
-    if (aberta) {
-      acoes += '<button type="button" class="b ok" data-acao="concluir" title="Concluir">✓ Concluir</button>';
-      acoes += '<button type="button" class="b" data-acao="adiar" title="Adiar (conta quantas vezes)">Adiar</button>';
-      acoes += '<button type="button" class="b perigo" data-acao="anular" title="Anular">Anular</button>';
-    }
+    if (aberta) acoes += '<button type="button" class="b ok" data-acao="concluir" title="Concluir">✓ Concluir</button>';
     if (p && !opts.semProjeto) acoes += '<button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(obr.projetoId) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button>';
 
     var concluirBox = '';
@@ -792,12 +1015,22 @@
         '<button type="button" class="b ok" data-acao="confirmar-concluir">✓ OK</button>' +
         '<button type="button" class="b" data-acao="cancelar-concluir">Cancelar</button></div>';
     }
+    var titulo = aberta
+      ? '<div class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(obr.titulo) + '</div>'
+      : '<div class="t">' + escapeHtml(obr.titulo) + '</div>';
 
-    return '<div class="' + cls + '" data-id="' + escapeHtml(obr.id) + '">' +
+    var html = '<div class="' + cls + '" data-id="' + escapeHtml(obr.id) + '">' +
+      (aberta && opts.dnd ? gripHtml() : '') +
       (opts.ordem !== undefined ? '<span class="passo-ordem num">' + escapeHtml(opts.ordem) + '</span>' : '') +
-      '<div class="l-main"><div class="t">' + escapeHtml(obr.titulo) + '</div>' +
+      '<div class="l-main">' + titulo +
       '<div class="l-meta">' + meta.join('') + '</div>' + (opts.extra || '') + '</div>' +
-      '<div class="l-acoes">' + (opts.acoesExtra || '') + acoes + '</div>' + concluirBox + '</div>';
+      '<div class="l-acoes">' + (opts.acoesExtra || '') + acoes + '</div>' + (aberta ? maisHtml() : '') + concluirBox + '</div>';
+    if (opts.inserir && aberta) {
+      var pid = opts.semProjeto ? obr.projetoId : null;
+      if (novoTemp && novoTemp.aposId === obr.id && !novoTemp.coluna) html += linhaTemp(pid, opts.ordem !== undefined ? '+' : '');
+      html += inserirHtml(obr.id, pid);
+    }
+    return html;
   }
 
   function seletorLocal(obr) {
@@ -809,9 +1042,86 @@
   }
 
   function linhaProjetoSimples(p, dias, nota) {
-    return '<div class="linha" data-projeto-linha="' + escapeHtml(p.id) + '"><div class="l-main"><div class="t">' + escapeHtml(p.nome) + '</div>' +
+    return '<div class="linha" data-projeto-linha="' + escapeHtml(p.id) + '"><div class="l-main"><div class="t proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(p.id) + '" style="cursor:pointer" title="Abrir o painel do projeto">' + escapeHtml(p.nome) + '</div>' +
       '<div class="l-meta">' + (nota ? '<span>' + nota + '</span>' : '') + metaParado(dias) + '</div></div>' +
       '<div class="l-acoes"><button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(p.id) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button></div></div>';
+  }
+
+  /* ---------- Ordenação e agrupamento (sobre TODAS as abertas; nunca esconde) ---------- */
+  function ordenarItens(itens, hoje) {
+    if (ordenacao === 'titulo') return itens.slice().sort(function (a, b) { return String(a.obr.titulo).localeCompare(String(b.obr.titulo), 'pt'); });
+    if (ordenacao === 'recente') return itens.slice().sort(function (a, b) { return (b.obr.criadoEm || '') < (a.obr.criadoEm || '') ? -1 : 1; });
+    return G.ordenar(itens, hoje);
+  }
+  function semanaChave(obr, hoje) {
+    if (!obr.prazo) return 'semprazo';
+    var n = G.diasEntre(obr.prazo, hoje);   // >0 vencido
+    if (n === null) return 'semprazo';
+    if (n > 0) return 'vencidas';
+    var h = new Date(hoje + 'T00:00:00');
+    var dow = (h.getDay() + 6) % 7;         // 0 = segunda
+    var fimSemana = 6 - dow;                // dias até domingo
+    var d = -n;                             // dias até ao prazo
+    if (d <= fimSemana) return 'esta';
+    if (d <= fimSemana + 7) return 'proxima';
+    return 'tarde';
+  }
+  function segundaSeguinte(hoje) {
+    var h = new Date(hoje + 'T00:00:00');
+    var dow = (h.getDay() + 6) % 7;
+    h.setDate(h.getDate() + (7 - dow));
+    return G.hojeISO(h);
+  }
+  // Devolve [{ id, nome, cor (1..5), itens:[{obr, projeto}], novo:{projetoId, local, prazo} }]
+  function gruposDe(hoje) {
+    var abertas = G.listaAbertas(obrs);
+    var lista = abertas.map(function (o) { return { obr: o, projeto: projetoDe(o) }; });
+    var grupos = [];
+    if (grupo === 'projeto') {
+      var pids = Object.keys(projs).filter(function (id) { return projetoAtivo(projs[id]); })
+        .sort(function (a, b) { return String(projs[a].nome).localeCompare(String(projs[b].nome), 'pt'); });
+      pids.forEach(function (pid, i) {
+        var itens = lista.filter(function (x) { return x.obr.projetoId === pid; }).sort(function (a, b) { return cmpOrdemLocal(a.obr, b.obr); });
+        grupos.push({ id: 'p:' + pid, projetoId: pid, nome: projs[pid].nome, cor: (i % 5) + 1, itens: itens, novo: { projetoId: pid } });
+      });
+      var soltas = lista.filter(function (x) { return !x.obr.projetoId || !projetoAtivo(projs[x.obr.projetoId]); });
+      grupos.push({ id: 'semprojeto', nome: 'Sem projeto', cor: 5, itens: soltas, novo: {} });
+    } else if (grupo === 'local') {
+      G.LOCAIS.forEach(function (l, i) {
+        grupos.push({ id: 'l:' + l, nome: G.ROTULO_LOCAL[l], cor: (i % 5) + 1, itens: lista.filter(function (x) { return x.obr.local === l; }), novo: { local: l } });
+      });
+      grupos.push({ id: 'semlocal', nome: 'Sem local', cor: 5, itens: lista.filter(function (x) { return !x.obr.local || G.LOCAIS.indexOf(x.obr.local) < 0; }), novo: {} });
+    } else {
+      var defs = [['vencidas', 'Vencidas', 3, null], ['esta', 'Esta semana', 2, hoje], ['proxima', 'Próxima semana', 4, segundaSeguinte(hoje)], ['tarde', 'Mais tarde', 1, null], ['semprazo', 'Sem prazo', 5, null]];
+      defs.forEach(function (d) {
+        grupos.push({ id: 's:' + d[0], nome: d[1], cor: d[2], itens: lista.filter(function (x) { return semanaChave(x.obr, hoje) === d[0]; }), novo: { prazo: d[3] } });
+      });
+    }
+    grupos.forEach(function (g) { if (!(grupo === 'projeto' && g.projetoId && ordenacao === 'prazo')) g.itens = ordenarItens(g.itens, hoje); });
+    return grupos;
+  }
+  function cmpOrdemLocal(a, b) {
+    var oa = typeof a.ordem === 'number' ? a.ordem : Infinity, ob = typeof b.ordem === 'number' ? b.ordem : Infinity;
+    if (oa !== ob) return oa - ob;
+    return (a.criadoEm || '') < (b.criadoEm || '') ? -1 : 1;
+  }
+  // Filtro de local + procura: devolve {vis, fora} sem nunca perder a contagem.
+  function filtrar(itens) {
+    var vis = itens.filter(function (x) { return G.casaLocal(x.obr, filtroLocal) && casaProcura(x.obr); });
+    return { vis: vis, fora: itens.length - vis.length };
+  }
+  function contagem(n, total) { return '(' + n + (n !== total ? ' de ' + total : '') + ')'; }
+
+  /* ---------- Render: vista principal ---------- */
+  function renderToolbar() {
+    $('tbVistaTxt').textContent = vista === 'quadro' ? 'Quadro' : 'Lista';
+    $('tbVistaIcone').innerHTML = '<use href="#i-' + (vista === 'quadro' ? 'columns' : 'list') + '"/>';
+    $('tbGrupoTxt').textContent = grupo;
+    $('tbProcurar').classList.toggle('ativo', !!procura || $('tbProcura').classList.contains('on'));
+    $('tbFiltrar').classList.toggle('ativo', !!filtroLocal || $('filtroLocal').classList.contains('on'));
+    $('tbOrdenar').classList.toggle('ativo', ordenacao !== 'prazo');
+    $('tbOrdenar').title = 'Ordenar: ' + (ordenacao === 'titulo' ? 'título A–Z' : ordenacao === 'recente' ? 'mais recentes primeiro' : 'prazo e antiguidade');
+    Array.prototype.forEach.call($('filtroLocal').querySelectorAll('[data-filtro-local]'), function (b) { b.classList.toggle('ativo', b.dataset.filtroLocal === filtroLocal); });
   }
 
   function renderPrincipal() {
@@ -821,14 +1131,43 @@
     $('conteudo').style.display = '';
     var hoje = G.hojeISO();
     var v = G.vistaProximaAcao(obrs, projs, hoje);
-    var nAtivos = Object.keys(projs).filter(function (id) { var p = projs[id]; return p && p.estado === 'ativo' && p.anulado !== true; }).length;
+    var nAtivos = Object.keys(projs).filter(function (id) { return projetoAtivo(projs[id]); }).length;
 
     $('indAbertasN').textContent = v.totalAbertas;
     $('indParadosN').textContent = v.parados.length;
     $('indParados').classList.toggle('alerta', v.parados.length > 0);
     $('indProjetosN').textContent = nAtivos;
+    $('topoFinoN').textContent = v.totalAbertas + ' abertas';
+    renderToolbar();
 
-    // Parados > 14 dias: indicador visível no topo, além do selo em cada linha.
+    var emQuadro = vista === 'quadro';
+    $('vistaLista').style.display = emQuadro ? 'none' : '';
+    $('vistaQuadro').style.display = emQuadro ? '' : 'none';
+    var totalFora = 0;
+    if (emQuadro) totalFora = renderQuadro(hoje);
+    else if (grupo === 'projeto') totalFora = renderListaPorProjeto(v, hoje);
+    else totalFora = renderListaAgrupada(hoje);
+    $('listaPorProjeto').style.display = (!emQuadro && grupo === 'projeto') ? '' : 'none';
+    $('listaAgrupada').style.display = (!emQuadro && grupo !== 'projeto') ? '' : 'none';
+    $('procuraNota').textContent = procura ? (totalFora ? totalFora + ' fora da procura' : 'todas as abertas casam') : '';
+    $('filtroLocalNota').textContent = filtroLocal && !procura ? (totalFora ? '· ' + totalFora + ' noutros locais' : '') : '';
+    renderGeoAviso();
+
+    // Fechadas: todas, sem limite (só a secção é colapsável). Mais recentes primeiro.
+    var fechadas = comIds(obrs).filter(function (o) { return !G.estaAberta(o); })
+      .sort(function (a, b) { return (b.concluidaEm || b.anuladoEm || '') < (a.concluidaEm || a.anuladoEm || '') ? -1 : 1; });
+    $('sumFechadas').textContent = 'Obrigações e passos concluídos e anulados (' + fechadas.length + ')';
+    $('listaFechadas').innerHTML = fechadas.map(function (o) { return linhaObrigacao(o, {}); }).join('') || '<div class="vazio">Ainda nada.</div>';
+
+    var projFechados = comIds(projs).filter(function (p) { return !projetoAtivo(p); });
+    $('sumProjFechados').textContent = 'Projetos concluídos e anulados (' + projFechados.length + ')';
+    $('listaProjFechados').innerHTML = projFechados.map(function (p) {
+      return linhaProjetoSimples(p, null, p.anulado === true ? 'anulado ' + fmtDataHora(p.anuladoEm) : 'concluído ' + fmtDataHora(p.ultimoAvancoEm));
+    }).join('') || '<div class="vazio">Ainda nada.</div>';
+    reporFoco();
+  }
+
+  function renderListaPorProjeto(v, hoje) {
     $('secParados').style.display = v.parados.length ? '' : 'none';
     $('nParados').textContent = '(' + v.parados.length + ')';
     $('listaParados').innerHTML = v.parados.map(function (x) {
@@ -836,18 +1175,13 @@
       return linhaProjetoSimples(x.projeto, x.diasParado, prox ? 'próxima: ' + escapeHtml(prox.titulo) : 'sem próxima ação desbloqueada');
     }).join('');
 
-    // Filtro por local: só esconde linhas com um local DIFERENTE do escolhido;
-    // sem local aparece sempre. Conta-se o que ficou de fora, nunca se esconde em silêncio.
-    var fProj = v.projetos.filter(function (x) { return G.casaLocal(x.obr, filtroLocal); });
-    var fSoltas = v.soltas.filter(function (x) { return G.casaLocal(x.obr, filtroLocal); });
-    var escondidas = (v.projetos.length - fProj.length) + (v.soltas.length - fSoltas.length);
-    $('filtroLocalNota').textContent = filtroLocal ? (escondidas ? '· ' + escondidas + ' noutros locais' : '') : '';
-    Array.prototype.forEach.call($('filtroLocal').querySelectorAll('[data-filtro-local]'), function (b) { b.classList.toggle('ativo', b.dataset.filtroLocal === filtroLocal); });
-
-    $('nProjetos').textContent = '(' + fProj.length + (fProj.length !== v.projetos.length ? ' de ' + v.projetos.length : '') + ')';
-    $('listaProjetos').innerHTML = fProj.length
-      ? fProj.map(function (x) { return linhaObrigacao(x.obr, { diasParado: x.diasParado, abertasNoProjeto: x.abertasNoProjeto }); }).join('')
-      : '<div class="vazio">' + (v.projetos.length ? 'Nenhuma próxima ação neste local.' : 'Nenhum projeto ativo com passos abertos.') + '</div>';
+    var fp = filtrar(v.projetos), fs = filtrar(v.soltas);
+    var lp = ordenacao === 'prazo' ? fp.vis : ordenarItens(fp.vis, hoje);
+    var ls = ordenacao === 'prazo' ? fs.vis : ordenarItens(fs.vis, hoje);
+    $('nProjetos').textContent = contagem(lp.length, v.projetos.length);
+    $('listaProjetos').innerHTML = lp.length
+      ? lp.map(function (x) { return linhaObrigacao(x.obr, { diasParado: x.diasParado, abertasNoProjeto: x.abertasNoProjeto }); }).join('')
+      : '<div class="vazio">' + (v.projetos.length ? 'Nenhuma próxima ação casa com o filtro.' : 'Nenhum projeto ativo com passos abertos.') + '</div>';
 
     $('secBloqueados').style.display = v.bloqueados.length ? '' : 'none';
     $('nBloqueados').textContent = '(' + v.bloqueados.length + ')';
@@ -861,75 +1195,95 @@
       return linhaProjetoSimples(x.projeto, x.diasParado, 'sem passos abertos — decompor ou concluir');
     }).join('');
 
-    $('nSoltas').textContent = '(' + fSoltas.length + (fSoltas.length !== v.soltas.length ? ' de ' + v.soltas.length : '') + ')';
-    $('listaSoltas').innerHTML = fSoltas.length
-      ? fSoltas.map(function (x) { return linhaObrigacao(x.obr, {}); }).join('')
-      : '<div class="vazio">' + (v.soltas.length ? 'Nenhuma obrigação solta neste local.' : 'Sem obrigações soltas.') + '</div>';
-    renderGeoAviso();
-
-    // Fechadas: todas, sem limite (só a secção é colapsável). Mais recentes primeiro.
-    var fechadas = Object.keys(obrs).map(function (id) { var o = Object.assign({}, obrs[id]); o.id = id; return o; })
-      .filter(function (o) { return !G.estaAberta(o); })
-      .sort(function (a, b) { return (b.concluidaEm || b.anuladoEm || '') < (a.concluidaEm || a.anuladoEm || '') ? -1 : 1; });
-    $('sumFechadas').textContent = 'Obrigações e passos concluídos e anulados (' + fechadas.length + ')';
-    $('listaFechadas').innerHTML = fechadas.map(function (o) { return linhaObrigacao(o, {}); }).join('') || '<div class="vazio">Ainda nada.</div>';
-
-    var projFechados = Object.keys(projs).map(function (id) { var p = Object.assign({}, projs[id]); p.id = id; return p; })
-      .filter(function (p) { return !(p.estado === 'ativo' && p.anulado !== true); });
-    $('sumProjFechados').textContent = 'Projetos concluídos e anulados (' + projFechados.length + ')';
-    $('listaProjFechados').innerHTML = projFechados.map(function (p) {
-      return linhaProjetoSimples(p, null, p.anulado === true ? 'anulado ' + fmtDataHora(p.anuladoEm) : 'concluído ' + fmtDataHora(p.ultimoAvancoEm));
-    }).join('') || '<div class="vazio">Ainda nada.</div>';
-
-    var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
-    if (foco) { foco.focus(); foco.select(); }
-    var fp = document.querySelector('[data-prazo="' + prazoEmEdicao + '"]');
-    if (fp) fp.focus();
-    var fd = document.querySelector('[data-duracao="' + duracaoEmEdicao + '"]');
-    if (fd) { fd.focus(); fd.select(); }
+    $('nSoltas').textContent = contagem(ls.length, v.soltas.length);
+    var htmlSoltas = ls.map(function (x) { return linhaObrigacao(x.obr, { inserir: true }); }).join('');
+    if (novoTemp && !novoTemp.projetoId && !novoTemp.aposId && !novoTemp.coluna) htmlSoltas += linhaTemp(null, '');
+    $('listaSoltas').innerHTML = htmlSoltas || '<div class="vazio">' + (v.soltas.length ? 'Nenhuma obrigação solta casa com o filtro.' : 'Sem obrigações soltas.') + '</div>';
+    return fp.fora + fs.fora;
   }
 
-  /* ---------- Render: vista de projeto ---------- */
+  // Agrupado por local / semana em Lista: uma secção por grupo com TODAS as abertas do grupo.
+  function renderListaAgrupada(hoje) {
+    var fora = 0;
+    $('listaAgrupada').innerHTML = gruposDe(hoje).map(function (g) {
+      var f = filtrar(g.itens); fora += f.fora;
+      var sub = grupo === 'local' ? 'Onde se faz. Muda o local em qualquer linha; sem local aparece sempre aqui.' : 'Pelo prazo. Sem prazo fica sempre visível no fim.';
+      return '<div class="sec"><p class="sec-title">' + escapeHtml(g.nome) + ' <span class="n">' + contagem(f.vis.length, g.itens.length) + '</span></p><p class="sec-sub">' + sub + '</p>' +
+        '<div class="lista viva">' + (f.vis.map(function (x) { return linhaObrigacao(x.obr, { inserir: !x.obr.projetoId }); }).join('') || '<div class="vazio">Nada aqui.</div>') + '</div></div>';
+    }).join('');
+    return fora;
+  }
+
+  /* ---------- Render: vista Quadro ---------- */
+  function renderQuadro(hoje) {
+    var fora = 0;
+    $('quadro').innerHTML = gruposDe(hoje).map(function (g) {
+      var f = filtrar(g.itens); fora += f.fora;
+      var dnd = grupo === 'projeto' && !!g.projetoId;
+      var cartoes = f.vis.map(function (x) {
+        var o = x.obr;
+        var sub = g.projetoId || !x.projeto
+          ? '<span class="num">' + (o.duracaoPrevista || G.DURACAO_DEFAULT) + ' min</span>' + (o.prazo && grupo !== 'semana' ? ' · ' + metaPrazo(o, hoje) : '')
+          : '<span class="proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(o.projetoId) + '">' + escapeHtml(x.projeto.nome) + '</span>';
+        return '<div class="q-card ' + classePrazo(o, hoje) + '" data-id="' + escapeHtml(o.id) + '">' + (dnd ? gripHtml() : '') +
+          '<div class="q-corpo"><div class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(o.titulo) + '</div><div class="sub">' + sub + '</div></div>' + maisHtml() + '</div>';
+      }).join('');
+      if (novoTemp && novoTemp.coluna === g.id) cartoes += '<div class="q-card temp" data-temp="1"><div class="q-corpo"><div class="t placeholder" data-edit="novo" data-placeholder="Novo — Enter grava, Esc cancela"></div></div></div>';
+      return '<div class="q-col" data-coluna="' + escapeHtml(g.id) + '" style="--q-cor:var(--grupo-' + g.cor + ')">' +
+        '<div class="q-head"><span class="q-pill"><i></i><span>' + escapeHtml(g.nome) + '</span><span class="n num">' + (f.vis.length !== g.itens.length ? f.vis.length + '/' : '') + g.itens.length + '</span></span>' +
+        '<button type="button" class="l-mais" data-acao="menu-coluna" title="Opções da coluna" aria-label="Opções da coluna">' + icone('more-horizontal', 16) + '</button>' +
+        '<button type="button" class="q-plus" data-acao="novo-coluna" title="Novo neste grupo" aria-label="Novo neste grupo">' + icone('plus', 16) + '</button></div>' +
+        '<div class="q-cards"' + (dnd ? ' data-dnd-projeto="' + escapeHtml(g.projetoId) + '"' : '') + '>' + cartoes + '</div>' +
+        '<button type="button" class="q-novo" data-acao="novo-coluna">+ Novo</button></div>';
+    }).join('');
+    return fora;
+  }
+
+  /* ---------- Render: painel de projeto ---------- */
   function abrirProjeto(pid) {
+    if (!projs[pid]) return;
+    if (projetoAberto !== pid) { concluirEmCurso = null; prazoEmEdicao = null; duracaoEmEdicao = null; $('decomporBox').classList.remove('on'); fecharSugestao(); }
     projetoAberto = pid;
-    concluirEmCurso = null; prazoEmEdicao = null; duracaoEmEdicao = null;
-    $('decomporBox').classList.remove('on');
-    fecharSugestao();
     try { history.replaceState(null, '', '?projeto=' + encodeURIComponent(pid)); } catch (e) {}
-    render();
-    window.scrollTo(0, 0);
+    $('painel').classList.add('on'); $('painel').setAttribute('aria-hidden', 'false');
+    $('painelFundo').classList.add('on');
+    renderProjeto();
+    $('painel').scrollTop = 0;
   }
   function fecharProjeto() {
-    projetoAberto = null;
+    if (edicaoAtiva && edicaoAtiva.tipo !== 'titulo') { var el = document.querySelector('[contenteditable="true"]'); if (el) el.blur(); }
+    projetoAberto = null; novoTemp = null;
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    $('painel').classList.remove('on'); $('painel').setAttribute('aria-hidden', 'true');
+    $('painelFundo').classList.remove('on');
     render();
   }
+  $('painelFechar').addEventListener('click', fecharProjeto);
+  $('painelFundo').addEventListener('click', fecharProjeto);
 
   function renderProjeto() {
     var pid = projetoAberto;
     var p = projs[pid];
     if (!p) { fecharProjeto(); return; }
-    var ativo = p.estado === 'ativo' && p.anulado !== true;
+    var ativo = projetoAtivo(p);
     var hoje = G.hojeISO();
     var passos = G.passosDoProjeto(pid, obrs);
     var abertos = passos.filter(G.estaAberta);
     var prox = G.proximaAcao(pid, obrs);
     var dias = G.diasParado(p, hoje);
 
-    $('projNome').textContent = p.nome;
+    var h = $('projNome');
+    if (!(edicaoAtiva && edicaoAtiva.tipo === 'projNome')) h.textContent = p.nome;
+    h.contentEditable = ativo ? h.contentEditable : 'false';
     var est = $('projEstado');
     est.className = 'status ' + (p.anulado === true ? 'high' : p.estado === 'concluido' ? 'ok' : (dias > G.LIMITE_PARADO_DIAS ? 'parado' : 'ok'));
     est.textContent = p.anulado === true ? 'Anulado' : p.estado === 'concluido' ? 'Concluído' : (dias > G.LIMITE_PARADO_DIAS ? 'Parado há ' + dias + ' dias' : 'Ativo');
     $('projSub').textContent = 'Criado ' + fmtDataHora(p.criadoEm) + ' · último avanço ' + fmtDataHora(p.ultimoAvancoEm) +
       ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
     $('projDecomporBtn').style.display = ativo ? '' : 'none';
-    // Com passos, a ação principal é ATUALIZAR (propor alterações aos que faltam);
-    // «Sugerir passos» (lista nova) só num projeto ainda sem passos.
     $('projSugerirBtn').style.display = ativo ? '' : 'none';
     $('projSugerirBtn').dataset.modo = passos.length ? 'atualizar' : 'sugerir';
     $('projSugerirBtn').innerHTML = icone('sparkles') + (passos.length ? ' Atualizar passos' : ' Sugerir passos');
-    // Contexto: só se substitui o texto quando NÃO está a ser editado (o snapshot
-    // chega a cada escrita e pisaria o que o Manel está a escrever).
     var ta = $('ctxTexto');
     if (document.activeElement !== ta) ta.value = p.contexto || '';
     ta.disabled = !ativo;
@@ -939,8 +1293,9 @@
     $('projAnularBtn').style.display = ativo ? '' : 'none';
 
     $('nPassos').textContent = '(' + passos.length + ')';
-    var abertosIds = abertos.map(function (o) { return o.id; });
-    $('listaPassos').innerHTML = passos.length ? passos.map(function (o, i) {
+    var lista = $('listaPassos');
+    if (ativo) lista.setAttribute('data-dnd-projeto', pid); else lista.removeAttribute('data-dnd-projeto');
+    var html = passos.map(function (o, i) {
       var aberta = G.estaAberta(o);
       var deps = depsDe(o);
       var chips = deps.map(function (d) {
@@ -958,13 +1313,14 @@
       var extra = '<div class="passo-deps">' + (deps.length ? 'Depende de: ' : '') + chips + selDep +
         (bloqueada ? '<span class="bloqueada-tag">bloqueado</span>' : '') +
         (prox && prox.id === o.id ? '<span class="status ok">próxima ação</span>' : '') + '</div>';
-      var acoesExtra = ativo
-        ? '<button type="button" class="b icone" data-acao="subir" title="Subir" ' + (i === 0 ? 'disabled' : '') + '><svg class="icon" width="12" height="12" style="transform:rotate(180deg)"><use href="#i-chevron-down"/></svg></button>' +
-          '<button type="button" class="b icone" data-acao="descer" title="Descer" ' + (i === passos.length - 1 ? 'disabled' : '') + '>' + icone('chevron-down', 12) + '</button>'
-        : '';
-      return linhaObrigacao(o, { semProjeto: true, ordem: i + 1, extra: extra, acoesExtra: acoesExtra });
-    }).join('') : '<div class="vazio">Este projeto ainda não tem passos. Usa «Sugerir passos» para uma proposta automática, ou «Decompor» para os escrever à mão.</div>';
+      return linhaObrigacao(o, { semProjeto: true, ordem: i + 1, extra: extra, dnd: ativo, inserir: ativo });
+    }).join('');
+    if (novoTemp && novoTemp.projetoId === pid && !novoTemp.aposId && !novoTemp.coluna) html += linhaTemp(pid, passos.length + 1);
+    lista.innerHTML = html || '<div class="vazio">Este projeto ainda não tem passos. Usa «Sugerir passos» para uma proposta automática, «Decompor» para os escrever à mão, ou o + da toolbar.</div>';
+    reporFoco();
+  }
 
+  function reporFoco() {
     var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
     if (foco) { foco.focus(); foco.select(); }
     var fp = document.querySelector('[data-prazo="' + prazoEmEdicao + '"]');
@@ -975,41 +1331,316 @@
 
   function render() {
     if (!obrsCarregadas || !projsCarregados) return;
-    var emProjeto = !!projetoAberto;
-    $('vistaPrincipal').style.display = emProjeto ? 'none' : '';
-    $('vistaProjeto').style.display = emProjeto ? '' : 'none';
-    if (emProjeto) renderProjeto(); else renderPrincipal();
+    // Com um título em edição o DOM não se toca: o snapshot fica para depois do blur.
+    if (edicaoAtiva) { renderPendente = true; return; }
+    renderPendente = false;
+    renderPrincipal();
+    if (projetoAberto) renderProjeto();
   }
 
-  /* ---------- Reordenar (troca de ordem entre dois passos: dois set() em folhas) ---------- */
-  function mover(id, delta) {
-    var passos = G.passosDoProjeto(projetoAberto, obrs);
-    var i = passos.findIndex(function (o) { return o.id === id; });
-    var j = i + delta;
-    if (i < 0 || j < 0 || j >= passos.length) return;
-    // Normalizar primeiro: passos sem ordem numérica ficam com a posição atual,
-    // para a troca ser determinística. Só escreve onde a ordem muda.
-    var escritas = [];
-    passos.forEach(function (o, k) {
-      var alvo = k === i ? j + 1 : k === j ? i + 1 : k + 1;
-      if (o.ordem !== alvo) escritas.push(obrigacoesRef.child(o.id).child('ordem').set(alvo));
-    });
-    Promise.all(escritas).catch(erroEscrita);
+  /* ---------- Edição inline (título do passo, nome do projeto, linha nova) ----------
+     Clicar no texto entra em edição no sítio (contenteditable, mesma fonte). Enter e
+     blur gravam, Escape cancela. A gravação é um update() só com o campo no path do
+     registo. Confirmação visual: contorno verde que desvanece; nunca um alert. */
+  function iniciarEdicao(el) {
+    if (el.contentEditable === 'true' || !el.isConnected) return;
+    var tipo = el.dataset.edit;
+    var id = tipo === 'projNome' ? projetoAberto : tipo === 'titulo' ? el.closest('[data-id]').dataset.id : null;
+    if (tipo === 'projNome' && !projetoAtivo(projs[id])) return;
+    var original = el.textContent;
+    var cancelado = false;
+    edicaoAtiva = { tipo: tipo, id: id };
+    el.contentEditable = 'true';
+    el.spellcheck = false;
+    el.focus();
+    try { var r = document.createRange(); r.selectNodeContents(el); r.collapse(false); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {}
+    function tecla(ev) {
+      // stopPropagation: o mesmo Enter/Escape não pode chegar ao #main já com o
+      // elemento fora de edição e voltar a entrar em edição num nó desligado.
+      if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); el.blur(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cancelado = true; el.blur(); }
+    }
+    function terminar() {
+      el.removeEventListener('keydown', tecla);
+      el.removeEventListener('blur', terminar);
+      el.contentEditable = 'false';
+      var novo = el.textContent.replace(/\s+/g, ' ').trim();
+      edicaoAtiva = null;
+      if (tipo === 'novo') {
+        var t = novoTemp; novoTemp = null;
+        if (!cancelado && novo && t) criarDeTemp(t, novo);
+        render();
+        return;
+      }
+      if (cancelado || !novo || novo === original) { el.textContent = original; if (renderPendente) render(); return; }
+      el.textContent = novo;
+      var p = tipo === 'projNome' ? gravarNomeProjeto(id, novo.slice(0, 120)) : gravarTitulo(id, novo.slice(0, 200));
+      p.then(function () { piscarGuardado(el); }).catch(function (e) { el.textContent = original; erroEscrita(e); });
+      if (renderPendente) render();
+    }
+    el.addEventListener('keydown', tecla);
+    el.addEventListener('blur', terminar);
   }
+  function piscarGuardado(el) {
+    if (!el || !el.isConnected) return;
+    el.classList.remove('guardado-fade'); el.classList.add('guardado');
+    setTimeout(function () { el.classList.add('guardado-fade'); }, 60);
+    setTimeout(function () { el.classList.remove('guardado', 'guardado-fade'); }, 900);
+  }
+  function criarDeTemp(t, titulo) {
+    var dur = duracaoDefault();
+    var extra = { local: t.local || null, prazo: t.prazo || null };
+    var p = t.projetoId ? criarPassoApos(t.projetoId, t.aposId || null, titulo, dur, extra) : criarObrigacao(titulo, null, null, dur, extra);
+    p.then(function (id) {
+      // Realce breve na linha acabada de criar (chega no snapshot seguinte).
+      setTimeout(function () { var el = document.querySelector('[data-id="' + id + '"] [data-edit="titulo"]'); if (el) piscarGuardado(el); }, 250);
+      if (!t.projetoId) classificarLocalEmFundo([{ id: id, titulo: titulo }]);
+    }).catch(erroEscrita);
+  }
+  // Linha nova em edição: existe só no DOM até Enter/blur com texto; vazia ou Esc descarta.
+  function inserirTemp(t) {
+    if (edicaoAtiva) { var ativo = document.querySelector('[contenteditable="true"]'); if (ativo) ativo.blur(); }
+    novoTemp = t;
+    render();
+    var el = document.querySelector('[data-temp] [data-edit="novo"]');
+    if (el) { iniciarEdicao(el); el.scrollIntoView({ block: 'nearest' }); }
+    else novoTemp = null;
+  }
+  document.getElementById('main').addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-edit]');
+    if (el && el.contentEditable !== 'true' && !ev.target.closest('a, button, select, input')) { ev.preventDefault(); iniciarEdicao(el); return; }
+    var ins = ev.target.closest('[data-inserir-apos]');
+    if (ins) { inserirTemp({ projetoId: ins.dataset.inserirProjeto || null, aposId: ins.dataset.inserirApos }); }
+  });
+  document.getElementById('main').addEventListener('keydown', function (ev) {
+    var el = ev.target;
+    if (ev.defaultPrevented || !el.isConnected) return;
+    if (el.dataset && el.dataset.edit && el.contentEditable !== 'true' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); iniciarEdicao(el); }
+  });
 
-  /* ---------- Filtro por local (manual; "todos" por omissão) ---------- */
-  var filtroLocal = '';
+  /* ---------- Drag & drop pela pega (HTML5 no desktop, pointer + long-press ao toque) ----------
+     Só dentro do MESMO projeto (contentor [data-dnd-projeto]). Largar = renumerar()
+     todos os passos do projeto 1..n, um set() na folha ordem só onde muda. */
+  var dnd = { id: null, pid: null, alvo: null, antes: true, ghost: null, timer: null, ativo: false };
+  function contentorDnd(el) { return el ? el.closest('[data-dnd-projeto]') : null; }
+  function limparMarcas() {
+    Array.prototype.forEach.call(document.querySelectorAll('.largar-antes, .largar-depois, .arrastando'), function (e) { e.classList.remove('largar-antes', 'largar-depois', 'arrastando'); });
+  }
+  function marcarAlvo(item, y) {
+    limparMarcas();
+    var src = document.querySelector('[data-id="' + dnd.id + '"]'); if (src) src.classList.add('arrastando');
+    dnd.alvo = null;
+    if (!item || item.dataset.id === dnd.id) return;
+    var r = item.getBoundingClientRect();
+    dnd.antes = y < r.top + r.height / 2;
+    dnd.alvo = item.dataset.id;
+    item.classList.add(dnd.antes ? 'largar-antes' : 'largar-depois');
+  }
+  function largar() {
+    var pid = dnd.pid, id = dnd.id, alvo = dnd.alvo, antes = dnd.antes;
+    limparMarcas();
+    if (dnd.ghost) { dnd.ghost.remove(); dnd.ghost = null; }
+    dnd.id = null; dnd.pid = null; dnd.ativo = false;
+    if (!pid || !id || !alvo || alvo === id) return;
+    var ids = G.passosDoProjeto(pid, obrs).map(function (o) { return o.id; });
+    if (ids.indexOf(id) < 0 || ids.indexOf(alvo) < 0) return;
+    ids.splice(ids.indexOf(id), 1);
+    var k = ids.indexOf(alvo) + (antes ? 0 : 1);
+    ids.splice(k, 0, id);
+    renumerar(pid, ids).then(function () { return marcarAvanco(pid); }).catch(erroEscrita);
+  }
+  function itemSob(x, y, pid) {
+    var el = document.elementFromPoint(x, y);
+    var item = el ? el.closest('[data-id]') : null;
+    var c = contentorDnd(item);
+    return (item && c && c.dataset.dndProjeto === pid) ? item : null;
+  }
+  // HTML5 (rato)
+  document.addEventListener('dragstart', function (ev) {
+    var grip = ev.target.closest ? ev.target.closest('.l-grip') : null;
+    if (!grip) { ev.preventDefault(); return; }
+    var item = grip.closest('[data-id]'); var c = contentorDnd(item);
+    if (!item || !c) { ev.preventDefault(); return; }
+    dnd.id = item.dataset.id; dnd.pid = c.dataset.dndProjeto; dnd.alvo = null;
+    try { ev.dataTransfer.setData('text/plain', dnd.id); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setDragImage(item, 20, 20); } catch (e) {}
+    setTimeout(function () { var s = document.querySelector('[data-id="' + dnd.id + '"]'); if (s) s.classList.add('arrastando'); }, 0);
+  });
+  document.addEventListener('dragover', function (ev) {
+    if (!dnd.id) return;
+    var item = itemSob(ev.clientX, ev.clientY, dnd.pid);
+    if (item) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; marcarAlvo(item, ev.clientY); }
+  });
+  document.addEventListener('drop', function (ev) { if (!dnd.id) return; ev.preventDefault(); largar(); });
+  document.addEventListener('dragend', function () { if (dnd.id) { dnd.alvo = null; largar(); } });
+  // Pointer events (toque/caneta): long-press de 350 ms na pega inicia; sem hover não há dragstart.
+  document.addEventListener('pointerdown', function (ev) {
+    var grip = ev.target.closest ? ev.target.closest('.l-grip') : null;
+    if (!grip || ev.pointerType === 'mouse') return;
+    var item = grip.closest('[data-id]'); var c = contentorDnd(item);
+    if (!item || !c) return;
+    ev.preventDefault();
+    var x0 = ev.clientX, y0 = ev.clientY;
+    dnd.timer = setTimeout(function () {
+      dnd.timer = null; dnd.ativo = true; dnd.id = item.dataset.id; dnd.pid = c.dataset.dndProjeto; dnd.alvo = null;
+      try { grip.setPointerCapture(ev.pointerId); } catch (e) {}
+      var g = document.createElement('div'); g.className = 'dnd-ghost'; g.textContent = (obrs[dnd.id] || {}).titulo || '';
+      g.style.left = (x0 + 12) + 'px'; g.style.top = (y0 - 16) + 'px'; document.body.appendChild(g); dnd.ghost = g;
+      marcarAlvo(null, y0);
+      if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
+    }, 350);
+    var mover = function (e) {
+      if (dnd.timer && (Math.abs(e.clientX - x0) > 8 || Math.abs(e.clientY - y0) > 8)) { clearTimeout(dnd.timer); dnd.timer = null; }
+      if (!dnd.ativo) return;
+      e.preventDefault();
+      if (dnd.ghost) { dnd.ghost.style.left = (e.clientX + 12) + 'px'; dnd.ghost.style.top = (e.clientY - 16) + 'px'; }
+      if (dnd.ghost) dnd.ghost.style.display = 'none';
+      var it = itemSob(e.clientX, e.clientY, dnd.pid);
+      if (dnd.ghost) dnd.ghost.style.display = '';
+      if (it) marcarAlvo(it, e.clientY);
+    };
+    var fim = function () {
+      grip.removeEventListener('pointermove', mover); grip.removeEventListener('pointerup', fim); grip.removeEventListener('pointercancel', fim);
+      if (dnd.timer) { clearTimeout(dnd.timer); dnd.timer = null; }
+      if (dnd.ativo) largar();
+    };
+    grip.addEventListener('pointermove', mover); grip.addEventListener('pointerup', fim); grip.addEventListener('pointercancel', fim);
+  });
+
+  /* ---------- Menus flutuantes (⋯ da linha, colunas, chips da toolbar, +) ---------- */
+  var menuAncora = null;
+  function abrirMenu(ancora, itens) {
+    var m = $('menuPop');
+    m.innerHTML = itens.map(function (it) {
+      if (it.sep) return '<div class="sep"></div>';
+      if (it.html) return it.html;
+      return '<button type="button" class="' + (it.perigo ? 'perigo' : '') + (it.ativo ? ' ativo' : '') + '" data-menu-i="' + itens.indexOf(it) + '">' + (it.icone ? icone(it.icone, 14) : '') + escapeHtml(it.txt) + '</button>';
+    }).join('');
+    m.classList.add('on');
+    if (menuAncora) menuAncora.classList.remove('on');
+    menuAncora = ancora; ancora.classList.add('on');
+    var r = ancora.getBoundingClientRect();
+    var w = m.offsetWidth, h = m.offsetHeight;
+    var left = r.left + window.scrollX, top = r.bottom + 6 + window.scrollY;
+    if (r.left + w > window.innerWidth - 8) left = Math.max(8, r.right - w) + window.scrollX;
+    if (r.bottom + 6 + h > window.innerHeight - 8) top = r.top - h - 6 + window.scrollY;
+    // Dentro do painel (fixed) o menu tem de ser fixed também, senão fica preso ao scroll da página.
+    var noPainel = !!ancora.closest('#painel');
+    m.style.position = noPainel ? 'fixed' : 'absolute';
+    m.style.left = (noPainel ? left - window.scrollX : left) + 'px';
+    m.style.top = (noPainel ? top - window.scrollY : top) + 'px';
+    m._itens = itens;
+    var inp = m.querySelector('input'); if (inp) { inp.focus(); inp.select(); }
+  }
+  function fecharMenu() {
+    var m = $('menuPop'); m.classList.remove('on'); m.innerHTML = ''; m._itens = null;
+    if (menuAncora) { menuAncora.classList.remove('on'); menuAncora = null; }
+  }
+  $('menuPop').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-menu-i]');
+    if (b) { var it = $('menuPop')._itens[parseInt(b.dataset.menuI, 10)]; fecharMenu(); if (it && it.acao) it.acao(); return; }
+    var ok = ev.target.closest('[data-menu-dur-ok]');
+    if (ok) { var inp = $('menuPop').querySelector('[data-menu-dur]'); var n = numOuNull(inp.value); var id = inp.dataset.menuDur; fecharMenu(); if (n) setFolha(id, 'duracaoPrevista', n); }
+  });
+  $('menuPop').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { fecharMenu(); return; }
+    if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.menuDur) { ev.preventDefault(); var ok = $('menuPop').querySelector('[data-menu-dur-ok]'); if (ok) ok.click(); }
+  });
+  document.addEventListener('pointerdown', function (ev) {
+    if (!$('menuPop').classList.contains('on')) return;
+    if (ev.target.closest('#menuPop') || (menuAncora && ev.target.closest('.l-mais, .tb-chip, .tb-ghost, .tb-mais') === menuAncora)) return;
+    fecharMenu();
+  }, true);
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if ($('menuPop').classList.contains('on')) { fecharMenu(); return; }
+    if (edicaoAtiva) return;   // o Escape da edição é tratado no próprio elemento
+    if (projetoAberto && !ev.target.closest('#sugBox, #atzBox, #decomporBox')) fecharProjeto();
+  });
+  function menuLinha(btn, id) {
+    var o = obrs[id]; if (!o) return;
+    abrirMenu(btn, [
+      { html: '<label>' + icone('clock', 14) + 'Duração <input type="number" min="1" step="5" value="' + escapeHtml(o.duracaoPrevista || G.DURACAO_DEFAULT) + '" data-menu-dur="' + escapeHtml(id) + '" aria-label="Duração prevista em minutos"> min <button type="button" class="b" data-menu-dur-ok>OK</button></label>' },
+      { txt: o.prazo ? 'Alterar prazo' : 'Definir prazo', icone: 'calendar', acao: function () { prazoEmEdicao = id; concluirEmCurso = null; duracaoEmEdicao = null; render(); } },
+      { txt: 'Adiar (conta quantas vezes)', icone: 'chevron-right', acao: function () { adiar(id); } },
+      { txt: 'Duplicar', icone: 'copy', acao: function () { duplicar(id); } },
+      { sep: true },
+      { txt: 'Anular…', icone: 'x', perigo: true, acao: function () { anular(id); } }
+    ]);
+  }
+  function menuColuna(btn, col) {
+    var g = grupoPorId(col.dataset.coluna); if (!g) return;
+    var itens = [{ txt: 'Novo neste grupo', icone: 'plus', acao: function () { inserirTemp(Object.assign({ coluna: g.id }, g.novo)); } }];
+    if (g.projetoId) itens.push({ txt: 'Abrir projeto', icone: 'chevron-right', acao: function () { abrirProjeto(g.projetoId); } });
+    itens.push({ html: '<div class="hint">' + g.itens.length + (g.itens.length === 1 ? ' obrigação aberta' : ' obrigações abertas') + '</div>' });
+    abrirMenu(btn, itens);
+  }
+  function grupoPorId(id) { return gruposDe(G.hojeISO()).filter(function (g) { return g.id === id; })[0] || null; }
+
+  // Toolbar
+  $('tbVista').addEventListener('click', function () {
+    abrirMenu(this, [
+      { txt: 'Lista', icone: 'list', ativo: vista === 'lista', acao: function () { vista = 'lista'; gravarLS(LS_VISTA, vista); render(); } },
+      { txt: 'Quadro', icone: 'columns', ativo: vista === 'quadro', acao: function () { vista = 'quadro'; gravarLS(LS_VISTA, vista); render(); } }
+    ]);
+  });
+  $('tbGrupo').addEventListener('click', function () {
+    var f = function (g) { return function () { grupo = g; gravarLS(LS_GRUPO, g); render(); }; };
+    abrirMenu(this, [
+      { txt: 'Projeto', ativo: grupo === 'projeto', acao: f('projeto') },
+      { txt: 'Local', ativo: grupo === 'local', acao: f('local') },
+      { txt: 'Semana', ativo: grupo === 'semana', acao: f('semana') }
+    ]);
+  });
+  $('tbOrdenar').addEventListener('click', function () {
+    var f = function (o) { return function () { ordenacao = o; render(); }; };
+    abrirMenu(this, [
+      { txt: 'Prazo e antiguidade (regra do motor)', ativo: ordenacao === 'prazo', acao: f('prazo') },
+      { txt: 'Título A–Z', ativo: ordenacao === 'titulo', acao: f('titulo') },
+      { txt: 'Mais recentes primeiro', ativo: ordenacao === 'recente', acao: f('recente') }
+    ]);
+  });
+  $('tbProcurar').addEventListener('click', function () {
+    var box = $('tbProcura'); var on = !box.classList.contains('on');
+    box.classList.toggle('on', on);
+    if (on) $('procuraInput').focus(); else { procura = ''; $('procuraInput').value = ''; }
+    render();
+  });
+  $('procuraInput').addEventListener('input', function () { procura = this.value.trim(); render(); });
+  $('procuraInput').addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { $('tbProcurar').click(); } });
+  $('tbFiltrar').addEventListener('click', function () {
+    var on = !$('filtroLocal').classList.contains('on');
+    $('filtroLocal').classList.toggle('on', on);
+    if (!on) filtroLocal = '';
+    render();
+  });
+  $('tbMais').addEventListener('click', function () {
+    var itens = [
+      { txt: 'Novo projeto', icone: 'plus', acao: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); $('projInput').focus(); } },
+      { txt: 'Nova obrigação solta', icone: 'plus', acao: function () { inserirTemp({}); } }
+    ];
+    if (projetoAberto && projetoAtivo(projs[projetoAberto])) itens.unshift({ txt: 'Novo passo em «' + projs[projetoAberto].nome + '»', icone: 'plus', acao: function () { inserirTemp({ projetoId: projetoAberto }); } });
+    abrirMenu(this, itens);
+  });
   $('filtroLocal').addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-filtro-local]'); if (!b) return;
     filtroLocal = b.dataset.filtroLocal;
     render();
   });
-  // Correção manual do local em qualquer linha: grava localManual:true para não
-  // ser sobreposta por classificações futuras.
   document.getElementById('main').addEventListener('change', function (ev) {
     var el = ev.target;
     if (el.dataset && el.dataset.localSel) gravarLocalManual(el.dataset.localSel, el.value);
   });
+
+  /* ---------- Cabeçalho condensado ao fazer scroll ---------- */
+  (function () {
+    var barra = $('topoFino'); var on = false;
+    function ver() {
+      var deve = window.scrollY > 140;
+      if (deve !== on) { on = deve; barra.classList.toggle('on', on); barra.setAttribute('aria-hidden', on ? 'false' : 'true'); }
+    }
+    window.addEventListener('scroll', ver, { passive: true });
+    ver();
+  })();
 
   /* ---------- Locais de referência + deteção de posição ----------
      mrnLocais/{id} = { nome, lat, lng, raio, local, criadoEm, anulado? }. "Estou aqui
@@ -1107,8 +1738,10 @@
       .then(function () { $('ctxEstado').textContent = 'guardado ' + fmtDataHora(agoraISO()); })
       .catch(function (e) { $('ctxEstado').textContent = 'falha ao guardar'; erroEscrita(e); });
   }
-  $('ctxTexto').addEventListener('blur', gravarContexto);
-  $('ctxTexto').addEventListener('input', function () { $('ctxEstado').textContent = ''; });
+  // Auto-save: grava ao sair do campo E 1,2 s depois de parar de escrever (painel lateral).
+  var ctxTimer = null;
+  $('ctxTexto').addEventListener('blur', function () { clearTimeout(ctxTimer); gravarContexto(); });
+  $('ctxTexto').addEventListener('input', function () { $('ctxEstado').textContent = ''; clearTimeout(ctxTimer); ctxTimer = setTimeout(gravarContexto, 1200); });
 
   /* ---------- Sugerir passos (decomposição automática) ----------
      A chamada ao modelo está toda no gioco-sugestoes.js (GiocoSugestoes.sugerirPassos);
@@ -1488,7 +2121,6 @@
       .then(function () { $('decomporCriar').disabled = false; $('decomporInfo').textContent = ''; });
   });
 
-  $('projVoltar').addEventListener('click', fecharProjeto);
   $('projConcluirBtn').addEventListener('click', function () {
     var pid = projetoAberto; var p = projs[pid]; if (!p) return;
     if (G.listaAbertas(obrs).some(function (o) { return o.projetoId === pid; })) return;
@@ -1521,7 +2153,8 @@
       .then(function () { $('projAnularBtn').disabled = false; });
   });
 
-  /* ---------- Delegação de eventos nas listas ---------- */
+
+  /* ---------- Delegação de eventos nas listas (vista principal E painel) ---------- */
   document.getElementById('main').addEventListener('click', function (ev) {
     var btn = ev.target.closest('[data-acao]');
     if (!btn || btn.tagName === 'SELECT') return;
@@ -1529,8 +2162,11 @@
     var id = linha ? linha.dataset.id : null;
     var acao = btn.dataset.acao;
     if (acao === 'abrir-projeto') { abrirProjeto(btn.dataset.projeto); return; }
+    if (acao === 'menu-coluna') { menuColuna(btn, btn.closest('[data-coluna]')); return; }
+    if (acao === 'novo-coluna') { var g = grupoPorId(btn.closest('[data-coluna]').dataset.coluna); if (g) inserirTemp(Object.assign({ coluna: g.id }, g.novo)); return; }
     if (!id) return;
-    if (acao === 'concluir') { concluirEmCurso = id; prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
+    if (acao === 'menu') { menuLinha(btn, id); }
+    else if (acao === 'concluir') { concluirEmCurso = id; prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
     else if (acao === 'cancelar-concluir') { concluirEmCurso = null; render(); }
     else if (acao === 'confirmar-concluir') { confirmarConcluir(id); }
     else if (acao === 'adiar') { adiar(id); }
@@ -1538,8 +2174,6 @@
     else if (acao === 'editar-prazo') { prazoEmEdicao = id; concluirEmCurso = null; duracaoEmEdicao = null; render(); }
     else if (acao === 'limpar-prazo') { prazoEmEdicao = null; setFolha(id, 'prazo', null); }
     else if (acao === 'editar-duracao') { duracaoEmEdicao = id; concluirEmCurso = null; prazoEmEdicao = null; render(); }
-    else if (acao === 'subir') { mover(id, -1); }
-    else if (acao === 'descer') { mover(id, 1); }
     else if (acao === 'tirar-dep') {
       var deps = depsDe(obrs[id]).filter(function (d) { return d !== btn.dataset.dep; });
       setFolha(id, 'dependeDe', deps.length ? deps : null);
@@ -1570,14 +2204,13 @@
     var el = ev.target;
     if (el.dataset && el.dataset.real) {
       if (ev.key === 'Enter') { ev.preventDefault(); confirmarConcluir(el.dataset.real); }
-      if (ev.key === 'Escape') { concluirEmCurso = null; render(); }
+      if (ev.key === 'Escape') { ev.stopPropagation(); concluirEmCurso = null; render(); }
     }
-    if (el.dataset && (el.dataset.prazo || el.dataset.duracao) && ev.key === 'Escape') { prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
+    if (el.dataset && (el.dataset.prazo || el.dataset.duracao) && ev.key === 'Escape') { ev.stopPropagation(); prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
   });
   document.getElementById('main').addEventListener('focusout', function (ev) {
     var el = ev.target;
     if (el.dataset && el.dataset.prazo && prazoEmEdicao === el.dataset.prazo) {
-      // Sair do campo sem escolher fecha o editor; a escolha já foi gravada no change.
       setTimeout(function () { if (prazoEmEdicao === el.dataset.prazo && !document.activeElement.closest('[data-id="' + el.dataset.prazo + '"]')) { prazoEmEdicao = null; render(); } }, 150);
     }
   });
@@ -1602,10 +2235,12 @@
     // Deep-link ?projeto=ID (usado ao voltar ao separador): só na primeira leitura.
     if (projetoAberto === null && !projetosLidos) {
       var m = /[?&]projeto=([^&]+)/.exec(location.search);
-      if (m && projs[decodeURIComponent(m[1])]) projetoAberto = decodeURIComponent(m[1]);
+      if (m && projs[decodeURIComponent(m[1])] && obrsCarregadas) abrirProjeto(decodeURIComponent(m[1]));
+      else if (m && projs[decodeURIComponent(m[1])]) projetoAberto = decodeURIComponent(m[1]);
     }
     projetosLidos = true;
     render();
+    if (projetoAberto && !$('painel').classList.contains('on')) abrirProjeto(projetoAberto);
   });
   });
 </script>

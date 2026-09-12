@@ -89,6 +89,14 @@
     /* Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html: */
     '<symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>',
     '<symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>',
+    /* Set/2026, UX ao estilo Notion da obrigacoes.html (traço Lucide/Feather): pega de
+       arrastar, menu ⋯ da linha, vista Quadro, procurar/filtrar/ordenar da toolbar, duplicar. */
+    '<symbol id="i-grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>',
+    '<symbol id="i-more-horizontal" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>',
+    '<symbol id="i-columns" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></symbol>',
+    '<symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>',
+    '<symbol id="i-arrow-up-down" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>',
+    '<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -116,7 +124,9 @@
     // Set/2026, «Sugerir passos» na obrigacoes.html:
     'sparkles',
     // Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html:
-    'arrow-down', 'arrow-up'
+    'arrow-down', 'arrow-up',
+    // Set/2026, UX Notion da obrigacoes.html (pega, menu ⋯, Quadro, toolbar, duplicar):
+    'grip-vertical', 'more-horizontal', 'columns', 'filter', 'arrow-up-down', 'copy'
   ];
 
   function injectSprite() {
