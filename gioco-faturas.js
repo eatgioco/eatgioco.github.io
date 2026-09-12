@@ -9,11 +9,15 @@
    Vanilla, sem build, sem CDN. Namespace: window.GiocoFaturas.
 
    API:
-     GiocoFaturas.ler(file)
+     GiocoFaturas.ler(file, opts?)   opts = { sleep, onEspera } (rate limit, ver RETRY_429)
        → Promise<{ fornecedorTexto, montante, referencia, data, prazoPagamento, linhas
                    (cada uma com unidade, unidadeBruta, embalagem), nif (string|null),
                    nifCandidatos (string[]), nifOrigem, paginas (número|null), multiPagina (bool) }>
-     GiocoFaturas.analyzeInvoice(file)            → Promise<analyzeResult> (bruto do Azure)
+     GiocoFaturas.analyzeInvoice(file, opts?)     → Promise<analyzeResult> (bruto do Azure)
+     GiocoFaturas.RETRY_429 / esperaRetry429(err, tentativa) / erroHttp(msg, status, retryAfter)
+       → política de retry do 429 do tier F0 (~1 pedido/s): 4 tentativas, 2/5/12/30 s,
+         Retry-After respeitado com tecto de 60 s. Os erros HTTP levam .status,
+         .retryAfterMs, .fase ('post'|'poll') e .esgotado (polling que esgotou)
      GiocoFaturas.fieldText / fieldDateIso / fieldAmount / extrairLinhas
      GiocoFaturas.fileToBase64 / fileToDataUrl / compressImageDataUrl
      GiocoFaturas.prepararArquivoFatura(file)     → Promise<dataUrl> (imagem comprimida ou PDF tal e qual)
@@ -350,7 +354,37 @@
     setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
   }
 
-  async function analyzeInvoice(file) {
+  // ===== Rate limit do Azure F0 (Set/2026) =====
+  // O tier F0 aceita ~1 pedido por segundo; acima disso responde HTTP 429. Política
+  // ÚNICA de retry, partilhada por analyzeInvoice (polling) e pelo gioco-nif-backfill.js
+  // (pedido inicial): até 4 tentativas com esperas 2 s, 5 s, 12 s, 30 s; se a resposta
+  // trouxer Retry-After, usa-se esse valor em vez do backoff, com tecto de 60 s. Só o
+  // 429 é recuperável — 400/403/ficheiro corrompido falham à primeira.
+  var RETRY_429 = { tentativas: 4, esperasMs: [2000, 5000, 12000, 30000], tetoRetryAfterMs: 60000 };
+
+  function erroHttp(mensagem, status, retryAfter) {
+    var e = new Error(mensagem);
+    e.status = status;
+    var ra = parseFloat(retryAfter);
+    e.retryAfterMs = (retryAfter !== null && retryAfter !== undefined && !isNaN(ra)) ? Math.max(0, ra * 1000) : null;
+    return e;
+  }
+
+  // Quanto esperar antes da tentativa seguinte (1-based: tentativa = a que acabou de
+  // falhar). null = não repetir (não é 429, ou esgotou).
+  function esperaRetry429(err, tentativa) {
+    if (!err || err.status !== 429) return null;
+    if (tentativa >= RETRY_429.tentativas) return null;
+    if (typeof err.retryAfterMs === 'number') return Math.min(err.retryAfterMs, RETRY_429.tetoRetryAfterMs);
+    return RETRY_429.esperasMs[Math.min(tentativa - 1, RETRY_429.esperasMs.length - 1)];
+  }
+
+  // opts (opcional): { sleep(ms), onEspera({ms, tentativa, fase}) } — o sleep injectável
+  // é para os testes; onEspera alimenta o indicador de progresso da página.
+  async function analyzeInvoice(file, opts) {
+    opts = opts || {};
+    var dormir = opts.sleep || sleep;
+    var onEspera = opts.onEspera || function () {};
     var base64 = await fileToBase64(file);
     var analyzeUrl = AZURE_ENDPOINT + "documentintelligence/documentModels/" + AZURE_MODEL_ID +
       ":analyze?api-version=" + AZURE_API_VERSION;
@@ -365,7 +399,11 @@
     });
 
     if (postResp.status !== 202) {
-      throw new Error('Pedido inicial ao Azure falhou (HTTP ' + postResp.status + ')');
+      // O 429 no POST não é repetido AQUI: quem chama decide (o backfill repete com a
+      // mesma política; o upload manual mostra o erro). Vai com status e Retry-After.
+      var ePost = erroHttp('Pedido inicial ao Azure falhou (HTTP ' + postResp.status + ')', postResp.status, postResp.headers.get('Retry-After'));
+      ePost.fase = 'post';
+      throw ePost;
     }
 
     var operationLocation = postResp.headers.get('Operation-Location') || postResp.headers.get('operation-location');
@@ -374,17 +412,30 @@
     }
 
     var start = Date.now();
+    var tentativas429 = 0;
     while (true) {
       if (Date.now() - start > POLL_TIMEOUT_MS) {
         throw new Error('Tempo limite excedido a ler a fatura.');
       }
-      await sleep(POLL_INTERVAL_MS);
+      await dormir(POLL_INTERVAL_MS);
 
       var pollResp = await fetch(operationLocation, {
         headers: { 'Ocp-Apim-Subscription-Key': AZURE_KEY }
       });
+      if (pollResp.status === 429) {
+        // A análise JÁ está a correr no Azure (a página já contou): repetir o GET com
+        // backoff é o que evita reiniciar e gastar outra página.
+        tentativas429++;
+        var e429 = erroHttp('Erro a consultar o resultado (HTTP 429)', 429, pollResp.headers.get('Retry-After'));
+        var espera = esperaRetry429(e429, tentativas429);
+        if (espera === null) { e429.fase = 'poll'; e429.esgotado = true; throw e429; }
+        onEspera({ ms: espera, tentativa: tentativas429 + 1, fase: 'poll' });
+        await dormir(espera);
+        start = Date.now(); // a espera do rate limit não conta para o timeout da análise
+        continue;
+      }
       if (!pollResp.ok) {
-        throw new Error('Erro a consultar o resultado (HTTP ' + pollResp.status + ')');
+        throw erroHttp('Erro a consultar o resultado (HTTP ' + pollResp.status + ')', pollResp.status, null);
       }
       var pollJson = await pollResp.json();
       if (pollJson.status === 'succeeded') return pollJson.analyzeResult;
@@ -433,8 +484,8 @@
 
   // Só chama o Azure e extrai. Não escreve em lado nenhum.
   // Strings vazias ficam "" (como o Azure as devolve); montante null quando não há.
-  async function ler(file) {
-    var analyzeResult = await analyzeInvoice(file);
+  async function ler(file, opts) {
+    var analyzeResult = await analyzeInvoice(file, opts);
     var doc = analyzeResult && analyzeResult.documents && analyzeResult.documents[0];
     var fields = (doc && doc.fields) || (analyzeResult && analyzeResult.fields) || {};
     var nifs = extrairNifs(analyzeResult, fields);
@@ -469,6 +520,9 @@
     AZURE_MODEL_ID: AZURE_MODEL_ID,
     ler: ler,
     analyzeInvoice: analyzeInvoice,
+    RETRY_429: RETRY_429,
+    esperaRetry429: esperaRetry429,
+    erroHttp: erroHttp,
     fieldText: fieldText,
     fieldDateIso: fieldDateIso,
     fieldAmount: fieldAmount,

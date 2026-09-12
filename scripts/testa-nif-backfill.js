@@ -73,7 +73,11 @@ var azurePorFicheiro = {
   'fatura-f6.jpg': { nif: NIF_C, nifCandidatos: [NIF_C], nifOrigem: 'etiqueta' }
 };
 function FileShim(parts, name, opts) { this.name = name; this.type = opts.type; }
+// Temporizadores simulados: nenhum teste espera o tempo real das pausas.
+var esperas = [];
+function sleepFalso(ms) { esperas.push(ms); return Promise.resolve(); }
 var deps = {
+  sleep: sleepFalso,
   getSuppliers: function () { return store.suppliers; },
   lerArquivo: function (id) { return Promise.resolve(store.faturasArquivo[id] || null); },
   dataUrlParaFile: function (dataUrl, nome) {
@@ -101,7 +105,9 @@ var deps = {
 
 NB.executar(plano, deps).then(function (rel) {
   assert.deepStrictEqual(chamadasAzure.sort(), ['fatura-f12.jpg', 'fatura-f4.pdf', 'fatura-f7.jpg', 'fatura-f8.jpg', 'fatura-f9.jpg'], 'Azure só nas releituras; sA (nifTexto gravado) não chama');
-  assert.strictEqual(rel.paginasAzure, 5);
+  assert.strictEqual(rel.paginasAzure, 4, 'sE falhou → não conta como página');
+  // Pausa de 2 s só ENTRE alvos com Azure: 5 alvos pagos → 4 pausas; sA (sem Azure) não pausa, nem antes do primeiro.
+  assert.deepStrictEqual(esperas, [2000, 2000, 2000, 2000], 'pausas entre alvos com Azure');
   assert.ok(rel.manuais.some(function (m) { return m.supplierId === 'sJ' && /origem genérica/.test(m.motivo); }), 'relida e ainda genérica → manual');
   assert.ok(!('nif' in store.suppliers.sJ) && !('nif' in store.suppliers.sI), 'origem genérica nunca chega à ficha');
   assert.deepStrictEqual(rel.gravados.map(function (g) { return g.supplierId + ':' + g.nif; }).sort(), ['sA:' + NIF_A, 'sB:' + NIF_B, 'sH:' + NIF_C]);
@@ -109,6 +115,7 @@ NB.executar(plano, deps).then(function (rel) {
   assert.strictEqual(store.suppliers.sB.nif, NIF_B);
   assert.strictEqual(store.suppliers.sH.nif, NIF_C);
   assert.deepStrictEqual(rel.falhados.map(function (f) { return f.supplierId + ':' + f.motivo; }), ['sE:429 quota'], 'erro do Azure a meio: fila continua');
+  assert.strictEqual(rel.falhados[0].rateLimit, false, 'erro sem status 429 não é rate limit');
   assert.ok(rel.manuais.some(function (m) { return m.supplierId === 'sF' && /2 NIFs candidatos/.test(m.motivo); }), '2 candidatos sem desempate → manual');
   assert.ok(!('nif' in store.suppliers.sF), 'nada gravado na ficha do sF');
   assert.deepStrictEqual(aprendidos.sort(), ['sA', 'sB', 'sH'], 'aprender só com NIF determinado (sem alias no sF)');
@@ -157,6 +164,84 @@ NB.executar(plano, deps).then(function (rel) {
   }).then(function (rel3) {
     assert.strictEqual(rel3.parado, true);
     assert.strictEqual(rel3.gravados.length, 2, 'os 2 primeiros ficaram gravados');
-    console.log('testa-nif-backfill: OK');
+  }).then(function () {
+    // ===== Rate limit do Azure F0 (Set/2026) =====
+    function planoUm(sid, nome, fid) { return { semCusto: [], releitura: [{ supplierId: sid, nome: nome, fatura: { id: fid } }], manuais: [], totalSemNif: 1 }; }
+    function depsRL(respostas, opts) {
+      var sup = { s1: { nome: 'Um' }, s2: { nome: 'Dois' } };
+      var esp = [], progresso = [], chamadas = 0;
+      var d = {
+        sleep: function (ms) { esp.push(ms); return Promise.resolve(); },
+        getSuppliers: function () { return sup; },
+        lerArquivo: function () { return Promise.resolve('data:image/jpeg;base64,QUJD'); },
+        dataUrlParaFile: deps.dataUrlParaFile,
+        ler: function (file) {
+          var r = respostas[chamadas++];
+          // Os erros vêm do realm do vm: instanceof Error falha; decide-se pelo status.
+          if (r && typeof r.status === 'number') return Promise.reject(r);
+          return Promise.resolve(r);
+        },
+        gravarNif: function () { return Promise.resolve(); },
+        aprender: function (sid) { sup[sid].nif = NIF_B; return Promise.resolve(); },
+        onProgresso: function (p) { progresso.push(p); }
+      };
+      return { deps: Object.assign(d, opts || {}), esperas: esp, progresso: progresso, chamadas: function () { return chamadas; }, sup: sup };
+    }
+    var ok = { nif: NIF_B, nifCandidatos: [NIF_B], nifOrigem: 'etiqueta' };
+
+    // 429 duas vezes, sucesso à terceira → gravado, 1 página, esperas 2 s e 5 s.
+    var t1 = depsRL([GF.erroHttp('HTTP 429', 429, null), GF.erroHttp('HTTP 429', 429, null), ok]);
+    return NB.executar(planoUm('s1', 'Um', 'fx'), t1.deps).then(function (r) {
+      assert.strictEqual(r.gravados.length, 1, '429×2 + sucesso → gravado');
+      assert.strictEqual(r.falhados.length, 0);
+      assert.strictEqual(r.paginasAzure, 1, '1 página, não 3');
+      assert.deepStrictEqual(t1.esperas, [2000, 5000], 'backoff 2 s, 5 s');
+      var esp = t1.progresso.filter(function (p) { return p.fase === 'espera'; });
+      assert.deepStrictEqual(esp.map(function (p) { return p.segundos + ':' + p.tentativa; }), ['2:2', '5:3'], 'progresso honesto durante a espera');
+
+      // 429 nas 4 tentativas → falhado com o motivo certo, 0 páginas, fila continua.
+      var e429 = function () { return GF.erroHttp('HTTP 429', 429, null); };
+      var t2 = depsRL([e429(), e429(), e429(), e429(), ok]);
+      var plano2 = { semCusto: [], releitura: [{ supplierId: 's1', nome: 'Um', fatura: { id: 'fx' } }, { supplierId: 's2', nome: 'Dois', fatura: { id: 'fy' } }], manuais: [], totalSemNif: 2 };
+      return NB.executar(plano2, t2.deps).then(function (r2) {
+        assert.deepStrictEqual(r2.falhados.map(function (f) { return f.supplierId + ':' + f.motivo + ':' + f.rateLimit; }), ['s1:' + NB.MOTIVO_429 + ':true']);
+        assert.strictEqual(r2.gravados.length, 1, 'fila continuou para s2');
+        assert.strictEqual(r2.paginasAzure, 1, 's1 não conta páginas');
+        assert.strictEqual(t2.chamadas(), 5, '4 tentativas + 1');
+        assert.deepStrictEqual(t2.esperas, [2000, 5000, 12000, 2000], '3 esperas de backoff, depois a pausa entre alvos');
+        var rep = NB.planoRepetir(r2);
+        assert.deepStrictEqual(rep.releitura.map(function (a) { return a.supplierId + ':' + a.fatura.id; }), ['s1:fx'], 'planoRepetir só com os 429');
+
+        // Retry-After manda, com tecto de 60 s.
+        var t3 = depsRL([GF.erroHttp('HTTP 429', 429, '7'), GF.erroHttp('HTTP 429', 429, '300'), ok]);
+        return NB.executar(planoUm('s1', 'Um', 'fx'), t3.deps).then(function (r3) {
+          assert.strictEqual(r3.gravados.length, 1);
+          assert.deepStrictEqual(t3.esperas, [7000, 60000], 'Retry-After 7 s; 300 s cortado a 60 s');
+
+          // 403 → falha imediata, sem repetições.
+          var t4 = depsRL([GF.erroHttp('HTTP 403', 403, null), ok]);
+          return NB.executar(planoUm('s1', 'Um', 'fx'), t4.deps).then(function (r4) {
+            assert.strictEqual(t4.chamadas(), 1, '403 não repete');
+            assert.strictEqual(r4.falhados.length, 1);
+            assert.strictEqual(r4.falhados[0].rateLimit, false);
+            assert.strictEqual(r4.paginasAzure, 0);
+            assert.deepStrictEqual(t4.esperas, [], 'sem esperas');
+
+            // 429 esgotado no polling (dentro do analyzeInvoice) → não se volta a submeter.
+            var eEsg = GF.erroHttp('HTTP 429', 429, null); eEsg.esgotado = true;
+            var t5 = depsRL([eEsg, ok]);
+            return NB.executar(planoUm('s1', 'Um', 'fx'), t5.deps).then(function (r5) {
+              assert.strictEqual(t5.chamadas(), 1, 'polling esgotado não reinicia a análise');
+              assert.strictEqual(r5.falhados[0].rateLimit, true);
+              // Política partilhada
+              assert.strictEqual(GF.esperaRetry429(GF.erroHttp('x', 429, null), 4), null, 'esgota à 4.ª');
+              assert.strictEqual(GF.esperaRetry429(GF.erroHttp('x', 500, null), 1), null, 'só 429');
+              assert.strictEqual(GF.esperaRetry429(GF.erroHttp('x', 429, '1.5'), 1), 1500, 'Retry-After decimal');
+              console.log('testa-nif-backfill: OK');
+            });
+          });
+        });
+      });
+    });
   });
 }).catch(function (e) { console.error(e); process.exit(1); });

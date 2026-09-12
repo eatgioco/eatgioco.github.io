@@ -2317,7 +2317,16 @@ window.addEventListener('load', function () {
       return;
     }
 
+    await correrFilaNifs(plano);
+  }
+
+  // Corre uma fila (a inicial ou a dos falhados por 429) com pausas de 2 s entre
+  // alvos e retry com backoff no 429 — tudo dentro do gioco-nif-backfill.js; aqui
+  // só se desenha o progresso, incluindo as esperas do rate limit.
+  async function correrFilaNifs(plano) {
     backfillACorrer = true; backfillParar = false;
+    reconNifsBtn.disabled = true;
+    reconNifsParar.disabled = false;
     reconNifsParar.style.display = '';
     reconNifsProg.style.display = 'flex';
     reconNifsProgBar.style.width = '0%';
@@ -2332,7 +2341,10 @@ window.addEventListener('load', function () {
         gravarNif: function (id, campos) { return faturasRef.child(id).update(campos); },
         aprender: aprenderFornecedor,
         onProgresso: function (p) {
-          reconNifsProgTxt.textContent = (p.fase === 'ler' ? 'A ler ' : 'A gravar ') + p.indice + ' de ' + p.total + ' — ' + p.nome;
+          var pos = p.indice + ' de ' + p.total + ' — ' + p.nome;
+          if (p.fase === 'espera') reconNifsProgTxt.textContent = 'A aguardar limite do Azure — nova tentativa em ' + p.segundos + 's (' + pos + ')';
+          else if (p.fase === 'pausa') reconNifsProgTxt.textContent = 'Pausa de ' + p.segundos + 's entre pedidos ao Azure (' + pos + ')';
+          else reconNifsProgTxt.textContent = (p.fase === 'ler' ? 'A ler ' : 'A gravar ') + pos;
           reconNifsProgBar.style.width = Math.round((p.indice - 1) / p.total * 100) + '%';
         },
         deveParar: function () { return backfillParar; }
@@ -2355,8 +2367,22 @@ window.addEventListener('load', function () {
     if (rel.falhados.length) html += 'Falharam (não repetido automaticamente):<ul>' + rel.falhados.map(function (f) { return '<li class="falha">' + escapeHtml(f.nome) + ' — ' + escapeHtml(f.motivo) + '</li>'; }).join('') + '</ul>';
     if (rel.saltados.length) html += 'Saltados (já tinham NIF): ' + escapeHtml(nomes(rel.saltados)) + '<br>';
     if (rel.manuais.length) html += 'Não foi possível determinar — preencher à mão em compras.html:<ul>' + rel.manuais.map(function (m) { return '<li>' + escapeHtml(m.nome) + ' — ' + escapeHtml(m.motivo) + '</li>'; }).join('') + '</ul>';
+    var planoRep = NB.planoRepetir(rel);
+    if (planoRep.releitura.length) {
+      html += '<button type="button" class="btn-small" id="reconNifsRepetir">Repetir falhados (' + planoRep.releitura.length + ')</button>';
+    }
     reconNifsRel.innerHTML = html;
     reconNifsRel.style.display = 'block';
+    var btnRep = document.getElementById('reconNifsRepetir');
+    if (btnRep) {
+      btnRep.addEventListener('click', function () {
+        if (backfillACorrer) return;
+        var n = planoRep.releitura.length;
+        if (!confirm(n + (n === 1 ? ' fornecedor falhou' : ' fornecedores falharam') + ' pelo limite de pedidos do Azure (F0, ~1 pedido/s). Repetir só esses, com pausas entre pedidos?\n\nCusto: até ' + n + (n === 1 ? ' página' : ' páginas') + ' da quota Azure F0 (500/mês).\n' + nomes(planoRep.releitura) + '\n\nContinuar?')) return;
+        reconNifsRel.style.display = 'none';
+        correrFilaNifs(planoRep);
+      });
+    }
     showStatus('Preenchimento de NIFs: ' + rel.gravados.length + ' gravado(s), ' + rel.falhados.length + ' falhado(s).', rel.falhados.length ? 'error' : '');
   }
 
