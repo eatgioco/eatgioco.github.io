@@ -3080,25 +3080,84 @@
       corpo, botoesVista('diaSemana', VISTAS_BARRAS, vista));
   }
 
+  /* Top produtos: três vistas sobre o MESMO payload (Produtos | Subcategorias
+     | Categorias). A troca não lê o Firebase: agrega em memória as linhas de
+     p.produtos, somando qtd e valor. Os campos são os que construirPayload()
+     grava em cada linha de produto — `categoria` e `subcategoria` (esta pode
+     ser null) — iguais em vendas/{mes} e vendasDiario/{mes}/{dia}. Uma linha
+     sem valor agrupa em "Sem categoria" / "Sem subcategoria": nunca sai do
+     total. Função PURA, exposta em window.__vendas para verificação. */
+  var SEM_CATEGORIA = 'Sem categoria';
+  var SEM_SUBCATEGORIA = 'Sem subcategoria';
+  var VISTAS_TOP = [
+    { id:'produtos',      icone:'Produtos',      titulo:'Uma linha por produto' },
+    { id:'subcategorias', icone:'Subcategorias', titulo:'Produtos agregados por subcategoria' },
+    { id:'categorias',    icone:'Categorias',    titulo:'Produtos agregados por categoria' }
+  ];
+
+  function agregarTopProdutos(prods, nivel){
+    prods = prods || {};
+    var mapa = {};
+    Object.keys(prods).forEach(function(k){
+      var src = prods[k] || {};
+      var cat = src.categoria || SEM_CATEGORIA;
+      var sub = src.subcategoria || SEM_SUBCATEGORIA;
+      var chave, nome;
+      if (nivel === 'categorias'){ chave = cat; nome = cat; }
+      else { chave = cat + '\u00a6' + sub; nome = sub; }
+      var d = mapa[chave] || (mapa[chave] = { key:chave, desc:nome, categoria:cat,
+                                              subcategoria: nivel === 'categorias' ? null : sub,
+                                              qtd:0, valor:0, produtos:0 });
+      d.qtd += Number(src.qtd) || 0;
+      d.valor += Number(src.valor) || 0;
+      d.produtos += 1;
+    });
+    return Object.keys(mapa).map(function(k){
+      var d = mapa[k];
+      d.pvpMedio = d.qtd ? d.valor / d.qtd : 0;
+      return d;
+    });
+  }
+
+  function vistaTopDe(){
+    var v = estado.vistasGrafico.topProdutos;
+    return (v === 'subcategorias' || v === 'categorias') ? v : 'produtos';
+  }
+
   function vistaProdutos(p){
     var prods = p.produtos || {};
-    var lista = Object.keys(prods).map(function(k){
-      return { key:k, desc:prods[k].desc, categoria:prods[k].categoria,
-               subcategoria:prods[k].subcategoria || null,
-               qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0,
-               pvpMedio:Number(prods[k].pvpMedio) || 0 };
-    });
+    var nivel = vistaTopDe();
+    var lista;
+    if (nivel === 'produtos'){
+      lista = Object.keys(prods).map(function(k){
+        return { key:k, desc:prods[k].desc, categoria:prods[k].categoria,
+                 subcategoria:prods[k].subcategoria || null,
+                 qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0,
+                 pvpMedio:Number(prods[k].pvpMedio) || 0 };
+      });
+    } else {
+      lista = agregarTopProdutos(prods, nivel);
+    }
     var campo = estado.ordemProdutos;
     lista.sort(function(a, b){ return b[campo] - a[campo]; });
 
     var totalValor = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
 
     var linhas = lista.slice(0, 60).map(function(x, i){
-      return '<tr>' +
-        '<td class="num" style="color:var(--muted);">' + (i + 1) + '</td>' +
-        '<td>' + esc(x.desc) + '</td>' +
-        '<td><span class="tag">' + esc(x.categoria || 'Outro') + '</span></td>' +
-        '<td style="font-size:12px;color:var(--muted);">' + (x.subcategoria ? esc(x.subcategoria) : '—') + '</td>' +
+      var celulas = '<td class="num" style="color:var(--muted);">' + (i + 1) + '</td>';
+      if (nivel === 'produtos'){
+        celulas += '<td>' + esc(x.desc) + '</td>' +
+          '<td><span class="tag">' + esc(x.categoria || 'Outro') + '</span></td>' +
+          '<td style="font-size:12px;color:var(--muted);">' + (x.subcategoria ? esc(x.subcategoria) : '—') + '</td>';
+      } else if (nivel === 'subcategorias'){
+        celulas += '<td>' + esc(x.desc) + '</td>' +
+          '<td><span class="tag">' + esc(x.categoria) + '</span></td>' +
+          '<td class="num">' + intFmt(x.produtos) + '</td>';
+      } else {
+        celulas += '<td>' + esc(x.desc) + '</td>' +
+          '<td class="num">' + intFmt(x.produtos) + '</td>';
+      }
+      return '<tr>' + celulas +
         '<td class="num">' + dec(x.qtd, 0) + '</td>' +
         '<td class="num">' + eur(x.valor) + '</td>' +
         '<td class="num">' + (totalValor ? dec(x.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
@@ -3106,14 +3165,25 @@
         '</tr>';
     }).join('');
 
-    return seccao('Top produtos', lista.length + ' produtos vendidos. Clica nos cabeçalhos para ordenar (mostra os 60 primeiros).',
+    var cabecalho;
+    if (nivel === 'produtos') cabecalho = '<th>Produto</th><th>Categoria</th><th>Subcategoria</th>';
+    else if (nivel === 'subcategorias') cabecalho = '<th>Subcategoria</th><th>Categoria</th><th class="num">Produtos</th>';
+    else cabecalho = '<th>Categoria</th><th class="num">Produtos</th>';
+
+    var sub;
+    if (nivel === 'produtos') sub = lista.length + ' produtos vendidos. Clica nos cabeçalhos para ordenar (mostra os 60 primeiros).';
+    else if (nivel === 'subcategorias') sub = lista.length + ' subcategorias com venda (soma dos produtos de cada uma; sem subcategoria atribuída agrupa em "' + SEM_SUBCATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
+    else sub = lista.length + ' categorias com venda (soma dos produtos de cada uma; sem categoria atribuída agrupa em "' + SEM_CATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
+
+    return seccao('Top produtos', sub,
       '<div class="table-wrap"><table><thead><tr>' +
-        '<th class="num">#</th><th>Produto</th><th>Categoria</th><th>Subcategoria</th>' +
+        '<th class="num">#</th>' + cabecalho +
         '<th class="num sortable' + (campo === 'qtd' ? ' sorted' : '') + '" data-ordem="qtd">Qtd ↓</th>' +
         '<th class="num sortable' + (campo === 'valor' ? ' sorted' : '') + '" data-ordem="valor">Valor ↓</th>' +
         '<th class="num">% do total</th>' +
         '<th class="num">PVP médio</th>' +
-      '</tr></thead><tbody>' + linhas + '</tbody></table></div>');
+      '</tr></thead><tbody>' + linhas + '</tbody></table></div>',
+      botoesVista('topProdutos', VISTAS_TOP, nivel));
   }
 
   function vistaConcentracao(p){
@@ -3998,6 +4068,8 @@
     renderVistas: renderVistas,
     giocoAcumuladoHoras: giocoAcumuladoHoras,
     vistaHoras: vistaHoras,
+    vistaProdutos: vistaProdutos,
+    agregarTopProdutos: agregarTopProdutos,
     temSuportePasta: temSuportePasta,
     estado: estado
   };
