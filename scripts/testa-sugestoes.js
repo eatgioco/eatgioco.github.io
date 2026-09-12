@@ -50,17 +50,39 @@ assert.ok(S.promptPassos('x', new Array(6000).join('a')).length < S.promptPassos
 var C = require('../gioco-contexto.js');
 var bloco = C.texto();
 assert.ok(bloco.indexOf('CONTEXTO DO NEGÓCIO') === 0 && bloco.indexOf('Rua de São Bento 154') > 0 && bloco.indexOf('518717186') > 0);
-C.DADOS.equipa.forEach(function (p) { assert.ok(bloco.indexOf(p.nome) > 0, 'equipa no bloco: ' + p.nome); });
-assert.ok(bloco.indexOf('ÚNICO decisor') > 0);
-// os TRÊS prompts começam pelo bloco de negócio — sem duplicar nomes no gioco-sugestoes.js
+assert.ok(bloco.indexOf('Tribo Poética Unipessoal Lda.') > 0 && bloco.indexOf('2026') > 0 && bloco.indexOf('fase inicial') > 0);
+assert.ok(bloco.indexOf('fundador e o ÚNICO decisor') > 0 && bloco.indexOf('hierarquia') > 0);
+assert.strictEqual(C.DADOS.equipa, undefined, 'o contexto não tem equipa');
+// os TRÊS prompts começam pelo bloco de negócio
 [S.promptPassos('x'), S.promptPassos('x', 'ctx'), S.promptAtualizacao('x', 'ctx', { abertos: [] }), S.promptClassificarLocal(['a'])].forEach(function (pr) {
   assert.strictEqual(pr.indexOf(bloco), 0, 'prompt começa pelo bloco de negócio');
-  assert.ok(pr.indexOf('Alfredo Giangaspero') > 0 && pr.indexOf('Leonor Borges') > 0);
 });
-assert.strictEqual(require('fs').readFileSync(__dirname + '/../gioco-sugestoes.js', 'utf8').indexOf('Giangaspero'), -1, 'nomes da equipa só no gioco-contexto.js');
+// SEM NOMES DE PESSOAS (12/09/2026): nem no contexto nem no módulo de sugestões pode
+// aparecer um nome próprio de pessoa — a única excepção é "Manel" (fundador e decisor).
+// Duas redes: (a) lista de nomes que já lá estiveram; (b) heurística "Nome Apelido"
+// (duas palavras capitalizadas seguidas) fora de uma allow-list de nomes de coisas.
+(function () {
+  var fs = require('fs');
+  var ficheiros = ['gioco-contexto.js', 'gioco-sugestoes.js'];
+  var proibidos = /\b(Alfredo|Giangaspero|Mattia|Pivetta|Leonor|Borges|Reym[aã]o)\b/;
+  var coisas = /^(Rua de São|São Bento|Tribo Poética|Poética Unipessoal|Unipessoal Lda|Quota do Gemini|Google Gemini|AI Studio|Head of|Sem Firebase|Gemini API|Google AI)$/i;
+  ficheiros.forEach(function (f) {
+    var t = fs.readFileSync(__dirname + '/../' + f, 'utf8');
+    assert.strictEqual(t.search(proibidos), -1, 'nome de pessoa em ' + f);
+    var pares = t.match(/\b[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{2,}\s+(?:d[aeo]s?\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{2,}\b/g) || [];
+    var suspeitos = pares.filter(function (p) { return !coisas.test(p.replace(/\s+/g, ' ')); });
+    assert.deepStrictEqual(suspeitos, [], 'possível nome de pessoa em ' + f + ' (acrescentar à allow-list se for coisa)');
+  });
+  // o "Manel" é permitido só como decisor, no contexto
+  assert.ok(/\bManel\b/.test(fs.readFileSync(__dirname + '/../gioco-contexto.js', 'utf8')));
+})();
+// a regra do papel genérico está nos dois prompts de passos
+[S.promptPassos('x'), S.promptAtualizacao('x', '', { abertos: [] })].forEach(function (pr) {
+  assert.ok(pr.indexOf('PAPEL GENÉRICO') > 0 && pr.indexOf('NUNCA inventes nomes') > 0, 'regra do papel genérico');
+});
 // regras do bom passo nos dois prompts de passos, não no de local
 assert.strictEqual(S.MAX_PASSOS, 8);
-['VERIFICÁVEL', 'antes de decidir', 'passo PRÓPRIO', 'PRIMEIRO passo', 'nome real', 'complexidade REAL'].forEach(function (r) {
+['VERIFICÁVEL', 'antes de decidir', 'passo PRÓPRIO', 'PRIMEIRO passo', 'PAPEL GENÉRICO', 'complexidade REAL'].forEach(function (r) {
   assert.ok(S.promptPassos('x').indexOf(r) > 0, 'regra na sugestão: ' + r);
   assert.ok(S.promptAtualizacao('x', '', { abertos: [] }).indexOf(r) > 0, 'regra na atualização: ' + r);
 });

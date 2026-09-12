@@ -30,15 +30,19 @@
 
    CONTEXTO DE NEGÓCIO (Set/2026): TODOS os prompts (passos, atualização e local)
    começam pelo bloco do gioco-contexto.js (GiocoContexto.texto(): o que é a
-   GIOCO, entidade legal, equipa com papéis, Manel único decisor). É a FONTE ÚNICA
-   — nada da equipa está escrito aqui. Carregar gioco-contexto.js antes deste
-   ficheiro (em Node é um require). Sem ele, lança ao carregar: um prompt sem
-   equipa era exactamente o problema que isto resolve.
+   GIOCO, morada, entidade legal, fase inicial, Manel fundador e único decisor).
+   É a FONTE ÚNICA e NÃO tem equipa: nem aqui nem lá há nomes, papéis ou
+   funções de pessoas (12/09/2026 — uma lista de equipa desatualiza-se, e
+   contexto errado é pior que ausente; o testa-sugestoes.js falha se um nome
+   próprio aparecer nos dois módulos). Carregar gioco-contexto.js antes deste
+   ficheiro (em Node é um require). Sem ele, lança ao carregar.
    REGRAS DE UM BOM PASSO (Set/2026, nos prompts de passos e de atualização):
    estado final verificável ("obter Y", não "tratar de X"); recolher informação
    antes de decidir com base nela; esperas por terceiros são passos próprios com o
-   nome da pessoa; o 1.º passo é executável hoje sem depender de nada nem de
-   ninguém; nomes reais da equipa; o número de passos segue a complexidade real
+   entidade pelo papel; o 1.º passo é executável hoje sem depender de nada nem
+   de ninguém; terceiros pelo PAPEL GENÉRICO (o responsável da loja, o
+   fornecedor, o senhorio, a câmara), nunca nomes inventados — um nome só quando
+   o Manel o escreve no contexto; o número de passos segue a complexidade real
    (4 simples … 8 complexo, nunca sempre o mesmo), tecto MAX_PASSOS = 8 — listas
    maiores paralisam, que é o problema que a ferramenta existe para resolver.
 
@@ -114,7 +118,7 @@
   var DEF_LOCAIS = "'loja' = presencial na loja (Rua de São Bento 154); 'computador' = trabalho ao ecrã; " +
     "'telefone' = ligar ou falar com alguém à distância; 'rua' = fora, deslocação a terceiros; null quando não for claro.";
 
-  // Fonte única do contexto de negócio (equipa, papéis, entidade legal): gioco-contexto.js.
+  // Fonte única do contexto de negócio (o que é a GIOCO, entidade legal, decisor): gioco-contexto.js. Sem nomes de equipa.
   var Contexto = (typeof window !== 'undefined' && window.GiocoContexto) ? window.GiocoContexto
     : (typeof require === 'function' ? require('./gioco-contexto.js') : null);
   if (!Contexto || typeof Contexto.texto !== 'function') throw new Error('gioco-sugestoes.js: carregar gioco-contexto.js antes');
@@ -124,9 +128,9 @@
     'REGRAS DE UM BOM PASSO (obrigatórias):\n' +
     '1. Cada passo tem um estado final VERIFICÁVEL — não "tratar de X" mas "obter Y", "ter Z aprovado", "enviar W a alguém".\n' +
     '2. Recolher informação vem SEMPRE antes de decidir com base nela (primeiro "obter orçamentos", só depois "decidir fornecedor").\n' +
-    '3. Uma espera por terceiros (resposta, entrega, aprovação) é um passo PRÓPRIO, com o nome da pessoa ou entidade quando se souber quem é.\n' +
+    '3. Uma espera por terceiros (resposta, entrega, aprovação) é um passo PRÓPRIO, que diz de quem se espera (pelo papel).\n' +
     '4. O PRIMEIRO passo tem de ser executável HOJE, pelo Manel, sem depender de nada nem de ninguém.\n' +
-    '5. Quando um passo envolve alguém da equipa, usa o nome real da pessoa certa para essa área (ver CONTEXTO DO NEGÓCIO); o Manel decide, os outros executam ou informam.\n' +
+    '5. Quando um passo depende de outra pessoa, descreve-a pelo PAPEL GENÉRICO (o responsável da loja, o fornecedor, o senhorio, a câmara) e NUNCA inventes nomes. Se o contexto escrito pelo Manel mencionar alguém, usa esse nome.\n' +
     '6. O número de passos segue a complexidade REAL do projeto: um simples pode ter 4, um complexo até ' + MAX_PASSOS + '. Nunca devolvas sempre o mesmo número e nunca mais de ' + MAX_PASSOS + '.\n' +
     '7. Cada passo é UMA ação única que cabe numa sessão de trabalho, com a duração estimada em minutos; título curto e direto, em português de Portugal, a começar por um verbo.\n';
 
