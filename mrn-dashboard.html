@@ -462,6 +462,12 @@
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:12px;font-weight:700;line-height:22px;text-align:center;
   }
+  /* Cartão Obrigações: as 3 próximas ações reutilizam .cc-linhas; o valor
+     da linha é o projeto/prazo, à direita. Vencida a vermelho (texto). */
+  .card-obrigacoes .cc-linha-label{ color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .card-obrigacoes .cc-linha-valor{ color:var(--muted);flex:0 0 auto;font-size:11.5px; }
+  .card-obrigacoes .cc-linha-valor.vencida{ color:var(--red-ink);font-weight:700; }
+  .card-obrigacoes .obr-parados{ color:var(--red-ink);font-weight:600; }
   .cc-linhas{ margin:12px 0 0;padding:0;list-style:none; }
   .cc-linha{
     display:flex;justify-content:space-between;gap:10px;
@@ -2063,6 +2069,7 @@
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
 <script src="gioco-caixa.js"></script>
+<script src="gioco-obrigacoes.js"></script>
 <script src="gioco-correspondencia.js"></script>
 <script src="gioco-eventos.js"></script>
 
@@ -2247,6 +2254,18 @@
       <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-calendar"/></svg></div>
       <h3 class="card-title">Calendário</h3>
       <p class="card-subtitle" id="cardCalendarioSub">—</p>
+    </a>
+
+    <!-- Obrigações (obrigacoes.html, Fase 1). Página pessoal do Manel: este
+         cartão e a nav 'privada' são os ÚNICOS pontos de entrada — nunca no
+         index nem na nav pública. Só leitura de obrigacoes/ e projetos/; o
+         cálculo (próxima ação, parados > 14 dias) é do gioco-obrigacoes.js. -->
+    <a class="card glass-light card-compact card-obrigacoes" id="cardObrigacoes" href="obrigacoes.html">
+      <span class="cc-badge" id="obrBadge" hidden>0</span>
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-clipboard-check"/></svg></div>
+      <h3 class="card-title">Obrigações</h3>
+      <p class="card-subtitle" id="obrSub">A carregar…</p>
+      <ul class="cc-linhas" id="obrLinhas" hidden></ul>
     </a>
 
     <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
@@ -2672,6 +2691,53 @@ window.addEventListener('load', function () {
     }
     if (pedidosCarregados) renderPedidosDash();
   });
+  // obrigacoes/ + projetos/ (cartão Obrigações): só leitura. Abertas, projetos
+  // parados > 14 dias e as 3 próximas ações — a mesma vista da obrigacoes.html,
+  // calculada pelo gioco-obrigacoes.js. Mostrar 3 e CONTAR o resto: nunca
+  // esconder uma aberta sem dizer quantas ficam de fora.
+  var obrigacoesRef = db.ref('obrigacoes');
+  var projetosRef = db.ref('projetos');
+  var obrigacoesDash = null, projetosDash = null;
+  function renderObrigacoesDash() {
+    if (obrigacoesDash === null || projetosDash === null) return;
+    var G = window.GiocoObrigacoes;
+    var sub = document.getElementById('obrSub');
+    var ul = document.getElementById('obrLinhas');
+    var badge = document.getElementById('obrBadge');
+    if (!G || !sub || !ul) return;
+    var hoje = G.hojeISO();
+    var v = G.vistaProximaAcao(obrigacoesDash, projetosDash, hoje);
+    var partes = [v.totalAbertas + (v.totalAbertas === 1 ? ' aberta' : ' abertas')];
+    if (v.parados.length) partes.push('<span class="obr-parados">' + v.parados.length + (v.parados.length === 1 ? ' projeto parado' : ' projetos parados') + ' há mais de ' + G.LIMITE_PARADO_DIAS + ' dias</span>');
+    else partes.push('nenhum projeto parado há mais de ' + G.LIMITE_PARADO_DIAS + ' dias');
+    sub.innerHTML = partes.join(' · ');
+    if (badge) { badge.textContent = v.totalAbertas; badge.hidden = v.totalAbertas === 0; }
+    var proximas = v.projetos.concat(v.soltas);
+    proximas = G.ordenar(proximas, hoje);
+    var tres = proximas.slice(0, 3);
+    var html = tres.map(function (x) {
+      var o = x.obr;
+      var dir = '', cls = '';
+      if (o.prazo) {
+        var n = G.diasEntre(o.prazo, hoje);
+        dir = n > 0 ? 'vencida há ' + n + 'd' : n === 0 ? 'hoje' : 'prazo ' + o.prazo.slice(8, 10) + '/' + o.prazo.slice(5, 7);
+        cls = n >= 0 ? ' vencida' : '';
+      } else if (x.projeto) {
+        dir = x.diasParado > 0 ? 'parado há ' + x.diasParado + 'd' : x.projeto.nome;
+      } else dir = (o.duracaoPrevista || 30) + ' min';
+      var label = (x.projeto ? escapeHtml(x.projeto.nome) + ': ' : '') + escapeHtml(o.titulo);
+      return '<li class="cc-linha"><span class="cc-linha-label" title="' + label + '">' + label + '</span><span class="cc-linha-valor' + cls + '">' + escapeHtml(dir) + '</span></li>';
+    });
+    // O resto conta TODAS as abertas que não estão nas 3 linhas (passos seguintes
+    // dos projetos e bloqueados incluídos): o cartão nunca esconde sem contar.
+    var resto = v.totalAbertas - tres.length;
+    if (resto > 0) html.push('<li class="cc-linha"><span class="cc-linha-label" style="color:var(--muted)">+' + resto + ' outras abertas</span><span class="cc-linha-valor">→ Ver todas</span></li>');
+    ul.innerHTML = html.join('');
+    ul.hidden = html.length === 0;
+  }
+  obrigacoesRef.on('value', function (snapshot) { obrigacoesDash = snapshot.val() || {}; renderObrigacoesDash(); });
+  projetosRef.on('value', function (snapshot) { projetosDash = snapshot.val() || {}; renderObrigacoesDash(); });
+
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
