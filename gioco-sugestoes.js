@@ -21,6 +21,19 @@
        dependência fora do intervalo ou a si próprio → null.
    promptPassos(nomeProjeto, contexto?) → o texto do pedido (PURA, exportada para os testes).
 
+   LOCAL (Set/2026): cada passo sugerido e cada passo acrescentado traz também
+   local ∈ LOCAIS = 'loja' | 'computador' | 'rua' | 'telefone' | null (null = em
+   qualquer sítio / não é claro). normalizarLocal(v) aceita só esses quatro; tudo
+   o resto é null. O Manel nunca escolhe o local à mão por obrigação — é sempre
+   pré-preenchido e ele corrige quando está errado.
+   classificarLocal(titulos, opts?) → Promise<{ locais:[local|null…], modelo }>,
+       UM pedido para N títulos (as linhas coladas de uma vez vão juntas), pela
+       mesma cadeia. promptClassificarLocal(titulos) e
+       normalizarLocais(texto, titulos) são PURAS: a resposta casa por título
+       (normalizado) e, se não bater, por posição; sem entrada → null. A lista
+       devolvida tem SEMPRE o tamanho de titulos. Em caso de dúvida null, nunca
+       adivinhar — está no prompt e a normalização não inventa.
+
    ATUALIZAÇÃO INCREMENTAL (Set/2026) — para um projeto que JÁ tem passos:
    sugerirAlteracoes(nomeProjeto, { contexto, abertos, concluidos, anulados, ... })
        → Promise<{ alteracoes, modelo }>. Mesma chave, mesma cadeia de modelos e
@@ -74,6 +87,10 @@
   var MAX_PASSOS = 12;
   var MAX_CONTEXTO = 4000;
   var DURACAO_DEFAULT = 30;
+  var LOCAIS = ['loja', 'computador', 'rua', 'telefone'];
+  function normalizarLocal(v) { v = String(v === null || v === undefined ? '' : v).trim().toLowerCase(); return LOCAIS.indexOf(v) >= 0 ? v : null; }
+  var DEF_LOCAIS = "'loja' = presencial na loja (Rua de São Bento 154); 'computador' = trabalho ao ecrã; " +
+    "'telefone' = ligar ou falar com alguém à distância; 'rua' = fora, deslocação a terceiros; null quando não for claro.";
 
   function limparContexto(c) { return String(c === null || c === undefined ? '' : c).trim().slice(0, MAX_CONTEXTO); }
 
@@ -94,9 +111,37 @@
       'Cada passo é UMA ação única que cabe numa sessão de trabalho, com a duração estimada em minutos. ' +
       'Inclui explicitamente passos de decisão e de verificação legal/administrativa quando aplicável. ' +
       'Escreve em português de Portugal, títulos curtos e diretos (começam por um verbo).\n' +
+      'Para cada passo indica onde se faz, em "local": ' + DEF_LOCAIS + ' Em caso de dúvida null, nunca adivinhar.\n' +
       'Responde APENAS com JSON, sem preâmbulo nem backticks, exatamente neste formato:\n' +
-      '[{"titulo":"...","duracaoPrevista":30,"dependeDePasso":null}]\n' +
+      '[{"titulo":"...","duracaoPrevista":30,"dependeDePasso":null,"local":"loja"}]\n' +
       'dependeDePasso = índice 0-based do passo de que depende, ou null.';
+  }
+
+  function promptClassificarLocal(titulos) {
+    var lista = (titulos || []).map(function (t, i) { return (i + 1) + '. ' + tituloDe(t); });
+    return 'Contexto: a GIOCO é uma focacciaria italiana de balcão em Lisboa (Rua de São Bento 154). ' +
+      'Para cada obrigação abaixo, diz ONDE se faz: ' + DEF_LOCAIS + '\n' +
+      'Obrigações:\n' + lista.join('\n') + '\n' +
+      'Responde APENAS com JSON, sem preâmbulo nem backticks, um item por obrigação pela mesma ordem, exatamente neste formato:\n' +
+      '[{"titulo":"...","local":"loja"}]\n' +
+      'Em caso de dúvida devolve null em "local", nunca adivinhes.';
+  }
+
+  function chaveTitulo(t) { return tituloDe(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); }
+
+  function normalizarLocais(texto, titulos) {
+    titulos = titulos || [];
+    var dados;
+    try { dados = extrairJson(texto, '[', ']'); } catch (e) { dados = null; }
+    if (!Array.isArray(dados)) throw erroDe('resposta', 'A resposta do modelo não é uma lista');
+    var itens = dados.filter(function (x) { return x && typeof x === 'object'; });
+    var porTitulo = {};
+    itens.forEach(function (x) { var k = chaveTitulo(x.titulo); if (k && !(k in porTitulo)) porTitulo[k] = normalizarLocal(x.local); });
+    return titulos.map(function (t, i) {
+      var k = chaveTitulo(t);
+      if (k in porTitulo) return porTitulo[k];
+      return itens[i] ? normalizarLocal(itens[i].local) : null;
+    });
   }
 
   function tituloDe(x) { return String(x && typeof x === 'object' ? (x.titulo || '') : (x || '')).replace(/\s+/g, ' ').trim(); }
@@ -124,7 +169,8 @@
       'contexto; (4) se nada mudar, devolve as três listas vazias; (5) cada passo novo é uma ação única que cabe numa sessão de trabalho, ' +
       'com duração em minutos; "depoisDe" é o id do passo aberto a seguir ao qual entra, ou null para o fim.\n' +
       'Responde APENAS com JSON, sem preâmbulo nem backticks, exatamente neste formato:\n' +
-      '{"acrescentar":[{"titulo":"...","duracaoPrevista":30,"depoisDe":"<id de passo aberto ou null>","porque":"..."}],' +
+      'Cada passo em "acrescentar" traz também "local": ' + DEF_LOCAIS + '\n' +
+      '{"acrescentar":[{"titulo":"...","duracaoPrevista":30,"depoisDe":"<id de passo aberto ou null>","local":"loja","porque":"..."}],' +
       '"remover":[{"id":"...","porque":"..."}],"alterar":[{"id":"...","titulo":"...","duracaoPrevista":30,"porque":"..."}]}';
   }
 
@@ -172,7 +218,7 @@
       var t = tituloDe(x).slice(0, 200);
       if (!t) return;
       var dep = (x.depoisDe !== null && x.depoisDe !== undefined && porId[String(x.depoisDe)] && vistos[String(x.depoisDe)] !== 'remover') ? String(x.depoisDe) : null;
-      acrescentar.push({ titulo: t, duracaoPrevista: dur(x.duracaoPrevista) || DURACAO_DEFAULT, depoisDe: dep, porque: porque(x) });
+      acrescentar.push({ titulo: t, duracaoPrevista: dur(x.duracaoPrevista) || DURACAO_DEFAULT, depoisDe: dep, local: normalizarLocal(x.local), porque: porque(x) });
     });
     return { acrescentar: acrescentar, remover: remover, alterar: alterar };
   }
@@ -206,7 +252,7 @@
       if (!titulo) { mapa.push(null); return; }
       var d = parseInt(p.duracaoPrevista, 10);
       mapa.push(passos.length);
-      passos.push({ titulo: titulo, duracaoPrevista: d > 0 ? d : DURACAO_DEFAULT, _dep: p.dependeDePasso });
+      passos.push({ titulo: titulo, duracaoPrevista: d > 0 ? d : DURACAO_DEFAULT, local: normalizarLocal(p.local), _dep: p.dependeDePasso });
     });
     passos.forEach(function (p, i) {
       var d = p._dep;
@@ -301,6 +347,15 @@
     });
   }
 
+  function classificarLocal(titulos, opts) {
+    opts = opts || {};
+    var lista = (titulos || []).map(tituloDe);
+    if (!lista.length || !lista.some(Boolean)) return Promise.resolve({ locais: lista.map(function () { return null; }), modelo: null });
+    return pedirAoModelo(promptClassificarLocal(lista), opts).then(function (r) {
+      return { locais: normalizarLocais(r.texto, lista), modelo: r.modelo };
+    });
+  }
+
   function sugerirAlteracoes(nomeProjeto, opts) {
     opts = opts || {};
     var nome = String(nomeProjeto || '').trim();
@@ -318,6 +373,11 @@
     apagarChave: apagarChave,
     CHAVE_STORAGE: CHAVE_STORAGE,
     sugerirAlteracoes: sugerirAlteracoes,
+    classificarLocal: classificarLocal,
+    normalizarLocais: normalizarLocais,
+    promptClassificarLocal: promptClassificarLocal,
+    normalizarLocal: normalizarLocal,
+    LOCAIS: LOCAIS,
     normalizarPassos: normalizarPassos,
     normalizarAlteracoes: normalizarAlteracoes,
     promptPassos: promptPassos,
