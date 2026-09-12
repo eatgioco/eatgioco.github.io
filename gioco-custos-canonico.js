@@ -95,8 +95,9 @@
      mês, do anterior ou do seguinte (ANTI-DUPLICAÇÃO — pagamentos atravessam
      meses). Rubrica: override de classificacaoMovimentos > regra mais longa
      de classificacaoRegras > 'impostos' se o descritivo casar RE_IMPOSTO >
-     ligado a uma linha de paymentRequests: prestadores → pessoal, senão a
-     categoria do fornecedor da linha (procurado por nome em suppliers);
+     RE_BANCO_PESSOAL (subash|adiantamento|prestador — sem "mattia" nem
+     "prestação": ficam porValidar) > ligado a uma linha de paymentRequests:
+     RE_BANCO_PESSOAL → pessoal, senão a categoria do fornecedor da linha (procurado por nome em suppliers);
      sem ficha ou sem categoria → porValidar > senão rubrica null e
      porValidar. 'fixos' NUNCA vem por via de fornecedor.
    - classificacaoDespesas/{ALIMENTAR,BEBIDAS,PACKAGING,SERVICOS}: a única
@@ -125,12 +126,22 @@ function giocoCustosCanonicoEngine(deps){
 
   // As mesmas regex da resultados.html (decisão da auditoria): prestadores
   // e adiantamentos pagos pela caixa / por pedido são pessoal, não compras.
-  var RE_CAIXA_PESSOAL = /subash|mattia|adiantamento|prestador|presta[cç][aã]o/i;   // caixa E banco residual
-  var RE_PRESTADOR     = /mattia|subash/i;
+  // CAIXA: o motivo é escrito por quem lança e é fiável — mantém os quatro termos de sempre.
+  var RE_CAIXA_PESSOAL = /subash|mattia|adiantamento|prestador/i;
+  // BANCO (residuais e linhas de pedido ligadas): SEM "mattia" e SEM "prestação" (Set/2026,
+  // revertido): um pagamento bancário ao Mattia pode ser margem (cmv) ou consultoria
+  // (outros) e o descritivo não distingue — fica porValidar até o Manel validar, e a
+  // regra aprendida trata das seguintes. "subash" é o único nome de rubrica fixa.
+  var RE_BANCO_PESSOAL = /subash|adiantamento|prestador/i;
   var RE_IMPOSTO = /PAG\.TSU|PAG\.DUC|IMP\.SELO|PAGAMENTO POR CONTA|\bIVA\b|\bIRC\b|\bIUC\b|AUTORIDADE TRIBUT/i;
   var RE_INTERNA = /INTERNA/i;
 
   var TSU_TAXA_PATRONAL = (deps.compromissos && deps.compromissos.TSU_TAXA_PATRONAL) || 0.2375;
+  // As parcelas conta/cartão de um recibo vêm SEMPRE do gioco-compromissos.js
+  // (partesDoRecibo: valor lido, senão derivado de totais.liquido) — nunca
+  // reimplementadas aqui. É por isso que o motor exige uma instância do CE.
+  if (!deps.compromissos || typeof deps.compromissos.partesDoRecibo !== 'function') throw new Error('gioco-custos-canonico.js precisa de deps.compromissos (giocoCompromissosEngine) com partesDoRecibo');
+  var partesDoRecibo = deps.compromissos.partesDoRecibo;
   var ocorrenciaPaga = (typeof giocoPagamentosEngine === 'function' && giocoPagamentosEngine.ocorrenciaPaga) ||
     function(reg){ return !!reg && reg.anulado !== true; };
 
@@ -140,9 +151,15 @@ function giocoCustosCanonicoEngine(deps){
   /* ---------- helpers ---------- */
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
   function arred(v){ var n = Number(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; }
+  // Números já gravados como number passam intactos. Strings em formato
+  // português ("2.062,50": ponto de milhares, vírgula decimal) e "2062.50"
+  // (ponto decimal) são ambas aceites — antes "2.062,50" lia-se como 2,062.
   function num(v){
     if (v === null || v === undefined || v === '') return null;
-    var n = parseFloat(String(v).replace(',', '.'));
+    if (typeof v === 'number') return isNaN(v) ? null : v;
+    var t = String(v).trim().replace(/\s/g, '');
+    if (t.indexOf(',') !== -1) t = t.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(t);
     return isNaN(n) ? null : n;
   }
   function centimos(v){ var n = num(v); return n === null ? null : Math.round(Math.abs(n) * 100); }
@@ -312,12 +329,19 @@ function giocoCustosCanonicoEngine(deps){
      posterior substitui-a na regeneração seguinte (a real tem sempre
      prioridade: o movimento nem entra na cascata).
        N1 valor exacto (cêntimos) contra recibos (pagamento.conta e
-          pagamento.cartao, separados) e compromissos do mês; consumo único.
+          pagamento.cartao, separados — valor lido quando > 0, senão o
+          derivado de totais.liquido por partesDoRecibo() do
+          gioco-compromissos.js, que o motor exige em deps.compromissos) e
+          compromissos do mês; consumo único.
           Só liga com EXACTAMENTE um alvo com esse valor — com vários,
           desce aos níveis seguintes (o nome desambigua) e, se nada
           resolver, fica porValidar com o motivo. Faturas não entram.
        N2 nome do compromisso (normalizado) como substring do descritivo E
-          valor igual. Nome sem valor a bater não liga.
+          valor igual. Nome sem valor a bater não liga — EXCEPTO nos
+          compromissos valorVariavel (decisão do Manel): aí basta o nome, o
+          valor do registo passa a ser o do movimento, consumo único por mês;
+          dois variáveis a casar o mesmo descritivo, ou o mesmo variável a
+          casar dois movimentos → nenhum liga, porValidar com o motivo.
        N3 família pelo descritivo (CARTAO/CARTOES REFEICAO → cartões dos
           recibos; SAL/SALARIO → contas dos recibos) e valor = soma de um
           subconjunto dos alvos livres da família → liga a todos; mais do
@@ -383,15 +407,18 @@ function giocoCustosCanonicoEngine(deps){
     var alvos = [], rs = g('getRecibos'), cs = g('getCompromissos');
     Object.keys(rs).forEach(function(pid){
       var r = rs[pid] && rs[pid][mes];
-      if (!r || !r.pagamento) return;
+      if (!r) return;
+      r = Object.assign({}, r, { pagamento: r.pagamento || {} });
       var partes = { conta: null, cartao: null };
       compromissosDaPessoa(pid).forEach(function(cid){
         var c = cs[cid.replace(/~cartao$/, '')] || {};
         var parte = /~cartao$/.test(cid) ? 'cartao' : (c.parteRecibo || 'conta');
         if (ligacao('fixo:' + cid + '_' + periodoSemZero(mes))) partes[parte] = 'ligado';
       });
+      var derivadas = partesDoRecibo(r) || {};
       ['conta', 'cartao'].forEach(function(parte){
-        var c = centimos(r.pagamento[parte]);
+        // valor explícito em pagamento quando > 0; senão o derivado de totais.liquido pelo CE
+        var c = centimos(r.pagamento[parte]) || centimos(derivadas[parte]);
         if (!c || partes[parte] === 'ligado') return;
         alvos.push({ key: 'rec:' + pid + '|' + parte, cents: c, familia: parte, nome: null, consumido: false });
       });
@@ -404,8 +431,9 @@ function giocoCustosCanonicoEngine(deps){
       var orcado = (c.valorDiario !== null && c.valorDiario !== undefined && c.valorDiario !== '')
         ? diasUteis(mes) * (num(c.valorDiario) || 0) : (num(c.valor) || 0);
       var cents = centimos(orcado);
-      if (!cents) return;
-      alvos.push({ key: 'fixo:' + id, cents: cents, familia: 'compromisso', nome: normalizar(c.nome), consumido: false });
+      var variavel = c.valorVariavel === true;
+      if (!cents && !variavel) return;
+      alvos.push({ key: 'fixo:' + id, cents: cents || 0, familia: 'compromisso', nome: normalizar(c.nome), variavel: variavel, consumido: false });
     });
     return alvos;
   }
@@ -437,22 +465,32 @@ function giocoCustosCanonicoEngine(deps){
     if (memoInfer[mes]) return memoInfer[mes];
     var res = { porMovimento: {}, alvos: {}, ambiguos: {}, linhaPedido: {} };
     memoInfer[mes] = res;
-    var alvos = alvosDoMes(mes), pedidos = alvosPayReq();
+    var alvos = alvosDoMes(mes), pedidos = alvosPayReq(), movs = movimentosResiduais(mes);
     function ligar(m, lista, nivel){
       res.porMovimento[m.id] = { nivel: nivel, alvos: lista.map(function(a){ return a.key; }) };
       lista.forEach(function(a){
         a.consumido = true;
         if (a.total) pedidos.forEach(function(x){ if (x.pedido === a.pedido) x.consumido = true; });
-        var reg = res.alvos[a.key] || (res.alvos[a.key] = { movimentoIds: [], nivel: nivel, data: m.data });
-        if (reg.movimentoIds.indexOf(m.id) === -1) reg.movimentoIds.push(m.id);
+        var reg = res.alvos[a.key] || (res.alvos[a.key] = { movimentoIds: [], nivel: nivel, data: m.data, cents: 0 });
+        if (reg.movimentoIds.indexOf(m.id) === -1){ reg.movimentoIds.push(m.id); reg.cents += m.cents; }
         if (m.data > reg.data) reg.data = m.data;
       });
     }
-    movimentosResiduais(mes).forEach(function(m){
+    // N2 variável: quantos movimentos do mês casam o nome de cada compromisso de
+    // valor variável — mais do que um é ambiguidade nos dois sentidos.
+    var casamVar = {};
+    alvos.forEach(function(a){ if (a.variavel && a.nome) casamVar[a.key] = movs.filter(function(m){ return m.descN.indexOf(a.nome) !== -1; }).map(function(m){ return m.id; }); });
+    movs.forEach(function(m){
       var c1 = alvos.filter(function(a){ return !a.consumido && a.cents === m.cents; });
       if (c1.length === 1) return ligar(m, c1, 1);
-      var c2 = c1.filter(function(a){ return a.familia === 'compromisso' && a.nome && m.descN.indexOf(a.nome) !== -1; });
-      if (c2.length === 1) return ligar(m, c2, 2);
+      // N2: fixos com nome no descritivo E valor igual; variáveis só com o nome (valor do registo = o do movimento)
+      var c2 = c1.filter(function(a){ return a.familia === 'compromisso' && !a.variavel && a.nome && m.descN.indexOf(a.nome) !== -1; });
+      var c2var = alvos.filter(function(a){ return !a.consumido && a.variavel && a.nome && m.descN.indexOf(a.nome) !== -1; });
+      var varAmb = c2var.filter(function(a){ return casamVar[a.key].length > 1; });
+      c2 = c2.concat(c2var.filter(function(a){ return casamVar[a.key].length === 1; }));
+      if (c2.length === 1 && !varAmb.length) return ligar(m, c2, 2);
+      if (c2.length + varAmb.length > 1){ res.ambiguos[m.id] = 'ambíguo (N2): ' + (c2.length + varAmb.length) + ' compromissos casam o descritivo (' + c2.concat(varAmb).map(function(a){ return a.key; }).join(', ') + ')'; return; }
+      if (varAmb.length === 1){ res.ambiguos[m.id] = 'ambíguo (N2): o compromisso ' + varAmb[0].key + ' casa com ' + casamVar[varAmb[0].key].length + ' movimentos do mês'; return; }
       var fam = RE_FAM_CARTAO.test(m.descN) ? 'cartao' : (RE_FAM_SAL.test(m.descN) ? 'conta' : null);
       if (fam){
         var livres = alvos.filter(function(a){ return !a.consumido && a.familia === fam; });
@@ -582,18 +620,21 @@ function giocoCustosCanonicoEngine(deps){
       var nome = (r.pessoa && r.pessoa.nome) || pid;
       var pag = juntarPagamentos(compromissosDaPessoa(pid).map(function(cid){ return pagamentoDeOcorrencia(cid, mes); }));
       var inf = inferir(mes).alvos, partes = 0, cobertas = 0;
+      var derivadas = partesDoRecibo(r) || {};
       ['conta', 'cartao'].forEach(function(parte){
-        if (!(r.pagamento && centimos(r.pagamento[parte]))) return;
+        if (!((r.pagamento && centimos(r.pagamento[parte])) || centimos(derivadas[parte]))) return;
         partes++;
         if (aplicarInferido(pag, inf['rec:' + pid + '|' + parte]) || pag.estado === 'pago') cobertas++;
       });
       if (partes && cobertas === partes) pag.estado = 'pago';
+      var semParcelas = !partes;
       out.push(base({
         id: 'rec:' + pid, origem: 'recibo', origemRef: 'recibos/' + pid + '/' + mes, mes: mes, data: ultimoDia(mes),
         valor: suj + nsuj, rubrica: 'pessoal', despesa: nome,
         entidade: { tipo: 'pessoa', id: pid, nome: nome },
         pagamento: pag,
-        motivo: (suj + nsuj) > 0 ? null : 'recibo sem totais'
+        motivo: (suj + nsuj) > 0 ? null : 'recibo sem totais',
+        rasto: semParcelas ? 'recibo sem parcelas conta/cartão nem líquido — o banco não consegue ligar-se a ele' : null
       }));
     });
     if (baseTsu > 0){
@@ -621,7 +662,8 @@ function giocoCustosCanonicoEngine(deps){
       var pag = pagamentoDeOcorrencia(id, mes);
       var valor = (pag.valorMovimento !== undefined && pag.valorMovimento > 0) ? pag.valorMovimento : orcado;
       delete pag.valorMovimento;
-      if (!pag.movimentoIds.length && aplicarInferido(pag, inferir(mes).alvos['fixo:' + id])) pag.estado = 'pago';
+      var infC = inferir(mes).alvos['fixo:' + id];
+      if (!pag.movimentoIds.length && aplicarInferido(pag, infC)){ pag.estado = 'pago'; if (infC.cents) valor = infC.cents / 100; }
       if (!(valor > 0)) return;   // 0 € não é custo do mês
       var dia = parseInt(c.dia, 10);
       var ud = ultimoDia(mes), nd = parseInt(ud.slice(8), 10);
@@ -671,7 +713,7 @@ function giocoCustosCanonicoEngine(deps){
       var despesa = cls ? cls.despesa : null;
       var motivo = null, rasto = null;
       // Prestadores / adiantamentos no descritivo → pessoal (a mesma regex da caixa), abaixo de override e regra.
-      if (!cls && RE_CAIXA_PESSOAL.test(desc + ' ' + (m.creditor_name || ''))){ cls = { rubrica: 'pessoal' }; despesa = m.creditor_name || desc; }
+      if (!cls && RE_BANCO_PESSOAL.test(desc + ' ' + (m.creditor_name || ''))){ cls = { rubrica: 'pessoal' }; despesa = m.creditor_name || desc; }
       if (!cls){
         var pr = linhaPayReq(recPorMov[id] || '') || (inf.linhaPedido[id] ? { linha: inf.linhaPedido[id] } : null);
         if (pr){
@@ -681,7 +723,7 @@ function giocoCustosCanonicoEngine(deps){
           var nomeL = pr.linha.fornecedor || '';
           var fr = fornecedorPorNome(nomeL);
           ent = { tipo: 'fornecedor', id: fr ? fr.id : null, nome: nomeL || desc };
-          if (RE_PRESTADOR.test(nomeL)){ cls = { rubrica: 'pessoal' }; despesa = nomeL; }
+          if (RE_BANCO_PESSOAL.test(nomeL)){ cls = { rubrica: 'pessoal' }; despesa = nomeL; }
           else {
             var catB = fr ? categoriaFornecedor(fr.s) : { rubrica: null, despesa: null, motivo: 'fornecedor "' + (nomeL || desc) + '" sem ficha em suppliers' };
             if (catB.rubrica){ cls = { rubrica: catB.rubrica }; despesa = catB.despesa; rasto = catB.rasto || null; }
@@ -868,7 +910,7 @@ function giocoCustosCanonicoEngine(deps){
 
   return {
     RUBRICAS: RUBRICAS, ORIGENS: ORIGENS, TSU_TAXA_PATRONAL: TSU_TAXA_PATRONAL,
-    RE_CAIXA_PESSOAL: RE_CAIXA_PESSOAL, RE_IMPOSTO: RE_IMPOSTO,
+    RE_CAIXA_PESSOAL: RE_CAIXA_PESSOAL, RE_BANCO_PESSOAL: RE_BANCO_PESSOAL, RE_IMPOSTO: RE_IMPOSTO,
     CATEGORIAS_FORNECEDOR: CATEGORIAS_FORNECEDOR, categoriaFornecedor: categoriaFornecedor,
     inferir: inferir, gerar: gerar, regenerar: regenerar, validar: validar, atualizarResumo: atualizarResumo, garantirDespesas: garantirDespesas,
     resumoDe: resumoDe, mesVizinho: mesVizinho, diasUteis: diasUteis, ultimoDia: ultimoDia

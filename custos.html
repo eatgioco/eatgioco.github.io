@@ -24,6 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-pagamentos.js"></script>
+<script src="gioco-compromissos.js"></script>
 <script src="gioco-custos-canonico.js"></script>
 
 <style>
@@ -391,7 +392,16 @@ document.addEventListener('DOMContentLoaded', function(){
                movimentos: { abanca: v[6], revolut: v[7] }, reconciliacao: v[8], suppliers: v[9], regras: v[10], overrides: v[11] };
       custosMes = v[12];
       base.despesas = v[13];
+      // Instância do motor dos compromissos só para partesDoRecibo/TSU (sem UI própria aqui).
+      var CE = giocoCompromissosEngine({
+        getCompromissos: function(){ return base.compromissos; },
+        getRecibos: function(){ return base.recibos; },
+        getPessoas: function(){ return {}; },
+        formatEuro: formatEuro, parseMontante: function(m){ var n = parseFloat(String(m == null ? '' : m).replace(',', '.')); return isNaN(n) ? 0 : n; },
+        MESES_PT: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+      });
       CC = giocoCustosCanonicoEngine({
+        compromissos: CE,
         getFaturas: function(){ return base.faturas; },
         getCaixaMovimentos: function(){ return base.caixa; },
         getRecibos: function(){ return base.recibos; },
