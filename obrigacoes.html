@@ -101,6 +101,17 @@
   .sug-linha select{ padding:6px 8px; border:1.5px solid var(--line); border-radius:100px; background:var(--white); font:inherit; font-size:11.5px; color:var(--ink); max-width:190px; }
   .sug-linha .b.icone{ margin-left:auto; }
   .sug-acoes{ display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
+  /* Atualização incremental: alterações propostas, agrupadas por tipo, com checkbox */
+  .atz-grupo{ margin-top:12px; }
+  .atz-grupo-t{ font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:0 0 6px; }
+  .atz-item{ display:flex; gap:10px; align-items:flex-start; padding:9px 10px; background:var(--white); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; color:var(--ink); font-size:13.5px; cursor:pointer; }
+  .atz-item input[type="checkbox"]{ margin:3px 0 0; width:16px; height:16px; flex-shrink:0; accent-color:var(--red); }
+  .atz-item .t{ font-weight:600; }
+  .atz-item .de{ color:var(--muted); text-decoration:line-through; font-weight:500; }
+  .atz-item .porque{ display:block; margin-top:3px; font-size:12.5px; color:var(--muted); }
+  .atz-item .meta{ font-size:12px; color:var(--muted); }
+  .atz-item.desmarcada{ opacity:.55; }
+  .atz-nada{ margin-top:10px; padding:12px 14px; border:1px dashed var(--line); border-radius:10px; font-size:13.5px; color:var(--muted); }
   .sug-spin{ display:inline-block; width:12px; height:12px; border:2px solid var(--line); border-top-color:var(--red); border-radius:50%; animation:sugspin .8s linear infinite; vertical-align:-2px; }
   @keyframes sugspin{ to{ transform:rotate(360deg); } }
 
@@ -359,6 +370,19 @@
           <button type="button" class="b" id="sugRepetir">Pedir outra sugestão</button>
           <button type="button" class="b" id="sugCancelar">Cancelar</button>
           <span id="sugInfo"></span>
+        </div>
+      </div>
+      <!-- Atualização incremental: o modelo propõe ALTERAÇÕES aos passos que faltam.
+           Nada é gravado até «Aplicar»; cada alteração tem checkbox (ativa por omissão). -->
+      <div class="sug-box" id="atzBox">
+        <div class="sug-head" id="atzHead"></div>
+        <div class="sug-erro" id="atzErro" style="display:none;"></div>
+        <div id="atzLista"></div>
+        <div class="sug-acoes" id="atzAcoes">
+          <button type="button" class="btn-add" id="atzAplicar">Aplicar alterações</button>
+          <button type="button" class="b" id="atzRepetir">Pedir outra proposta</button>
+          <button type="button" class="b" id="atzCancelar">Cancelar</button>
+          <span id="atzInfo"></span>
         </div>
       </div>
     </div>
@@ -802,7 +826,11 @@
     $('projSub').textContent = 'Criado ' + fmtDataHora(p.criadoEm) + ' · último avanço ' + fmtDataHora(p.ultimoAvancoEm) +
       ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
     $('projDecomporBtn').style.display = ativo ? '' : 'none';
+    // Com passos, a ação principal é ATUALIZAR (propor alterações aos que faltam);
+    // «Sugerir passos» (lista nova) só num projeto ainda sem passos.
     $('projSugerirBtn').style.display = ativo ? '' : 'none';
+    $('projSugerirBtn').dataset.modo = passos.length ? 'atualizar' : 'sugerir';
+    $('projSugerirBtn').innerHTML = icone('sparkles') + (passos.length ? ' Atualizar passos' : ' Sugerir passos');
     // Contexto: só se substitui o texto quando NÃO está a ser editado (o snapshot
     // chega a cada escrita e pisaria o que o Manel está a escrever).
     var ta = $('ctxTexto');
@@ -899,12 +927,14 @@
   var sugProjeto = null;      // projeto a que a sugestão pertence (mudar de projeto descarta-a)
   var S = window.GiocoSugestoes;
 
+  var aposChave = null;     // o que voltar a pedir depois de guardar a chave (sugestão ou atualização)
   function fecharSugestao() {
     sugLinhas = null; sugProjeto = null; sugPedido++;
     $('sugBox').classList.remove('on');
     $('sugLista').innerHTML = '';
     $('sugErro').style.display = 'none';
     $('sugInfo').textContent = '';
+    fecharAtualizacao();
   }
   function sugEstado(aCarregar, erro, pedirChave) {
     $('sugAcoes').style.display = aCarregar ? 'none' : '';
@@ -914,18 +944,28 @@
     var e = $('sugErro');
     if (erro) { e.innerHTML = '<b>Sem sugestão automática.</b> ' + escapeHtml(erro) + '<br><span style="color:var(--muted);font-size:12.5px">' + (pedirChave ? 'Cola a chave abaixo, ou escreve os passos à mão com «Decompor».' : 'Podes tentar de novo ou escrever os passos à mão com «Decompor».') + '</span>'; e.style.display = ''; }
     else e.style.display = 'none';
-    $('sugChave').style.display = pedirChave ? '' : 'none';
-    if (pedirChave) $('sugChaveInput').value = '';
+    mostrarChave(pedirChave, $('sugErro'), pedirSugestao);
+  }
+  // A caixa da chave é uma só e vai para a caixa que a pediu (sugestão ou atualização).
+  function mostrarChave(mostrar, depoisDe, callback) {
+    var c = $('sugChave');
+    c.style.display = mostrar ? '' : 'none';
+    if (!mostrar) return;
+    aposChave = callback;
+    depoisDe.insertAdjacentElement('afterend', c);
+    $('sugChaveInput').value = '';
   }
   $('sugChaveGuardar').addEventListener('click', function () {
     if (!S.guardarChave($('sugChaveInput').value)) { $('sugChaveInput').focus(); return; }
-    pedirSugestao();
+    $('sugChave').style.display = 'none';
+    if (aposChave) aposChave();
   });
   $('sugChaveInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); $('sugChaveGuardar').click(); } });
   function pedirSugestao() {
     var pid = projetoAberto; var p = projs[pid];
     if (!p || !S) return;
     $('decomporBox').classList.remove('on');
+    fecharAtualizacao();
     sugLinhas = null; sugProjeto = pid;
     var meu = ++sugPedido;
     $('sugBox').classList.add('on');
@@ -1014,7 +1054,175 @@
   });
   $('sugRepetir').addEventListener('click', function () { pedirSugestao(); });
   $('sugCancelar').addEventListener('click', fecharSugestao);
-  $('projSugerirBtn').addEventListener('click', function () { pedirSugestao(); });
+  $('projSugerirBtn').addEventListener('click', function () {
+    if ($('projSugerirBtn').dataset.modo === 'atualizar') pedirAtualizacao(); else pedirSugestao();
+  });
+
+  /* ---------- Atualizar passos (proposta incremental) ----------
+     Envia nome + contexto + abertos (com id) + concluídos + anulados e recebe SÓ
+     alterações (GiocoSugestoes.sugerirAlteracoes). Cada uma fica com checkbox,
+     ativa por omissão; só «Aplicar» grava, e só as marcadas:
+       acrescentar → criarObrigacao (sugerida:true, dependeDe = [depoisDe]) + ordem
+                     recalculada (um set() na folha ordem só onde muda);
+       alterar     → update() em obrigacoes/{id} só com os campos propostos;
+       remover     → NUNCA remove(): update({estado:'anulada', anulado:true,
+                     anuladoEm, anuladoPorSugestao:true}).
+     Um concluído nunca é tocado: o normalizarAlteracoes do módulo já descarta
+     qualquer id que não seja de um passo aberto, e aqui volta-se a verificar. */
+  var atzProposta = null;   // {acrescentar, remover, alterar} em aprovação, ou null
+  var atzProjeto = null;
+  function fecharAtualizacao() {
+    atzProposta = null; atzProjeto = null;
+    $('atzBox').classList.remove('on');
+    $('atzLista').innerHTML = '';
+    $('atzErro').style.display = 'none';
+    $('atzInfo').textContent = '';
+  }
+  function atzEstado(aCarregar, erro, pedirChave) {
+    $('atzAcoes').style.display = aCarregar ? 'none' : '';
+    $('atzAplicar').style.display = (!aCarregar && atzProposta) ? '' : 'none';
+    $('atzRepetir').style.display = pedirChave ? 'none' : '';
+    var e = $('atzErro');
+    if (erro) { e.innerHTML = '<b>Sem proposta de alterações.</b> ' + escapeHtml(erro) + '<br><span style="color:var(--muted);font-size:12.5px">' + (pedirChave ? 'Cola a chave abaixo, ou edita os passos à mão.' : 'Nada foi alterado. Podes tentar de novo ou editar os passos à mão.') + '</span>'; e.style.display = ''; }
+    else e.style.display = 'none';
+    mostrarChave(pedirChave, e, pedirAtualizacao);
+  }
+  function pedirAtualizacao() {
+    var pid = projetoAberto; var p = projs[pid];
+    if (!p || !S) return;
+    $('decomporBox').classList.remove('on');
+    $('sugBox').classList.remove('on'); sugLinhas = null;
+    atzProposta = null; atzProjeto = pid;
+    var meu = ++sugPedido;
+    $('atzBox').classList.add('on');
+    $('atzLista').innerHTML = '';
+    var contexto = contextoAtual();
+    gravarContexto();
+    var passos = G.passosDoProjeto(pid, obrs);
+    var abertos = passos.filter(G.estaAberta).map(function (o) { return { id: o.id, titulo: o.titulo, ordem: o.ordem, duracaoPrevista: o.duracaoPrevista, dependeDe: depsDe(o) }; });
+    var concluidos = passos.filter(function (o) { return o.estado === 'concluida'; }).map(function (o) { return { titulo: o.titulo }; });
+    var anulados = passos.filter(function (o) { return o.anulado === true || o.estado === 'anulada'; }).map(function (o) { return { titulo: o.titulo }; });
+    $('atzHead').innerHTML = '<span class="sug-spin"></span> A pedir uma proposta de alterações para <b>' + escapeHtml(p.nome) + '</b> (' + abertos.length + ' abertos, ' + concluidos.length + ' concluídos)…';
+    atzEstado(true, null, false);
+    S.sugerirAlteracoes(p.nome, { contexto: contexto, abertos: abertos, concluidos: concluidos, anulados: anulados }).then(function (r) {
+      if (meu !== sugPedido) return;
+      var a = r.alteracoes;
+      var n = a.acrescentar.length + a.remover.length + a.alterar.length;
+      if (!n) {
+        atzProposta = null;
+        $('atzHead').innerHTML = 'Proposta para <b>' + escapeHtml(p.nome) + '</b> (' + escapeHtml(r.modelo) + ')';
+        $('atzLista').innerHTML = '<div class="atz-nada">Nada a alterar — os passos abertos continuam de acordo com o contexto.</div>';
+        atzEstado(false, null, false);
+        return;
+      }
+      atzProposta = a;
+      $('atzHead').innerHTML = 'Proposta de <b>' + n + (n === 1 ? ' alteração' : ' alterações') + '</b> (' + escapeHtml(r.modelo) + ') — desmarca o que não queres; nada fica gravado até aplicares.';
+      atzEstado(false, null, false);
+      renderAtualizacao();
+    }, function (e) {
+      if (meu !== sugPedido) return;
+      console.error('Proposta de alterações falhou:', e);
+      $('atzHead').innerHTML = 'Proposta para <b>' + escapeHtml(p.nome) + '</b>';
+      atzEstado(false, (e && e.motivo) ? e.motivo : 'Erro inesperado ao contactar o modelo.', !!(e && (e.codigo === 'semChave' || e.codigo === 'chave')));
+    });
+  }
+  function tituloPasso(id) { var o = obrs[id]; return o ? o.titulo : '(passo desconhecido)'; }
+  function renderAtualizacao() {
+    var a = atzProposta; if (!a) return;
+    var item = function (tipo, i, corpo) {
+      return '<label class="atz-item"><input type="checkbox" checked data-atz="' + tipo + '" data-i="' + i + '"><span>' + corpo + '</span></label>';
+    };
+    var html = '';
+    if (a.acrescentar.length) {
+      html += '<div class="atz-grupo"><p class="atz-grupo-t">Acrescentar (' + a.acrescentar.length + ')</p>' + a.acrescentar.map(function (x, i) {
+        return item('acrescentar', i, '<span class="t">' + escapeHtml(x.titulo) + '</span> <span class="meta num">· ' + x.duracaoPrevista + ' min' +
+          (x.depoisDe ? ' · a seguir a «' + escapeHtml(tituloPasso(x.depoisDe)) + '»' : ' · no fim') + '</span>' +
+          (x.porque ? '<span class="porque">' + escapeHtml(x.porque) + '</span>' : ''));
+      }).join('') + '</div>';
+    }
+    if (a.alterar.length) {
+      html += '<div class="atz-grupo"><p class="atz-grupo-t">Alterar (' + a.alterar.length + ')</p>' + a.alterar.map(function (x, i) {
+        var o = obrs[x.id] || {};
+        var partes = [];
+        if (x.titulo) partes.push('<span class="de">' + escapeHtml(o.titulo) + '</span> → <span class="t">' + escapeHtml(x.titulo) + '</span>');
+        else partes.push('<span class="t">' + escapeHtml(o.titulo) + '</span>');
+        if (x.duracaoPrevista) partes.push('<span class="meta num">' + (o.duracaoPrevista || G.DURACAO_DEFAULT) + ' → ' + x.duracaoPrevista + ' min</span>');
+        return item('alterar', i, partes.join(' ') + (x.porque ? '<span class="porque">' + escapeHtml(x.porque) + '</span>' : ''));
+      }).join('') + '</div>';
+    }
+    if (a.remover.length) {
+      html += '<div class="atz-grupo"><p class="atz-grupo-t">Remover — fica anulado, nunca apagado (' + a.remover.length + ')</p>' + a.remover.map(function (x, i) {
+        return item('remover', i, '<span class="de">' + escapeHtml(tituloPasso(x.id)) + '</span>' + (x.porque ? '<span class="porque">' + escapeHtml(x.porque) + '</span>' : ''));
+      }).join('') + '</div>';
+    }
+    $('atzLista').innerHTML = html;
+    atualizarContagemAplicar();
+  }
+  function selecionadas() {
+    var sel = { acrescentar: [], remover: [], alterar: [] };
+    if (!atzProposta) return sel;
+    Array.prototype.forEach.call($('atzLista').querySelectorAll('input[data-atz]'), function (cb) {
+      if (cb.checked) sel[cb.dataset.atz].push(atzProposta[cb.dataset.atz][parseInt(cb.dataset.i, 10)]);
+    });
+    return sel;
+  }
+  function atualizarContagemAplicar() {
+    var s = selecionadas();
+    var n = s.acrescentar.length + s.remover.length + s.alterar.length;
+    $('atzAplicar').textContent = 'Aplicar ' + n + (n === 1 ? ' alteração' : ' alterações');
+    $('atzAplicar').disabled = !n;
+  }
+  $('atzLista').addEventListener('change', function (ev) {
+    var cb = ev.target; if (!cb.dataset || !cb.dataset.atz) return;
+    cb.closest('.atz-item').classList.toggle('desmarcada', !cb.checked);
+    atualizarContagemAplicar();
+  });
+  $('atzRepetir').addEventListener('click', function () { pedirAtualizacao(); });
+  $('atzCancelar').addEventListener('click', fecharAtualizacao);
+  $('atzAplicar').addEventListener('click', function () {
+    var pid = projetoAberto; if (!pid || !atzProposta || atzProjeto !== pid) return;
+    var sel = selecionadas();
+    var n = sel.acrescentar.length + sel.remover.length + sel.alterar.length;
+    if (!n) return;
+    // Rede de segurança repetida aqui: só passos ABERTOS deste projeto são tocados.
+    var abertoDoProjeto = function (id) { var o = obrs[id]; return !!o && o.projetoId === pid && G.estaAberta(o); };
+    sel.alterar = sel.alterar.filter(function (x) { return abertoDoProjeto(x.id); });
+    sel.remover = sel.remover.filter(function (x) { return abertoDoProjeto(x.id); });
+    $('atzAplicar').disabled = true;
+    $('atzInfo').textContent = 'A aplicar…';
+    var agora = agoraISO();
+    var seq = Promise.resolve();
+    sel.alterar.forEach(function (x) {
+      var campos = {};
+      if (x.titulo) campos.titulo = x.titulo;
+      if (x.duracaoPrevista) campos.duracaoPrevista = x.duracaoPrevista;
+      seq = seq.then(function () { return obrigacoesRef.child(x.id).update(campos); });
+    });
+    sel.remover.forEach(function (x) {
+      seq = seq.then(function () { return obrigacoesRef.child(x.id).update({ estado: 'anulada', anulado: true, anuladoEm: agora, anuladoPorSugestao: true }); });
+    });
+    // Acrescentar: posição a seguir ao passo âncora (ou no fim), com a ordem de
+    // TODOS os passos recalculada 1..n e escrita só onde mudou (como em mover()).
+    var atuais = G.passosDoProjeto(pid, obrs).map(function (o) { return { id: o.id, ordem: o.ordem, novo: null }; });
+    sel.acrescentar.forEach(function (x) {
+      var reg = { id: null, ordem: null, novo: x };
+      var k = x.depoisDe ? atuais.map(function (r) { return r.id; }).lastIndexOf(x.depoisDe) : -1;
+      // Novos com a mesma âncora entram pela ordem em que vieram, um a seguir ao outro.
+      if (k >= 0) { var j = k + 1; while (j < atuais.length && atuais[j].novo && atuais[j].novo.depoisDe === x.depoisDe) j++; atuais.splice(j, 0, reg); }
+      else atuais.push(reg);
+    });
+    atuais.forEach(function (r, i) {
+      var ordem = i + 1;
+      if (r.novo) {
+        seq = seq.then(function () { return criarObrigacao(r.novo.titulo, pid, ordem, r.novo.duracaoPrevista, { dependeDe: r.novo.depoisDe ? [r.novo.depoisDe] : null, sugerida: true }); });
+      } else if (r.ordem !== ordem) {
+        seq = seq.then(function () { return obrigacoesRef.child(r.id).child('ordem').set(ordem); });
+      }
+    });
+    seq.then(function () { return marcarAvanco(pid); })
+      .then(function () { fecharAtualizacao(); })
+      .catch(function (e) { erroEscrita(e); $('atzAplicar').disabled = false; $('atzInfo').textContent = 'Falhou a meio — verifica os passos antes de repetir.'; });
+  });
   $('sugCriar').addEventListener('click', function () {
     var pid = projetoAberto; if (!pid || !sugLinhas || sugProjeto !== pid) return;
     lerSugestaoDoDom();
