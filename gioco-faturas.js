@@ -10,8 +10,9 @@
 
    API:
      GiocoFaturas.ler(file)
-       → Promise<{ fornecedorTexto, montante, referencia, data, prazoPagamento, linhas,
-                   nif (string|null), nifCandidatos (string[]) }>
+       → Promise<{ fornecedorTexto, montante, referencia, data, prazoPagamento, linhas
+                   (cada uma com unidade, unidadeBruta, embalagem), nif (string|null),
+                   nifCandidatos (string[]), nifOrigem, paginas (número|null), multiPagina (bool) }>
      GiocoFaturas.analyzeInvoice(file)            → Promise<analyzeResult> (bruto do Azure)
      GiocoFaturas.fieldText / fieldDateIso / fieldAmount / extrairLinhas
      GiocoFaturas.fileToBase64 / fileToDataUrl / compressImageDataUrl
@@ -22,11 +23,16 @@
                                                     cliente em TODAS as faturas; nunca é candidato)
      GiocoFaturas.soDigitos(s)                    → só os dígitos da string
      GiocoFaturas.nifValido(n)                    → 9 dígitos, 1.º ∈ {1,2,3,5,6,8,9}, check digit mod 11
+     GiocoFaturas.limparContentParaNifs(content) → texto sem IBANs, ATCUD, EANs (10+ dígitos)
      GiocoFaturas.extrairNifs(analyzeResult, fields)
-       → { nif: string|null, candidatos: string[] } — VendorTaxId primeiro; depois
-         varre analyzeResult.content (rótulo NIF/NIPC/Contribuinte/VAT/PT + 9 dígitos,
-         e por fim qualquer \b\d{9}\b), valida, exclui o NIF_PROPRIO, dedupe por ordem.
-         Sem VendorTaxId válido e com exactamente 1 candidato → esse é o nif.
+       → { nif, candidatos, origem } — origem ∈ 'vendorTaxId' | 'etiqueta' | 'pt' |
+         'generico' | null, pela ordem de prioridade documentada na função. Só as três
+         primeiras são de confiança para gravar numa ficha (nifOrigemConfiavel()).
+     GiocoFaturas.normalizarUnidade(u)            → { unidade, unidadeBruta } (bx/box/cx→cx;
+                                                    pc/pç/pcs/uni/un/und→un; mo→mo; em→emb; …)
+     GiocoFaturas.inferirUnidadeDaDescricao(desc) → { unidade, tamanhoEmbalagem, unidadesPorCaixa } | null
+                                                    (multiplicador "x" ou "*", nas duas ordens)
+     GiocoFaturas.detetarMultiPagina(paginas, content)
      GiocoFaturas.findMatchingSupplierDetalhe(vendorName, allSuppliers, {nif, nifCandidatos})
        → { id, via: 'nif' | 'nome' | null }. Ordem: (1) NIF — soDigitos(supplier.nif)
          contra nif e cada candidato, primeiro acerto ganha; (2) nome — substring do
@@ -94,37 +100,120 @@
     return check === parseInt(d.charAt(8), 10);
   }
 
-  // Devolve { nif, candidatos }. Ambos os inputs podem faltar (ficheiro sem texto,
-  // tenant que não devolve VendorTaxId): aí é { nif:null, candidatos:[] }.
+  // Limpeza do texto ANTES de qualquer procura de NIF (Set/2026, contra faturas
+  // reais): sem isto, "PT50 0035 0325 0001 3261 130 97" (IBAN CGD) dava 500035032,
+  // que PASSA no dígito de controlo. Tira IBANs (PT50 e forma genérica), as linhas
+  // de ATCUD / programa certificado / Nº Interno e os números de 10+ dígitos
+  // seguidos (EANs de artigo). Exportada para teste.
+  function limparContentParaNifs(content) {
+    var t = String(content || "");
+    t = t.replace(/\bPT\s?50[\s\d]{19,30}/gi, " ");
+    t = t.replace(/\b[A-Z]{2}\d{2}(?:\s?\d){10,30}\b/g, " ");
+    t = t.replace(/^.*(?:ATCUD|Processado por programa certificado|N[ºo°.]?\s*Interno).*$/gim, " ");
+    t = t.replace(/\d{10,}/g, " ");
+    return t;
+  }
+
+  // Origens em que o NIF principal é de confiança suficiente para ser GRAVADO numa
+  // ficha sem mais confirmação. 'generico' (única sequência de 9 dígitos solta) e
+  // null só sugerem. 'manual' nunca sai de extrairNifs(): é a leitura-faturas.html
+  // que o põe quando o NIF foi escrito à mão no modal de edição.
+  var NIF_ORIGENS_CONFIAVEIS = ['vendorTaxId', 'etiqueta', 'pt', 'manual'];
+  function nifOrigemConfiavel(origem) { return NIF_ORIGENS_CONFIAVEIS.indexOf(origem) !== -1; }
+
+  // Devolve { nif, candidatos, origem }. Ambos os inputs podem faltar (ficheiro sem
+  // texto, tenant que não devolve VendorTaxId): aí é { nif:null, candidatos:[], origem:null }.
+  // PRIORIDADE do principal (pára no primeiro nível com um NIF válido ≠ NIF_PROPRIO):
+  //   1. VendorTaxId do Azure                                 → 'vendorTaxId'
+  //   2. etiqueta forte (N/Contribuinte, Contribuinte, NIPC, NIF, N.I.F., VAT) NÃO
+  //      precedida de "V/" (V/Contribuinte é o cliente = nós)  → 'etiqueta'
+  //   3. "PT" COLADO a 9 dígitos (PT516179934; nunca "PT " + espaço, que apanhava IBANs) → 'pt'
+  //   4. passagem genérica \b\d{9}\b com EXACTAMENTE 1 candidato → 'generico'
+  //   5. null, com todos os válidos em candidatos.
+  // Dentro de um nível ganha o que aparece MAIS CEDO no content (o bloco do emissor
+  // vem sempre antes do rodapé, onde vive o NIF do licenciado do software).
   function extrairNifs(analyzeResult, fields) {
-    var principal = null;
     var vistos = {};
     var candidatos = [];
 
     function aceitar(bruto) {
       var d = soDigitos(bruto);
-      if (!nifValido(d) || d === NIF_PROPRIO || vistos[d]) return null;
-      vistos[d] = true;
-      candidatos.push(d);
+      if (!nifValido(d) || d === NIF_PROPRIO) return null;
+      if (!vistos[d]) { vistos[d] = true; candidatos.push(d); }
       return d;
     }
 
-    var vendorTax = aceitar(fieldText(fields, 'VendorTaxId'));
-    if (vendorTax) principal = vendorTax;
+    var principal = aceitar(fieldText(fields, 'VendorTaxId'));
+    var origem = principal ? 'vendorTaxId' : null;
 
-    var content = analyzeResult && typeof analyzeResult.content === 'string' ? analyzeResult.content : "";
+    var content = limparContentParaNifs(analyzeResult && typeof analyzeResult.content === 'string' ? analyzeResult.content : "");
     if (content) {
-      // (a) com rótulo — mais fiável, por isso entra primeiro na ordem
-      var reRotulo = /(?:NIF|NIPC|N\.?I\.?F|Contribuinte|VAT|PT)\s*[:.\-]?\s*((?:\d[\s.]?){9})/gi;
-      var m;
-      while ((m = reRotulo.exec(content)) !== null) aceitar(m[1]);
-      // (b) qualquer sequência de 9 dígitos isolada
+      var m, d;
+      // (2) etiquetas fortes, por ordem de posição; "V/" à frente é o NIF do cliente.
+      var reEtiqueta = /(V\s*[\/º°.]?\s*)?(?:N\s*[\/º°.]?\s*Contribuinte|Contribuinte|NIPC|N\.?I\.?F\.?|VAT\s*(?:No|Number)?)(?:\s*do\s+Cliente)?\s*[:.\-]?\s*(?:PT)?\s*((?:\d[\s.]?){9})/gi;
+      while ((m = reEtiqueta.exec(content)) !== null) {
+        d = aceitar(m[2]);
+        if (d && !principal && !m[1] && !/do\s+Cliente/i.test(m[0])) { principal = d; origem = 'etiqueta'; }
+      }
+      // (3) PT colado a 9 dígitos.
+      var rePt = /\bPT(\d{9})\b/g;
+      while ((m = rePt.exec(content)) !== null) {
+        d = aceitar(m[1]);
+        if (d && !principal) { principal = d; origem = 'pt'; }
+      }
+      // (4) genérica: só entra como principal se for a única.
       var reSolto = /\b\d{9}\b/g;
-      while ((m = reSolto.exec(content)) !== null) aceitar(m[0]);
+      var genericos = [];
+      while ((m = reSolto.exec(content)) !== null) {
+        d = aceitar(m[0]);
+        if (d && genericos.indexOf(d) === -1) genericos.push(d);
+      }
+      if (!principal && candidatos.length === 1) { principal = candidatos[0]; origem = 'generico'; }
     }
 
-    if (!principal && candidatos.length === 1) principal = candidatos[0];
-    return { nif: principal, candidatos: candidatos };
+    return { nif: principal, candidatos: candidatos, origem: origem };
+  }
+
+  // ===== Unidades das linhas =====
+  // normalizarUnidade('BX') → { unidade:'cx', unidadeBruta:'bx' }. Uma unidade que
+  // não se reconhece NÃO se perde: fica unidadeBruta em minúsculas e unidade null.
+  var UNIDADES = {
+    kg:'kg', kgs:'kg', quilo:'kg', quilos:'kg', g:'g', gr:'g', grs:'g', grama:'g', gramas:'g',
+    l:'l', lt:'l', ltr:'l', litro:'l', litros:'l', ml:'ml', cl:'cl',
+    un:'un', uni:'un', und:'un', unid:'un', unidade:'un', unidades:'un', pc:'un', 'pç':'un', pcs:'un', 'pçs':'un',
+    bx:'cx', box:'cx', cx:'cx', caixa:'cx', caixas:'cx',
+    mo:'mo', em:'emb', emb:'emb',
+    sc:'saco', saco:'saco', gf:'garrafa', garrafa:'garrafa', pct:'pacote', pacote:'pacote'
+  };
+  function normalizarUnidade(u) {
+    var bruta = String(u === null || u === undefined ? "" : u).trim().toLowerCase().replace(/\.$/, "");
+    if (!bruta) return { unidade: null, unidadeBruta: null };
+    return { unidade: UNIDADES[bruta] || null, unidadeBruta: bruta };
+  }
+
+  // Lê da descrição o tamanho da embalagem e o nº de unidades por caixa.
+  //   "FARINHA 0 NUVOLA 5KG CAPUTO"          → { unidade:'kg', tamanhoEmbalagem:5,   unidadesPorCaixa:null }
+  //   "AGUA CALDAS PENACOVA 24X50CL"         → { unidade:'cl', tamanhoEmbalagem:50,  unidadesPorCaixa:24 }
+  //   "LT UHT MG 1LT*6 ESTR ATLANTICO"       → { unidade:'l',  tamanhoEmbalagem:1,   unidadesPorCaixa:6 }  (formato invertido)
+  //   "Stracciatella by Artigiana 500g *10"  → { unidade:'g',  tamanhoEmbalagem:500, unidadesPorCaixa:10 }
+  //   "PORCHETTA 1/2"                        → null (não se adivinha)
+  // O multiplicador é "x" OU "*" — as faturas reais usam "*".
+  var RE_MEDIDA = 'kg|gr|g|lt|l|ml|cl';
+  function inferirUnidadeDaDescricao(desc) {
+    var t = String(desc || "");
+    if (!t.trim()) return null;
+    function num(s) { return parseFloat(String(s).replace(',', '.')); }
+    var m;
+    // N x TAMANHO UNIDADE  (24X50CL, 10 x 1,5 kg)
+    m = new RegExp('(\\d+)\\s*[x*×]\\s*(\\d+[.,]?\\d*)\\s*(' + RE_MEDIDA + ')\\b', 'i').exec(t);
+    if (m) return { unidade: normalizarUnidade(m[3]).unidade, tamanhoEmbalagem: num(m[2]), unidadesPorCaixa: parseInt(m[1], 10) };
+    // TAMANHO UNIDADE x N  (1LT*6, 500g *10, 125GR*8)
+    m = new RegExp('(\\d+[.,]?\\d*)\\s*(' + RE_MEDIDA + ')\\s*[x*×]\\s*(\\d+)\\b', 'i').exec(t);
+    if (m) return { unidade: normalizarUnidade(m[2]).unidade, tamanhoEmbalagem: num(m[1]), unidadesPorCaixa: parseInt(m[3], 10) };
+    // TAMANHO UNIDADE sozinho  (5KG, 250 g, 0,75L)
+    m = new RegExp('(\\d+[.,]?\\d*)\\s*(' + RE_MEDIDA + ')\\b', 'i').exec(t);
+    if (m) return { unidade: normalizarUnidade(m[2]).unidade, tamanhoEmbalagem: num(m[1]), unidadesPorCaixa: null };
+    return null;
   }
 
   // allSuppliers = objeto {id: {nome, nif?, aliases?, ...}} tal como vem de suppliers/
@@ -334,6 +423,9 @@
         quantidade: (obj.Quantity && typeof obj.Quantity.valueNumber === 'number') ? obj.Quantity.valueNumber : null,
         precoUnitario: fieldAmount(obj, 'UnitPrice'),
         montante: fieldAmount(obj, 'Amount'),
+        unidade: normalizarUnidade(fieldText(obj, 'Unit')).unidade,
+        unidadeBruta: normalizarUnidade(fieldText(obj, 'Unit')).unidadeBruta,
+        embalagem: inferirUnidadeDaDescricao(fieldText(obj, 'Description')),
         ingredienteId: null
       };
     });
@@ -346,6 +438,8 @@
     var doc = analyzeResult && analyzeResult.documents && analyzeResult.documents[0];
     var fields = (doc && doc.fields) || (analyzeResult && analyzeResult.fields) || {};
     var nifs = extrairNifs(analyzeResult, fields);
+    var conteudo = (analyzeResult && typeof analyzeResult.content === 'string') ? analyzeResult.content : "";
+    var paginas = (analyzeResult && Array.isArray(analyzeResult.pages)) ? analyzeResult.pages.length : null;
     return {
       fornecedorTexto: fieldText(fields, 'VendorName'),
       montante: fieldAmount(fields, 'InvoiceTotal'),
@@ -354,8 +448,18 @@
       prazoPagamento: fieldDateIso(fields, 'DueDate'),
       linhas: extrairLinhas(fields),
       nif: nifs.nif,
-      nifCandidatos: nifs.candidatos
+      nifCandidatos: nifs.candidatos,
+      nifOrigem: nifs.origem,
+      paginas: paginas,
+      multiPagina: detetarMultiPagina(paginas, conteudo)
     };
+  }
+
+  // Fatura com mais de uma página, ou com marcas de continuação ("A transportar",
+  // "Folha Nº 1 de 2") — o InvoiceTotal pode ser o transporte da 1.ª folha, não o total.
+  function detetarMultiPagina(paginas, content) {
+    if (typeof paginas === 'number' && paginas > 1) return true;
+    return /A\s+transportar|Folha\s*N[ºo°.]?\s*\d+\s*de\s*\d+|P[áa]gina\s*\d+\s*de\s*[2-9]\d*/i.test(String(content || ""));
   }
 
   global.GiocoFaturas = {
@@ -378,7 +482,13 @@
     NIF_PROPRIO: NIF_PROPRIO,
     soDigitos: soDigitos,
     nifValido: nifValido,
+    limparContentParaNifs: limparContentParaNifs,
+    NIF_ORIGENS_CONFIAVEIS: NIF_ORIGENS_CONFIAVEIS,
+    nifOrigemConfiavel: nifOrigemConfiavel,
     extrairNifs: extrairNifs,
+    normalizarUnidade: normalizarUnidade,
+    inferirUnidadeDaDescricao: inferirUnidadeDaDescricao,
+    detetarMultiPagina: detetarMultiPagina,
     findMatchingSupplierDetalhe: findMatchingSupplierDetalhe,
     findMatchingSupplier: findMatchingSupplier
   };

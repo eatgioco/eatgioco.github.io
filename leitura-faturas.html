@@ -1179,8 +1179,9 @@ window.addEventListener('load', function () {
 
   // APRENDIZAGEM. Chamada depois de um match por nome, quando o utilizador escolhe
   // um fornecedor à mão no modal, e ao aplicar um grupo da reconciliação.
-  //  - NIF: a ficha sem nif recebe o da fatura (update() só nessa folha). Um nif
-  //    diferente do lido NUNCA é sobrescrito — fica o aviso no cartão.
+  //  - NIF: a ficha sem nif recebe o da fatura (update() só nessa folha) SÓ quando
+  //    a nifOrigem é de confiança (Set/2026). Um nif diferente do lido NUNCA é
+  //    sobrescrito — fica o aviso no cartão.
   //  - Alias: o texto lido, tal e qual, entra em suppliers/{id}/aliases quando não
   //    bate nem com o nome nem com nenhum alias (máx. 10, dedupe por normalizeNome).
   // Devolve uma Promise que resolve quando as escritas locais estiverem feitas.
@@ -1190,8 +1191,10 @@ window.addEventListener('load', function () {
     var sRef = suppliersRef.child(supplierId);
     var escritas = [];
 
+    // Só com nifOrigem de confiança ('vendorTaxId' | 'etiqueta' | 'pt'); com
+    // 'generico' ou sem origem o cartão mostra a sugestão e o Manel confirma.
     var cand = nifCandidatoDaFatura(fatura);
-    if (cand && !GiocoFaturas.soDigitos(s.nif)) {
+    if (cand && GiocoFaturas.nifOrigemConfiavel(fatura.nifOrigem) && !GiocoFaturas.soDigitos(s.nif)) {
       escritas.push(sRef.update({ nif: cand }));
       showStatus('NIF ' + cand + ' guardado na ficha de ' + (s.nome || 'fornecedor') + '.', '');
     }
@@ -1514,6 +1517,8 @@ window.addEventListener('load', function () {
         fornecedorMatchVia: det.via || null,
         nifTexto: lida.nif || null,
         nifCandidatos: nifCandidatos.length ? nifCandidatos : null,
+        nifOrigem: lida.nifOrigem || null,
+        multiPagina: lida.multiPagina ? true : null,
         montante: montante,
         referencia: referencia || null,
         data: data || null,
@@ -1601,6 +1606,16 @@ window.addEventListener('load', function () {
     if (matched && nifDivergente(supplier, f)) {
       html += '<div class="card-row" style="color:var(--red-ink);"><span>⚠ NIF lido não coincide com a ficha (' + escapeHtml(supplier.nif) + ')</span></div>';
     }
+    // NIF lido sem origem de confiança e ficha sem NIF: sugestão, nunca gravação automática.
+    var nifSugerido = (matched && !GiocoFaturas.soDigitos(supplier.nif) && !GiocoFaturas.nifOrigemConfiavel(f.nifOrigem)) ? nifCandidatoDaFatura(f) : null;
+    if (nifSugerido) {
+      html += '<div class="card-row"><span>NIF sugerido ' + escapeHtml(nifSugerido) + ' (' + (f.nifOrigem === 'generico' ? 'sem etiqueta na fatura' : 'origem não registada') + ')</span>' +
+        '<button type="button" class="btn-mini btn-usar-nif" data-nif="' + escapeHtml(nifSugerido) + '">Usar na ficha</button></div>';
+    }
+    var montanteNum = parseFloat(f.montante);
+    var montanteZero = isNaN(montanteNum) || montanteNum === 0;
+    if (montanteZero) html += '<div class="card-row"><span class="badge badge-unmatched">Total 0,00 € — verificar</span></div>';
+    if (f.multiPagina) html += '<div class="card-row"><span class="badge badge-unmatched">Fatura multi-página — confirmar total</span></div>';
 
     html += '<div class="card-row"><strong>Montante</strong><span>' + formatMontante(f.montante) + '</span></div>';
     html += '<div class="card-row"><strong>Data</strong><span>' + escapeHtml(isoToDDMMYYYY(f.data) || 'n/d') + '</span></div>';
@@ -1680,7 +1695,24 @@ window.addEventListener('load', function () {
     var btnCriar = card.querySelector('.btn-criar-pagamento');
     if (btnCriar) {
       btnCriar.addEventListener('click', function () {
+        var n = parseFloat(f.montante);
+        if (isNaN(n) || n === 0) {
+          if (!confirm('O total lido desta fatura é 0,00 € (ou não foi lido). Pode ser uma oferta com 100 % de desconto, ou uma leitura falhada.\n\nCriar o pedido de pagamento na mesma?')) return;
+        }
         openPaymentModalFromFatura(f);
+      });
+    }
+
+    var btnUsarNif = card.querySelector('.btn-usar-nif');
+    if (btnUsarNif) {
+      btnUsarNif.addEventListener('click', function () {
+        var nif = btnUsarNif.getAttribute('data-nif');
+        if (!supplier || GiocoFaturas.soDigitos(supplier.nif)) return;
+        if (!confirm('Gravar o NIF ' + nif + ' na ficha de "' + (supplier.nome || '') + '"?\n\nConfirma no documento que é o NIF do emissor (não o de um licenciado de software nem de um banco).')) return;
+        btnUsarNif.disabled = true;
+        suppliersRef.child(f.fornecedorIdEncontrado).update({ nif: nif })
+          .then(function () { showStatus('NIF ' + nif + ' guardado na ficha de ' + (supplier.nome || 'fornecedor') + '.', ''); })
+          .catch(function (err) { btnUsarNif.disabled = false; showStatus('Erro ao gravar o NIF: ' + err.message, 'error'); });
       });
     }
 
@@ -2021,6 +2053,10 @@ window.addEventListener('load', function () {
       referencia: document.getElementById('editReferencia').value.trim() || null,
       prazoPagamento: document.getElementById('editPrazoPagamento').value || null
     };
+    // NIF escrito à mão → origem 'manual' (decisão humana, de confiança para a ficha);
+    // igual ao que estava → conserva a origem; apagado → null.
+    changes.nifOrigem = !changes.nifTexto ? null
+      : (changes.nifTexto === (antes.nifTexto || null) ? (antes.nifOrigem || null) : 'manual');
 
     // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
     var faturaRef = faturasRef.child(currentEditFaturaId);
@@ -2033,6 +2069,7 @@ window.addEventListener('load', function () {
       aprenderFornecedor(novoId, {
         fornecedorTexto: changes.fornecedorTexto,
         nifTexto: changes.nifTexto,
+        nifOrigem: changes.nifOrigem,
         nifCandidatos: antes.nifCandidatos || null
       }).then(segundaPassagemPorNif);
     }
@@ -2192,7 +2229,8 @@ window.addEventListener('load', function () {
           // Só o NIF: os restantes campos do registo ficam como estavam.
           await faturasRef.child(f.id).update({
             nifTexto: lida.nif || null,
-            nifCandidatos: cands.length ? cands : null
+            nifCandidatos: cands.length ? cands : null,
+            nifOrigem: lida.nifOrigem || null
           });
           feitas++;
         } catch (err) {

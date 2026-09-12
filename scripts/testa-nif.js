@@ -28,14 +28,87 @@ r = G.extrairNifs({ content: 'NIF 518717186' }, { VendorTaxId: { valueString: 'P
 assert.strictEqual(r.nif, '500697256', 'VendorTaxId é o principal');
 
 r = G.extrairNifs({ content: 'NIF 500 697 256 e VAT PT501442600' }, {});
-assert.strictEqual(r.nif, null, '2 candidatos → sem principal');
+assert.strictEqual(r.nif, '500697256', '2 etiquetas → ganha a que aparece primeiro (regra Set/2026)');
+assert.strictEqual(r.origem, 'etiqueta');
 assert.deepStrictEqual(r.candidatos, ['500697256', '501442600']);
 
+// ===== Fixtures de faturas reais (Set/2026) =====
+['518252000', '502030712', '516179934', '514430869', '517034573'].forEach(function (n) {
+  assert.strictEqual(G.nifValido(n), true, n + ' válido');
+});
+assert.strictEqual(G.nifValido('518717186'), true, 'o próprio é válido (excluído noutro sítio)');
+assert.deepStrictEqual(G.extrairNifs({ content: 'NIF 518717186' }, {}).candidatos, [], 'o próprio nunca é candidato');
+['938916861', '214609400', '210515578'].forEach(function (n) {
+  assert.strictEqual(G.nifValido(n), false, 'telefone ' + n + ' inválido');
+});
+assert.strictEqual(G.nifValido('123456789'), true, '123456789 passa no dígito de controlo');
+
+// O TESTE CENTRAL: o IBAN nunca dá NIF.
+var bocconcino = 'IL BOCCONCINO LDA\nNIF 516179934\nRua X\nIBAN CGD - PT50 0035 0325 0001 3261 130 97\nTotal 206,10';
+assert.strictEqual(G.nifValido('500035032'), true, 'o falso positivo passa no check digit — daí a limpeza');
+assert.ok(G.limparContentParaNifs(bocconcino).indexOf('0035 0325') === -1, 'IBAN removido');
+r = G.extrairNifs({ content: bocconcino }, {});
+assert.strictEqual(r.nif, '516179934');
+assert.strictEqual(r.candidatos.indexOf('500035032'), -1, 'NUNCA 500035032');
+assert.strictEqual(r.origem, 'etiqueta');
+
+// IBAN genérico, ATCUD, EAN
+var lixo = 'ES91 2100 0418 4502 0005 1332\nATCUD: JFZ7T4NP-500697256\nEAN 5603722502361\nNIPC 502030712';
+r = G.extrairNifs({ content: lixo }, {});
+assert.deepStrictEqual(r.candidatos, ['502030712'], 'ATCUD e IBAN estrangeiro e EAN fora');
+
+// N/ vs V/
+r = G.extrairNifs({ content: 'N/Contribuinte 518252000\nV/Contribuinte 518717186' }, {});
+assert.strictEqual(r.nif, '518252000'); assert.strictEqual(r.origem, 'etiqueta');
+r = G.extrairNifs({ content: 'V/Contribuinte 502030712\nN/Contribuinte 518252000' }, {});
+assert.strictEqual(r.nif, '518252000', 'V/ nunca é principal mesmo aparecendo antes');
+assert.deepStrictEqual(r.candidatos, ['502030712', '518252000']);
+
+// "do Cliente" com PT colado
+r = G.extrairNifs({ content: 'N.I.F. do Cliente : PT518717186\nNº Contribuinte: 502030712' }, {});
+assert.strictEqual(r.nif, '502030712'); assert.strictEqual(r.origem, 'etiqueta');
+
+// Dois NIFs válidos: topo (emissor) vs rodapé (licenciado do software)
+r = G.extrairNifs({ content: 'Contribuinte 516179934\n...\nLicenciado a Sage - NIF 514430869' }, {});
+assert.strictEqual(r.nif, '516179934'); assert.strictEqual(r.origem, 'etiqueta');
+assert.deepStrictEqual(r.candidatos, ['516179934', '514430869']);
+
+// PT colado vs "PT " com espaço
+r = G.extrairNifs({ content: 'Emitente PT517034573' }, {});
+assert.strictEqual(r.nif, '517034573'); assert.strictEqual(r.origem, 'pt');
+r = G.extrairNifs({ content: 'Emitente PT 517034573' }, {});
+assert.strictEqual(r.origem, 'generico', 'PT com espaço já não é etiqueta: cai na genérica (1 candidato)');
+r = G.extrairNifs({ content: 'Emitente 517034573 e outro 502030712' }, {});
+assert.strictEqual(r.nif, null, '2 genéricos → null'); assert.strictEqual(r.origem, null);
+assert.deepStrictEqual(r.candidatos, ['517034573', '502030712']);
+r = G.extrairNifs({ content: 'Contribuinte 516179934' }, { VendorTaxId: { valueString: 'PT502030712' } });
+assert.strictEqual(r.nif, '502030712'); assert.strictEqual(r.origem, 'vendorTaxId');
+assert.strictEqual(G.nifOrigemConfiavel('pt'), true); assert.strictEqual(G.nifOrigemConfiavel('generico'), false); assert.strictEqual(G.nifOrigemConfiavel(null), false);
+
+// ===== Unidades =====
+[['Uni','un'],['UNI','un'],['KG','kg'],['BX','cx'],['PC','un'],['MO','mo'],['EM','emb'],['UN','un'],['Cx.','cx']].forEach(function (par) {
+  assert.strictEqual(G.normalizarUnidade(par[0]).unidade, par[1], par[0] + ' → ' + par[1]);
+});
+assert.deepStrictEqual(G.normalizarUnidade('ZZ'), { unidade: null, unidadeBruta: 'zz' }, 'desconhecida guarda a bruta');
+assert.deepStrictEqual(G.normalizarUnidade(null), { unidade: null, unidadeBruta: null });
+
+assert.deepStrictEqual(G.inferirUnidadeDaDescricao('FARINHA 0 NUVOLA 5KG CAPUTO'), { unidade: 'kg', tamanhoEmbalagem: 5, unidadesPorCaixa: null });
+assert.deepStrictEqual(G.inferirUnidadeDaDescricao('AGUA CALDAS PENACOVA 24X50CL'), { unidade: 'cl', tamanhoEmbalagem: 50, unidadesPorCaixa: 24 });
+assert.deepStrictEqual(G.inferirUnidadeDaDescricao('LT UHT MG 1LT*6 ESTR ATLANTICO'), { unidade: 'l', tamanhoEmbalagem: 1, unidadesPorCaixa: 6 });
+assert.deepStrictEqual(G.inferirUnidadeDaDescricao('Stracciatella by Artigiana 500g *10'), { unidade: 'g', tamanhoEmbalagem: 500, unidadesPorCaixa: 10 });
+assert.deepStrictEqual(G.inferirUnidadeDaDescricao('MOZZARELLA FIOR DI LATTE 125GR*8'), { unidade: 'g', tamanhoEmbalagem: 125, unidadesPorCaixa: 8 });
+assert.strictEqual(G.inferirUnidadeDaDescricao('PORCHETTA 1/2'), null, 'sem unidade → null');
+
+// Multi-página
+assert.strictEqual(G.detetarMultiPagina(2, ''), true);
+assert.strictEqual(G.detetarMultiPagina(1, 'Folha Nº 1 de 2\nA transportar 206,10'), true);
+assert.strictEqual(G.detetarMultiPagina(1, 'Total 10,00'), false);
+
 r = G.extrairNifs(null, null);
-assert.deepStrictEqual(r, { nif: null, candidatos: [] }, 'sem nada não rebenta');
+assert.deepStrictEqual(r, { nif: null, candidatos: [], origem: null }, 'sem nada não rebenta');
 
 r = G.extrairNifs({ content: 'NIF 518717186' }, { VendorTaxId: { valueString: '518717186' } });
-assert.deepStrictEqual(r, { nif: null, candidatos: [] }, 'só o próprio → nada');
+assert.deepStrictEqual(r, { nif: null, candidatos: [], origem: null }, 'só o próprio → nada');
 
 // findMatchingSupplierDetalhe
 var sup = {

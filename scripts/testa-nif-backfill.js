@@ -21,11 +21,13 @@ function cenario() {
       sE: { nome: 'Epsilon' },                    // releitura que falha no Azure
       sF: { nome: 'Fi' },                         // releitura, o Azure devolve 2 candidatos → manual
       sG: { nome: 'Gee', nif: '' },               // nif vazio conta como sem nif; sem faturas → manual
-      sH: { nome: 'Aga' }                         // releitura que encontra NIF → gravado
+      sH: { nome: 'Aga' },                        // releitura que encontra NIF → gravado
+      sI: { nome: 'Iota' },                       // nifTexto de origem genérica, sem ficheiro → manual
+      sJ: { nome: 'Jota' }                        // nifTexto sem origem (antigo) mas com ficheiro → releitura
     },
     faturasProcessadas: {
       f1: { fornecedorIdEncontrado: 'sA', criadoEm: 10, fornecedorTexto: 'ALFA LDA', montante: 5 },
-      f2: { fornecedorIdEncontrado: 'sA', criadoEm: 20, fornecedorTexto: 'ALFA LDA', nifTexto: NIF_A, montante: 7, linhas: [{ d: 1 }] },
+      f2: { fornecedorIdEncontrado: 'sA', criadoEm: 20, fornecedorTexto: 'ALFA LDA', nifTexto: NIF_A, nifOrigem: 'etiqueta', montante: 7, linhas: [{ d: 1 }] },
       f3: { fornecedorIdEncontrado: 'sB', criadoEm: 5, fornecedorTexto: 'BETA', montante: 1 },
       f4: { fornecedorIdEncontrado: 'sB', criadoEm: 9, fornecedorTexto: 'BETA', montante: 2 },
       f5: { fornecedorIdEncontrado: 'sC', criadoEm: 9, fornecedorTexto: 'GAMA' },
@@ -33,10 +35,12 @@ function cenario() {
       f7: { fornecedorIdEncontrado: 'sE', criadoEm: 9, fornecedorTexto: 'EPS' },
       f8: { fornecedorIdEncontrado: 'sF', criadoEm: 9, fornecedorTexto: 'FI' },
       f9: { fornecedorIdEncontrado: 'sH', criadoEm: 9, fornecedorTexto: 'AGA SA' },
-      f10: { fornecedorIdEncontrado: null, criadoEm: 99, fornecedorTexto: 'SOLTA' }
+      f10: { fornecedorIdEncontrado: null, criadoEm: 99, fornecedorTexto: 'SOLTA' },
+      f11: { fornecedorIdEncontrado: 'sI', criadoEm: 9, fornecedorTexto: 'IOTA', nifTexto: NIF_B, nifOrigem: 'generico' },
+      f12: { fornecedorIdEncontrado: 'sJ', criadoEm: 9, fornecedorTexto: 'JOTA', nifTexto: NIF_B }
     },
     faturasArquivo: { f1: 'data:image/jpeg;base64,QUJD', f3: 'data:image/jpeg;base64,QUJD', f4: 'data:application/pdf;base64,QUJD',
-                      f7: 'data:image/jpeg;base64,QUJD', f8: 'data:image/jpeg;base64,QUJD', f9: 'data:image/jpeg;base64,QUJD' }
+                      f7: 'data:image/jpeg;base64,QUJD', f8: 'data:image/jpeg;base64,QUJD', f9: 'data:image/jpeg;base64,QUJD', f12: 'data:image/jpeg;base64,QUJD' }
   };
   return store;
 }
@@ -45,10 +49,10 @@ var store = cenario();
 var antes = JSON.parse(JSON.stringify(store.faturasProcessadas));
 var plano = NB.planear(store.suppliers, store.faturasProcessadas, function (id) { return !!store.faturasArquivo[id]; });
 
-assert.strictEqual(plano.totalSemNif, 7, 'sC tem nif; sG com nif vazio conta');
+assert.strictEqual(plano.totalSemNif, 9, 'sC tem nif; sG com nif vazio conta');
 assert.deepStrictEqual(plano.semCusto.map(function (a) { return a.supplierId + ':' + a.fatura.id; }), ['sA:f2'], 'grátis: a mais recente com NIF gravado');
-assert.deepStrictEqual(plano.releitura.map(function (a) { return a.supplierId + ':' + a.fatura.id; }).sort(), ['sB:f4', 'sE:f7', 'sF:f8', 'sH:f9'], 'releitura: a mais recente com ficheiro');
-assert.deepStrictEqual(plano.manuais.map(function (a) { return a.supplierId + ':' + a.motivo; }).sort(), ['sD:sem ficheiro arquivado', 'sG:sem faturas ligadas']);
+assert.deepStrictEqual(plano.releitura.map(function (a) { return a.supplierId + ':' + a.fatura.id; }).sort(), ['sB:f4', 'sE:f7', 'sF:f8', 'sH:f9', 'sJ:f12'], 'releitura: a mais recente com ficheiro (sJ: NIF sem origem relê)');
+assert.deepStrictEqual(plano.manuais.map(function (a) { return a.supplierId + ':' + a.motivo; }).sort(), ['sD:sem ficheiro arquivado', 'sG:sem faturas ligadas', 'sI:NIF ' + NIF_B + ' sem etiqueta na fatura (origem genérica) — confirmar à mão']);
 assert.ok(!plano.semCusto.concat(plano.releitura, plano.manuais).some(function (a) { return a.supplierId === 'sC'; }), 'fornecedor com nif saltado');
 // Um alvo por fornecedor
 var ids = plano.semCusto.concat(plano.releitura, plano.manuais).map(function (a) { return a.supplierId; });
@@ -61,11 +65,12 @@ assert.ok(planoSemInfo.releitura.some(function (a) { return a.supplierId === 'sD
 // ---- execução ----
 var chamadasAzure = [], escritasFatura = [], aprendidos = [];
 var azurePorFicheiro = {
-  'fatura-f4.pdf': { nif: NIF_B, nifCandidatos: [NIF_B] },
+  'fatura-f4.pdf': { nif: NIF_B, nifCandidatos: [NIF_B], nifOrigem: 'vendorTaxId' },
   'fatura-f7.jpg': null, // erro
-  'fatura-f8.jpg': { nif: null, nifCandidatos: [NIF_A, NIF_C] },
-  'fatura-f9.jpg': { nif: null, nifCandidatos: [NIF_C] },
-  'fatura-f6.jpg': { nif: NIF_C, nifCandidatos: [NIF_C] }
+  'fatura-f8.jpg': { nif: null, nifCandidatos: [NIF_A, NIF_C], nifOrigem: null },
+  'fatura-f9.jpg': { nif: NIF_C, nifCandidatos: [NIF_C], nifOrigem: 'pt' },
+  'fatura-f12.jpg': { nif: NIF_B, nifCandidatos: [NIF_B], nifOrigem: 'generico' }, // relida: continua genérica → manual
+  'fatura-f6.jpg': { nif: NIF_C, nifCandidatos: [NIF_C], nifOrigem: 'etiqueta' }
 };
 function FileShim(parts, name, opts) { this.name = name; this.type = opts.type; }
 var deps = {
@@ -95,8 +100,10 @@ var deps = {
 };
 
 NB.executar(plano, deps).then(function (rel) {
-  assert.deepStrictEqual(chamadasAzure.sort(), ['fatura-f4.pdf', 'fatura-f7.jpg', 'fatura-f8.jpg', 'fatura-f9.jpg'], 'Azure só nas releituras; sA (nifTexto gravado) não chama');
-  assert.strictEqual(rel.paginasAzure, 4);
+  assert.deepStrictEqual(chamadasAzure.sort(), ['fatura-f12.jpg', 'fatura-f4.pdf', 'fatura-f7.jpg', 'fatura-f8.jpg', 'fatura-f9.jpg'], 'Azure só nas releituras; sA (nifTexto gravado) não chama');
+  assert.strictEqual(rel.paginasAzure, 5);
+  assert.ok(rel.manuais.some(function (m) { return m.supplierId === 'sJ' && /origem genérica/.test(m.motivo); }), 'relida e ainda genérica → manual');
+  assert.ok(!('nif' in store.suppliers.sJ) && !('nif' in store.suppliers.sI), 'origem genérica nunca chega à ficha');
   assert.deepStrictEqual(rel.gravados.map(function (g) { return g.supplierId + ':' + g.nif; }).sort(), ['sA:' + NIF_A, 'sB:' + NIF_B, 'sH:' + NIF_C]);
   assert.strictEqual(store.suppliers.sA.nif, NIF_A);
   assert.strictEqual(store.suppliers.sB.nif, NIF_B);
@@ -112,12 +119,12 @@ NB.executar(plano, deps).then(function (rel) {
   var depois = store.faturasProcessadas;
   Object.keys(antes).forEach(function (id) {
     var a = Object.assign({}, antes[id]), d = Object.assign({}, depois[id]);
-    delete a.nifTexto; delete a.nifCandidatos; delete d.nifTexto; delete d.nifCandidatos;
+    delete a.nifTexto; delete a.nifCandidatos; delete a.nifOrigem; delete d.nifTexto; delete d.nifCandidatos; delete d.nifOrigem;
     assert.deepStrictEqual(d, a, 'fatura ' + id + ': outros campos intactos');
   });
-  assert.strictEqual(escritasFatura.length, 3, 'update em f4, f8, f9 (f7 falhou antes de gravar)');
-  assert.deepStrictEqual(escritasFatura.find(function (e) { return e.id === 'f8'; }).campos, { nifTexto: null, nifCandidatos: [NIF_A, NIF_C] });
-  assert.strictEqual(Object.keys(store.faturasProcessadas).length, 10, 'nenhuma fatura criada ou apagada');
+  assert.strictEqual(escritasFatura.length, 4, 'update em f4, f8, f9, f12 (f7 falhou antes de gravar)');
+  assert.deepStrictEqual(escritasFatura.find(function (e) { return e.id === 'f8'; }).campos, { nifTexto: null, nifCandidatos: [NIF_A, NIF_C], nifOrigem: null });
+  assert.strictEqual(Object.keys(store.faturasProcessadas).length, 12, 'nenhuma fatura criada ou apagada');
 
   // Rule 7: fornecedor que entretanto aprendeu o NIF é saltado sem Azure.
   var store2 = cenario();
@@ -126,14 +133,14 @@ NB.executar(plano, deps).then(function (rel) {
   var deps2 = Object.assign({}, deps, {
     getSuppliers: function () { return store2.suppliers; },
     lerArquivo: function (id) { return Promise.resolve(store2.faturasArquivo[id] || null); },
-    ler: function (file) { azure2++; return Promise.resolve({ nif: NIF_B, nifCandidatos: [NIF_B] }); },
+    ler: function (file) { azure2++; return Promise.resolve({ nif: NIF_B, nifCandidatos: [NIF_B], nifOrigem: 'etiqueta' }); },
     gravarNif: function () { return Promise.resolve(); },
     aprender: function (sid) { store2.suppliers[sid].nif = NIF_B; return Promise.resolve(); },
     onProgresso: function (p) { if (p.nome === 'Beta') store2.suppliers.sE.nif = '505050505'; } // alguém preencheu o sE a meio
   });
   return NB.executar(plano2, deps2).then(function (rel2) {
     assert.ok(rel2.saltados.some(function (s) { return s.supplierId === 'sE'; }), 'sE saltado (reavaliado a cada iteração)');
-    assert.strictEqual(azure2, 3, 'sB, sF, sH — sem sE');
+    assert.strictEqual(azure2, 4, 'sB, sF, sH, sJ — sem sE');
 
     // Botão "Parar": fica o já feito.
     var store3 = cenario();

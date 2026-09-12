@@ -31,7 +31,7 @@
          lerArquivo(faturaId)   → Promise<dataUrl|null>
          dataUrlParaFile(dataUrl, nome) → File|null
          ler(file)              → Promise<{nif, nifCandidatos, ...}>  (GiocoFaturas.ler)
-         gravarNif(faturaId, {nifTexto, nifCandidatos}) → Promise   // update() só nessas folhas
+         gravarNif(faturaId, {nifTexto, nifCandidatos, nifOrigem}) → Promise // update() só nessas folhas
          aprender(supplierId, fatura) → Promise                   // aprenderFornecedor da página
          onProgresso({ indice, total, nome, fase })              // opcional
          deveParar()            → bool                            // opcional, botão "Parar"
@@ -42,9 +42,10 @@
                      manuais:[{supplierId,nome,motivo}], saltados:[...], paginasAzure,
                      parado }
 
-   REGRA de não escrita (rule 6 do pedido): NIF lido inválido, o NIF_PROPRIO, ou
-   2+ candidatos sem VendorTaxId a desempatar → NÃO se escreve nada na ficha (nem
-   NIF nem alias); o fornecedor vai para "manuais". O registo da fatura recebe na
+   REGRA de não escrita: NIF lido inválido, o NIF_PROPRIO, sem nifTexto (2+
+   candidatos sem desempate), ou nifOrigem fora de GiocoFaturas.NIF_ORIGENS_CONFIAVEIS
+   ('generico' / ausente) → NÃO se escreve nada na ficha (nem NIF nem alias); o
+   fornecedor vai para "manuais" com o motivo. O registo da fatura recebe na
    mesma nifTexto/nifCandidatos (é o que evita reler outra vez no futuro).
 
    Testes: scripts/testa-nif-backfill.js (Node, store em memória — nunca toca no RTDB).
@@ -59,13 +60,14 @@
       return !!(f && (f.nifTexto || (Array.isArray(f.nifCandidatos) && f.nifCandidatos.length)));
     }
 
-    // NIF que uma fatura propõe: o lido, ou o único candidato. Nunca o próprio
-    // nem um inválido. Mesma regra do nifCandidatoDaFatura da leitura-faturas.html.
+    // NIF que uma fatura propõe para GRAVAR: o nifTexto, válido, ≠ próprio, e com
+    // nifOrigem de confiança ('vendorTaxId' | 'etiqueta' | 'pt' — Set/2026). Uma
+    // origem 'generico' (única sequência de 9 dígitos solta) ou ausente (faturas
+    // lidas antes de existir o campo) nunca chega à ficha por esta via.
     function nifDaFatura(f) {
-      var cands = Array.isArray(f.nifCandidatos) ? f.nifCandidatos : [];
-      var cand = f.nifTexto || (cands.length === 1 ? cands[0] : null);
-      cand = cand ? GF.soDigitos(cand) : '';
+      var cand = f.nifTexto ? GF.soDigitos(f.nifTexto) : '';
       if (!cand || !GF.nifValido(cand) || cand === GF.NIF_PROPRIO) return null;
+      if (!GF.nifOrigemConfiavel(f.nifOrigem)) return null;
       return cand;
     }
 
@@ -74,6 +76,8 @@
       var lido = f.nifTexto ? GF.soDigitos(f.nifTexto) : '';
       if (lido && lido === GF.NIF_PROPRIO) return 'o NIF lido é o da GIOCO';
       if (lido && !GF.nifValido(lido)) return 'NIF lido inválido (' + lido + ')';
+      if (lido && f.nifOrigem === 'generico') return 'NIF ' + lido + ' sem etiqueta na fatura (origem genérica) — confirmar à mão';
+      if (lido && !f.nifOrigem) return 'NIF ' + lido + ' lido antes de haver origem registada — confirmar à mão';
       if (!lido && cands.length > 1) return cands.length + ' NIFs candidatos, sem desempate';
       if (!lido && !cands.length) return 'nenhum NIF encontrado no ficheiro';
       return 'NIF não determinável';
@@ -106,10 +110,14 @@
           if (!comNif && temNifInfo(lista[i])) comNif = lista[i];
           if (!comArquivo && temArquivo(lista[i].id) !== false) comArquivo = lista[i];
         }
-        if (comNif) {
-          if (nifDaFatura(comNif)) plano.semCusto.push({ supplierId: sid, nome: nome, fatura: comNif });
-          else plano.manuais.push({ supplierId: sid, nome: nome, motivo: motivoSemNif(comNif) });
+        if (comNif && nifDaFatura(comNif)) {
+          plano.semCusto.push({ supplierId: sid, nome: nome, fatura: comNif });
+        } else if (comNif && !comArquivo) {
+          plano.manuais.push({ supplierId: sid, nome: nome, motivo: motivoSemNif(comNif) });
         } else if (comArquivo) {
+          // Com NIF gravado mas não de confiança (origem genérica ou sem origem),
+          // reler dá a origem — vale a página.
+
           plano.releitura.push({ supplierId: sid, nome: nome, fatura: comArquivo });
         } else {
           plano.manuais.push({ supplierId: sid, nome: nome, motivo: 'sem ficheiro arquivado' });
@@ -144,8 +152,8 @@
             var lida = await deps.ler(file);
             var cands = Array.isArray(lida.nifCandidatos) ? lida.nifCandidatos : [];
             // Só o NIF: os restantes campos do registo ficam como estavam.
-            await deps.gravarNif(fatura.id, { nifTexto: lida.nif || null, nifCandidatos: cands.length ? cands : null });
-            fatura = Object.assign({}, fatura, { nifTexto: lida.nif || null, nifCandidatos: cands });
+            await deps.gravarNif(fatura.id, { nifTexto: lida.nif || null, nifCandidatos: cands.length ? cands : null, nifOrigem: lida.nifOrigem || null });
+            fatura = Object.assign({}, fatura, { nifTexto: lida.nif || null, nifCandidatos: cands, nifOrigem: lida.nifOrigem || null });
           }
           var nif = nifDaFatura(fatura);
           if (!nif) { rel.manuais.push({ supplierId: alvo.supplierId, nome: alvo.nome, motivo: motivoSemNif(fatura) }); continue; }
