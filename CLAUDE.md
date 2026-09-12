@@ -833,9 +833,15 @@ custos                — NÓ CANÓNICO DOS CUSTOS (Set/2026), escrito SÓ pelo
                          fornecedor da linha a dar a rubrica. Os alvos são só do MESMO
                          mês do movimento (um salário pago no dia 1 do mês seguinte não
                          é apanhado — a reconciliação real resolve). RE_CAIXA_PESSOAL
-                         (subash|mattia|adiantamento|prestador|prestação → pessoal)
-                         aplica-se à caixa E aos 'banco:' residuais, abaixo de override
-                         e regra.
+                         (subash|mattia|adiantamento|prestador → pessoal) aplica-se SÓ à
+                         caixa, onde o motivo é escrito por quem lança. Nos 'banco:'
+                         residuais e nas linhas de pedido ligadas vale RE_BANCO_PESSOAL
+                         (subash|adiantamento|prestador), abaixo de override e regra —
+                         SEM "mattia" nem "prestação" (revertido em Set/2026: um
+                         pagamento bancário ao Mattia pode ser margem (cmv) ou consultoria
+                         (outros) e o descritivo não distingue; fica porValidar, o Manel
+                         valida uma vez e a regra aprendida trata das seguintes). Não há
+                         heurística nenhuma para adivinhar margem vs. consultoria.
                          IDEMPOTÊNCIA: "Regenerar mês" corre N vezes com o mesmo
                          resultado (registo igual não é reescrito). validado → o motor
                          preserva rubrica, despesa, entidade e validacao e só actualiza

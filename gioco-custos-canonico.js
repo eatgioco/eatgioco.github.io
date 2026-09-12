@@ -95,8 +95,9 @@
      mês, do anterior ou do seguinte (ANTI-DUPLICAÇÃO — pagamentos atravessam
      meses). Rubrica: override de classificacaoMovimentos > regra mais longa
      de classificacaoRegras > 'impostos' se o descritivo casar RE_IMPOSTO >
-     ligado a uma linha de paymentRequests: prestadores → pessoal, senão a
-     categoria do fornecedor da linha (procurado por nome em suppliers);
+     RE_BANCO_PESSOAL (subash|adiantamento|prestador — sem "mattia" nem
+     "prestação": ficam porValidar) > ligado a uma linha de paymentRequests:
+     RE_BANCO_PESSOAL → pessoal, senão a categoria do fornecedor da linha (procurado por nome em suppliers);
      sem ficha ou sem categoria → porValidar > senão rubrica null e
      porValidar. 'fixos' NUNCA vem por via de fornecedor.
    - classificacaoDespesas/{ALIMENTAR,BEBIDAS,PACKAGING,SERVICOS}: a única
@@ -125,8 +126,13 @@ function giocoCustosCanonicoEngine(deps){
 
   // As mesmas regex da resultados.html (decisão da auditoria): prestadores
   // e adiantamentos pagos pela caixa / por pedido são pessoal, não compras.
-  var RE_CAIXA_PESSOAL = /subash|mattia|adiantamento|prestador|presta[cç][aã]o/i;   // caixa E banco residual
-  var RE_PRESTADOR     = /mattia|subash/i;
+  // CAIXA: o motivo é escrito por quem lança e é fiável — mantém os quatro termos de sempre.
+  var RE_CAIXA_PESSOAL = /subash|mattia|adiantamento|prestador/i;
+  // BANCO (residuais e linhas de pedido ligadas): SEM "mattia" e SEM "prestação" (Set/2026,
+  // revertido): um pagamento bancário ao Mattia pode ser margem (cmv) ou consultoria
+  // (outros) e o descritivo não distingue — fica porValidar até o Manel validar, e a
+  // regra aprendida trata das seguintes. "subash" é o único nome de rubrica fixa.
+  var RE_BANCO_PESSOAL = /subash|adiantamento|prestador/i;
   var RE_IMPOSTO = /PAG\.TSU|PAG\.DUC|IMP\.SELO|PAGAMENTO POR CONTA|\bIVA\b|\bIRC\b|\bIUC\b|AUTORIDADE TRIBUT/i;
   var RE_INTERNA = /INTERNA/i;
 
@@ -707,7 +713,7 @@ function giocoCustosCanonicoEngine(deps){
       var despesa = cls ? cls.despesa : null;
       var motivo = null, rasto = null;
       // Prestadores / adiantamentos no descritivo → pessoal (a mesma regex da caixa), abaixo de override e regra.
-      if (!cls && RE_CAIXA_PESSOAL.test(desc + ' ' + (m.creditor_name || ''))){ cls = { rubrica: 'pessoal' }; despesa = m.creditor_name || desc; }
+      if (!cls && RE_BANCO_PESSOAL.test(desc + ' ' + (m.creditor_name || ''))){ cls = { rubrica: 'pessoal' }; despesa = m.creditor_name || desc; }
       if (!cls){
         var pr = linhaPayReq(recPorMov[id] || '') || (inf.linhaPedido[id] ? { linha: inf.linhaPedido[id] } : null);
         if (pr){
@@ -717,7 +723,7 @@ function giocoCustosCanonicoEngine(deps){
           var nomeL = pr.linha.fornecedor || '';
           var fr = fornecedorPorNome(nomeL);
           ent = { tipo: 'fornecedor', id: fr ? fr.id : null, nome: nomeL || desc };
-          if (RE_PRESTADOR.test(nomeL)){ cls = { rubrica: 'pessoal' }; despesa = nomeL; }
+          if (RE_BANCO_PESSOAL.test(nomeL)){ cls = { rubrica: 'pessoal' }; despesa = nomeL; }
           else {
             var catB = fr ? categoriaFornecedor(fr.s) : { rubrica: null, despesa: null, motivo: 'fornecedor "' + (nomeL || desc) + '" sem ficha em suppliers' };
             if (catB.rubrica){ cls = { rubrica: catB.rubrica }; despesa = catB.despesa; rasto = catB.rasto || null; }
@@ -904,7 +910,7 @@ function giocoCustosCanonicoEngine(deps){
 
   return {
     RUBRICAS: RUBRICAS, ORIGENS: ORIGENS, TSU_TAXA_PATRONAL: TSU_TAXA_PATRONAL,
-    RE_CAIXA_PESSOAL: RE_CAIXA_PESSOAL, RE_IMPOSTO: RE_IMPOSTO,
+    RE_CAIXA_PESSOAL: RE_CAIXA_PESSOAL, RE_BANCO_PESSOAL: RE_BANCO_PESSOAL, RE_IMPOSTO: RE_IMPOSTO,
     CATEGORIAS_FORNECEDOR: CATEGORIAS_FORNECEDOR, categoriaFornecedor: categoriaFornecedor,
     inferir: inferir, gerar: gerar, regenerar: regenerar, validar: validar, atualizarResumo: atualizarResumo, garantirDespesas: garantirDespesas,
     resumoDe: resumoDe, mesVizinho: mesVizinho, diasUteis: diasUteis, ultimoDia: ultimoDia

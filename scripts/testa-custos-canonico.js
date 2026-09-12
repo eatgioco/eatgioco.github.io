@@ -54,7 +54,8 @@ function dataset(){
       cx2: { tipo: 'saida', motivo: 'Compra', valor: 0.01, valorDevolvido: 0, estado: 'acertado', dataHora: '2099-01-09T12:00:00Z', semFatura: true, semFaturaDeclaradoPor: 'Teste' },
       cx3: { tipo: 'saida', motivo: 'Depósito bancário', valor: 0.01, dataHora: '2099-01-10T12:00:00Z' },
       cx4: { tipo: 'saida', motivo: 'Adiantamento Subash', valor: 0.01, valorDevolvido: 0, estado: 'acertado', dataHora: '2099-01-11T12:00:00Z', semFatura: true },
-      cx5: { tipo: 'entrada', motivo: 'Reforço de caixa', valor: 0.01, dataHora: '2099-01-11T12:00:00Z' }
+      cx5: { tipo: 'entrada', motivo: 'Reforço de caixa', valor: 0.01, dataHora: '2099-01-11T12:00:00Z' },
+      cx6: { tipo: 'saida', motivo: 'Pagamento Mattia', valor: 0.01, valorDevolvido: 0, estado: 'acertado', dataHora: '2099-01-12T12:00:00Z', semFatura: true }   // caixa: Mattia continua pessoal
     },
     recibos: {
       p1: { '2099-01': { pessoa: { nome: 'Pessoa Teste' }, totais: { sujeito: 0.04, naoSujeito: 0.01 } } },
@@ -118,7 +119,13 @@ function dataset(){
         mK2:  { credit_debit_indicator: 'DBIT', amount: -0.10, booking_date: '2099-01-30', remittance_information: 'CARTOES REFEICAO NOVOS' },   // N3 → p7.cartao + p8.cartao (0,05+0,05)
         mRG:  { credit_debit_indicator: 'DBIT', amount: -2062.50, booking_date: '2099-01-08', remittance_information: 'RENDA GRANDE' },          // N1 → fx9 ("2.062,50")
         mEp:  { credit_debit_indicator: 'DBIT', amount: -0.09, booking_date: '2099-01-16', remittance_information: 'DD.EPAL TESTE SA' },         // N2 variável → fx2 (orçado 0,11 ≠ 0,09)
-        mLuz: { credit_debit_indicator: 'DBIT', amount: -0.37, booking_date: '2099-01-14', remittance_information: 'DD LUZ TESTE DOIS' }         // N2 variável ambíguo (fx10 e fx11 casam) → porValidar
+        mLuz: { credit_debit_indicator: 'DBIT', amount: -0.37, booking_date: '2099-01-14', remittance_information: 'DD LUZ TESTE DOIS' },        // N2 variável ambíguo (fx10 e fx11 casam) → porValidar
+        // ---- prestadores no banco (revertido): "prestação" e "Mattia" ficam porValidar; só "subash" é pessoal ----
+        mMP:  { credit_debit_indicator: 'DBIT', amount: -0.21, booking_date: '2099-01-24', remittance_information: 'MATTIA PRESTACAO 2000 2/3' },
+        mPF:  { credit_debit_indicator: 'DBIT', amount: -0.23, booking_date: '2099-01-24', remittance_information: 'PRESTACAO FT 2099/1' },
+        mSub: { credit_debit_indicator: 'DBIT', amount: -0.24, booking_date: '2099-01-24', remittance_information: 'SUBASH JAN' },
+        mPO:  { credit_debit_indicator: 'DBIT', amount: -0.25, booking_date: '2099-01-25', remittance_information: 'PRESTACAO FT 2099/2' },      // com override → mantém
+        mPRg: { credit_debit_indicator: 'DBIT', amount: -0.26, booking_date: '2099-01-25', remittance_information: 'PRESTACAO MARGEM JAN' }      // com regra aprendida → mantém
       },
       revolut: {
         rX: { credit_debit_indicator: 'DBIT', amount: -0.01, booking_date: '2099-01-21', remittance_information: 'Pedido sem fatura Lda' },
@@ -126,8 +133,8 @@ function dataset(){
         rY: { credit_debit_indicator: 'DBIT', amount: -0.01, booking_date: '2099-01-23', remittance_information: 'Pedido sem ficha Lda' }
       }
     },
-    classificacaoRegras: { r1: { padrao: 'FACEBK', rubrica: 'outros', despesa: 'Meta Ads' } },
-    classificacaoMovimentos: { 'revolut~rO': { rubrica: 'fixos', manual: true, despesa: 'Override Despesa' } },
+    classificacaoRegras: { r1: { padrao: 'FACEBK', rubrica: 'outros', despesa: 'Meta Ads' }, r2: { padrao: 'PRESTACAO MARGEM', rubrica: 'cmv', despesa: 'Margem Mattia' } },
+    classificacaoMovimentos: { 'revolut~rO': { rubrica: 'fixos', manual: true, despesa: 'Override Despesa' }, 'abanca~mPO': { rubrica: 'outros', manual: true, despesa: 'Consultoria' } },
     classificacaoDespesas: { 'META-ADS': { nome: 'Meta Ads', criadoEm: 'x' }, ALIMENTAR: { nome: 'ALIMENTAR', criadoEm: 'x' } },
     custos: {}
   };
@@ -178,7 +185,8 @@ async function main(){
   console.log('registos 2099-01:', ids.join(' '));
   var esperados = ['banco:abanca~mB', 'banco:abanca~mC', 'banco:abanca~mD', 'banco:revolut~rO', 'banco:revolut~rX', 'banco:revolut~rY',
                    'banco:abanca~mSal', 'banco:abanca~mAg', 'banco:abanca~mQ', 'banco:abanca~mN', 'banco:abanca~mPS', 'banco:abanca~mLuz',
-                   'cxf:cx1', 'cxf:cx2', 'cxf:cx4', 'fat:fatA', 'fat:fatB', 'fat:fat2', 'fat:fat3', 'fat:fat4', 'fat:fat5', 'fat:fat6', 'fat:fat7', 'fat:fatSemData',
+                   'banco:abanca~mMP', 'banco:abanca~mPF', 'banco:abanca~mSub', 'banco:abanca~mPO', 'banco:abanca~mPRg',
+                   'cxf:cx1', 'cxf:cx2', 'cxf:cx4', 'cxf:cx6', 'fat:fatA', 'fat:fatB', 'fat:fat2', 'fat:fat3', 'fat:fat4', 'fat:fat5', 'fat:fat6', 'fat:fat7', 'fat:fatSemData',
                    'fat:fatP', 'fat:fatQ1', 'fat:fatQ2',
                    'fixo:fx1', 'fixo:fx2', 'fixo:fx3', 'fixo:fx4', 'fixo:fx5', 'fixo:fx6', 'fixo:fx9', 'fixo:fx10', 'fixo:fx11',
                    'rec:p1', 'rec:p2', 'rec:p3', 'rec:p4', 'rec:p5', 'rec:p6', 'rec:p7', 'rec:p8', 'tsu'].sort();
@@ -244,7 +252,12 @@ async function main(){
   assert.strictEqual(porId['fat:fatQ1'].pagamento.estado, 'pendente'); assert.strictEqual(porId['fat:fatQ2'].pagamento.estado, 'pendente');
   assert.strictEqual(porId['banco:abanca~mAg'].validacao.estado, 'porValidar');
   assert.deepStrictEqual([porId['banco:abanca~mN'].rubrica, porId['banco:abanca~mN'].despesa, porId['banco:abanca~mN'].entidade.id], ['outros', 'SERVICOS', 'sup4'], 'N4 sem fatura: banco: classificado pelo fornecedor da linha');
-  assert.deepStrictEqual([porId['banco:abanca~mPS'].rubrica, porId['banco:abanca~mPS'].validacao.estado], ['pessoal', 'auto'], 'PRESTACAO → pessoal');
+  // prestadores no banco (revertido Set/2026): sem heurística para "prestação"/"Mattia"
+  ['mPS', 'mMP', 'mPF'].forEach(function(k){ var r = porId['banco:abanca~' + k]; assert.strictEqual(r.rubrica, null, k + ' sem rubrica'); assert.strictEqual(r.validacao.estado, 'porValidar', k + ' porValidar'); });
+  assert.deepStrictEqual([porId['banco:abanca~mSub'].rubrica, porId['banco:abanca~mSub'].validacao.estado], ['pessoal', 'auto'], 'SUBASH → pessoal');
+  assert.deepStrictEqual([porId['cxf:cx6'].rubrica, porId['cxf:cx6'].validacao.estado], ['pessoal', 'porValidar'], 'caixa: motivo com Mattia continua pessoal (porValidar só por ser sem fatura)');
+  assert.deepStrictEqual([porId['banco:abanca~mPO'].rubrica, porId['banco:abanca~mPO'].despesa, porId['banco:abanca~mPO'].validacao.estado], ['outros', 'Consultoria', 'auto'], 'override vence');
+  assert.deepStrictEqual([porId['banco:abanca~mPRg'].rubrica, porId['banco:abanca~mPRg'].despesa, porId['banco:abanca~mPRg'].validacao.estado], ['cmv', 'Margem Mattia', 'auto'], 'regra aprendida vence');
   assert.strictEqual(porId['banco:abanca~mC'].validacao.estado, 'auto', 'regra aprendida vence uma ambiguidade de valor');
   assert.strictEqual(porId['banco:revolut~rO'].validacao.estado, 'auto', 'override vence uma ambiguidade de valor');
   // nenhum euro contado duas vezes: cada movimento inferido aparece em exactamente um registo
@@ -252,8 +265,8 @@ async function main(){
   // (excepção: um movimento de N3 paga VÁRIOS recibos de uma vez — aparece em cada um, mas os valores vêm dos totais dos recibos, não do movimento)
   plano.registos.forEach(function(r){ (r.pagamento.movimentoIds || []).forEach(function(id){ if (vistos[id] && !(r.pagamento.nivel === 3 && vistos[id].nivel === 3)) assert.fail(id + ' em dois registos: ' + vistos[id].id + ' e ' + r.id); vistos[id] = { id: r.id, nivel: r.pagamento.nivel }; }); });
   var somaMovs = plano.registos.filter(function(r){ return r.origem === 'banco'; }).reduce(function(a, r){ return a + r.valor; }, 0);
-  console.log('banco: residual =', somaMovs.toFixed(2), '(mB mC mD rO rX rY mSal mAg mQ mN mPS mLuz = 0,72)');
-  assert.strictEqual(Math.round(somaMovs * 100), 72);
+  console.log('banco: residual =', somaMovs.toFixed(2), '(0,72 + mMP mPF mSub mPO mPRg 1,19 = 1,91)');
+  assert.strictEqual(Math.round(somaMovs * 100), 191);
   assert.strictEqual(porId['cxf:cx2'].validacao.estado, 'porValidar');
   assert.strictEqual(porId['cxf:cx4'].rubrica, 'pessoal');
   assert.strictEqual(porId['rec:p1'].valor, 0.05);
@@ -281,35 +294,35 @@ async function main(){
   var r3 = await CC.regenerar('2099-01');
   console.log('regenerar ×3: escritos', r1.escritos, r2.escritos, r3.escritos, '| registos', n1, registos(store, '2099-01').length, '| total', tot1, '| porValidar', r3.resumo.porValidar);
   console.log('porRubrica:', t1);
-  assert.strictEqual(r1.escritos, 45); assert.strictEqual(r2.escritos, 0); assert.strictEqual(r3.escritos, 0);
+  assert.strictEqual(r1.escritos, 51); assert.strictEqual(r2.escritos, 0); assert.strictEqual(r3.escritos, 0);
   assert.deepStrictEqual(Object.keys(store.classificacaoDespesas).sort(), ['BEBIDAS', 'PACKAGING', 'SERVICOS'], 'classificacaoDespesas: só as que faltavam (ALIMENTAR já existia)');
   assert.strictEqual(registos(store, '2099-01').length, n1);
   assert.strictEqual(JSON.stringify(store.custos['2099-01']._resumo.porRubrica), t1);
   assert.strictEqual(store.custos['2099-01']._resumo.total, tot1);
-  assert.strictEqual(r3.resumo.porValidar, 13, 'fatB, fat5, fatSemData, cx2, cx4, mD, rY, mSal, mAg, mQ, mLuz, fx10, fx11');
+  assert.strictEqual(r3.resumo.porValidar, 17, 'fatB, fat5, fatSemData, cx2, cx4, cx6, mD, rY, mSal, mAg, mQ, mLuz, fx10, fx11, mPS, mMP, mPF');
 
   // 3) validado à mão sobrevive à regeneração
   await CC.validar('2099-01', 'banco:abanca~mD', { rubrica: 'outros', despesa: 'Despesa Humana', validadoPor: 'Teste' });
   assert.strictEqual(store.custos['2099-01']['banco:abanca~mD'].validacao.estado, 'validado');
-  assert.strictEqual(store.custos['2099-01']._resumo.porValidar, 12);
+  assert.strictEqual(store.custos['2099-01']._resumo.porValidar, 16);
   var r4 = await CC.regenerar('2099-01');
   var mD = store.custos['2099-01']['banco:abanca~mD'];
   assert.strictEqual(mD.rubrica, 'outros', 'rubrica humana preservada'); assert.strictEqual(mD.despesa, 'Despesa Humana');
   assert.strictEqual(mD.validacao.estado, 'validado'); assert.strictEqual(mD.validacao.validadoPor, 'Teste');
   assert.strictEqual(r4.escritos, 0, 'nada muda ao regenerar depois de validar');
-  assert.strictEqual(r4.resumo.porValidar, 12);
-  assert.strictEqual(r4.resumo.porRubrica.outros, 0.13, 'mC + mD + fat4 + fat7 + rX + mN(0,08)');
+  assert.strictEqual(r4.resumo.porValidar, 16);
+  assert.strictEqual(r4.resumo.porRubrica.outros, 0.38, 'mC + mD + fat4 + fat7 + rX + mN(0,08) + mPO(0,25)');
 
   // 4) origem deixa de produzir → anulado:true, nunca remove; volta → anulado sai
   var fatB = d.faturasProcessadas.fatB; delete d.faturasProcessadas.fatB;
   var r5 = await CC.regenerar('2099-01');
   assert.strictEqual(r5.anulados, 1); assert.strictEqual(store.custos['2099-01']['fat:fatB'].anulado, true);
   assert.ok(store.custos['2099-01']['fat:fatB'].anuladoEm);
-  assert.strictEqual(r5.resumo.porValidar, 11);
+  assert.strictEqual(r5.resumo.porValidar, 15);
   d.faturasProcessadas.fatB = fatB;
   await CC.regenerar('2099-01');
   assert.strictEqual(store.custos['2099-01']['fat:fatB'].anulado, undefined);
-  assert.strictEqual(store.custos['2099-01']._resumo.porValidar, 12);
+  assert.strictEqual(store.custos['2099-01']._resumo.porValidar, 16);
 
   // 4b) migração: um mês gerado pela regra antiga (cmv cego, despesa = nome) migra sem duplicar
   var antigo = JSON.parse(JSON.stringify(store.custos['2099-01']['fat:fat4']));
