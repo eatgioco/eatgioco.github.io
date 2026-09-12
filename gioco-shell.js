@@ -305,6 +305,9 @@
       { href: 'tesouraria.html', icone: 'receipt',          label: 'Tesouraria' },
       { href: 'calendario.html', icone: 'calendar',         label: 'Calendário' },
       { href: 'tarefas.html',    icone: 'pencil',           label: 'Tarefas' },
+      /* Obrigações: motor de obrigações/projetos do Manel (Fase 1, Set/2026).
+         Página pessoal — só no conjunto privado, nunca no público nem no index. */
+      { href: 'obrigacoes.html', icone: 'clipboard-check',  label: 'Obrigações' },
       /* conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
          é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. */
       { href: 'conta-bancaria.html?conta=abanca', icone: 'trending-up', label: 'Conta bancária' }

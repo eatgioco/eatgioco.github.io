@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Obrigações">
+<!-- Página pessoal do Manel, usada também ao telemóvel (despejar o que há a fazer
+     onde quer que esteja): viewport device-width + opt-in shell-mobile, como a
+     tesouraria e o calendário. Sem @media próprios — só regras body.shell-touch. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO OS · Obrigações</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="gioco-obrigacoes.js"></script>
+
+<style>
+  body{ -webkit-font-smoothing:antialiased; }
+
+  .page-subtitle{ margin:0 0 4px; font-size:13px; color:var(--muted); }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  main{ padding:20px 0 80px; }
+  .card > *{ position:relative; z-index:1; }
+  .card{ margin-top:18px; }
+
+  /* ---------- Captura ---------- */
+  .cap-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .cap-row input[type="text"]{
+    flex:1 1 260px; min-width:0; padding:12px 14px; border:2px solid var(--line); border-radius:12px;
+    background:var(--dough); font-family:'Inter',sans-serif; font-size:15px; color:var(--ink);
+  }
+  .cap-row input[type="text"]:focus{ outline:none; border-color:var(--ink); }
+  .cap-row select, .sel{
+    padding:10px 12px; border:1.5px solid var(--line); border-radius:100px; background:var(--white);
+    font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); cursor:pointer; max-width:220px;
+  }
+  .chip{
+    display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border:1.5px solid var(--line);
+    border-radius:100px; background:var(--white); font-family:'Inter',sans-serif; font-size:12.5px;
+    font-weight:600; color:var(--ink); cursor:pointer; white-space:nowrap;
+  }
+  .chip:hover{ border-color:var(--ink); }
+  .chip input{ width:56px; border:none; background:transparent; font:inherit; color:var(--ink); text-align:right; }
+  .chip input:focus{ outline:none; }
+  .cap-hint{ margin:10px 0 0; font-size:12px; color:var(--muted); }
+
+  /* ---------- Indicadores ---------- */
+  .ind-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
+  .ind{ flex:1 1 180px; border-radius:14px; padding:14px 18px; }
+  .ind .k-label{ font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px; }
+  .ind .k-valor{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:26px; font-weight:700; line-height:1; }
+  .ind.alerta .k-valor{ color:var(--red-ink); }
+
+  /* ---------- Secções e linhas ---------- */
+  .sec{ margin-top:26px; }
+  .sec-title{
+    display:flex; align-items:baseline; gap:8px; margin:0 0 10px; font-family:'Inter',sans-serif;
+    font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  }
+  .sec-title .n{ color:var(--ink); }
+  .lista{ display:flex; flex-direction:column; gap:8px; }
+  .linha{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px;
+    background:var(--white); border:1px solid var(--line); border-radius:12px; color:var(--ink); font-size:14px;
+  }
+  .linha.vencida{ border-left:4px solid var(--red); }
+  .linha.hoje-prazo{ border-left:4px solid var(--amber); }
+  .linha.fechada{ opacity:.65; }
+  .linha.fechada .t{ text-decoration:line-through; color:var(--muted); }
+  .l-main{ flex:1 1 240px; min-width:0; }
+  .t{ font-weight:600; word-break:break-word; }
+  .l-meta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; font-size:12px; color:var(--muted); }
+  .l-meta .num{ font-variant-numeric:tabular-nums; }
+  .l-meta .proj{ color:var(--ink); font-weight:600; }
+  .l-meta .parado{ font-weight:600; }
+  .l-meta .parado.muito{ color:var(--red-ink); }
+  .l-meta .prazo-late{ color:var(--red-ink); font-weight:700; }
+  .l-meta .prazo-hoje{ color:var(--amber); font-weight:700; }
+  .l-meta .adiada{ color:var(--amber); }
+  .l-meta button{ background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; text-decoration:underline dotted var(--muted); }
+  .l-meta button:hover{ color:var(--ink); }
+  .l-acoes{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .b{
+    padding:7px 11px; border:1.5px solid var(--line); border-radius:100px; background:var(--white);
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .b:hover{ border-color:var(--ink); }
+  .b.ok{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .b.ok:hover{ background:var(--red); border-color:var(--red); color:var(--on-red); }
+  .b.perigo:hover{ border-color:var(--red); color:var(--red-ink); }
+  .b:disabled{ opacity:.5; cursor:default; }
+  .b.icone{ padding:6px 8px; }
+
+  /* Concluir: pergunta inline do tempo real */
+  .concluir-box{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-basis:100%; padding-top:8px; border-top:1px dashed var(--line); font-size:13px; }
+  .concluir-box input{ width:70px; padding:7px 9px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; color:var(--ink); text-align:right; }
+  .concluir-box input:focus{ outline:none; border-color:var(--ink); }
+  .inline-date{ padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; background:var(--dough); font:inherit; font-size:12px; color:var(--ink); }
+
+  .vazio{ padding:28px 20px; text-align:center; font-size:14px; color:var(--muted); border:2px dashed var(--line); border-radius:12px; }
+  .loading-state{ font-size:12px; color:var(--muted); margin:28px 0 0; }
+
+  details.fold summary{ cursor:pointer; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  details.fold summary:hover{ color:var(--ink); }
+
+  /* ---------- Vista de projeto ---------- */
+  .proj-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .proj-head h2{ margin:0; font-family:'Inter',sans-serif; font-size:18px; font-weight:700; flex:1 1 200px; }
+  .proj-sub{ margin:6px 0 0; font-size:12.5px; color:var(--muted); }
+  .passo-ordem{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:12px; font-weight:700; color:var(--red); width:26px; flex-shrink:0; }
+  .passo-deps{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:6px; font-size:12px; color:var(--muted); }
+  .dep-chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:100px; background:var(--dough); border:1px solid var(--line); font-size:11.5px; color:var(--ink); }
+  .dep-chip.pendente{ border-color:var(--amber); }
+  .dep-chip button{ background:none; border:none; padding:0 0 0 2px; cursor:pointer; color:var(--muted); font-size:12px; line-height:1; }
+  .dep-chip button:hover{ color:var(--red-ink); }
+  .passo-deps select{ padding:3px 8px; border:1px solid var(--line); border-radius:100px; background:var(--white); font:inherit; font-size:11.5px; color:var(--ink); max-width:200px; }
+  .bloqueada-tag{ font-size:11px; font-weight:700; color:var(--amber); }
+  .decompor-box{ margin-top:14px; display:none; }
+  .decompor-box.on{ display:block; }
+  .decompor-box textarea{
+    width:100%; min-height:130px; padding:12px 14px; border:2px solid var(--line); border-radius:12px; background:var(--dough);
+    font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); resize:vertical; box-sizing:border-box;
+  }
+  .decompor-box textarea:focus{ outline:none; border-color:var(--ink); }
+  .decompor-acoes{ display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
+
+  .status.parado{ background:var(--blush); color:#141414; }
+  [data-theme="dark"] .status.parado{ color:#141414; }
+
+  /* ---------- Toque (sem hover): alvos maiores, acções em linha própria ---------- */
+  body.shell-touch .l-acoes{ flex-basis:100%; }
+  body.shell-touch .b{ padding:10px 14px; font-size:13px; }
+  body.shell-touch .cap-row select{ max-width:100%; }
+</style>
+</head>
+<body class="shell-mobile">
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel privado</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('obrigacoes.html', 'privada');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Manel</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-clipboard-check"/></svg>GIOCO · <b>Obrigações</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Próxima ação de cada projeto — nada sai daqui sem ser concluído ou anulado</p>
+
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main id="main">
+
+  <!-- ===== Vista principal ===== -->
+  <div id="vistaPrincipal">
+    <div class="card glass-light">
+      <div class="cap-row">
+        <input type="text" id="capInput" placeholder="O que tens de fazer? Enter cria. Colar várias linhas cria várias." autocomplete="off">
+        <select id="capProjeto" title="Projeto"><option value="">Sem projeto</option></select>
+        <span class="chip" id="capDuracaoChip" title="Duração prevista por omissão (clica para alterar)">
+          <svg class="icon" width="13" height="13"><use href="#i-clock"/></svg>
+          <input type="number" id="capDuracao" min="1" step="5" value="30" aria-label="Duração prevista em minutos"> min
+        </span>
+        <button type="button" class="btn-add" id="capBtn">Criar</button>
+      </div>
+      <p class="cap-hint">Uma linha por item, sem campos. A duração só se pede se quiseres mudar os 30 min por omissão.</p>
+    </div>
+
+    <p class="loading-state" id="loadingState">A carregar…</p>
+
+    <div class="ind-row" id="indRow" style="display:none;">
+      <div class="ind glass-light" id="indAbertas"><div class="k-label">Obrigações abertas</div><div class="k-valor num" id="indAbertasN">0</div></div>
+      <div class="ind glass-light" id="indParados"><div class="k-label">Projetos parados há mais de 14 dias</div><div class="k-valor num" id="indParadosN">0</div></div>
+      <div class="ind glass-light" id="indProjetos"><div class="k-label">Projetos ativos</div><div class="k-valor num" id="indProjetosN">0</div></div>
+    </div>
+
+    <div id="conteudo" style="display:none;">
+      <div class="sec" id="secParados" style="display:none;">
+        <p class="sec-title">Parados há mais de 14 dias <span class="n" id="nParados"></span></p>
+        <div class="lista" id="listaParados"></div>
+      </div>
+
+      <div class="sec">
+        <p class="sec-title">Próxima ação por projeto <span class="n" id="nProjetos"></span></p>
+        <div class="lista" id="listaProjetos"></div>
+      </div>
+
+      <div class="sec" id="secBloqueados" style="display:none;">
+        <p class="sec-title">Projetos com todos os passos bloqueados <span class="n" id="nBloqueados"></span></p>
+        <div class="lista" id="listaBloqueados"></div>
+      </div>
+
+      <div class="sec" id="secSemPassos" style="display:none;">
+        <p class="sec-title">Projetos sem passos abertos <span class="n" id="nSemPassos"></span></p>
+        <div class="lista" id="listaSemPassos"></div>
+      </div>
+
+      <div class="sec">
+        <p class="sec-title">Obrigações soltas <span class="n" id="nSoltas"></span></p>
+        <div class="lista" id="listaSoltas"></div>
+      </div>
+
+      <details class="sec fold" id="secFechadas">
+        <summary id="sumFechadas">Concluídas e anuladas (0)</summary>
+        <div class="lista" id="listaFechadas"></div>
+      </details>
+
+      <details class="sec fold" id="secProjFechados">
+        <summary id="sumProjFechados">Projetos concluídos e anulados (0)</summary>
+        <div class="lista" id="listaProjFechados"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ===== Vista de projeto ===== -->
+  <div id="vistaProjeto" style="display:none;">
+    <div class="card glass-light">
+      <div class="proj-head">
+        <button type="button" class="b" id="projVoltar"><svg class="icon" width="14" height="14"><use href="#i-chevron-left"/></svg> Voltar</button>
+        <h2 id="projNome"></h2>
+        <span class="status" id="projEstado"></span>
+        <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Decompor</button>
+        <button type="button" class="b" id="projConcluirBtn">Concluir projeto</button>
+        <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
+      </div>
+      <p class="proj-sub" id="projSub"></p>
+      <div class="decompor-box" id="decomporBox">
+        <textarea id="decomporTexto" placeholder="Um passo por linha. Ficam com ordem sequencial a seguir aos passos existentes e a duração por omissão."></textarea>
+        <div class="decompor-acoes">
+          <button type="button" class="btn-add" id="decomporCriar">Criar passos</button>
+          <button type="button" class="b" id="decomporCancelar">Cancelar</button>
+          <span id="decomporInfo"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title">Passos <span class="n" id="nPassos"></span></p>
+      <div class="lista" id="listaPassos"></div>
+    </div>
+  </div>
+
+</main>
+
+    </div>
+  </div>
+</div>
+<div class="nav-overlay" id="navOverlay"></div>
+
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  autenticarEContinuar(function () {
+  var db = firebase.database();
+  var G = window.GiocoObrigacoes;
+
+  /* ESCRITAS (ver CLAUDE.md, nós obrigacoes/ e projetos/):
+     criar = push().set() do objeto completo — o ÚNICO set() no nó do registo;
+     tudo o resto = update() por caminho no nó do registo ou set() numa folha.
+     NUNCA remove(): concluir e anular são estados/flags, e uma obrigação aberta
+     só sai da vista por ação explícita. */
+  var obrigacoesRef = db.ref('obrigacoes');
+  var projetosRef = db.ref('projetos');
+
+  var obrs = {};
+  var projs = {};
+  var obrsCarregadas = false, projsCarregados = false;
+  var projetoAberto = null;      // id do projeto na vista de projeto
+  var concluirEmCurso = null;    // id da obrigação com a pergunta do tempo aberta
+  var prazoEmEdicao = null;      // id com o date input aberto
+  var duracaoEmEdicao = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function agoraISO() { return new Date().toISOString(); }
+  function icone(n, s) { s = s || 14; return '<svg class="icon" width="' + s + '" height="' + s + '"><use href="#i-' + n + '"/></svg>'; }
+  function fmtData(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
+  }
+  function fmtDataHora(iso) {
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return '—';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function duracaoDefault() {
+    var n = parseInt($('capDuracao').value, 10);
+    return n > 0 ? n : G.DURACAO_DEFAULT;
+  }
+  function numOuNull(v) { var n = parseInt(v, 10); return n > 0 ? n : null; }
+  function projetoDe(obr) { return obr && obr.projetoId ? projs[obr.projetoId] : null; }
+  function nomeProjeto(pid) { var p = projs[pid]; return p ? p.nome : '(projeto apagado)'; }
+  function depsDe(obr) {
+    var d = obr && obr.dependeDe;
+    if (!d) return [];
+    return Array.isArray(d) ? d.slice() : Object.keys(d).map(function (k) { return d[k]; });
+  }
+
+  /* ---------- Escritas ---------- */
+  function criarObrigacao(titulo, projetoId, ordem, duracao) {
+    var ref = obrigacoesRef.push();
+    var reg = {
+      titulo: titulo,
+      projetoId: projetoId || null,
+      ordem: typeof ordem === 'number' ? ordem : null,
+      duracaoPrevista: duracao || G.DURACAO_DEFAULT,
+      duracaoReal: null,
+      prazo: null,
+      dependeDe: null,
+      estado: 'aberta',
+      origem: 'manual',
+      criadoEm: agoraISO(),
+      adiada: 0
+    };
+    return ref.set(reg).then(function () { return ref.key; });
+  }
+  // antesDeGravar(id) corre ANTES do set(): o 'value' local dispara logo,
+  // antes de a Promise resolver, e quem quer reagir ao id novo tem de o saber já.
+  function criarProjeto(nome, antesDeGravar) {
+    var ref = projetosRef.push();
+    var t = agoraISO();
+    if (antesDeGravar) antesDeGravar(ref.key);
+    return ref.set({ nome: nome, estado: 'ativo', criadoEm: t, ultimoAvancoEm: t, anulado: false })
+      .then(function () { return ref.key; });
+  }
+  function marcarAvanco(pid) {
+    if (!pid || !projs[pid]) return Promise.resolve();
+    return projetosRef.child(pid).child('ultimoAvancoEm').set(agoraISO());
+  }
+  function concluir(id, duracaoReal) {
+    var o = obrs[id]; if (!o || !G.estaAberta(o)) return Promise.resolve();
+    return obrigacoesRef.child(id).update({ estado: 'concluida', concluidaEm: agoraISO(), duracaoReal: duracaoReal })
+      .then(function () { return marcarAvanco(o.projetoId); });
+  }
+  function adiar(id) {
+    var o = obrs[id]; if (!o) return;
+    obrigacoesRef.child(id).child('adiada').set((o.adiada || 0) + 1).catch(erroEscrita);
+  }
+  function anular(id) {
+    var o = obrs[id]; if (!o) return;
+    if (!confirm('Anular «' + o.titulo + '»? Fica registada como anulada (nunca é apagada).')) return;
+    obrigacoesRef.child(id).update({ estado: 'anulada', anulado: true, anuladoEm: agoraISO() }).catch(erroEscrita);
+  }
+  function setFolha(id, campo, valor) {
+    obrigacoesRef.child(id).child(campo).set(valor).catch(erroEscrita);
+  }
+  function erroEscrita(e) {
+    console.error('Falha ao gravar:', e);
+    alert('Falha ao gravar no Firebase: ' + (e && e.message ? e.message : e));
+  }
+
+  function maxOrdem(pid) {
+    var m = 0;
+    G.passosDoProjeto(pid, obrs).forEach(function (o) { if (typeof o.ordem === 'number' && o.ordem > m) m = o.ordem; });
+    return m;
+  }
+
+  /* ---------- Captura ---------- */
+  function linhasDe(texto) {
+    return String(texto || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function capturar(linhasColadas) {
+    var input = $('capInput');
+    // Um <input> de uma linha descarta os \n ao receber valor: as linhas coladas
+    // chegam aqui directamente, nunca passam pelo value.
+    var linhas = linhasDe(input.value).concat(linhasColadas || []);
+    if (!linhas.length) return;
+    var pid = $('capProjeto').value || null;
+    var dur = duracaoDefault();
+    var base = pid ? maxOrdem(pid) : null;
+    input.value = '';
+    var seq = Promise.resolve();
+    linhas.forEach(function (t, i) {
+      seq = seq.then(function () { return criarObrigacao(t, pid, pid ? base + i + 1 : null, dur); });
+    });
+    seq.then(function () { if (pid) return marcarAvanco(pid); }).catch(erroEscrita);
+    input.focus();
+  }
+  $('capBtn').addEventListener('click', function () { capturar(); });
+  $('capInput').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); capturar(); }
+  });
+  // Colar várias linhas: cada linha é um item. O input de uma linha achataria o
+  // texto — intercepta-se o paste e cria-se logo.
+  $('capInput').addEventListener('paste', function (ev) {
+    var txt = ev.clipboardData && ev.clipboardData.getData('text');
+    if (!txt || txt.indexOf('\n') < 0) return;
+    ev.preventDefault();
+    capturar(linhasDe(txt));
+  });
+  $('capProjeto').addEventListener('change', function () {
+    if (this.value !== '__novo') return;
+    var nome = prompt('Nome do novo projeto:');
+    nome = nome ? nome.trim() : '';
+    if (!nome) { this.value = ''; return; }
+    var sel = this;
+    criarProjeto(nome, function (id) { sel.dataset.pendente = id; }).catch(erroEscrita);
+  });
+  $('capDuracao').addEventListener('change', function () {
+    if (!(parseInt(this.value, 10) > 0)) this.value = G.DURACAO_DEFAULT;
+  });
+
+  function renderSelectProjetos() {
+    var sel = $('capProjeto');
+    var atual = sel.dataset.pendente || sel.value;
+    // O pendente só se consome quando o projeto já chegou ao snapshot.
+    if (sel.dataset.pendente && projs[sel.dataset.pendente]) delete sel.dataset.pendente;
+    var html = '<option value="">Sem projeto</option>';
+    Object.keys(projs).filter(function (id) { var p = projs[id]; return p && p.estado === 'ativo' && p.anulado !== true; })
+      .sort(function (a, b) { return (projs[a].nome || '').localeCompare(projs[b].nome || ''); })
+      .forEach(function (id) { html += '<option value="' + escapeHtml(id) + '">' + escapeHtml(projs[id].nome) + '</option>'; });
+    html += '<option value="__novo">+ Novo projeto…</option>';
+    sel.innerHTML = html;
+    sel.value = projs[atual] ? atual : '';
+  }
+
+  /* ---------- Render: vista principal ---------- */
+  function metaPrazo(obr, hoje) {
+    if (!obr.prazo) return '';
+    var n = G.diasEntre(obr.prazo, hoje);
+    var cls = n === null ? '' : n > 0 ? 'prazo-late' : n === 0 ? 'prazo-hoje' : '';
+    var txt = 'Prazo ' + fmtData(obr.prazo);
+    if (n !== null && n > 0) txt += ' · vencido há ' + n + (n === 1 ? ' dia' : ' dias');
+    else if (n === 0) txt += ' · hoje';
+    return '<span class="' + cls + '">' + txt + '</span>';
+  }
+  function metaParado(dias) {
+    if (dias === null || dias === undefined) return '';
+    var muito = dias > G.LIMITE_PARADO_DIAS;
+    var txt = dias === 0 ? 'com avanço hoje' : 'parado há ' + dias + (dias === 1 ? ' dia' : ' dias');
+    return '<span class="parado' + (muito ? ' muito' : '') + '">' + txt + '</span>';
+  }
+  function classePrazo(obr, hoje) {
+    var g = G.grupoPrazo(obr, hoje);
+    if (g !== 0) return '';
+    return G.diasEntre(obr.prazo, hoje) > 0 ? 'vencida' : 'hoje-prazo';
+  }
+
+  function linhaObrigacao(obr, opts) {
+    opts = opts || {};
+    var hoje = G.hojeISO();
+    var aberta = G.estaAberta(obr);
+    var p = projetoDe(obr);
+    var cls = 'linha' + (aberta ? ' ' + classePrazo(obr, hoje) : ' fechada');
+    var meta = [];
+    if (p && !opts.semProjeto) meta.push('<span class="proj">' + escapeHtml(p.nome) + '</span>');
+    else if (obr.projetoId && !p) meta.push('<span>(projeto apagado)</span>');
+    if (aberta && duracaoEmEdicao === obr.id) {
+      meta.push('<span><input type="number" class="inline-date" style="width:64px" min="1" step="5" value="' + escapeHtml(obr.duracaoPrevista) + '" data-duracao="' + escapeHtml(obr.id) + '" autofocus> min</span>');
+    } else {
+      meta.push('<span class="num">' + (aberta ? '<button type="button" data-acao="editar-duracao" title="Alterar duração prevista">' : '') + (obr.duracaoPrevista || '—') + ' min previstos' + (aberta ? '</button>' : '') + '</span>');
+    }
+    if (obr.estado === 'concluida' && obr.duracaoReal) meta.push('<span class="num">' + obr.duracaoReal + ' min reais</span>');
+    if (aberta && prazoEmEdicao === obr.id) {
+      meta.push('<span><input type="date" class="inline-date" value="' + escapeHtml(obr.prazo || '') + '" data-prazo="' + escapeHtml(obr.id) + '"> <button type="button" data-acao="limpar-prazo">sem prazo</button></span>');
+    } else if (obr.prazo) {
+      meta.push(aberta ? '<button type="button" data-acao="editar-prazo" title="Alterar prazo">' + metaPrazo(obr, hoje) + '</button>' : metaPrazo(obr, hoje));
+    } else if (aberta) {
+      meta.push('<button type="button" data-acao="editar-prazo">+ prazo</button>');
+    }
+    if (opts.diasParado !== undefined && opts.diasParado !== null) meta.push(metaParado(opts.diasParado));
+    if (obr.adiada > 0) meta.push('<span class="adiada">adiada ' + obr.adiada + '×</span>');
+    if (obr.estado === 'concluida') meta.push('<span>concluída ' + fmtDataHora(obr.concluidaEm) + '</span>');
+    if (obr.estado === 'anulada') meta.push('<span>anulada ' + fmtDataHora(obr.anuladoEm) + '</span>');
+    if (opts.abertasNoProjeto > 1) meta.push('<span class="num">+' + (opts.abertasNoProjeto - 1) + ' passos abertos a seguir</span>');
+
+    var acoes = '';
+    if (aberta) {
+      acoes += '<button type="button" class="b ok" data-acao="concluir" title="Concluir">✓ Concluir</button>';
+      acoes += '<button type="button" class="b" data-acao="adiar" title="Adiar (conta quantas vezes)">Adiar</button>';
+      acoes += '<button type="button" class="b perigo" data-acao="anular" title="Anular">Anular</button>';
+    }
+    if (p && !opts.semProjeto) acoes += '<button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(obr.projetoId) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button>';
+
+    var concluirBox = '';
+    if (aberta && concluirEmCurso === obr.id) {
+      concluirBox = '<div class="concluir-box">Quanto tempo demorou de facto? ' +
+        '<input type="number" min="1" step="5" value="' + escapeHtml(obr.duracaoPrevista || G.DURACAO_DEFAULT) + '" data-real="' + escapeHtml(obr.id) + '" aria-label="Minutos reais"> min ' +
+        '<button type="button" class="b ok" data-acao="confirmar-concluir">✓ OK</button>' +
+        '<button type="button" class="b" data-acao="cancelar-concluir">Cancelar</button></div>';
+    }
+
+    return '<div class="' + cls + '" data-id="' + escapeHtml(obr.id) + '">' +
+      (opts.ordem !== undefined ? '<span class="passo-ordem num">' + escapeHtml(opts.ordem) + '</span>' : '') +
+      '<div class="l-main"><div class="t">' + escapeHtml(obr.titulo) + '</div>' +
+      '<div class="l-meta">' + meta.join('') + '</div>' + (opts.extra || '') + '</div>' +
+      '<div class="l-acoes">' + (opts.acoesExtra || '') + acoes + '</div>' + concluirBox + '</div>';
+  }
+
+  function linhaProjetoSimples(p, dias, nota) {
+    return '<div class="linha" data-projeto-linha="' + escapeHtml(p.id) + '"><div class="l-main"><div class="t">' + escapeHtml(p.nome) + '</div>' +
+      '<div class="l-meta">' + (nota ? '<span>' + nota + '</span>' : '') + metaParado(dias) + '</div></div>' +
+      '<div class="l-acoes"><button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(p.id) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button></div></div>';
+  }
+
+  function renderPrincipal() {
+    if (!obrsCarregadas || !projsCarregados) return;
+    $('loadingState').style.display = 'none';
+    $('indRow').style.display = '';
+    $('conteudo').style.display = '';
+    renderSelectProjetos();
+
+    var hoje = G.hojeISO();
+    var v = G.vistaProximaAcao(obrs, projs, hoje);
+    var nAtivos = Object.keys(projs).filter(function (id) { var p = projs[id]; return p && p.estado === 'ativo' && p.anulado !== true; }).length;
+
+    $('indAbertasN').textContent = v.totalAbertas;
+    $('indParadosN').textContent = v.parados.length;
+    $('indParados').classList.toggle('alerta', v.parados.length > 0);
+    $('indProjetosN').textContent = nAtivos;
+
+    // Parados > 14 dias: indicador visível no topo, além do selo em cada linha.
+    $('secParados').style.display = v.parados.length ? '' : 'none';
+    $('nParados').textContent = '(' + v.parados.length + ')';
+    $('listaParados').innerHTML = v.parados.map(function (x) {
+      var prox = G.proximaAcao(x.projeto.id, obrs);
+      return linhaProjetoSimples(x.projeto, x.diasParado, prox ? 'próxima: ' + escapeHtml(prox.titulo) : 'sem próxima ação desbloqueada');
+    }).join('');
+
+    $('nProjetos').textContent = '(' + v.projetos.length + ')';
+    $('listaProjetos').innerHTML = v.projetos.length
+      ? v.projetos.map(function (x) { return linhaObrigacao(x.obr, { diasParado: x.diasParado, abertasNoProjeto: x.abertasNoProjeto }); }).join('')
+      : '<div class="vazio">Nenhum projeto ativo com passos abertos.</div>';
+
+    $('secBloqueados').style.display = v.bloqueados.length ? '' : 'none';
+    $('nBloqueados').textContent = '(' + v.bloqueados.length + ')';
+    $('listaBloqueados').innerHTML = v.bloqueados.map(function (x) {
+      return linhaProjetoSimples(x.projeto, x.diasParado, x.abertas + (x.abertas === 1 ? ' passo aberto' : ' passos abertos') + ', todos à espera de dependências');
+    }).join('');
+
+    $('secSemPassos').style.display = v.semPassos.length ? '' : 'none';
+    $('nSemPassos').textContent = '(' + v.semPassos.length + ')';
+    $('listaSemPassos').innerHTML = v.semPassos.map(function (x) {
+      return linhaProjetoSimples(x.projeto, x.diasParado, 'sem passos abertos — decompor ou concluir');
+    }).join('');
+
+    $('nSoltas').textContent = '(' + v.soltas.length + ')';
+    $('listaSoltas').innerHTML = v.soltas.length
+      ? v.soltas.map(function (x) { return linhaObrigacao(x.obr, {}); }).join('')
+      : '<div class="vazio">Sem obrigações soltas.</div>';
+
+    // Fechadas: todas, sem limite (só a secção é colapsável). Mais recentes primeiro.
+    var fechadas = Object.keys(obrs).map(function (id) { var o = Object.assign({}, obrs[id]); o.id = id; return o; })
+      .filter(function (o) { return !G.estaAberta(o); })
+      .sort(function (a, b) { return (b.concluidaEm || b.anuladoEm || '') < (a.concluidaEm || a.anuladoEm || '') ? -1 : 1; });
+    $('sumFechadas').textContent = 'Concluídas e anuladas (' + fechadas.length + ')';
+    $('listaFechadas').innerHTML = fechadas.map(function (o) { return linhaObrigacao(o, {}); }).join('') || '<div class="vazio">Ainda nada.</div>';
+
+    var projFechados = Object.keys(projs).map(function (id) { var p = Object.assign({}, projs[id]); p.id = id; return p; })
+      .filter(function (p) { return !(p.estado === 'ativo' && p.anulado !== true); });
+    $('sumProjFechados').textContent = 'Projetos concluídos e anulados (' + projFechados.length + ')';
+    $('listaProjFechados').innerHTML = projFechados.map(function (p) {
+      return linhaProjetoSimples(p, null, p.anulado === true ? 'anulado ' + fmtDataHora(p.anuladoEm) : 'concluído ' + fmtDataHora(p.ultimoAvancoEm));
+    }).join('') || '<div class="vazio">Ainda nada.</div>';
+
+    var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
+    if (foco) { foco.focus(); foco.select(); }
+    var fp = document.querySelector('[data-prazo="' + prazoEmEdicao + '"]');
+    if (fp) fp.focus();
+    var fd = document.querySelector('[data-duracao="' + duracaoEmEdicao + '"]');
+    if (fd) { fd.focus(); fd.select(); }
+  }
+
+  /* ---------- Render: vista de projeto ---------- */
+  function abrirProjeto(pid) {
+    projetoAberto = pid;
+    concluirEmCurso = null; prazoEmEdicao = null; duracaoEmEdicao = null;
+    $('decomporBox').classList.remove('on');
+    try { history.replaceState(null, '', '?projeto=' + encodeURIComponent(pid)); } catch (e) {}
+    render();
+    window.scrollTo(0, 0);
+  }
+  function fecharProjeto() {
+    projetoAberto = null;
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    render();
+  }
+
+  function renderProjeto() {
+    var pid = projetoAberto;
+    var p = projs[pid];
+    if (!p) { fecharProjeto(); return; }
+    var ativo = p.estado === 'ativo' && p.anulado !== true;
+    var hoje = G.hojeISO();
+    var passos = G.passosDoProjeto(pid, obrs);
+    var abertos = passos.filter(G.estaAberta);
+    var prox = G.proximaAcao(pid, obrs);
+    var dias = G.diasParado(p, hoje);
+
+    $('projNome').textContent = p.nome;
+    var est = $('projEstado');
+    est.className = 'status ' + (p.anulado === true ? 'high' : p.estado === 'concluido' ? 'ok' : (dias > G.LIMITE_PARADO_DIAS ? 'parado' : 'ok'));
+    est.textContent = p.anulado === true ? 'Anulado' : p.estado === 'concluido' ? 'Concluído' : (dias > G.LIMITE_PARADO_DIAS ? 'Parado há ' + dias + ' dias' : 'Ativo');
+    $('projSub').textContent = 'Criado ' + fmtDataHora(p.criadoEm) + ' · último avanço ' + fmtDataHora(p.ultimoAvancoEm) +
+      ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
+    $('projDecomporBtn').style.display = ativo ? '' : 'none';
+    $('projConcluirBtn').style.display = ativo ? '' : 'none';
+    $('projConcluirBtn').disabled = abertos.length > 0;
+    $('projConcluirBtn').title = abertos.length > 0 ? 'Ainda há ' + abertos.length + ' passo(s) aberto(s): conclui-os ou anula-os primeiro' : 'Marcar o projeto como concluído';
+    $('projAnularBtn').style.display = ativo ? '' : 'none';
+
+    $('nPassos').textContent = '(' + passos.length + ')';
+    var abertosIds = abertos.map(function (o) { return o.id; });
+    $('listaPassos').innerHTML = passos.length ? passos.map(function (o, i) {
+      var aberta = G.estaAberta(o);
+      var deps = depsDe(o);
+      var chips = deps.map(function (d) {
+        var dep = obrs[d];
+        var feita = !dep || dep.estado === 'concluida' || dep.anulado === true || dep.estado === 'anulada';
+        return '<span class="dep-chip' + (feita ? '' : ' pendente') + '">' + (feita ? '✓ ' : '') + escapeHtml(dep ? dep.titulo : '(apagada)') +
+          (aberta && ativo ? '<button type="button" data-acao="tirar-dep" data-dep="' + escapeHtml(d) + '" title="Remover dependência">✕</button>' : '') + '</span>';
+      }).join('');
+      var candidatos = passos.filter(function (c) { return c.id !== o.id && deps.indexOf(c.id) < 0 && G.estaAberta(c); });
+      var selDep = (aberta && ativo && candidatos.length)
+        ? '<select data-acao="add-dep" aria-label="Adicionar dependência"><option value="">+ depende de…</option>' +
+          candidatos.map(function (c) { return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.titulo) + '</option>'; }).join('') + '</select>'
+        : '';
+      var bloqueada = aberta && !G.dependenciasSatisfeitas(o, obrs);
+      var extra = '<div class="passo-deps">' + (deps.length ? 'Depende de: ' : '') + chips + selDep +
+        (bloqueada ? '<span class="bloqueada-tag">bloqueada</span>' : '') +
+        (prox && prox.id === o.id ? '<span class="status ok">próxima ação</span>' : '') + '</div>';
+      var acoesExtra = ativo
+        ? '<button type="button" class="b icone" data-acao="subir" title="Subir" ' + (i === 0 ? 'disabled' : '') + '><svg class="icon" width="12" height="12" style="transform:rotate(180deg)"><use href="#i-chevron-down"/></svg></button>' +
+          '<button type="button" class="b icone" data-acao="descer" title="Descer" ' + (i === passos.length - 1 ? 'disabled' : '') + '>' + icone('chevron-down', 12) + '</button>'
+        : '';
+      return linhaObrigacao(o, { semProjeto: true, ordem: i + 1, extra: extra, acoesExtra: acoesExtra });
+    }).join('') : '<div class="vazio">Este projeto ainda não tem passos. Usa «Decompor» para os criar de uma vez.</div>';
+
+    var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
+    if (foco) { foco.focus(); foco.select(); }
+    var fp = document.querySelector('[data-prazo="' + prazoEmEdicao + '"]');
+    if (fp) fp.focus();
+    var fd = document.querySelector('[data-duracao="' + duracaoEmEdicao + '"]');
+    if (fd) { fd.focus(); fd.select(); }
+  }
+
+  function render() {
+    if (!obrsCarregadas || !projsCarregados) return;
+    var emProjeto = !!projetoAberto;
+    $('vistaPrincipal').style.display = emProjeto ? 'none' : '';
+    $('vistaProjeto').style.display = emProjeto ? '' : 'none';
+    if (emProjeto) renderProjeto(); else renderPrincipal();
+  }
+
+  /* ---------- Reordenar (troca de ordem entre dois passos: dois set() em folhas) ---------- */
+  function mover(id, delta) {
+    var passos = G.passosDoProjeto(projetoAberto, obrs);
+    var i = passos.findIndex(function (o) { return o.id === id; });
+    var j = i + delta;
+    if (i < 0 || j < 0 || j >= passos.length) return;
+    // Normalizar primeiro: passos sem ordem numérica ficam com a posição atual,
+    // para a troca ser determinística. Só escreve onde a ordem muda.
+    var escritas = [];
+    passos.forEach(function (o, k) {
+      var alvo = k === i ? j + 1 : k === j ? i + 1 : k + 1;
+      if (o.ordem !== alvo) escritas.push(obrigacoesRef.child(o.id).child('ordem').set(alvo));
+    });
+    Promise.all(escritas).catch(erroEscrita);
+  }
+
+  /* ---------- Decompor ---------- */
+  $('projDecomporBtn').addEventListener('click', function () {
+    $('decomporBox').classList.add('on');
+    $('decomporInfo').textContent = '';
+    $('decomporTexto').focus();
+  });
+  $('decomporCancelar').addEventListener('click', function () {
+    $('decomporBox').classList.remove('on');
+    $('decomporTexto').value = '';
+  });
+  $('decomporCriar').addEventListener('click', function () {
+    var pid = projetoAberto; if (!pid) return;
+    var linhas = linhasDe($('decomporTexto').value);
+    if (!linhas.length) { $('decomporInfo').textContent = 'Escreve pelo menos um passo.'; return; }
+    var base = maxOrdem(pid);
+    var dur = duracaoDefault();
+    $('decomporCriar').disabled = true;
+    $('decomporInfo').textContent = 'A criar ' + linhas.length + ' passos…';
+    var seq = Promise.resolve();
+    linhas.forEach(function (t, i) { seq = seq.then(function () { return criarObrigacao(t, pid, base + i + 1, dur); }); });
+    seq.then(function () { return marcarAvanco(pid); })
+      .then(function () {
+        $('decomporTexto').value = '';
+        $('decomporBox').classList.remove('on');
+      })
+      .catch(erroEscrita)
+      .then(function () { $('decomporCriar').disabled = false; $('decomporInfo').textContent = ''; });
+  });
+
+  $('projVoltar').addEventListener('click', fecharProjeto);
+  $('projConcluirBtn').addEventListener('click', function () {
+    var pid = projetoAberto; var p = projs[pid]; if (!p) return;
+    if (G.listaAbertas(obrs).some(function (o) { return o.projetoId === pid; })) return;
+    if (!confirm('Concluir o projeto «' + p.nome + '»?')) return;
+    projetosRef.child(pid).update({ estado: 'concluido', ultimoAvancoEm: agoraISO() }).catch(erroEscrita);
+  });
+  $('projAnularBtn').addEventListener('click', function () {
+    var pid = projetoAberto; var p = projs[pid]; if (!p) return;
+    var nAb = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; }).length;
+    var aviso = nAb ? ' Os ' + nAb + ' passos abertos NÃO são anulados: passam para a lista de obrigações soltas até os concluíres ou anulares um a um.' : '';
+    if (!confirm('Anular o projeto «' + p.nome + '»? Fica registado como anulado (nunca é apagado).' + aviso)) return;
+    projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agoraISO() }).catch(erroEscrita);
+  });
+
+  /* ---------- Delegação de eventos nas listas ---------- */
+  document.getElementById('main').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-acao]');
+    if (!btn || btn.tagName === 'SELECT') return;
+    var linha = btn.closest('[data-id]');
+    var id = linha ? linha.dataset.id : null;
+    var acao = btn.dataset.acao;
+    if (acao === 'abrir-projeto') { abrirProjeto(btn.dataset.projeto); return; }
+    if (!id) return;
+    if (acao === 'concluir') { concluirEmCurso = id; prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
+    else if (acao === 'cancelar-concluir') { concluirEmCurso = null; render(); }
+    else if (acao === 'confirmar-concluir') { confirmarConcluir(id); }
+    else if (acao === 'adiar') { adiar(id); }
+    else if (acao === 'anular') { anular(id); }
+    else if (acao === 'editar-prazo') { prazoEmEdicao = id; concluirEmCurso = null; duracaoEmEdicao = null; render(); }
+    else if (acao === 'limpar-prazo') { prazoEmEdicao = null; setFolha(id, 'prazo', null); }
+    else if (acao === 'editar-duracao') { duracaoEmEdicao = id; concluirEmCurso = null; prazoEmEdicao = null; render(); }
+    else if (acao === 'subir') { mover(id, -1); }
+    else if (acao === 'descer') { mover(id, 1); }
+    else if (acao === 'tirar-dep') {
+      var deps = depsDe(obrs[id]).filter(function (d) { return d !== btn.dataset.dep; });
+      setFolha(id, 'dependeDe', deps.length ? deps : null);
+    }
+  });
+  document.getElementById('main').addEventListener('change', function (ev) {
+    var el = ev.target;
+    if (el.dataset && el.dataset.acao === 'add-dep' && el.value) {
+      var linha = el.closest('[data-id]'); if (!linha) return;
+      var id = linha.dataset.id;
+      var deps = depsDe(obrs[id]);
+      if (deps.indexOf(el.value) < 0) deps.push(el.value);
+      setFolha(id, 'dependeDe', deps);
+      return;
+    }
+    if (el.dataset && el.dataset.prazo) {
+      var pid = el.dataset.prazo; prazoEmEdicao = null;
+      setFolha(pid, 'prazo', /^\d{4}-\d{2}-\d{2}$/.test(el.value) ? el.value : null);
+      return;
+    }
+    if (el.dataset && el.dataset.duracao) {
+      var did = el.dataset.duracao; var n = numOuNull(el.value);
+      duracaoEmEdicao = null;
+      if (n) setFolha(did, 'duracaoPrevista', n); else render();
+    }
+  });
+  document.getElementById('main').addEventListener('keydown', function (ev) {
+    var el = ev.target;
+    if (el.dataset && el.dataset.real) {
+      if (ev.key === 'Enter') { ev.preventDefault(); confirmarConcluir(el.dataset.real); }
+      if (ev.key === 'Escape') { concluirEmCurso = null; render(); }
+    }
+    if (el.dataset && (el.dataset.prazo || el.dataset.duracao) && ev.key === 'Escape') { prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
+  });
+  document.getElementById('main').addEventListener('focusout', function (ev) {
+    var el = ev.target;
+    if (el.dataset && el.dataset.prazo && prazoEmEdicao === el.dataset.prazo) {
+      // Sair do campo sem escolher fecha o editor; a escolha já foi gravada no change.
+      setTimeout(function () { if (prazoEmEdicao === el.dataset.prazo && !document.activeElement.closest('[data-id="' + el.dataset.prazo + '"]')) { prazoEmEdicao = null; render(); } }, 150);
+    }
+  });
+  function confirmarConcluir(id) {
+    var inp = document.querySelector('[data-real="' + id + '"]');
+    var n = inp ? numOuNull(inp.value) : null;
+    if (!n) { if (inp) inp.focus(); return; }
+    concluirEmCurso = null;
+    concluir(id, n).catch(erroEscrita);
+  }
+
+  /* ---------- Listeners ---------- */
+  var projetosLidos = false;
+  obrigacoesRef.on('value', function (snap) {
+    obrs = snap.val() || {};
+    obrsCarregadas = true;
+    render();
+  });
+  projetosRef.on('value', function (snap) {
+    projs = snap.val() || {};
+    projsCarregados = true;
+    // Deep-link ?projeto=ID (usado ao voltar ao separador): só na primeira leitura.
+    if (projetoAberto === null && !projetosLidos) {
+      var m = /[?&]projeto=([^&]+)/.exec(location.search);
+      if (m && projs[decodeURIComponent(m[1])]) projetoAberto = decodeURIComponent(m[1]);
+    }
+    projetosLidos = true;
+    render();
+  });
+  });
+</script>
+</body>
+</html>
