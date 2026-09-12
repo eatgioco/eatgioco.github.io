@@ -70,6 +70,15 @@
   .cap-titulo{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
   .cap-titulo b{ color:var(--red); }
   .cap-solta{ margin-top:18px; padding-top:16px; border-top:1px dashed var(--line); }
+  /* Contexto em texto corrido (Novo projeto e vista de projeto): vai ao modelo e fica em projetos/{id}/contexto */
+  .ctx-area{
+    width:100%; min-height:88px; margin-top:8px; padding:10px 12px; border:1.5px solid var(--line); border-radius:12px;
+    background:var(--white); font-family:'Inter',sans-serif; font-size:13.5px; line-height:1.5; color:var(--ink); resize:vertical; box-sizing:border-box;
+  }
+  .ctx-area:focus{ outline:none; border-color:var(--ink); }
+  .ctx-box{ margin-top:12px; }
+  .ctx-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .ctx-head .estado{ font-weight:500; letter-spacing:0; text-transform:none; }
   .cap-solta input[type="text"]{ padding:10px 12px; font-size:14px; background:var(--white); }
 
   /* ---------- Sugestão de passos (Gemini): lista editável, nunca gravada sem confirmar ---------- */
@@ -244,6 +253,7 @@
         <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo os passos" autocomplete="off">
         <button type="button" class="btn-add" id="projCriarBtn">Criar projeto</button>
       </div>
+      <textarea class="ctx-area" id="projContexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
       <p class="cap-hint">Abre logo a vista do projeto com uma sugestão de passos a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
 
       <div class="cap-solta">
@@ -318,6 +328,10 @@
         <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
       </div>
       <p class="proj-sub" id="projSub"></p>
+      <div class="ctx-box" id="ctxBox">
+        <div class="ctx-head">Contexto <span class="estado" id="ctxEstado"></span></div>
+        <textarea class="ctx-area" id="ctxTexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
+      </div>
       <div class="decompor-box" id="decomporBox">
         <textarea id="decomporTexto" placeholder="Um passo por linha. Ficam com ordem sequencial a seguir aos passos existentes e a duração por omissão."></textarea>
         <div class="decompor-acoes">
@@ -509,10 +523,10 @@
     };
     return ref.set(reg).then(function () { return ref.key; });
   }
-  function criarProjeto(nome) {
+  function criarProjeto(nome, contexto) {
     var ref = projetosRef.push();
     var t = agoraISO();
-    return ref.set({ nome: nome, estado: 'ativo', criadoEm: t, ultimoAvancoEm: t, anulado: false })
+    return ref.set({ nome: nome, estado: 'ativo', criadoEm: t, ultimoAvancoEm: t, anulado: false, contexto: contexto || null })
       .then(function () { return ref.key; });
   }
   function marcarAvanco(pid) {
@@ -578,9 +592,11 @@
     var nome = input.value.trim();
     if (!nome) { input.focus(); return; }
     $('projCriarBtn').disabled = true;
-    criarProjeto(nome)
+    var contexto = $('projContexto').value.trim();
+    criarProjeto(nome, contexto)
       .then(function (id) {
         input.value = '';
+        $('projContexto').value = '';
         abrirProjeto(id);
         pedirSugestao();
       })
@@ -787,6 +803,11 @@
       ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
     $('projDecomporBtn').style.display = ativo ? '' : 'none';
     $('projSugerirBtn').style.display = ativo ? '' : 'none';
+    // Contexto: só se substitui o texto quando NÃO está a ser editado (o snapshot
+    // chega a cada escrita e pisaria o que o Manel está a escrever).
+    var ta = $('ctxTexto');
+    if (document.activeElement !== ta) ta.value = p.contexto || '';
+    ta.disabled = !ativo;
     $('projConcluirBtn').style.display = ativo ? '' : 'none';
     $('projConcluirBtn').disabled = abertos.length > 0;
     $('projConcluirBtn').title = abertos.length > 0 ? 'Ainda há ' + abertos.length + ' passo(s) aberto(s): conclui-os ou anula-os primeiro' : 'Marcar o projeto como concluído';
@@ -851,6 +872,20 @@
     Promise.all(escritas).catch(erroEscrita);
   }
 
+  /* ---------- Contexto do projeto: um set() na folha projetos/{id}/contexto ao sair do campo ---------- */
+  function contextoAtual() { return $('ctxTexto').value.trim(); }
+  function gravarContexto() {
+    var pid = projetoAberto; var p = projs[pid]; if (!p) return;
+    var novo = contextoAtual();
+    if (novo === (p.contexto || '')) return;
+    $('ctxEstado').textContent = 'a guardar…';
+    projetosRef.child(pid).child('contexto').set(novo || null)
+      .then(function () { $('ctxEstado').textContent = 'guardado ' + fmtDataHora(agoraISO()); })
+      .catch(function (e) { $('ctxEstado').textContent = 'falha ao guardar'; erroEscrita(e); });
+  }
+  $('ctxTexto').addEventListener('blur', gravarContexto);
+  $('ctxTexto').addEventListener('input', function () { $('ctxEstado').textContent = ''; });
+
   /* ---------- Sugerir passos (decomposição automática) ----------
      A chamada ao modelo está toda no gioco-sugestoes.js (GiocoSugestoes.sugerirPassos);
      aqui só se mostra o resultado numa lista EDITÁVEL (texto, duração,
@@ -895,9 +930,12 @@
     var meu = ++sugPedido;
     $('sugBox').classList.add('on');
     $('sugLista').innerHTML = '';
-    $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de passos para <b>' + escapeHtml(p.nome) + '</b>…';
+    var contexto = contextoAtual();
+    gravarContexto();
+    $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de passos para <b>' + escapeHtml(p.nome) + '</b>' +
+      (contexto ? ' com o contexto escrito' : '') + '…';
     sugEstado(true, null, false);
-    S.sugerirPassos(p.nome).then(function (r) {
+    S.sugerirPassos(p.nome, { contexto: contexto }).then(function (r) {
       if (meu !== sugPedido) return;
       sugLinhas = r.passos.map(function (x) { return { titulo: x.titulo, duracaoPrevista: x.duracaoPrevista, dependeDePasso: x.dependeDePasso }; });
       $('sugHead').innerHTML = 'Sugestão de <b>' + sugLinhas.length + ' passos</b> (' + escapeHtml(r.modelo) + ') — edita, apaga ou acrescenta; nada fica gravado até confirmares.';

@@ -6,6 +6,11 @@
    modelo, outra API, um proxy próprio) é mexer SÓ neste ficheiro.
 
    sugerirPassos(nomeProjeto, opts?) → Promise<{ passos, modelo }>
+       opts.contexto (string, opcional): texto corrido do Manel sobre o projeto —
+       o que já fez, o que o preocupa, o que falta decidir. Com contexto o prompt
+       trata-o como fonte principal, pede passos próprios para as decisões
+       implícitas e proíbe passos que contradigam o que já está feito. Vazio ou
+       só espaços = comportamento só com o nome. Cortado a MAX_CONTEXTO chars.
        passos = [{ titulo, duracaoPrevista (min, inteiro > 0), dependeDePasso (índice
        0-based de OUTRO passo da mesma lista, ou null) }], 1..MAX_PASSOS itens.
        opts.fetch / opts.timeoutMs / opts.modelos são injectáveis (testes).
@@ -14,7 +19,7 @@
    normalizarPassos(texto) → passos válidos (PURA; lança em JSON inválido/vazio):
        aceita ```json … ``` à volta, corta títulos a 200, duração inválida → 30,
        dependência fora do intervalo ou a si próprio → null.
-   promptPassos(nomeProjeto) → o texto do pedido (PURA, exportada para os testes).
+   promptPassos(nomeProjeto, contexto?) → o texto do pedido (PURA, exportada para os testes).
 
    A RESPOSTA NUNCA É GRAVADA DIRETAMENTE: a página mostra-a numa lista editável e
    só grava em obrigacoes/ o que o Manel confirmar. Este módulo não toca no
@@ -47,11 +52,24 @@
   var MODELOS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
   var TIMEOUT_MS = 45000;
   var MAX_PASSOS = 12;
+  var MAX_CONTEXTO = 4000;
   var DURACAO_DEFAULT = 30;
 
-  function promptPassos(nome) {
+  function limparContexto(c) { return String(c === null || c === undefined ? '' : c).trim().slice(0, MAX_CONTEXTO); }
+
+  function promptPassos(nome, contexto) {
+    var ctx = limparContexto(contexto);
+    var bloco = ctx
+      ? 'O fundador escreveu o seguinte sobre o projeto (é a FONTE PRINCIPAL — tem prioridade sobre o que ' +
+        'assumirias por defeito):\n---\n' + ctx + '\n---\n' +
+        'Regras sobre este texto: (1) o que ele diz já estar feito NÃO volta a ser um passo e nenhum passo ' +
+        'pode contradizê-lo; (2) identifica explicitamente as decisões por tomar que estão implícitas no ' +
+        'texto (dúvidas, "não sei se", alternativas em aberto) e transforma cada uma num passo próprio de ' +
+        'decisão, com título a começar por "Decidir"; (3) as pessoas e preocupações mencionadas entram nos ' +
+        'passos a que dizem respeito.\n'
+      : '';
     return 'Contexto: a GIOCO é uma focacciaria italiana de balcão em Lisboa (Rua de São Bento 154), ' +
-      'gerida pelo fundador. Projeto a decompor: «' + String(nome || '').trim() + '».\n' +
+      'gerida pelo fundador. Projeto a decompor: «' + String(nome || '').trim() + '».\n' + bloco +
       'Dá entre 4 e 8 passos concretos e acionáveis para este projeto, na ordem certa. ' +
       'Cada passo é UMA ação única que cabe numa sessão de trabalho, com a duração estimada em minutos. ' +
       'Inclui explicitamente passos de decisão e de verificação legal/administrativa quando aplicável. ' +
@@ -155,7 +173,7 @@
     if (!(opts.chave || lerStorage())) return Promise.reject(erroDe('semChave', 'Sem chave da API do Gemini neste browser'));
     var modelos = (opts.modelos || MODELOS).slice();
     var corpo = {
-      contents: [{ parts: [{ text: promptPassos(nome) }] }],
+      contents: [{ parts: [{ text: promptPassos(nome, opts.contexto) }] }],
       generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
     };
     function tentar(i, ultimoErro) {
@@ -186,6 +204,7 @@
     promptPassos: promptPassos,
     MODELOS: MODELOS,
     MAX_PASSOS: MAX_PASSOS,
+    MAX_CONTEXTO: MAX_CONTEXTO,
     DURACAO_DEFAULT: DURACAO_DEFAULT
   };
   if (typeof window !== 'undefined') window.GiocoSugestoes = S;

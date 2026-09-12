@@ -39,6 +39,12 @@ assert.throws(function () { S.normalizarPassos('[{"titulo":""}]'); }, function (
 // prompt
 assert.ok(S.promptPassos('Loja Chiado').indexOf('«Loja Chiado»') > 0);
 assert.ok(S.promptPassos('x').indexOf('dependeDePasso') > 0);
+// contexto: vazio/espaços = prompt só com o nome; com texto entra como fonte principal, cortado a MAX_CONTEXTO
+assert.strictEqual(S.promptPassos('x', '   '), S.promptPassos('x'));
+assert.strictEqual(S.promptPassos('x', null), S.promptPassos('x'));
+var pc = S.promptPassos('x', 'Já falei com o senhorio. Não sei se contrato mais uma pessoa.');
+assert.ok(pc.indexOf('FONTE PRINCIPAL') > 0 && pc.indexOf('Já falei com o senhorio') > 0 && pc.indexOf('Decidir') > 0);
+assert.ok(S.promptPassos('x', new Array(6000).join('a')).length < S.promptPassos('x').length + S.MAX_CONTEXTO + 800);
 
 // sugerirPassos com fetch simulado: 503 no 1.º modelo passa ao 2.º; 400 de chave pára logo
 function fetchFalso(respostas) {
@@ -65,6 +71,14 @@ Promise.resolve()
   .then(function () {
     return S.sugerirPassos('Teste', { fetch: f0, modelos: ['a'] }).then(function () { throw new Error('devia falhar'); }, function (e) {
       assert.strictEqual(e.codigo, 'semChave'); assert.deepStrictEqual(f0.chamadas, []);
+    });
+  })
+  .then(function () {
+    // o contexto vai no corpo do pedido
+    var visto = null;
+    var fc = function (url, init) { visto = JSON.parse(init.body).contents[0].parts[0].text; return Promise.resolve({ status: 200, text: function () { return Promise.resolve(ok); } }); };
+    return S.sugerirPassos('Teste', { fetch: fc, modelos: ['a'], chave: 'k', contexto: 'senhorio já contactado' }).then(function () {
+      assert.ok(visto.indexOf('senhorio já contactado') > 0);
     });
   })
   .then(function () { return S.sugerirPassos('Teste', { fetch: f1, modelos: ['a', 'b'], chave: 'k' }); })
