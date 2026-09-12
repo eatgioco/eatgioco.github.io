@@ -50,7 +50,7 @@ assert.strictEqual(v.totalAbertas, 10, 'todas as abertas contam, incluindo bloqu
 assert.deepStrictEqual(v.projetos.map(function(x){ return x.obr.id; }), ['e', 'b'], 'com prazo primeiro; depois parado há mais tempo');
 assert.strictEqual(v.projetos[1].diasParado, 22);
 assert.deepStrictEqual(v.soltas.map(function(x){ return x.obr.id; }), ['f', 'g', 'i', 'h'],
-  'vencida primeiro; sem prazo por antiguidade (i do projeto anulado passa a solta, nunca desaparece)');
+  'vencida primeiro; sem prazo por antiguidade (i, passo aberto de projeto anulado, é inconsistência de dados: o motor NUNCA a esconde — a anulação em cascata da obrigacoes.html e o scripts/corrige-passos-projetos-anulados.js garantem que não existe)');
 assert.deepStrictEqual(v.bloqueados.map(function(x){ return x.projeto.id + ':' + x.abertas; }), ['P4:2']);
 assert.deepStrictEqual(v.semPassos.map(function(x){ return x.projeto.id; }), ['P5']);
 assert.deepStrictEqual(v.parados.map(function(x){ return x.projeto.id; }), ['P1'], 'P1 parado há 22 dias > 14; P2 não');
