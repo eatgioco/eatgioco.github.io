@@ -84,6 +84,8 @@
     '<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>',
     /* Set/2026, videochamada nos eventos do Outlook (calendario.html): */
     '<symbol id="i-video" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></symbol>',
+    /* Set/2026, «Sugerir passos» (decomposição automática) na obrigacoes.html (traço Lucide): */
+    '<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.9 5.6L19.5 10.5 13.9 12.4 12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></symbol>',
     /* Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html: */
     '<symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>',
     '<symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>',
@@ -111,6 +113,8 @@
     'coins', 'list', 'lock',
     // Set/2026, videochamada nos eventos do Outlook (calendario.html):
     'video',
+    // Set/2026, «Sugerir passos» na obrigacoes.html:
+    'sparkles',
     // Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html:
     'arrow-down', 'arrow-up'
   ];
