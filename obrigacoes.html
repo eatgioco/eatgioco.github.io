@@ -28,6 +28,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-obrigacoes.js"></script>
+<script src="gioco-contexto.js"></script>
 <script src="gioco-sugestoes.js"></script>
 
 <style>
@@ -91,6 +92,10 @@
   .sug-chave{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--muted); }
   .sug-chave input{ flex:1 1 260px; min-width:0; padding:9px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--dough); font:inherit; font-size:13px; color:var(--ink); }
   .sug-chave input:focus{ outline:none; border-color:var(--ink); }
+  .sug-pressupostos{ margin-top:12px; padding:10px 14px; border-left:4px solid var(--mustard); background:var(--white); border-radius:10px; font-size:13px; color:var(--ink); }
+  .sug-pressupostos .t{ display:block; font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+  .sug-pressupostos ul{ margin:0; padding-left:18px; }
+  .sug-pressupostos li{ margin:2px 0; }
   .sug-lista{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
   .sug-linha{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 10px; background:var(--white); border:1px solid var(--line); border-radius:10px; }
   .sug-linha .passo-ordem{ width:22px; }
@@ -417,6 +422,9 @@
           <button type="button" class="btn-add" id="sugChaveGuardar">Guardar chave e sugerir</button>
           <span>Fica só neste browser (localStorage) e só é enviada à API da Google.</span>
         </div>
+        <!-- Pressupostos declarados pelo modelo: só informativos (o que ele assumiu e
+             não sabe). Nunca editáveis, nunca gravados; vazios/ausentes → escondido. -->
+        <div class="sug-pressupostos" id="sugPressupostos" style="display:none;"></div>
         <div class="sug-lista" id="sugLista"></div>
         <div class="sug-acoes" id="sugAcoes">
           <button type="button" class="btn-add" id="sugCriar">Criar passos</button>
@@ -1130,7 +1138,16 @@
     $('sugLista').innerHTML = '';
     $('sugErro').style.display = 'none';
     $('sugInfo').textContent = '';
+    mostrarPressupostos([]);
     fecharAtualizacao();
+  }
+  // Pressupostos do modelo: texto informativo acima dos passos. Ausentes/vazios → nada.
+  function mostrarPressupostos(lista) {
+    var el = $('sugPressupostos');
+    if (!Array.isArray(lista) || !lista.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="t">O modelo assumiu (não sabe — acrescenta ao contexto se estiver errado)</span><ul>' +
+      lista.map(function (p) { return '<li>' + escapeHtml(p) + '</li>'; }).join('') + '</ul>';
+    el.style.display = '';
   }
   function sugEstado(aCarregar, erro, pedirChave) {
     $('sugAcoes').style.display = aCarregar ? 'none' : '';
@@ -1166,6 +1183,7 @@
     var meu = ++sugPedido;
     $('sugBox').classList.add('on');
     $('sugLista').innerHTML = '';
+    mostrarPressupostos([]);
     var contexto = contextoAtual();
     gravarContexto();
     $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de passos para <b>' + escapeHtml(p.nome) + '</b>' +
@@ -1176,6 +1194,7 @@
       sugLinhas = r.passos.map(function (x) { return { titulo: x.titulo, duracaoPrevista: x.duracaoPrevista, dependeDePasso: x.dependeDePasso, local: x.local || null }; });
       $('sugHead').innerHTML = 'Sugestão de <b>' + sugLinhas.length + ' passos</b> (' + escapeHtml(r.modelo) + ') — edita, apaga ou acrescenta; nada fica gravado até confirmares.';
       sugEstado(false, null, false);
+      mostrarPressupostos(r.pressupostos);
       renderSugestao();
     }, function (e) {
       if (meu !== sugPedido) return;

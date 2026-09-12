@@ -5,21 +5,42 @@
    conhece a Promise e a forma dos passos devolvidos. Trocar de fornecedor (outro
    modelo, outra API, um proxy próprio) é mexer SÓ neste ficheiro.
 
-   sugerirPassos(nomeProjeto, opts?) → Promise<{ passos, modelo }>
+   sugerirPassos(nomeProjeto, opts?) → Promise<{ passos, pressupostos, modelo }>
        opts.contexto (string, opcional): texto corrido do Manel sobre o projeto —
        o que já fez, o que o preocupa, o que falta decidir. Com contexto o prompt
        trata-o como fonte principal, pede passos próprios para as decisões
        implícitas e proíbe passos que contradigam o que já está feito. Vazio ou
        só espaços = comportamento só com o nome. Cortado a MAX_CONTEXTO chars.
        passos = [{ titulo, duracaoPrevista (min, inteiro > 0), dependeDePasso (índice
-       0-based de OUTRO passo da mesma lista, ou null) }], 1..MAX_PASSOS itens.
+       0-based de OUTRO passo da mesma lista, ou null), local }], 1..MAX_PASSOS itens.
+       pressupostos = [string] (0..MAX_PRESSUPOSTOS): o que o modelo ASSUMIU e não
+       sabe — em vez de inventar em silêncio, declara. Só informativo: a página
+       mostra-os acima dos passos, nunca cria registos com eles. Resposta sem o
+       campo (ou uma lista nua, o formato antigo) → [] — retrocompatível.
        opts.fetch / opts.timeoutMs / opts.modelos são injectáveis (testes).
        Rejeita com um Error cujo .motivo é uma frase curta em português para a UI
        e .codigo ∈ semChave | chave | quota | indisponivel | rede | resposta | vazio.
-   normalizarPassos(texto) → passos válidos (PURA; lança em JSON inválido/vazio):
-       aceita ```json … ``` à volta, corta títulos a 200, duração inválida → 30,
-       dependência fora do intervalo ou a si próprio → null.
+   normalizarResposta(texto) → { passos, pressupostos } (PURA; lança em JSON
+       inválido/vazio): aceita ```json … ``` à volta, o objeto {passos, pressupostos}
+       OU a lista nua de passos; corta títulos a 200, duração inválida → 30,
+       dependência fora do intervalo ou a si próprio → null; pressupostos que não
+       sejam strings caem, cada um cortado a 200, tecto MAX_PRESSUPOSTOS.
+   normalizarPassos(texto) → só os passos (o mesmo, mantido para compatibilidade).
    promptPassos(nomeProjeto, contexto?) → o texto do pedido (PURA, exportada para os testes).
+
+   CONTEXTO DE NEGÓCIO (Set/2026): TODOS os prompts (passos, atualização e local)
+   começam pelo bloco do gioco-contexto.js (GiocoContexto.texto(): o que é a
+   GIOCO, entidade legal, equipa com papéis, Manel único decisor). É a FONTE ÚNICA
+   — nada da equipa está escrito aqui. Carregar gioco-contexto.js antes deste
+   ficheiro (em Node é um require). Sem ele, lança ao carregar: um prompt sem
+   equipa era exactamente o problema que isto resolve.
+   REGRAS DE UM BOM PASSO (Set/2026, nos prompts de passos e de atualização):
+   estado final verificável ("obter Y", não "tratar de X"); recolher informação
+   antes de decidir com base nela; esperas por terceiros são passos próprios com o
+   nome da pessoa; o 1.º passo é executável hoje sem depender de nada nem de
+   ninguém; nomes reais da equipa; o número de passos segue a complexidade real
+   (4 simples … 8 complexo, nunca sempre o mesmo), tecto MAX_PASSOS = 8 — listas
+   maiores paralisam, que é o problema que a ferramenta existe para resolver.
 
    LOCAL (Set/2026): cada passo sugerido e cada passo acrescentado traz também
    local ∈ LOCAIS = 'loja' | 'computador' | 'rua' | 'telefone' | null (null = em
@@ -84,7 +105,8 @@
   var BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
   var MODELOS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
   var TIMEOUT_MS = 45000;
-  var MAX_PASSOS = 12;
+  var MAX_PASSOS = 8;
+  var MAX_PRESSUPOSTOS = 4;
   var MAX_CONTEXTO = 4000;
   var DURACAO_DEFAULT = 30;
   var LOCAIS = ['loja', 'computador', 'rua', 'telefone'];
@@ -92,34 +114,50 @@
   var DEF_LOCAIS = "'loja' = presencial na loja (Rua de São Bento 154); 'computador' = trabalho ao ecrã; " +
     "'telefone' = ligar ou falar com alguém à distância; 'rua' = fora, deslocação a terceiros; null quando não for claro.";
 
+  // Fonte única do contexto de negócio (equipa, papéis, entidade legal): gioco-contexto.js.
+  var Contexto = (typeof window !== 'undefined' && window.GiocoContexto) ? window.GiocoContexto
+    : (typeof require === 'function' ? require('./gioco-contexto.js') : null);
+  if (!Contexto || typeof Contexto.texto !== 'function') throw new Error('gioco-sugestoes.js: carregar gioco-contexto.js antes');
+  function blocoNegocio() { return Contexto.texto() + '\n'; }
+
+  var REGRAS_PASSO =
+    'REGRAS DE UM BOM PASSO (obrigatórias):\n' +
+    '1. Cada passo tem um estado final VERIFICÁVEL — não "tratar de X" mas "obter Y", "ter Z aprovado", "enviar W a alguém".\n' +
+    '2. Recolher informação vem SEMPRE antes de decidir com base nela (primeiro "obter orçamentos", só depois "decidir fornecedor").\n' +
+    '3. Uma espera por terceiros (resposta, entrega, aprovação) é um passo PRÓPRIO, com o nome da pessoa ou entidade quando se souber quem é.\n' +
+    '4. O PRIMEIRO passo tem de ser executável HOJE, pelo Manel, sem depender de nada nem de ninguém.\n' +
+    '5. Quando um passo envolve alguém da equipa, usa o nome real da pessoa certa para essa área (ver CONTEXTO DO NEGÓCIO); o Manel decide, os outros executam ou informam.\n' +
+    '6. O número de passos segue a complexidade REAL do projeto: um simples pode ter 4, um complexo até ' + MAX_PASSOS + '. Nunca devolvas sempre o mesmo número e nunca mais de ' + MAX_PASSOS + '.\n' +
+    '7. Cada passo é UMA ação única que cabe numa sessão de trabalho, com a duração estimada em minutos; título curto e direto, em português de Portugal, a começar por um verbo.\n';
+
   function limparContexto(c) { return String(c === null || c === undefined ? '' : c).trim().slice(0, MAX_CONTEXTO); }
 
   function promptPassos(nome, contexto) {
     var ctx = limparContexto(contexto);
     var bloco = ctx
-      ? 'O fundador escreveu o seguinte sobre o projeto (é a FONTE PRINCIPAL — tem prioridade sobre o que ' +
+      ? 'O Manel escreveu o seguinte sobre o projeto (é a FONTE PRINCIPAL — tem prioridade sobre o que ' +
         'assumirias por defeito):\n---\n' + ctx + '\n---\n' +
         'Regras sobre este texto: (1) o que ele diz já estar feito NÃO volta a ser um passo e nenhum passo ' +
         'pode contradizê-lo; (2) identifica explicitamente as decisões por tomar que estão implícitas no ' +
         'texto (dúvidas, "não sei se", alternativas em aberto) e transforma cada uma num passo próprio de ' +
         'decisão, com título a começar por "Decidir"; (3) as pessoas e preocupações mencionadas entram nos ' +
         'passos a que dizem respeito.\n'
-      : '';
-    return 'Contexto: a GIOCO é uma focacciaria italiana de balcão em Lisboa (Rua de São Bento 154), ' +
-      'gerida pelo fundador. Projeto a decompor: «' + String(nome || '').trim() + '».\n' + bloco +
-      'Dá entre 4 e 8 passos concretos e acionáveis para este projeto, na ordem certa. ' +
-      'Cada passo é UMA ação única que cabe numa sessão de trabalho, com a duração estimada em minutos. ' +
-      'Inclui explicitamente passos de decisão e de verificação legal/administrativa quando aplicável. ' +
-      'Escreve em português de Portugal, títulos curtos e diretos (começam por um verbo).\n' +
+      : 'O Manel não escreveu contexto sobre o projeto.\n';
+    return blocoNegocio() +
+      'Projeto a decompor em passos: «' + String(nome || '').trim() + '».\n' + bloco +
+      REGRAS_PASSO +
+      'Inclui explicitamente passos de decisão (título a começar por "Decidir") e de verificação legal/administrativa quando aplicável.\n' +
       'Para cada passo indica onde se faz, em "local": ' + DEF_LOCAIS + ' Em caso de dúvida null, nunca adivinhar.\n' +
+      'PRESSUPOSTOS: em vez de inventares em silêncio, declara em "pressupostos" o que assumiste e não sabes ' +
+      '(frases curtas, no máximo ' + MAX_PRESSUPOSTOS + '; lista vazia se não assumiste nada). Servem para o Manel perceber o que falta dizer no contexto.\n' +
       'Responde APENAS com JSON, sem preâmbulo nem backticks, exatamente neste formato:\n' +
-      '[{"titulo":"...","duracaoPrevista":30,"dependeDePasso":null,"local":"loja"}]\n' +
+      '{"passos":[{"titulo":"...","duracaoPrevista":30,"dependeDePasso":null,"local":"loja"}],"pressupostos":["..."]}\n' +
       'dependeDePasso = índice 0-based do passo de que depende, ou null.';
   }
 
   function promptClassificarLocal(titulos) {
     var lista = (titulos || []).map(function (t, i) { return (i + 1) + '. ' + tituloDe(t); });
-    return 'Contexto: a GIOCO é uma focacciaria italiana de balcão em Lisboa (Rua de São Bento 154). ' +
+    return blocoNegocio() +
       'Para cada obrigação abaixo, diz ONDE se faz: ' + DEF_LOCAIS + '\n' +
       'Obrigações:\n' + lista.join('\n') + '\n' +
       'Responde APENAS com JSON, sem preâmbulo nem backticks, um item por obrigação pela mesma ordem, exatamente neste formato:\n' +
@@ -155,9 +193,9 @@
     });
     var concluidos = (listas.concluidos || []).map(tituloDe).filter(Boolean);
     var anulados = (listas.anulados || []).map(tituloDe).filter(Boolean);
-    return 'Contexto: a GIOCO é uma focacciaria italiana de balcão em Lisboa (Rua de São Bento 154), ' +
-      'gerida pelo fundador. Projeto em curso: «' + String(nome || '').trim() + '».\n' +
-      (ctx ? 'O fundador escreveu o seguinte sobre o projeto (FONTE PRINCIPAL — inclui o que descobriu, decidiu ou mudou entretanto):\n---\n' + ctx + '\n---\n' : 'O fundador não escreveu contexto.\n') +
+    return blocoNegocio() +
+      'Projeto em curso: «' + String(nome || '').trim() + '».\n' +
+      (ctx ? 'O Manel escreveu o seguinte sobre o projeto (FONTE PRINCIPAL — inclui o que descobriu, decidiu ou mudou entretanto):\n---\n' + ctx + '\n---\n' : 'O Manel não escreveu contexto.\n') +
       'PASSOS ABERTOS (por fazer), um por linha em JSON:\n' + (abertos.length ? abertos.join('\n') : '(nenhum)') + '\n' +
       'PASSOS CONCLUÍDOS (factos consumados — já aconteceram, nunca voltam a ser passos):\n' + (concluidos.length ? concluidos.map(function (t) { return '- ' + t; }).join('\n') : '(nenhum)') + '\n' +
       'PASSOS ANULADOS (foram descartados de propósito — não voltar a propor):\n' + (anulados.length ? anulados.map(function (t) { return '- ' + t; }).join('\n') : '(nenhum)') + '\n' +
@@ -166,8 +204,9 @@
       'deixaram de fazer sentido, e passos abertos cujo título ou duração deva mudar. Regras: (1) nunca propor remover ou alterar passos ' +
       'concluídos — só os ids da lista de ABERTOS são válidos em "remover", "alterar" e "depoisDe"; (2) nunca propor um passo que repita ' +
       'algo já concluído nem um anulado; (3) "porque" é UMA frase curta, em português de Portugal, que justifica a alteração com base no ' +
-      'contexto; (4) se nada mudar, devolve as três listas vazias; (5) cada passo novo é uma ação única que cabe numa sessão de trabalho, ' +
-      'com duração em minutos; "depoisDe" é o id do passo aberto a seguir ao qual entra, ou null para o fim.\n' +
+      'contexto; (4) se nada mudar, devolve as três listas vazias; (5) "depoisDe" é o id do passo aberto a seguir ao qual entra, ou null para o fim; ' +
+      '(6) o total de passos abertos depois das alterações nunca passa de ' + MAX_PASSOS + '.\n' +
+      'Cada passo novo ou alterado cumpre as ' + REGRAS_PASSO +
       'Responde APENAS com JSON, sem preâmbulo nem backticks, exatamente neste formato:\n' +
       'Cada passo em "acrescentar" traz também "local": ' + DEF_LOCAIS + '\n' +
       '{"acrescentar":[{"titulo":"...","duracaoPrevista":30,"depoisDe":"<id de passo aberto ou null>","local":"loja","porque":"..."}],' +
@@ -230,18 +269,32 @@
     return e;
   }
 
-  function normalizarPassos(texto) {
+  function normalizarPressupostos(v) {
+    if (!Array.isArray(v)) return [];
+    return v.map(function (x) { return typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, 200) : ''; })
+      .filter(Boolean).slice(0, MAX_PRESSUPOSTOS);
+  }
+
+  function normalizarResposta(texto) {
     var t = String(texto === null || texto === undefined ? '' : texto).trim();
     // Rede de segurança: o modelo às vezes embrulha em ```json … ``` apesar do pedido.
     t = t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     var dados;
     try { dados = JSON.parse(t); }
     catch (e) {
-      // Segunda tentativa: o primeiro [...] que apareça no texto.
-      var m = /\[[\s\S]*\]/.exec(t);
+      // Segunda tentativa: o primeiro {...} ou [...] que apareça no texto (o que abrir primeiro).
+      var io = t.indexOf('{'), ia = t.indexOf('[');
+      var objeto = io >= 0 && (ia < 0 || io < ia);
+      var m = objeto ? /\{[\s\S]*\}/.exec(t) : /\[[\s\S]*\]/.exec(t);
       if (!m) throw erroDe('resposta', 'A resposta do modelo não é JSON');
       try { dados = JSON.parse(m[0]); }
       catch (e2) { throw erroDe('resposta', 'A resposta do modelo não é JSON'); }
+    }
+    // Formato atual {passos, pressupostos}; a lista nua é o formato antigo e continua aceite.
+    var pressupostos = [];
+    if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
+      pressupostos = normalizarPressupostos(dados.pressupostos);
+      dados = dados.passos;
     }
     if (!Array.isArray(dados)) throw erroDe('resposta', 'A resposta do modelo não é uma lista de passos');
     var brutos = dados.filter(function (p) { return p && typeof p === 'object'; }).slice(0, MAX_PASSOS);
@@ -262,8 +315,10 @@
       p.dependeDePasso = (alvo !== null && alvo !== undefined && alvo !== i) ? alvo : null;
     });
     if (!passos.length) throw erroDe('vazio', 'O modelo não devolveu nenhum passo');
-    return passos;
+    return { passos: passos, pressupostos: pressupostos };
   }
+
+  function normalizarPassos(texto) { return normalizarResposta(texto).passos; }
 
   function textoDaResposta(json) {
     try {
@@ -343,7 +398,8 @@
     var nome = String(nomeProjeto || '').trim();
     if (!nome) return Promise.reject(erroDe('vazio', 'O projeto não tem nome'));
     return pedirAoModelo(promptPassos(nome, opts.contexto), opts).then(function (r) {
-      return { passos: normalizarPassos(r.texto), modelo: r.modelo };
+      var n = normalizarResposta(r.texto);
+      return { passos: n.passos, pressupostos: n.pressupostos, modelo: r.modelo };
     });
   }
 
@@ -379,7 +435,10 @@
     normalizarLocal: normalizarLocal,
     LOCAIS: LOCAIS,
     normalizarPassos: normalizarPassos,
+    normalizarResposta: normalizarResposta,
     normalizarAlteracoes: normalizarAlteracoes,
+    REGRAS_PASSO: REGRAS_PASSO,
+    MAX_PRESSUPOSTOS: MAX_PRESSUPOSTOS,
     promptPassos: promptPassos,
     promptAtualizacao: promptAtualizacao,
     MODELOS: MODELOS,

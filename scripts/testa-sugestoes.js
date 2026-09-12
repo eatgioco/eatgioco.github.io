@@ -46,6 +46,39 @@ var pc = S.promptPassos('x', 'Já falei com o senhorio. Não sei se contrato mai
 assert.ok(pc.indexOf('FONTE PRINCIPAL') > 0 && pc.indexOf('Já falei com o senhorio') > 0 && pc.indexOf('Decidir') > 0);
 assert.ok(S.promptPassos('x', new Array(6000).join('a')).length < S.promptPassos('x').length + S.MAX_CONTEXTO + 800);
 
+// ---- Contexto de negócio (fonte única gioco-contexto.js) e regras de passo ----
+var C = require('../gioco-contexto.js');
+var bloco = C.texto();
+assert.ok(bloco.indexOf('CONTEXTO DO NEGÓCIO') === 0 && bloco.indexOf('Rua de São Bento 154') > 0 && bloco.indexOf('518717186') > 0);
+C.DADOS.equipa.forEach(function (p) { assert.ok(bloco.indexOf(p.nome) > 0, 'equipa no bloco: ' + p.nome); });
+assert.ok(bloco.indexOf('ÚNICO decisor') > 0);
+// os TRÊS prompts começam pelo bloco de negócio — sem duplicar nomes no gioco-sugestoes.js
+[S.promptPassos('x'), S.promptPassos('x', 'ctx'), S.promptAtualizacao('x', 'ctx', { abertos: [] }), S.promptClassificarLocal(['a'])].forEach(function (pr) {
+  assert.strictEqual(pr.indexOf(bloco), 0, 'prompt começa pelo bloco de negócio');
+  assert.ok(pr.indexOf('Alfredo Giangaspero') > 0 && pr.indexOf('Leonor Borges') > 0);
+});
+assert.strictEqual(require('fs').readFileSync(__dirname + '/../gioco-sugestoes.js', 'utf8').indexOf('Giangaspero'), -1, 'nomes da equipa só no gioco-contexto.js');
+// regras do bom passo nos dois prompts de passos, não no de local
+assert.strictEqual(S.MAX_PASSOS, 8);
+['VERIFICÁVEL', 'antes de decidir', 'passo PRÓPRIO', 'PRIMEIRO passo', 'nome real', 'complexidade REAL'].forEach(function (r) {
+  assert.ok(S.promptPassos('x').indexOf(r) > 0, 'regra na sugestão: ' + r);
+  assert.ok(S.promptAtualizacao('x', '', { abertos: [] }).indexOf(r) > 0, 'regra na atualização: ' + r);
+});
+assert.strictEqual(S.promptClassificarLocal(['a']).indexOf('REGRAS DE UM BOM PASSO'), -1);
+assert.ok(S.promptPassos('x').indexOf('"pressupostos":["..."]') > 0 && S.promptPassos('x').indexOf('"passos":[') > 0);
+// ---- Pressupostos: formato novo, retrocompatível com a lista nua ----
+var r1 = S.normalizarResposta('{"passos":[{"titulo":"A","duracaoPrevista":10}],"pressupostos":["  Assumi que a loja está aberta ","",5,null,"b","c","d","e"]}');
+assert.deepStrictEqual(r1.pressupostos, ['Assumi que a loja está aberta', 'b', 'c', 'd'], 'strings limpas, não-strings caem, tecto 4');
+assert.strictEqual(r1.passos[0].titulo, 'A');
+assert.deepStrictEqual(S.normalizarResposta('{"passos":[{"titulo":"A"}]}').pressupostos, []);
+assert.deepStrictEqual(S.normalizarResposta('{"passos":[{"titulo":"A"}],"pressupostos":"não é lista"}').pressupostos, []);
+assert.deepStrictEqual(S.normalizarResposta('[{"titulo":"A"}]').pressupostos, [], 'lista nua (formato antigo) → sem pressupostos');
+assert.strictEqual(S.normalizarResposta('```json\n{"passos":[{"titulo":"A"}],"pressupostos":["p"]}\n```').pressupostos[0], 'p');
+assert.strictEqual(S.normalizarResposta('Aqui: {"passos":[{"titulo":"A [x]"}],"pressupostos":[]} fim').passos[0].titulo, 'A [x]');
+assert.strictEqual(S.normalizarResposta(JSON.stringify({ passos: [{ titulo: 'A' }], pressupostos: [new Array(300).join('z')] })).pressupostos[0].length, 200);
+assert.throws(function () { S.normalizarResposta('{"pressupostos":["p"]}'); }, function (e) { return e.codigo === 'resposta'; });
+assert.throws(function () { S.normalizarResposta('{"passos":[]}'); }, function (e) { return e.codigo === 'vazio'; });
+
 // ---- Local ----
 assert.strictEqual(S.normalizarLocal(' Loja '), 'loja');
 assert.strictEqual(S.normalizarLocal('escritório'), null);
@@ -123,11 +156,32 @@ Promise.resolve()
     });
   })
   .then(function () {
-    // o contexto vai no corpo do pedido
+    // o contexto vai no corpo do pedido, a seguir ao bloco de negócio; lista nua → pressupostos []
     var visto = null;
     var fc = function (url, init) { visto = JSON.parse(init.body).contents[0].parts[0].text; return Promise.resolve({ status: 200, text: function () { return Promise.resolve(ok); } }); };
-    return S.sugerirPassos('Teste', { fetch: fc, modelos: ['a'], chave: 'k', contexto: 'senhorio já contactado' }).then(function () {
-      assert.ok(visto.indexOf('senhorio já contactado') > 0);
+    return S.sugerirPassos('Teste', { fetch: fc, modelos: ['a'], chave: 'k', contexto: 'senhorio já contactado' }).then(function (r) {
+      assert.ok(visto.indexOf('senhorio já contactado') > 0 && visto.indexOf(bloco) === 0);
+      assert.deepStrictEqual(r.pressupostos, []);
+    });
+  })
+  .then(function () {
+    // formato novo com pressupostos
+    var okP = JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"passos":[{"titulo":"Pedir orçamento à Leonor Borges","duracaoPrevista":20}],"pressupostos":["Assumi que a sinalética é interior"]}' }] } }] });
+    var fp = fetchFalso({ a: { status: 200, texto: okP } });
+    return S.sugerirPassos('Teste', { fetch: fp, modelos: ['a'], chave: 'k' }).then(function (r) {
+      assert.deepStrictEqual(r.pressupostos, ['Assumi que a sinalética é interior']);
+      assert.strictEqual(r.passos[0].titulo, 'Pedir orçamento à Leonor Borges');
+    });
+  })
+  .then(function () {
+    // a atualização incremental e a classificação de local também levam o bloco de negócio
+    var vistos = [];
+    var fv = function (url, init) { vistos.push(JSON.parse(init.body).contents[0].parts[0].text); return Promise.resolve({ status: 200, text: function () { return Promise.resolve(JSON.stringify({ candidates: [{ content: { parts: [{ text: vistos.length === 1 ? '{}' : '[{"titulo":"x","local":null}]' }] } }] })); } }); };
+    return S.sugerirAlteracoes('Teste', { fetch: fv, modelos: ['a'], chave: 'k', abertos: ABERTOS }).then(function () {
+      return S.classificarLocal(['x'], { fetch: fv, modelos: ['a'], chave: 'k' });
+    }).then(function () {
+      assert.strictEqual(vistos.length, 2);
+      vistos.forEach(function (v) { assert.strictEqual(v.indexOf(bloco), 0); });
     });
   })
   .then(function () {
