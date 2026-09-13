@@ -1300,16 +1300,19 @@
      Uso principal ao telemóvel, de pé ao balcão: alvos de toque ≥ 44px,
      uma só coluna, nada de split-grid (a 375px a coluna fixa de 380px
      transbordava). Sem @media próprios: o layout é o mesmo em desktop. */
-  /* Topo em duas colunas (Set/2026): "O que falta" à esquerda (2 partes) e
-     "Compras físicas" à direita (3 partes). Sem @media (regra do OS): a
-     largura de base é o truque do flex — calc((1000px − 100%) × 999) fica
-     negativa (= 0) acima de 1000px, e as duas secções dividem a linha 2:3;
-     abaixo fica gigante e cada uma cai para a sua linha a 100%, na ordem
-     atual (faltas primeiro). min-width:0 nas duas: nada transborda. */
-  .topo-grid{ display:flex; flex-wrap:wrap; gap:40px 28px; align-items:flex-start; margin-top:8px; }
+  /* Topo em duas colunas (Set/2026, revisto): "O que falta" à esquerda
+     (2 partes) e "Compras físicas" à direita (3 partes), a partir de 900px de
+     VIEWPORT; abaixo, empilhadas na ordem de sempre (faltas primeiro).
+     EXCEPÇÃO documentada no CLAUDE.md: usa @media. A versão anterior (truque
+     do flex-basis calc((1000px − 100%) × 999)) media o limite sobre a largura
+     do CONTENTOR, não do ecrã — com a sidebar e o padding do shell, um ecrã de
+     ~950px CSS (o PC da loja com escala do Windows a 150 %) dava um contentor
+     de ~800px e ficava sempre numa coluna. minmax(0,…) nas duas: nada transborda. */
+  .topo-grid{ display:grid; grid-template-columns:minmax(0,1fr); gap:40px 28px; align-items:start; margin-top:8px; }
   .topo-grid > .section, .topo-grid > #faltas-section{ margin-top:0; min-width:0; max-width:100%; }
-  .topo-grid > #faltas-section{ flex:2 1 calc((1000px - 100%) * 999); }
-  .topo-grid > #compras-fisicas-section{ flex:3 1 calc((1000px - 100%) * 999); }
+  @media (min-width:900px){
+    .topo-grid{ grid-template-columns:minmax(0,2fr) minmax(0,3fr); }
+  }
   #faltas-section{ margin-top:8px; }
   .faltas-card{
     background:var(--white);
