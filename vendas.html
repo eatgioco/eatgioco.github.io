@@ -3107,10 +3107,12 @@
       else { chave = cat + '\u00a6' + sub; nome = sub; }
       var d = mapa[chave] || (mapa[chave] = { key:chave, desc:nome, categoria:cat,
                                               subcategoria: nivel === 'categorias' ? null : sub,
-                                              qtd:0, valor:0, produtos:0 });
+                                              qtd:0, valor:0, produtos:0, itens:[] });
       d.qtd += Number(src.qtd) || 0;
       d.valor += Number(src.valor) || 0;
       d.produtos += 1;
+      d.itens.push({ key:k, desc:src.desc || k, qtd:Number(src.qtd) || 0, valor:Number(src.valor) || 0,
+                     pvpMedio:Number(src.pvpMedio) || 0 });
     });
     return Object.keys(mapa).map(function(k){
       var d = mapa[k];
@@ -3143,26 +3145,46 @@
 
     var totalValor = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
 
+    /* Nas vistas agregadas cada linha abre por baixo os produtos do grupo —
+       o MESMO mecanismo (cat-expansivel / cat-sub / cat-seta) do Mix por
+       categoria; o handler é partilhado. As linhas-filho ficam hidden e a %
+       é sobre o total do período, como na linha do grupo. */
     var linhas = lista.slice(0, 60).map(function(x, i){
       var celulas = '<td class="num" style="color:var(--muted);">' + (i + 1) + '</td>';
+      var abre = nivel !== 'produtos' && x.itens && x.itens.length;
+      var seta = abre ? '<span class="cat-seta">▸</span> ' : '';
+      var chaveGrupo = 'top:' + x.key;
       if (nivel === 'produtos'){
         celulas += '<td>' + esc(x.desc) + '</td>' +
           '<td><span class="tag">' + esc(x.categoria || 'Outro') + '</span></td>' +
           '<td style="font-size:12px;color:var(--muted);">' + (x.subcategoria ? esc(x.subcategoria) : '—') + '</td>';
       } else if (nivel === 'subcategorias'){
-        celulas += '<td>' + esc(x.desc) + '</td>' +
+        celulas += '<td>' + seta + esc(x.desc) + '</td>' +
           '<td><span class="tag">' + esc(x.categoria) + '</span></td>' +
           '<td class="num">' + intFmt(x.produtos) + '</td>';
       } else {
-        celulas += '<td>' + esc(x.desc) + '</td>' +
+        celulas += '<td>' + seta + esc(x.desc) + '</td>' +
           '<td class="num">' + intFmt(x.produtos) + '</td>';
       }
-      return '<tr>' + celulas +
+      var linha = '<tr' + (abre ? ' class="cat-linha cat-expansivel" data-cat="' + esc(chaveGrupo) + '"' : '') + '>' + celulas +
         '<td class="num">' + dec(x.qtd, 0) + '</td>' +
         '<td class="num">' + eur(x.valor) + '</td>' +
         '<td class="num">' + (totalValor ? dec(x.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
         '<td class="num">' + eur(x.pvpMedio) + '</td>' +
         '</tr>';
+      if (!abre) return linha;
+      var filhos = x.itens.slice().sort(function(a, b){ return b[campo] - a[campo]; }).map(function(it){
+        var vazias = nivel === 'subcategorias' ? '<td></td><td></td>' : '<td></td>';
+        return '<tr class="cat-sub" data-cat="' + esc(chaveGrupo) + '" hidden>' +
+          '<td></td>' +
+          '<td style="padding-left:28px;color:var(--muted);">' + esc(it.desc) + '</td>' + vazias +
+          '<td class="num">' + dec(it.qtd, 0) + '</td>' +
+          '<td class="num">' + eur(it.valor) + '</td>' +
+          '<td class="num">' + (totalValor ? dec(it.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
+          '<td class="num">' + eur(it.pvpMedio) + '</td>' +
+          '</tr>';
+      }).join('');
+      return linha + filhos;
     }).join('');
 
     var cabecalho;
@@ -3172,8 +3194,8 @@
 
     var sub;
     if (nivel === 'produtos') sub = lista.length + ' produtos vendidos. Clica nos cabeçalhos para ordenar (mostra os 60 primeiros).';
-    else if (nivel === 'subcategorias') sub = lista.length + ' subcategorias com venda (soma dos produtos de cada uma; sem subcategoria atribuída agrupa em "' + SEM_SUBCATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
-    else sub = lista.length + ' categorias com venda (soma dos produtos de cada uma; sem categoria atribuída agrupa em "' + SEM_CATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
+    else if (nivel === 'subcategorias') sub = lista.length + ' subcategorias com venda (clica numa linha para ver os produtos; sem subcategoria atribuída agrupa em "' + SEM_SUBCATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
+    else sub = lista.length + ' categorias com venda (clica numa linha para ver os produtos; sem categoria atribuída agrupa em "' + SEM_CATEGORIA + '"). Clica nos cabeçalhos para ordenar (mostra as 60 primeiras).';
 
     return seccao('Top produtos', sub,
       '<div class="table-wrap"><table><thead><tr>' +
