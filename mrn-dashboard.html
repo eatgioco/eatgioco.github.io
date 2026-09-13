@@ -462,6 +462,12 @@
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:12px;font-weight:700;line-height:22px;text-align:center;
   }
+  /* Cartão Obrigações: as 3 próximas ações reutilizam .cc-linhas; o valor
+     da linha é o projeto/prazo, à direita. Vencida a vermelho (texto). */
+  .card-obrigacoes .cc-linha-label{ color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .card-obrigacoes .cc-linha-valor{ color:var(--muted);flex:0 0 auto;font-size:11.5px; }
+  .card-obrigacoes .cc-linha-valor.vencida{ color:var(--red-ink);font-weight:700; }
+  .card-obrigacoes .obr-parados{ color:var(--red-ink);font-weight:600; }
   .cc-linhas{ margin:12px 0 0;padding:0;list-style:none; }
   .cc-linha{
     display:flex;justify-content:space-between;gap:10px;
@@ -1907,7 +1913,8 @@
     margin-bottom:6px;
   }
 
-  .modal-campo input[type="number"]{
+  .modal-campo input[type="number"],
+  .modal-campo input[data-valor]{
     width:100%;
     font-family:'Inter', sans-serif;
     font-variant-numeric:tabular-nums;
@@ -1920,7 +1927,8 @@
     color:var(--ink);
   }
 
-  .modal-campo input[type="number"]:focus{
+  .modal-campo input[type="number"]:focus,
+  .modal-campo input[data-valor]:focus{
     outline:none;
     border-color:var(--red);
   }
@@ -2063,6 +2071,7 @@
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
 <script src="gioco-caixa.js"></script>
+<script src="gioco-obrigacoes.js"></script>
 <script src="gioco-correspondencia.js"></script>
 <script src="gioco-eventos.js"></script>
 
@@ -2233,12 +2242,32 @@
       <span class="status-badge status-badge-warning vendas-oculto" id="cardVendasBadge">Em configuração</span>
     </a>
 
+    <!-- Reconciliação POS ↔ TPA (reconciliacao.html). Página privada: este
+         cartão é o ÚNICO ponto de entrada — não está no index nem na nav. -->
+    <a class="card glass-light card-compact" id="cardReconciliacao" href="reconciliacao.html">
+      <div class="card-icon"><svg class="icon" width="28" height="28"><use href="#i-scan"/></svg></div>
+      <h3 class="card-title">Reconciliação POS ↔ TPA</h3>
+      <p class="card-subtitle">SAF-T contra extrato do terminal, transação a transação. Ficheiros lidos no browser, nada gravado.</p>
+    </a>
+
     <!-- Calendário pessoal (calendario.html). Só leitura aqui: conta os
          eventos de hoje em eventos/ que não estão anulados. -->
     <a class="card glass-light card-compact card-calendario" id="cardCalendario" href="calendario.html">
       <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-calendar"/></svg></div>
       <h3 class="card-title">Calendário</h3>
       <p class="card-subtitle" id="cardCalendarioSub">—</p>
+    </a>
+
+    <!-- Obrigações (obrigacoes.html, Fase 1). Página pessoal do Manel: este
+         cartão e a nav 'privada' são os ÚNICOS pontos de entrada — nunca no
+         index nem na nav pública. Só leitura de obrigacoes/ e projetos/; o
+         cálculo (próxima ação, parados > 14 dias) é do gioco-obrigacoes.js. -->
+    <a class="card glass-light card-compact card-obrigacoes" id="cardObrigacoes" href="obrigacoes.html">
+      <span class="cc-badge" id="obrBadge" hidden>0</span>
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-clipboard-check"/></svg></div>
+      <h3 class="card-title">Obrigações</h3>
+      <p class="card-subtitle" id="obrSub">A carregar…</p>
+      <ul class="cc-linhas" id="obrLinhas" hidden></ul>
     </a>
 
     <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
@@ -2463,7 +2492,7 @@
       </div>
       <div class="field">
         <label class="field-label">Montante (€) *</label>
-        <input type="number" id="npMontante" min="0" step="0.01">
+        <input type="text" inputmode="decimal" autocomplete="off" data-valor id="npMontante" placeholder="0,00">
       </div>
       <div class="field">
         <label class="field-label">Prazo *</label>
@@ -2547,7 +2576,7 @@
     <p class="modal-contexto" id="devolucaoContexto"></p>
     <div class="modal-campo">
       <label for="devolucaoValor">Valor a devolver (€)</label>
-      <input type="number" id="devolucaoValor" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      <input type="text" id="devolucaoValor" inputmode="decimal" autocomplete="off" data-valor placeholder="0,00">
     </div>
     <p class="modal-erro" id="devolucaoErro"></p>
     <div class="modal-actions">
@@ -2664,6 +2693,53 @@ window.addEventListener('load', function () {
     }
     if (pedidosCarregados) renderPedidosDash();
   });
+  // obrigacoes/ + projetos/ (cartão Obrigações): só leitura. Abertas, projetos
+  // parados > 14 dias e as 3 próximas ações — a mesma vista da obrigacoes.html,
+  // calculada pelo gioco-obrigacoes.js. Mostrar 3 e CONTAR o resto: nunca
+  // esconder uma aberta sem dizer quantas ficam de fora.
+  var obrigacoesRef = db.ref('obrigacoes');
+  var projetosRef = db.ref('projetos');
+  var obrigacoesDash = null, projetosDash = null;
+  function renderObrigacoesDash() {
+    if (obrigacoesDash === null || projetosDash === null) return;
+    var G = window.GiocoObrigacoes;
+    var sub = document.getElementById('obrSub');
+    var ul = document.getElementById('obrLinhas');
+    var badge = document.getElementById('obrBadge');
+    if (!G || !sub || !ul) return;
+    var hoje = G.hojeISO();
+    var v = G.vistaProximaAcao(obrigacoesDash, projetosDash, hoje);
+    var partes = [v.totalAbertas + (v.totalAbertas === 1 ? ' aberta' : ' abertas')];
+    if (v.parados.length) partes.push('<span class="obr-parados">' + v.parados.length + (v.parados.length === 1 ? ' projeto parado' : ' projetos parados') + ' há mais de ' + G.LIMITE_PARADO_DIAS + ' dias</span>');
+    else partes.push('nenhum projeto parado há mais de ' + G.LIMITE_PARADO_DIAS + ' dias');
+    sub.innerHTML = partes.join(' · ');
+    if (badge) { badge.textContent = v.totalAbertas; badge.hidden = v.totalAbertas === 0; }
+    var proximas = v.projetos.concat(v.soltas);
+    proximas = G.ordenar(proximas, hoje);
+    var tres = proximas.slice(0, 3);
+    var html = tres.map(function (x) {
+      var o = x.obr;
+      var dir = '', cls = '';
+      if (o.prazo) {
+        var n = G.diasEntre(o.prazo, hoje);
+        dir = n > 0 ? 'vencida há ' + n + 'd' : n === 0 ? 'hoje' : 'prazo ' + o.prazo.slice(8, 10) + '/' + o.prazo.slice(5, 7);
+        cls = n >= 0 ? ' vencida' : '';
+      } else if (x.projeto) {
+        dir = x.diasParado > 0 ? 'parado há ' + x.diasParado + 'd' : x.projeto.nome;
+      } else dir = (o.duracaoPrevista || 30) + ' min';
+      var label = (x.projeto ? escapeHtml(x.projeto.nome) + ': ' : '') + escapeHtml(o.titulo);
+      return '<li class="cc-linha"><span class="cc-linha-label" title="' + label + '">' + label + '</span><span class="cc-linha-valor' + cls + '">' + escapeHtml(dir) + '</span></li>';
+    });
+    // O resto conta TODAS as abertas que não estão nas 3 linhas (passos seguintes
+    // dos projetos e bloqueados incluídos): o cartão nunca esconde sem contar.
+    var resto = v.totalAbertas - tres.length;
+    if (resto > 0) html.push('<li class="cc-linha"><span class="cc-linha-label" style="color:var(--muted)">+' + resto + ' outras abertas</span><span class="cc-linha-valor">→ Ver todas</span></li>');
+    ul.innerHTML = html.join('');
+    ul.hidden = html.length === 0;
+  }
+  obrigacoesRef.on('value', function (snapshot) { obrigacoesDash = snapshot.val() || {}; renderObrigacoesDash(); });
+  projetosRef.on('value', function (snapshot) { projetosDash = snapshot.val() || {}; renderObrigacoesDash(); });
+
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
   var compromissosRef = db.ref('compromissosFixos');
@@ -3439,7 +3515,14 @@ window.addEventListener('load', function () {
 
   btnGuardarNovoPagamento.addEventListener('click', function () {
     var descricao = document.getElementById('npDescricao').value.trim();
-    var montante = document.getElementById('npMontante').value.trim();
+    var npMontanteEl = document.getElementById('npMontante');
+    var montanteBruto = npMontanteEl.value.trim();
+    var montanteNum = montanteBruto === '' ? NaN : parseValor(montanteBruto);
+    var montanteMau = montanteBruto !== '' && (isNaN(montanteNum) || montanteNum <= 0);
+    giocoValorErro(npMontanteEl, montanteMau ? 'Escreve um montante maior do que zero (ex.: 120,50)' : null);
+    if (montanteMau) return;
+    // Forma canónica com ponto, a mesma que o type="number" dava (o resto do OS lê com parseMontante).
+    var montante = isNaN(montanteNum) ? '' : String(Math.round(montanteNum * 100) / 100);
     var prazoIso = document.getElementById('npPrazo').value;
     var referencia = document.getElementById('npReferencia').value.trim();
     var iban = document.getElementById('npIban').value.trim();
@@ -5498,7 +5581,7 @@ window.addEventListener('load', function () {
       formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' +
       'por depositar ' + formatEuro(devolucaoMaximo);
     devolucaoValorInput.value = '';
-    devolucaoValorInput.max = devolucaoMaximo;
+    giocoValorErro(devolucaoValorInput, null);
     devolucaoErroEl.textContent = '';
     devolucaoSimBtn.disabled = true;
     devolucaoSimBtn.textContent = '↩ Confirmar devolução';
@@ -5512,9 +5595,10 @@ window.addEventListener('load', function () {
   }
 
   function validarDevolucao(){
-    var valor = parseFloat(devolucaoValorInput.value);
+    var bruto = devolucaoValorInput.value.trim();
+    var valor = parseValor(bruto);
     if (!(valor > 0)){
-      devolucaoErroEl.textContent = '';
+      devolucaoErroEl.textContent = (bruto !== '') ? 'Escreve um valor maior do que zero (ex.: 20,00)' : '';
       devolucaoSimBtn.disabled = true;
       return null;
     }

@@ -24,6 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="gioco-consumo.js"></script>
 
 <style>
 
@@ -447,7 +448,8 @@
     color:var(--ink);
   }
 
-  .field input[type="number"]{
+  .field input[type="number"],
+  .field input[data-valor]{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
     font-weight:700;
@@ -1294,6 +1296,169 @@
   .section, .modal, .cf-row, .temp-row{ border-radius:12px; }
   .modal{ border-radius:16px; }
 
+  /* ---------- Faltas (ruturas de stock) ----------
+     Uso principal ao telemóvel, de pé ao balcão: alvos de toque ≥ 44px,
+     uma só coluna, nada de split-grid (a 375px a coluna fixa de 380px
+     transbordava). Sem @media próprios: o layout é o mesmo em desktop. */
+  /* Topo em duas colunas (Set/2026): "O que falta" à esquerda (2 partes) e
+     "Compras físicas" à direita (3 partes). Sem @media (regra do OS): a
+     largura de base é o truque do flex — calc((1000px − 100%) × 999) fica
+     negativa (= 0) acima de 1000px, e as duas secções dividem a linha 2:3;
+     abaixo fica gigante e cada uma cai para a sua linha a 100%, na ordem
+     atual (faltas primeiro). min-width:0 nas duas: nada transborda. */
+  .topo-grid{ display:flex; flex-wrap:wrap; gap:40px 28px; align-items:flex-start; margin-top:8px; }
+  .topo-grid > .section, .topo-grid > #faltas-section{ margin-top:0; min-width:0; max-width:100%; }
+  .topo-grid > #faltas-section{ flex:2 1 calc((1000px - 100%) * 999); }
+  .topo-grid > #compras-fisicas-section{ flex:3 1 calc((1000px - 100%) * 999); }
+  #faltas-section{ margin-top:8px; }
+  .faltas-card{
+    background:var(--white);
+    border:2px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    color:var(--ink);
+  }
+  .faltas-card.tem-acabou{ border-color:var(--red); }
+  .faltas-top{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-bottom:8px;
+  }
+  .faltas-top h2{
+    margin:0; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  }
+  .faltas-contador{
+    font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;
+  }
+  .faltas-vazio{ margin:6px 0 4px; font-size:14px; color:var(--muted); }
+  .falta-row{
+    display:block;
+    padding:12px 0; border-top:1px solid var(--line);
+  }
+  .falta-row:first-child{ border-top:none; }
+  .falta-main{ min-width:0; }
+  .falta-nome-linha{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .falta-nome{ font-size:16px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+  .falta-tipo{
+    font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
+    border:1.5px solid var(--line); border-radius:100px; padding:1px 7px; white-space:nowrap;
+  }
+  .falta-badge{
+    font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    padding:3px 8px; border-radius:100px; white-space:nowrap; color:#FFFFFF;
+  }
+  .falta-badge-acabou{ background:var(--red); }
+  .falta-badge-aacabar{ background:var(--mustard); color:#141414; }
+  .falta-meta{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .falta-nota{ font-size:13px; margin-top:4px; }
+  .falta-afeta{ font-size:12px; color:var(--muted); margin-top:4px; line-height:1.45; }
+  .falta-afeta b{ font-weight:600; color:var(--ink); }
+  /* Os controlos vivem POR BAIXO do conteúdo da linha, colados a ele — antes
+     iam para a extremidade direita e, num ecrã largo, ficavam órfãos do nome.
+     Ordem: Resolvido (principal) · Comprar (contorno, só ingredientes) ·
+     Anular (texto, visivelmente secundário). Alvos ≥ 44px mantidos. */
+  .falta-acoes{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; }
+  .falta-btn{
+    min-height:44px; min-width:44px; padding:0 14px;
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:700;
+    border-radius:100px; border:2px solid var(--ink); background:var(--ink); color:var(--white);
+    cursor:pointer;
+  }
+  .falta-btn:hover{ background:var(--red); border-color:var(--red); color:#FFFFFF; }
+  .falta-btn-comprar{ background:transparent; color:var(--ink); }
+  .falta-btn-anular{
+    background:transparent; color:var(--muted); border-color:transparent; font-weight:500;
+    padding:0 10px;
+  }
+  .falta-btn-anular:hover{ background:transparent; border-color:transparent; color:var(--red-ink); }
+  .falta-enviado{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; color:var(--muted); white-space:nowrap;
+  }
+  .falta-enviado .icon{ width:12px; height:12px; }
+  .faltas-esgotados{
+    margin-top:12px; padding-top:12px; border-top:2px solid var(--line);
+  }
+  .faltas-esgotados-t{
+    font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:0 0 8px;
+  }
+  .faltas-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .faltas-chip{
+    font-size:13px; font-weight:600; padding:6px 12px; border-radius:100px;
+    background:var(--red); color:#FFFFFF;
+  }
+  .faltas-chip-derivado{ background:transparent; color:var(--red-ink); border:2px solid var(--red); }
+  .faltas-acoes-topo{ display:flex; gap:8px; margin-top:14px; }
+  .faltas-registar-btn{
+    flex:1; min-height:48px; padding:0 16px;
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+    border-radius:100px; border:2px solid var(--ink); background:var(--ink); color:var(--white); cursor:pointer;
+  }
+  .faltas-registar-btn:hover{ background:var(--red); border-color:var(--red); color:#FFFFFF; }
+  .faltas-registar-btn[aria-expanded="true"]{ background:transparent; color:var(--ink); }
+
+  /* Formulário compacto */
+  .faltas-form{
+    margin-top:12px; padding:14px; border:2px solid var(--line); border-radius:12px; background:var(--dough);
+  }
+  .faltas-form .field select,
+  .faltas-form .field input[type="text"]{ min-height:48px; font-size:16px; background:var(--white); }
+  .faltas-seg{ display:flex; gap:0; border:2px solid var(--line); border-radius:100px; overflow:hidden; background:var(--white); }
+  .faltas-seg button{
+    flex:1; min-height:44px; border:none; background:transparent; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .faltas-seg button[aria-pressed="true"]{ background:var(--ink); color:var(--white); }
+  .faltas-seg-estado button[data-v="acabou"][aria-pressed="true"]{ background:var(--red); color:#FFFFFF; }
+  .faltas-seg-estado button[data-v="aAcabar"][aria-pressed="true"]{ background:var(--mustard); color:#141414; }
+  .faltas-busca{ position:relative; }
+  .faltas-sugestoes{
+    position:absolute; left:0; right:0; top:100%; z-index:5;
+    background:var(--white); border:2px solid var(--ink); border-top:none; border-radius:0 0 12px 12px;
+    max-height:260px; overflow-y:auto; display:none;
+  }
+  .faltas-sugestoes.on{ display:block; }
+  .faltas-sug{
+    display:block; width:100%; text-align:left; min-height:44px; padding:10px 12px;
+    border:none; border-top:1px solid var(--line); background:transparent; color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:15px; cursor:pointer;
+  }
+  .faltas-sug:first-child{ border-top:none; }
+  .faltas-sug:hover, .faltas-sug:focus{ background:var(--dough); outline:none; }
+  .faltas-sug-livre{ color:var(--muted); font-style:italic; }
+  .faltas-escolhido{ font-size:12px; color:var(--muted); margin-top:4px; min-height:16px; }
+  .faltas-form-acoes{ display:flex; gap:8px; margin-top:4px; }
+  .faltas-form-acoes .btn-registar{ min-height:48px; }
+  .faltas-cancelar{
+    min-height:48px; padding:0 18px; border-radius:100px; border:2px solid var(--line);
+    background:transparent; color:var(--ink); font-family:'Inter',sans-serif; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .faltas-erro{ color:var(--red-ink); font-size:13px; margin:0 0 8px; }
+
+  /* Blocos colapsáveis (mapa + histórico) */
+  .faltas-details{
+    margin-top:16px; background:var(--white); border:1px solid var(--line); border-radius:12px;
+    color:var(--ink);
+  }
+  .faltas-details summary{
+    list-style:none; cursor:pointer; min-height:48px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--ink);
+  }
+  .faltas-details summary::-webkit-details-marker{ display:none; }
+  .faltas-details summary::after{ content:'▾'; color:var(--muted); }
+  .faltas-details[open] summary::after{ content:'▴'; }
+  .faltas-details-body{ padding:0 14px 14px; }
+  .faltas-mapa-lista{ display:grid; gap:0; margin-top:10px; }
+  .faltas-mapa-item{
+    display:flex; align-items:center; gap:12px; min-height:48px; padding:6px 4px;
+    border-top:1px solid var(--line); font-size:15px; cursor:pointer;
+  }
+  .faltas-mapa-item input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; accent-color:var(--red); }
+  .faltas-mapa-nota{ font-size:12px; color:var(--muted); margin:8px 0 0; line-height:1.45; }
+  .faltas-mapa-derivado{ font-size:12px; color:var(--muted); margin:10px 0 0; }
+  .faltas-hist-row{ padding:10px 0; border-top:1px solid var(--line); font-size:14px; }
+  .faltas-hist-row:first-child{ border-top:none; }
+  .faltas-hist-meta{ font-size:12px; color:var(--muted); margin-top:2px; }
+
   /* ---------- Erro de autenticação (padrão do OS) ---------- */
   #authErro{ display:none; margin:18px 0 0; }
   #authErro.on{ display:block; }
@@ -1373,6 +1538,58 @@
       </div>
 
 <main>
+  <div class="topo-grid">
+  <div class="section" id="faltas-section">
+    <p class="section-title">O que falta</p>
+    <div class="faltas-card" id="faltasCard">
+      <div class="faltas-top">
+        <h2>Faltas</h2>
+        <span class="faltas-contador" id="faltasContador"></span>
+      </div>
+      <div id="faltasLista"><p class="faltas-vazio">Sem faltas registadas</p></div>
+      <div id="faltasEsgotados"></div>
+      <div class="faltas-acoes-topo">
+        <button type="button" class="faltas-registar-btn" id="faltasAbrirForm" aria-expanded="false" aria-controls="faltasForm">+ Registar falta</button>
+      </div>
+
+      <div class="faltas-form hidden" id="faltasForm">
+        <div class="field">
+          <label class="field-label">Tipo</label>
+          <div class="faltas-seg" id="faltasTipoSeg">
+            <button type="button" data-v="ingrediente" aria-pressed="true">Ingrediente</button>
+            <button type="button" data-v="produto" aria-pressed="false">Produto</button>
+          </div>
+        </div>
+        <div class="field faltas-busca">
+          <label class="field-label" for="faltasNome">O que falta</label>
+          <input type="text" id="faltasNome" autocomplete="off" autocapitalize="sentences" placeholder="Escreve para procurar…">
+          <div class="faltas-sugestoes" id="faltasSugestoes"></div>
+          <div class="faltas-escolhido" id="faltasEscolhido"></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Estado</label>
+          <div class="faltas-seg faltas-seg-estado" id="faltasEstadoSeg">
+            <button type="button" data-v="acabou" aria-pressed="true">Acabou</button>
+            <button type="button" data-v="aAcabar" aria-pressed="false">A acabar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="faltasNota">Nota (opcional)</label>
+          <input type="text" id="faltasNota" placeholder="ex: chega amanhã de manhã">
+        </div>
+        <div class="field">
+          <label class="field-label" for="faltasPessoa">Quem regista</label>
+          <select id="faltasPessoa" disabled><option>A carregar...</option></select>
+        </div>
+        <p class="faltas-erro hidden" id="faltasErro"></p>
+        <div class="faltas-form-acoes">
+          <button type="button" class="btn-registar" id="faltasGuardar">Guardar</button>
+          <button type="button" class="faltas-cancelar" id="faltasCancelar">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="section" id="compras-fisicas-section">
     <p class="section-title">Compras Físicas</p>
 
@@ -1406,6 +1623,7 @@
       <div id="cfPrintArea"></div>
     </div>
   </div>
+  </div><!-- /.topo-grid -->
 
   <div class="section">
     <p class="section-title">Planta</p>
@@ -1530,7 +1748,7 @@
 
         <div class="field">
           <label class="field-label" for="temp-valor">Temperatura (°C)</label>
-          <input type="number" id="temp-valor" inputmode="decimal" step="0.1" placeholder="0.0">
+          <input type="text" id="temp-valor" inputmode="decimal" autocomplete="off" data-valor="1" placeholder="0,0">
         </div>
 
         <div class="field">
@@ -1629,6 +1847,26 @@
       <div id="pedidosList"></div>
     </div>
     </div>
+  </div>
+  <div class="section" id="faltas-config-section">
+    <details class="faltas-details" id="faltasMapaDetails">
+      <summary>Mapa de faltas</summary>
+      <div class="faltas-details-body">
+        <p class="faltas-mapa-nota">Para cada ingrediente, marca os produtos que deixam de se poder fazer quando ele acaba. É só uma dependência sim/não — sem quantidades. O card "O que falta" usa isto para mostrar "Afeta: …".</p>
+        <div class="field" style="margin-top:12px">
+          <label class="field-label" for="faltasMapaIng">Ingrediente</label>
+          <select id="faltasMapaIng"><option value="">— escolher ingrediente —</option></select>
+        </div>
+        <div id="faltasMapaProdutos"></div>
+      </div>
+    </details>
+
+    <details class="faltas-details" id="faltasHistDetails">
+      <summary>Histórico de faltas</summary>
+      <div class="faltas-details-body">
+        <div id="faltasHistorico"><p class="faltas-vazio">Sem faltas resolvidas nos últimos 30 dias</p></div>
+      </div>
+    </details>
   </div>
 </main>
 
@@ -2580,7 +2818,9 @@
     e.preventDefault();
 
     var equipamento = document.getElementById('temp-equipamento').value;
-    var temperatura = parseFloat(document.getElementById('temp-valor').value);
+    var tempEl = document.getElementById('temp-valor');
+    var temperatura = parseValor(tempEl.value);
+    giocoValorErro(tempEl, (tempEl.value.trim() !== '' && isNaN(temperatura)) ? 'Escreve a temperatura em °C (ex.: 3,5 ou -18)' : null);
     var pessoaSelecao = resolvePessoaSelecao(document.getElementById('temp-pessoa'));
     var notas = document.getElementById('temp-notas').value.trim();
     var fileInput = document.getElementById('temp-foto');
@@ -2838,8 +3078,8 @@
   function onEquipTipoChange(){
     var tipo = document.getElementById('equipEdit-tipo').value;
     var def = EQUIP_TIPO_LIMITES_DEFAULT[tipo] || { min: null, max: null };
-    document.getElementById('equipEdit-limiteMin').value = (def.min === null || def.min === undefined) ? '' : def.min;
-    document.getElementById('equipEdit-limiteMax').value = (def.max === null || def.max === undefined) ? '' : def.max;
+    document.getElementById('equipEdit-limiteMin').value = (typeof def.min === 'number') ? formatValor(def.min, 1) : '';
+    document.getElementById('equipEdit-limiteMax').value = (typeof def.max === 'number') ? formatValor(def.max, 1) : '';
   }
   window.onEquipTipoChange = onEquipTipoChange;
 
@@ -2858,10 +3098,12 @@
     }
 
     function numOrNull(elId){
-      var raw = document.getElementById(elId).value.trim();
-      if (raw === '') return null;
-      var n = parseFloat(raw);
-      if (isNaN(n)) throw new Error('Valor numérico inválido.');
+      var el = document.getElementById(elId);
+      var raw = el.value.trim();
+      if (raw === '') { giocoValorErro(el, null); return null; }
+      var n = parseValor(raw);
+      if (isNaN(n)) { giocoValorErro(el, 'Escreve um número (ex.: 12,5)'); throw new Error('Valor numérico inválido.'); }
+      giocoValorErro(el, null);
       return n;
     }
 
@@ -3030,6 +3272,7 @@
     var isNovo = !eq;
     var d = equipDraft || {};
     var val = function(v){ return (v === null || v === undefined) ? '' : v; };
+    var valNum = function(v, casas){ return (typeof v === 'number') ? formatValor(v, casas) : val(v); };
     var html = '<div class="equip-manage-panel">';
 
     if (!isNovo){
@@ -3073,17 +3316,17 @@
       html += '<option value="' + t + '"' + (d.tipo === t ? ' selected' : '') + '>' + EQUIP_TIPO_LABELS[t] + '</option>';
     });
     html += '</select></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMin">Limite mínimo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMin" step="0.1" value="' + val(d.limiteMin) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMax">Limite máximo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMax" step="0.1" value="' + val(d.limiteMax) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMin">Limite mínimo (°C, vazio = sem limite)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-limiteMin" value="' + valNum(d.limiteMin, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMax">Limite máximo (°C, vazio = sem limite)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-limiteMax" value="' + valNum(d.limiteMax, 1) + '"></div>';
 
     html += '<p class="equip-manage-zona-title">Ficha</p>';
     html += '<div class="equip-ficha-grid">';
-    html += '<div class="field"><label class="field-label" for="equipEdit-largura">Largura (cm)</label><input type="number" id="equipEdit-largura" step="0.1" value="' + val(d.largura) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-profundidade">Profundidade (cm)</label><input type="number" id="equipEdit-profundidade" step="0.1" value="' + val(d.profundidade) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-altura">Altura (cm)</label><input type="number" id="equipEdit-altura" step="0.1" value="' + val(d.altura) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-largura">Largura (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-largura" value="' + valNum(d.largura, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-profundidade">Profundidade (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-profundidade" value="' + valNum(d.profundidade, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-altura">Altura (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-altura" value="' + valNum(d.altura, 1) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-potencia">Potência (W)</label><input type="number" id="equipEdit-potencia" step="1" value="' + val(d.potencia) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-fornecedor">Fornecedor</label><input type="text" id="equipEdit-fornecedor" value="' + escapeHtml(val(d.fornecedor)) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-valorAquisicao">Valor de aquisição (€)</label><input type="number" id="equipEdit-valorAquisicao" step="0.01" value="' + val(d.valorAquisicao) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-valorAquisicao">Valor de aquisição (€)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="2" id="equipEdit-valorAquisicao" value="' + valNum(d.valorAquisicao, 2) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-dataAquisicao">Data de aquisição</label><input type="date" id="equipEdit-dataAquisicao" value="' + val(d.dataAquisicao) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-garantiaAte">Garantia até</label><input type="date" id="equipEdit-garantiaAte" value="' + val(d.garantiaAte) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-periodicidadeManutencao">Manutenção a cada (meses)</label><input type="number" id="equipEdit-periodicidadeManutencao" step="1" value="' + val(d.periodicidadeManutencao) + '"></div>';
@@ -3777,6 +4020,512 @@
       alert('Erro ao gerar exportação: ' + err.message);
     });
   });
+
+  /* =====================================================================
+     FALTAS — ruturas de stock ao fecho, visíveis na abertura (Set/2026)
+
+     Nós: faltas/{pushId} (registos de negócio — NUNCA remove(): resolver e
+     anular são flags) e faltasMapa/{ingredienteId}/{produtoKey}: true
+     (configuração: desmarcar escreve null nessa folha, e só nessa).
+     Só leitura: ingredientes/, pessoas/, vendasDiario/ (só os meses dos
+     últimos 60 dias), mapaProdutosReceitas/, receitas/, preparacoes/.
+
+     produtoKey = o código ZoneSoft (a chave de vendasDiario/…/produtos e de
+     mapaProdutosReceitas) — é o único identificador estável de um produto;
+     o nome legível vem do `desc`. Um produto escrito à mão fica refId:null.
+
+     Derivação "Afeta:": união de faltasMapa (manual) com a explosão da
+     ficha técnica via mapaProdutosReceitas + gioco-consumo.js quando esse
+     mapa tem dados; sem dados, só o faltasMapa. Nada é gravado a partir da
+     derivação.
+     ===================================================================== */
+  (function faltasModulo(){
+    var faltasRef = db.ref('faltas');
+    var faltasMapaRef = db.ref('faltasMapa');
+    var faltasIngRef = db.ref('ingredientes');
+
+    var allFaltas = {};
+    var allFaltasMapa = {};
+    var faltasIngredientes = {};       // id -> {nome} (só não arquivados)
+    var faltasProdutos = {};           // codigo -> desc (últimos 60 dias)
+    var mapaPR = {};                   // mapaProdutosReceitas (só leitura)
+    var faltasReceitas = {};
+    var faltasPreparacoes = {};
+    var derivadoPorIng = null;         // ingId -> {codigo:true}, calculado da ficha técnica
+
+    var CONS = (typeof giocoConsumoEngine === 'function') ? giocoConsumoEngine({
+      getReceitas: function(){ return faltasReceitas; },
+      getPreparacoes: function(){ return faltasPreparacoes; },
+      getVendasDiario: function(){ return {}; },
+      getMapa: function(){ return mapaPR; }
+    }) : null;
+
+    var LS_PESSOA = 'faltas.registadoPor';
+    var formTipo = 'ingrediente';
+    var formEstado = 'acabou';
+    var formEscolha = null;            // {refId, nome} quando escolhido da lista
+
+    function nowIso(){ return new Date().toISOString(); }
+
+    function normalizarNome(s){
+      return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function tempoRelativo(iso){
+      var t = new Date(iso).getTime();
+      if (!isFinite(t)) return '';
+      var diff = Math.max(0, Date.now() - t);
+      var min = Math.round(diff / 60000);
+      if (min < 1) return 'agora';
+      if (min < 60) return 'há ' + min + ' min';
+      var h = Math.round(min / 60);
+      if (h < 24) return 'há ' + h + 'h';
+      var d = Math.round(h / 24);
+      return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+    }
+
+    function faltaAtiva(f){ return f && f.resolvido !== true && f.anulado !== true; }
+
+    function chaveProduto(f){
+      return f.refId ? 'cod:' + f.refId : 'nome:' + normalizarNome(f.nome);
+    }
+
+    function nomeProduto(cod){ return faltasProdutos[cod] || cod; }
+
+    // ---------- Derivação a partir da ficha técnica (mapaProdutosReceitas) ----------
+    function recalcularDerivado(){
+      derivadoPorIng = null;
+      if (!CONS) return;
+      var cods = Object.keys(mapaPR || {});
+      if (!cods.length) return;
+      var out = {};
+      cods.forEach(function(cod){
+        var m = mapaPR[cod];
+        if (!m || m.ignorado) return;
+        var acc = CONS.novoAcc();
+        if (m.receitaId) { if (!CONS.explodirReceita(m.receitaId, 1, acc)) return; }
+        else if (m.ingredienteId) acc.ingredientes[m.ingredienteId] = 1;
+        else if (m.preparacaoId) CONS.explodirPreparacao(m.preparacaoId, 1, acc, {});
+        else return;
+        Object.keys(acc.ingredientes).forEach(function(ingId){
+          (out[ingId] || (out[ingId] = {}))[cod] = true;
+        });
+      });
+      derivadoPorIng = Object.keys(out).length ? out : null;
+    }
+
+    // Produtos afetados por um ingrediente: manual (faltasMapa) ∪ ficha técnica.
+    function produtosAfetados(ingId){
+      var set = {};
+      if (!ingId) return [];
+      var manual = allFaltasMapa[ingId] || {};
+      Object.keys(manual).forEach(function(cod){ if (manual[cod]) set[cod] = true; });
+      if (derivadoPorIng && derivadoPorIng[ingId]) Object.keys(derivadoPorIng[ingId]).forEach(function(cod){ set[cod] = true; });
+      return Object.keys(set).map(function(cod){ return { cod: cod, nome: nomeProduto(cod) }; })
+        .sort(function(a, b){ return a.nome.localeCompare(b.nome, 'pt'); });
+    }
+
+    // ---------- Card ----------
+    function renderFaltas(){
+      var lista = document.getElementById('faltasLista');
+      var esgot = document.getElementById('faltasEsgotados');
+      var cont = document.getElementById('faltasContador');
+      var card = document.getElementById('faltasCard');
+      if (!lista) return;
+
+      var ativas = Object.keys(allFaltas).map(function(id){ return Object.assign({ id: id }, allFaltas[id]); })
+        .filter(faltaAtiva)
+        .sort(function(a, b){
+          if (a.estado !== b.estado) return a.estado === 'acabou' ? -1 : 1;
+          return String(b.registadoEm || '').localeCompare(String(a.registadoEm || ''));
+        });
+
+      var nAcabou = ativas.filter(function(f){ return f.estado === 'acabou'; }).length;
+      card.classList.toggle('tem-acabou', nAcabou > 0);
+      cont.textContent = ativas.length ? (ativas.length + (ativas.length === 1 ? ' ativa' : ' ativas')) : '';
+
+      if (!ativas.length){
+        lista.innerHTML = '<p class="faltas-vazio">Sem faltas registadas</p>';
+        esgot.innerHTML = '';
+        return;
+      }
+
+      lista.innerHTML = ativas.map(function(f){
+        var acabou = f.estado === 'acabou';
+        var html = '<div class="falta-row" data-id="' + escapeHtml(f.id) + '">';
+        html += '<div class="falta-main">';
+        html += '<div class="falta-nome-linha"><span class="falta-nome">' + escapeHtml(f.nome) + '</span>';
+        html += '<span class="falta-badge ' + (acabou ? 'falta-badge-acabou' : 'falta-badge-aacabar') + '">' + (acabou ? 'Acabou' : 'A acabar') + '</span>';
+        html += '<span class="falta-tipo">' + (f.tipo === 'produto' ? 'produto' : 'ingrediente') + '</span></div>';
+        html += '<div class="falta-meta">' + escapeHtml(f.registadoPor || '—') + ' · ' + escapeHtml(tempoRelativo(f.registadoEm));
+        if (f.enviadoParaCompras === true){
+          html += ' · <span class="falta-enviado" title="Enviado para a página de compras' + (f.enviadoParaComprasEm ? ' ' + escapeHtml(tempoRelativo(f.enviadoParaComprasEm)) : '') + '"><svg class="icon"><use href="#i-shopping-cart"/></svg>enviado para compras</span>';
+        }
+        html += '</div>';
+        if (f.nota) html += '<div class="falta-nota">' + escapeHtml(f.nota) + '</div>';
+        if (f.tipo === 'ingrediente' && f.refId){
+          var afeta = produtosAfetados(f.refId);
+          if (afeta.length) html += '<div class="falta-afeta"><b>Afeta:</b> ' + afeta.map(function(p){ return escapeHtml(p.nome); }).join(', ') + '</div>';
+        }
+        html += '</div>';
+        html += '<div class="falta-acoes">';
+        html += '<button type="button" class="falta-btn" data-acao="resolver" data-id="' + escapeHtml(f.id) + '">Resolvido</button>';
+        // Só ingredientes se compram a fornecedor; um produto esgotado não.
+        if (f.tipo !== 'produto'){
+          html += '<button type="button" class="falta-btn falta-btn-comprar" data-acao="comprar" data-id="' + escapeHtml(f.id) + '" title="Levar esta falta para a página de compras a fornecedor">Comprar</button>';
+        }
+        html += '<button type="button" class="falta-btn falta-btn-anular" data-acao="anular" data-id="' + escapeHtml(f.id) + '" title="Anular registo">Anular</button>';
+        html += '</div></div>';
+        return html;
+      }).join('');
+
+      // Produtos esgotados: marcados diretamente + derivados dos ingredientes
+      // que ACABARAM (nunca dos "a acabar"). Sem duplicados.
+      var esgotados = {};
+      ativas.forEach(function(f){
+        if (f.estado !== 'acabou') return;
+        if (f.tipo === 'produto'){
+          var k = chaveProduto(f);
+          if (!esgotados[k]) esgotados[k] = { nome: f.nome, direto: true };
+          else esgotados[k].direto = true;
+        } else if (f.refId){
+          produtosAfetados(f.refId).forEach(function(p){
+            var k2 = 'cod:' + p.cod;
+            if (!esgotados[k2]) esgotados[k2] = { nome: p.nome, direto: false };
+          });
+        }
+      });
+      var chaves = Object.keys(esgotados).sort(function(a, b){ return esgotados[a].nome.localeCompare(esgotados[b].nome, 'pt'); });
+      if (!chaves.length){ esgot.innerHTML = ''; return; }
+      esgot.innerHTML = '<div class="faltas-esgotados"><p class="faltas-esgotados-t">Produtos esgotados (' + chaves.length + ')</p><div class="faltas-chips">' +
+        chaves.map(function(k){
+          var e = esgotados[k];
+          return '<span class="faltas-chip' + (e.direto ? '' : ' faltas-chip-derivado') + '"' + (e.direto ? '' : ' title="Derivado de um ingrediente que acabou"') + '>' + escapeHtml(e.nome) + '</span>';
+        }).join('') + '</div></div>';
+    }
+
+    function pessoaSelecionadaNome(){
+      var sel = document.getElementById('faltasPessoa');
+      if (!sel || sel.disabled) return null;
+      var r = resolvePessoaSelecao(sel);
+      return r.pessoaNome || null;
+    }
+
+    document.getElementById('faltasLista').addEventListener('click', function(ev){
+      var btn = ev.target.closest('button[data-acao]');
+      if (!btn) return;
+      var id = btn.getAttribute('data-id');
+      var f = allFaltas[id];
+      if (!f) return;
+      if (btn.getAttribute('data-acao') === 'comprar'){
+        enviarParaCompras(id, f);
+        return;
+      }
+      if (btn.getAttribute('data-acao') === 'resolver'){
+        if (!confirm('Marcar "' + f.nome + '" como resolvido?')) return;
+        faltasRef.child(id).update({ resolvido: true, resolvidoEm: nowIso(), resolvidoPor: pessoaSelecionadaNome() || f.registadoPor || null })
+          .catch(function(err){ alert('Erro ao resolver: ' + err.message); });
+      } else {
+        if (!confirm('Anular o registo "' + f.nome + '"? Fica no histórico como anulado.')) return;
+        faltasRef.child(id).update({ anulado: true, anuladoEm: nowIso() })
+          .catch(function(err){ alert('Erro ao anular: ' + err.message); });
+      }
+    });
+
+    // ---------- Comprar: handoff para a compras.html ----------
+    // Usa o rascunho de encomenda que a compras.html já tem: carrinho/{ingredienteId}
+    // (o mesmo registo que o "+ Adicionar ao carrinho" da ficha escreve lá). Com
+    // refId de um ingrediente vivo: junta-o ao carrinho (qtd 1 se ainda não lá
+    // estiver pendente; se já estiver, mantém a quantidade) e abre a ficha desse
+    // ingrediente na compras (?ingrediente=), onde o fornecedor já está resolvido.
+    // Texto livre (refId null) ou ingrediente arquivado: nada no carrinho, abre a
+    // aba "Por ingrediente" da compras com o nome na pesquisa (?pesquisa=).
+    // Em ambos os casos a falta fica enviadoParaCompras:true — e CONTINUA ativa:
+    // só "Resolvido" a fecha, quando a mercadoria chegar. update() em paths
+    // específicos, nunca set() nem remove().
+    var carrinhoRef = db.ref('carrinho');
+
+    function enviarParaCompras(id, f){
+      var ing = (f.refId && faltasIngredientes[f.refId]) ? faltasIngredientes[f.refId] : null;
+      var btn = document.querySelector('.falta-btn-comprar[data-id="' + id + '"]');
+      var qs = '?origem=falta&faltaId=' + encodeURIComponent(id) +
+        (ing ? '&ingrediente=' + encodeURIComponent(f.refId) : '&pesquisa=' + encodeURIComponent(f.nome || ''));
+      var destino = 'compras.html' + qs;
+      var pergunta = ing
+        ? 'Juntar "' + f.nome + '" ao carrinho de compras e abrir a página de compras?'
+        : '"' + f.nome + '" não está ligado a nenhum ingrediente da base. Abrir a página de compras com o nome na pesquisa?';
+      if (!confirm(pergunta)) return;
+      if (btn) btn.disabled = true;
+
+      var marcar = function(){
+        return faltasRef.child(id).update({ enviadoParaCompras: true, enviadoParaComprasEm: nowIso() });
+      };
+      var passo = ing
+        ? carrinhoRef.child(f.refId).once('value').then(function(s){
+            var atual = s.val();
+            var qtd = (atual && atual.encomendado !== true && Number(atual.qtd) > 0) ? Number(atual.qtd) : 1;
+            return carrinhoRef.child(f.refId).update({
+              nome: ing.nome || f.nome || '',
+              fornecedor: ing.fornecedor || '',
+              unidade: ing.unidade || '',
+              qtd: qtd,
+              addedAt: nowIso(),
+              encomendado: false,
+              encomendadoEm: null,
+              encomendadoVia: null
+            });
+          }).then(marcar)
+        : marcar();
+
+      passo.then(function(){ window.location.href = destino; })
+        .catch(function(err){
+          if (btn) btn.disabled = false;
+          alert('Erro ao enviar para compras: ' + err.message);
+        });
+    }
+
+    // ---------- Formulário ----------
+    var formEl = document.getElementById('faltasForm');
+    var abrirBtn = document.getElementById('faltasAbrirForm');
+    var nomeInput = document.getElementById('faltasNome');
+    var sugBox = document.getElementById('faltasSugestoes');
+    var escolhidoEl = document.getElementById('faltasEscolhido');
+    var erroEl = document.getElementById('faltasErro');
+
+    function setSeg(segId, valor){
+      Array.prototype.forEach.call(document.getElementById(segId).querySelectorAll('button'), function(b){
+        b.setAttribute('aria-pressed', b.getAttribute('data-v') === valor ? 'true' : 'false');
+      });
+    }
+
+    function abrirForm(abrir){
+      formEl.classList.toggle('hidden', !abrir);
+      abrirBtn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+      abrirBtn.textContent = abrir ? 'Fechar' : '+ Registar falta';
+      if (abrir){ limparForm(); setTimeout(function(){ nomeInput.focus(); }, 50); }
+    }
+
+    function limparForm(){
+      formTipo = 'ingrediente'; formEstado = 'acabou'; formEscolha = null;
+      setSeg('faltasTipoSeg', formTipo); setSeg('faltasEstadoSeg', formEstado);
+      nomeInput.value = ''; document.getElementById('faltasNota').value = '';
+      escolhidoEl.textContent = ''; sugBox.classList.remove('on'); sugBox.innerHTML = '';
+      erroEl.classList.add('hidden');
+    }
+
+    abrirBtn.addEventListener('click', function(){ abrirForm(formEl.classList.contains('hidden')); });
+    document.getElementById('faltasCancelar').addEventListener('click', function(){ abrirForm(false); });
+
+    document.getElementById('faltasTipoSeg').addEventListener('click', function(ev){
+      var b = ev.target.closest('button[data-v]'); if (!b) return;
+      formTipo = b.getAttribute('data-v'); setSeg('faltasTipoSeg', formTipo);
+      formEscolha = null; escolhidoEl.textContent = '';
+      nomeInput.placeholder = formTipo === 'produto' ? 'Escreve o nome do produto…' : 'Escreve o nome do ingrediente…';
+      mostrarSugestoes();
+    });
+    document.getElementById('faltasEstadoSeg').addEventListener('click', function(ev){
+      var b = ev.target.closest('button[data-v]'); if (!b) return;
+      formEstado = b.getAttribute('data-v'); setSeg('faltasEstadoSeg', formEstado);
+    });
+
+    function candidatos(){
+      if (formTipo === 'ingrediente'){
+        return Object.keys(faltasIngredientes).map(function(id){ return { refId: id, nome: faltasIngredientes[id].nome || id }; });
+      }
+      return Object.keys(faltasProdutos).map(function(cod){ return { refId: cod, nome: faltasProdutos[cod] }; });
+    }
+
+    function mostrarSugestoes(){
+      var q = normalizarNome(nomeInput.value);
+      var lista = candidatos().sort(function(a, b){ return a.nome.localeCompare(b.nome, 'pt'); });
+      var hits = q ? lista.filter(function(c){ return normalizarNome(c.nome).indexOf(q) !== -1; }) : lista;
+      hits = hits.slice(0, 8);
+      if (!nomeInput.value.trim() && !hits.length){ sugBox.classList.remove('on'); sugBox.innerHTML = ''; return; }
+      var html = hits.map(function(c){
+        return '<button type="button" class="faltas-sug" data-ref="' + escapeHtml(c.refId) + '" data-nome="' + escapeHtml(c.nome) + '">' + escapeHtml(c.nome) + '</button>';
+      }).join('');
+      var exato = hits.some(function(c){ return normalizarNome(c.nome) === q; });
+      if (q && !exato) html += '<button type="button" class="faltas-sug faltas-sug-livre" data-ref="" data-nome="' + escapeHtml(nomeInput.value.trim()) + '">Usar "' + escapeHtml(nomeInput.value.trim()) + '" (texto livre)</button>';
+      sugBox.innerHTML = html;
+      sugBox.classList.toggle('on', !!html);
+    }
+
+    nomeInput.addEventListener('input', function(){
+      formEscolha = null; escolhidoEl.textContent = '';
+      mostrarSugestoes();
+    });
+    nomeInput.addEventListener('focus', mostrarSugestoes);
+    nomeInput.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape'){ sugBox.classList.remove('on'); }
+      if (ev.key === 'Enter'){ ev.preventDefault(); var primeiro = sugBox.querySelector('.faltas-sug'); if (primeiro && sugBox.classList.contains('on')) primeiro.click(); }
+    });
+    sugBox.addEventListener('click', function(ev){
+      var b = ev.target.closest('.faltas-sug'); if (!b) return;
+      var ref = b.getAttribute('data-ref');
+      formEscolha = { refId: ref || null, nome: b.getAttribute('data-nome') };
+      nomeInput.value = formEscolha.nome;
+      escolhidoEl.textContent = ref ? '✓ ' + (formTipo === 'produto' ? 'Produto' : 'Ingrediente') + ' da lista' : 'Texto livre (não está na lista)';
+      sugBox.classList.remove('on');
+    });
+    document.addEventListener('click', function(ev){
+      if (!ev.target.closest('.faltas-busca')) sugBox.classList.remove('on');
+    });
+
+    document.getElementById('faltasPessoa').addEventListener('change', function(){
+      try { localStorage.setItem(LS_PESSOA, this.value); } catch (e) {}
+    });
+
+    function popularPessoasFaltas(){
+      var sel = document.getElementById('faltasPessoa');
+      popularSelectPessoas(sel);
+      if (sel.disabled) return;
+      var guardado = null;
+      try { guardado = localStorage.getItem(LS_PESSOA); } catch (e) {}
+      if (guardado && Array.prototype.some.call(sel.options, function(o){ return o.value === guardado; })) sel.value = guardado;
+    }
+    pessoasRef.on('value', function(){ setTimeout(popularPessoasFaltas, 0); });
+
+    document.getElementById('faltasGuardar').addEventListener('click', function(){
+      var nome = nomeInput.value.trim();
+      erroEl.classList.add('hidden');
+      if (!nome){ erroEl.textContent = 'Escreve o que falta.'; erroEl.classList.remove('hidden'); nomeInput.focus(); return; }
+      var pessoa = pessoaSelecionadaNome();
+      if (!pessoa){ erroEl.textContent = 'Escolhe quem regista.'; erroEl.classList.remove('hidden'); return; }
+      var escolha = formEscolha && normalizarNome(formEscolha.nome) === normalizarNome(nome) ? formEscolha : null;
+      if (!escolha){
+        // Escrito à mão mas igual a um da lista → aceita como da lista.
+        var igual = candidatos().filter(function(c){ return normalizarNome(c.nome) === normalizarNome(nome); })[0];
+        escolha = igual || { refId: null, nome: nome };
+      }
+      var nota = document.getElementById('faltasNota').value.trim();
+      var registo = {
+        tipo: formTipo,
+        refId: escolha.refId || null,
+        nome: escolha.nome,
+        estado: formEstado,
+        nota: nota || null,
+        registadoPor: pessoa,
+        registadoEm: nowIso(),
+        resolvido: false,
+        resolvidoEm: null,
+        resolvidoPor: null,
+        anulado: false,
+        anuladoEm: null
+      };
+      var btn = this; btn.disabled = true;
+      faltasRef.push(registo)
+        .then(function(){ btn.disabled = false; abrirForm(false); })
+        .catch(function(err){ btn.disabled = false; erroEl.textContent = 'Erro ao guardar: ' + err.message; erroEl.classList.remove('hidden'); });
+    });
+
+    // ---------- Mapa de faltas (configuração) ----------
+    var mapaIngSel = document.getElementById('faltasMapaIng');
+    var mapaProdBox = document.getElementById('faltasMapaProdutos');
+
+    function nLigados(ingId){
+      var m = allFaltasMapa[ingId] || {};
+      return Object.keys(m).filter(function(c){ return m[c]; }).length;
+    }
+
+    function renderMapaSelect(){
+      var atual = mapaIngSel.value;
+      var ids = Object.keys(faltasIngredientes).sort(function(a, b){
+        return String(faltasIngredientes[a].nome || '').localeCompare(String(faltasIngredientes[b].nome || ''), 'pt');
+      });
+      mapaIngSel.innerHTML = '<option value="">— escolher ingrediente —</option>' + ids.map(function(id){
+        var n = nLigados(id);
+        return '<option value="' + escapeHtml(id) + '">' + escapeHtml(faltasIngredientes[id].nome || id) + (n ? ' (' + n + ')' : '') + '</option>';
+      }).join('');
+      if (atual && faltasIngredientes[atual]) mapaIngSel.value = atual;
+      renderMapaProdutos();
+    }
+
+    function renderMapaProdutos(){
+      var ingId = mapaIngSel.value;
+      if (!ingId){ mapaProdBox.innerHTML = ''; return; }
+      var cods = Object.keys(faltasProdutos).sort(function(a, b){ return faltasProdutos[a].localeCompare(faltasProdutos[b], 'pt'); });
+      if (!cods.length){ mapaProdBox.innerHTML = '<p class="faltas-mapa-nota">Sem produtos vendidos nos últimos 60 dias — sem lista para ligar.</p>'; return; }
+      var m = allFaltasMapa[ingId] || {};
+      var html = '<p class="faltas-mapa-nota"><b>' + nLigados(ingId) + '</b> ' + (nLigados(ingId) === 1 ? 'produto ligado' : 'produtos ligados') + ' a ' + escapeHtml(faltasIngredientes[ingId] ? faltasIngredientes[ingId].nome : ingId) + '</p>';
+      html += '<div class="faltas-mapa-lista">' + cods.map(function(cod){
+        return '<label class="faltas-mapa-item"><input type="checkbox" data-cod="' + escapeHtml(cod) + '"' + (m[cod] ? ' checked' : '') + '><span>' + escapeHtml(faltasProdutos[cod]) + '</span></label>';
+      }).join('') + '</div>';
+      if (derivadoPorIng && derivadoPorIng[ingId]){
+        html += '<p class="faltas-mapa-derivado">Pela ficha técnica também afeta: ' + Object.keys(derivadoPorIng[ingId]).map(function(c){ return escapeHtml(nomeProduto(c)); }).join(', ') + '</p>';
+      }
+      mapaProdBox.innerHTML = html;
+    }
+
+    mapaIngSel.addEventListener('change', renderMapaProdutos);
+    mapaProdBox.addEventListener('change', function(ev){
+      var cb = ev.target; if (!cb || cb.type !== 'checkbox') return;
+      var ingId = mapaIngSel.value; var cod = cb.getAttribute('data-cod');
+      if (!ingId || !cod) return;
+      // Configuração, não dado de negócio: desmarcar escreve null só nesta folha.
+      faltasMapaRef.child(ingId).child(cod).set(cb.checked ? true : null)
+        .catch(function(err){ alert('Erro ao gravar o mapa: ' + err.message); });
+    });
+
+    // ---------- Histórico (resolvidas nos últimos 30 dias) ----------
+    function renderHistorico(){
+      var box = document.getElementById('faltasHistorico');
+      var limite = Date.now() - 30 * 86400000;
+      var lista = Object.keys(allFaltas).map(function(id){ return Object.assign({ id: id }, allFaltas[id]); })
+        .filter(function(f){ return f.resolvido === true && f.anulado !== true && new Date(f.resolvidoEm || 0).getTime() >= limite; })
+        .sort(function(a, b){ return String(b.resolvidoEm || '').localeCompare(String(a.resolvidoEm || '')); });
+      if (!lista.length){ box.innerHTML = '<p class="faltas-vazio">Sem faltas resolvidas nos últimos 30 dias</p>'; return; }
+      box.innerHTML = lista.map(function(f){
+        return '<div class="faltas-hist-row"><div>' + escapeHtml(f.nome) + ' <span class="falta-tipo">' + (f.estado === 'acabou' ? 'acabou' : 'a acabar') + '</span></div>' +
+          '<div class="faltas-hist-meta">Registada ' + escapeHtml(formatDataHoraFull(f.registadoEm)) + ' por ' + escapeHtml(f.registadoPor || '—') +
+          ' · Resolvida ' + escapeHtml(formatDataHoraFull(f.resolvidoEm)) + (f.resolvidoPor ? ' por ' + escapeHtml(f.resolvidoPor) : '') + '</div></div>';
+      }).join('');
+    }
+
+    function renderTudo(){ renderFaltas(); renderHistorico(); }
+
+    // ---------- Leituras ----------
+    faltasRef.on('value', function(s){ allFaltas = s.val() || {}; renderTudo(); });
+    faltasMapaRef.on('value', function(s){ allFaltasMapa = s.val() || {}; renderMapaSelect(); renderFaltas(); });
+    faltasIngRef.on('value', function(s){
+      var todos = s.val() || {};
+      faltasIngredientes = {};
+      Object.keys(todos).forEach(function(id){ if (todos[id] && todos[id].arquivado !== true) faltasIngredientes[id] = todos[id]; });
+      renderMapaSelect(); renderFaltas();
+    });
+
+    // Produtos dos últimos 60 dias: só os meses precisos de vendasDiario, uma vez.
+    (function carregarProdutos(){
+      var hoje = new Date(); var inicio = new Date(); inicio.setDate(hoje.getDate() - 60);
+      var meses = {}; var d = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+      while (d <= hoje){ meses[d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')] = true; d.setMonth(d.getMonth() + 1); }
+      var isoInicio = inicio.toISOString().slice(0, 10);
+      Object.keys(meses).forEach(function(mes){
+        db.ref('vendasDiario/' + mes).once('value').then(function(s){
+          var m = s.val() || {};
+          Object.keys(m).forEach(function(dia){
+            if (dia < isoInicio || !m[dia] || !m[dia].produtos) return;
+            var prods = m[dia].produtos;
+            Object.keys(prods).forEach(function(cod){ if (!faltasProdutos[cod]) faltasProdutos[cod] = (prods[cod] && prods[cod].desc) || cod; });
+          });
+          renderMapaProdutos(); renderFaltas();
+        }).catch(function(err){ console.warn('faltas: vendasDiario/' + mes, err); });
+      });
+    })();
+
+    // Ficha técnica (só leitura) para derivar "Afeta:" quando o mapa existe.
+    Promise.all([
+      db.ref('mapaProdutosReceitas').once('value'),
+      db.ref('receitas').once('value'),
+      db.ref('preparacoes').once('value')
+    ]).then(function(r){
+      mapaPR = r[0].val() || {}; faltasReceitas = r[1].val() || {}; faltasPreparacoes = r[2].val() || {};
+      recalcularDerivado(); renderFaltas(); renderMapaProdutos();
+    }).catch(function(err){ console.warn('faltas: ficha técnica indisponível', err); });
+
+    // "há 9h" envelhece: refrescar de minuto a minuto.
+    setInterval(renderFaltas, 60000);
+  })();
+
   }); // fim de autenticarEContinuar
 </script>
 

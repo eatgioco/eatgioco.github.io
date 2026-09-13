@@ -53,6 +53,17 @@
   --green-bg:#EEF6F1;
   --amber:#8A6508;
   --amber-bg:#FBF3DF;
+  /* --grupo-1..5 (Set/2026): cores de GRUPO da vista Quadro da obrigacoes.html —
+     ponto da pill, texto do «+ Novo» e fundo da coluna a 6 % (color-mix). São a
+     versão TEXTO-SEGURA das cinco superfícies de selo do shell (lime, mustard,
+     blush, sky, navy), porque um --lime a cheio como texto sobre --dough não se
+     lê (2,1:1); estas passam AA sobre --dough e --white. Nunca o azul/amarelo do
+     Notion. Par escuro obrigatório (são texto). */
+  --grupo-1:#5F7A1E;
+  --grupo-2:#8A6508;
+  --grupo-3:#B5424B;
+  --grupo-4:#3B6E9E;
+  --grupo-5:#004476;
 }
 [data-theme="dark"]{
   --dough:#15130f; --ink:#f2ede4; --white:#1f1c17; --line:#332e26; --muted:#8f887b;
@@ -73,6 +84,7 @@
   --green-bg:rgba(111,211,155,0.12);
   --amber:#E8B33A;
   --amber-bg:rgba(232,179,58,0.12);
+  --grupo-1:#B9D96A; --grupo-2:#E8B33A; --grupo-3:#E88C93; --grupo-4:#7FB3E6; --grupo-5:#5FA8E6;
 }
 
 /* ===== BASE / TIPOGRAFIA =====
@@ -383,6 +395,15 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 .cat-chip.active{ background:var(--ink); border-color:var(--ink); color:var(--white); }
 .cat-chip .circle{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
 .cat-chip span{ font-weight:600; font-size:13.5px; white-space:nowrap; }
+
+/* ===== CAMPOS DE VALOR (parseValor / formatValor, gioco-shell.js) =====
+   input[data-valor] é o campo monetário/decimal do OS (type="text",
+   inputmode="decimal"). Números em Inter + tabular-nums; .invalido quando o
+   texto não é um número; .valor-erro é a mensagem inline logo a seguir. */
+input[data-valor]{ font-variant-numeric:tabular-nums; }
+input[data-valor].invalido{ border-color:var(--red) !important; }
+.valor-erro{ color:var(--red-ink); font-size:12px; font-weight:600; margin-top:6px; }
+.valor-erro:empty, .valor-erro[hidden]{ display:none; }
 
 /* ===== MODAL (giocoModal, gioco-shell.js) =====
    Painel sobreposto genérico. Sem tokens novos: superfície --white (que no

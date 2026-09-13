@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Reconc.">
+<meta name="viewport" content="width=1200">
+<title>GIOCO · Reconciliação</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<!-- Mesmo JSZip e mesma versão do vendas.html: os SAF-T do ZoneSoft chegam em ZIP. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+  /* ============================================================
+     reconciliacao.html — página PRIVADA, em dois cartões (redesenho de
+     10 Set/2026).
+     A — "Reconciliações Base": sem ficheiros, só vendasDiario e
+         contasBancarias. Δ cru (sem repor comissão), Δ%, estado
+         OK/A Menos/A Mais/Ambíguo. Escreve descartes.
+     B — "Não Reconciliados Detalhe": SAF-T + extratos dos dois
+         terminais + Fecho de Caixa ZS, documento a documento, só para os
+         dias "A Menos" do cartão A. Escreve resoluções.
+     MUDANÇA DE PRINCÍPIO (Set/2026): a página deixa de ser só-leitura —
+     escreve reconciliacaoDescartes/ e reconciliacaoResolvidos/. Os
+     ficheiros carregados continuam só em memória, nunca gravados.
+     A reconciliação da CAIXA (contagens do OS) NÃO vive aqui — foi
+     removida desta página; fica confinada ao caixa.html.
+     Nomes visíveis: só POS, TPA ABANCA, TPA VERIFONE, CAIXA.
+     Prefixo rec- em todas as classes próprias.
+     ============================================================ */
+  body{ -webkit-font-smoothing:antialiased; }
+
+  main{ margin:0; padding:24px 0 80px; }
+
+  .back-link{
+    display:inline-block; margin-bottom:18px; padding:7px 14px;
+    border:1px solid var(--line); border-radius:100px;
+    background:var(--white); color:var(--ink);
+    font-size:12.5px; font-weight:600; text-decoration:none;
+    transition:border-color .15s ease;
+  }
+  .back-link:hover{ border-color:var(--red); }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  .card > *{ position:relative; z-index:1; }
+
+  /* ---------- Cartões (cabeçalho comum) ---------- */
+  .rec-cartao-titulo{ margin:28px 0 12px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .rec-cartao-titulo h2{ margin:0; font-size:20px; font-weight:700; color:var(--ink); }
+  .rec-cartao-titulo .rec-num{ font-size:12px; font-weight:700; color:var(--on-red); background:var(--red); border-radius:100px; padding:3px 9px; }
+  .rec-cartao-titulo p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+  /* ---------- Cartão A ---------- */
+  .rec-a-topo{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:16px; }
+  .rec-a-head{ padding:16px 18px; border-radius:12px; background:var(--white); border:2px solid var(--red); }
+  .rec-a-head.zero{ border-color:var(--green); }
+  .rec-a-head .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .rec-a-head .v{ font-size:32px; font-weight:700; color:var(--red-ink); margin-top:4px; line-height:1.1; }
+  .rec-a-head.zero .v{ color:var(--green); }
+  .rec-a-head .s{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.45; }
+  .rec-a-tipo{ padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
+  .rec-a-tipo .k{ font-size:11px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.04em; }
+  .rec-a-tipo .v{ font-size:20px; font-weight:700; margin-top:4px; color:var(--red-ink); }
+  .rec-a-tipo.zero .v{ color:var(--green); }
+  .rec-a-tipo .s{ font-size:11.5px; color:var(--muted); margin-top:3px; }
+
+  .rec-nota-comissao{
+    margin:0 0 16px; padding:10px 14px; border-radius:10px;
+    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
+  }
+
+  .rec-a-barra{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .rec-a-barra select{
+    font-family:'Inter',sans-serif; font-size:12.5px; padding:7px 10px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+  }
+  .rec-a-barra .spacer{ flex:1; }
+  .rec-a-legenda{ font-size:11.5px; color:var(--muted); }
+
+  .rec-a-tabela th{ padding:6px 8px; }
+  .rec-a-tabela td{ padding:9px 8px; color:var(--ink); vertical-align:top; }
+  .rec-a-tag{ display:inline-block; padding:3px 9px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .rec-a-tag.ok{ background:var(--green-bg); color:var(--green); }
+  .rec-a-tag.aMenos{ background:var(--red); color:var(--on-red); }
+  .rec-a-tag.aMais{ background:var(--amber-bg); color:var(--amber); }
+  .rec-a-tag.ambiguo{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .rec-a-descartar{
+    padding:4px 11px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
+  }
+  .rec-a-descartar:hover{ color:var(--red-ink); border-color:var(--red); }
+  .rec-a-reativar{
+    padding:3px 10px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
+  }
+  .rec-a-reativar:hover{ color:var(--ink); border-color:var(--red); }
+  .rec-a-descartados{ margin-top:14px; padding:5px 12px; border-radius:100px; cursor:pointer; display:inline-block;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .rec-a-descartados:hover{ color:var(--ink); border-color:var(--red); }
+  .rec-a-desc-lista{ margin-top:12px; }
+  .rec-a-desc-lista td{ color:var(--muted); }
+  .rec-a-desc-lista .rec-a-motivo{ color:var(--ink); }
+  .rec-vazio{ padding:28px 16px; color:var(--muted); font-size:13px; text-align:center; }
+
+  /* Formulário inline de descarte/resolução (motivo + confirmar) */
+  .rec-inline-form{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .rec-inline-form[hidden]{ display:none; }
+  .rec-inline-form input[type=text]{
+    font-family:'Inter',sans-serif; font-size:12px; padding:5px 9px;
+    background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+    min-width:180px; flex:1;
+  }
+  .rec-inline-form button{
+    padding:5px 12px; border-radius:8px; cursor:pointer; white-space:nowrap;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700;
+    background:var(--red); color:var(--on-red); border:none;
+  }
+  .rec-inline-form button:disabled{ opacity:.5; cursor:default; }
+  .rec-inline-form .cancelar{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+
+  td.num, th.num{ text-align:right; white-space:nowrap; }
+  .rec-neg{ color:var(--red-ink); font-weight:700; }
+  .rec-mono{ color:var(--muted); font-size:11.5px; }
+
+  /* ---------- Cartão B ---------- */
+  .rec-memoria{
+    margin:0 0 20px; padding:10px 14px; border-radius:10px;
+    background:var(--amber-bg); color:var(--amber); font-size:12.5px; font-weight:500; line-height:1.5;
+  }
+  .rec-uploads{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px; }
+  .rec-upload h3{ margin:0 0 6px; font-size:14.5px; font-weight:700; color:var(--ink); }
+  .rec-upload p{ margin:0 0 10px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .rec-upload-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rec-upload input[type=file]{ font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink); max-width:100%; }
+  .rec-faltam{ margin:10px 0 0; font-size:11.5px; color:var(--red-ink); line-height:1.5; }
+  .rec-faltam b{ font-weight:700; }
+  .rec-faltam.ok{ color:var(--green); }
+  .rec-ficheiros{ list-style:none; margin:12px 0 0; padding:0; font-size:12px; color:var(--ink); }
+  .rec-ficheiros li{ padding:5px 0; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; }
+  .rec-ficheiros li b{ font-weight:600; word-break:break-all; }
+  .rec-ficheiros li span{ color:var(--muted); }
+  .rec-ficheiros li .rec-erro{ color:var(--red-ink); }
+  .rec-ficheiros li .rec-origem{ font-weight:700; color:var(--ink); }
+  .rec-remover{
+    margin-left:auto; padding:2px 9px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line);
+  }
+  .rec-remover:hover{ color:var(--red-ink); border-color:var(--red); }
+
+  .rec-b-topo{ display:flex; align-items:center; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .rec-b-total{ font-size:13px; color:var(--muted); }
+  .rec-b-total b{ color:var(--ink); font-weight:700; }
+
+  .rec-dias{ list-style:none; margin:0; padding:0; }
+  .rec-dia{
+    display:grid; grid-template-columns:170px 1fr 32px; align-items:center; gap:12px;
+    padding:12px 16px; border-radius:12px; cursor:pointer; color:var(--ink);
+    border:1px solid transparent; transition:border-color .12s ease;
+  }
+  .rec-dia:hover{ border-color:var(--line); }
+  .rec-dia.aberto{ border-color:var(--red); }
+  .rec-dia + .rec-dia{ margin-top:4px; }
+  .rec-dia-data{ font-weight:700; font-size:13.5px; }
+  .rec-dia-data small{ display:block; font-weight:500; color:var(--muted); font-size:11.5px; }
+  .rec-dia-resumo{ font-size:12.5px; color:var(--muted); }
+  .rec-dia-resumo b{ color:var(--red-ink); font-weight:700; }
+  .rec-dia-resumo.zero b{ color:var(--green); }
+  .rec-dia-seta{ color:var(--muted); text-align:right; }
+
+  .rec-detalhe-dia{ padding:6px 16px 18px; }
+  .rec-vsc-caixa{ border-radius:10px; padding:12px 16px; background:var(--white); margin-top:4px; }
+  .rec-vsc-caixa table td{ padding:8px 8px; color:var(--ink); vertical-align:top; }
+  .rec-vsc-caixa table th{ padding:6px 8px; }
+  .rec-artigos{ font-size:11.5px; color:var(--muted); line-height:1.5; }
+  .rec-artigos b{ color:var(--ink); font-weight:600; }
+  .rec-b-resolver{
+    padding:4px 11px; border-radius:100px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+    background:transparent; color:var(--muted); border:1px solid var(--line); white-space:nowrap;
+  }
+  .rec-b-resolver:hover{ color:var(--green); border-color:var(--green); }
+  tr.rec-resolvida td{ opacity:.55; }
+  .rec-resolvida-razao{ font-size:11.5px; color:var(--green); font-style:italic; }
+  .rec-b-vazio-dia{ padding:14px; color:var(--green); font-size:13px; text-align:center; }
+  .rec-b-nota{ font-size:11.5px; color:var(--muted); margin:10px 0 0; }
+</style>
+</head>
+<body>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel privado</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('reconciliacao.html', 'privada');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Manel</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-scan"/></svg>GIOCO · <b>Reconciliação</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Primeiro onde está o erro (só com o que já está no Firebase), depois porquê (com os ficheiros). Descartes e resoluções ficam gravados.</p>
+
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main>
+  <a class="back-link" href="mrn-dashboard.html">← Dashboard</a>
+
+  <!-- ============ CARTÃO A — Reconciliações Base (sem ficheiros) ============ -->
+  <div class="rec-cartao-titulo"><span class="rec-num">A</span><h2>Reconciliações Base</h2><p>Só com o que já está no Firebase: vendas por dia e créditos do banco. Sem ficheiros.</p></div>
+  <div class="card glass-light" id="cartaoA"><div class="rec-vazio">A carregar…</div></div>
+
+  <!-- ============ CARTÃO B — Não Reconciliados Detalhe ============ -->
+  <div class="rec-cartao-titulo"><span class="rec-num">B</span><h2>Não Reconciliados Detalhe</h2><p>Carrega os ficheiros dos dias "A Menos" para saber porquê, talão a talão.</p></div>
+  <p class="rec-memoria">Os ficheiros são lidos só neste separador e ficam em memória: ao recarregar a página perde-se tudo e é preciso voltar a escolhê-los. Cada ficheiro novo acumula, nunca substitui os anteriores. Só os descartes e as resoluções são gravados no Firebase.</p>
+
+  <div class="rec-uploads">
+    <div class="card glass-light rec-upload">
+      <h3>SAF-T</h3>
+      <p>ZIP exportado do ZoneSoft (XML em Windows-1252). Vários de uma vez, e mais depois: acumulam. Documentos repetidos entre ficheiros contam uma vez.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inSaft" multiple accept=".zip,.xml,application/zip,text/xml">
+      </div>
+      <div class="rec-faltam" id="faltaSaft"></div>
+      <ul class="rec-ficheiros" id="listaSaft"></ul>
+    </div>
+    <div class="card glass-light rec-upload">
+      <h3>TPA ABANCA</h3>
+      <p>CSV de movimentos do TPA da ABANCA (ponto-e-vírgula, com preâmbulo). Vários ficheiros acumulam; a mesma operação repetida conta uma vez.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inAbanca" multiple accept=".csv,text/csv,text/plain">
+      </div>
+      <div class="rec-faltam" id="faltaAbanca"></div>
+      <ul class="rec-ficheiros" id="listaAbanca"></ul>
+    </div>
+    <div class="card glass-light rec-upload">
+      <h3>TPA VERIFONE</h3>
+      <p>Exportação de transações do portal Verifone (CSV, campos entre aspas). Vários ficheiros acumulam; a mesma transação repetida conta uma vez.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inVerifone" multiple accept=".csv,text/csv,text/plain">
+      </div>
+      <div class="rec-faltam" id="faltaVerifone"></div>
+      <ul class="rec-ficheiros" id="listaVerifone"></ul>
+    </div>
+    <div class="card glass-light rec-upload">
+      <h3>Fecho de Caixa ZS</h3>
+      <p>Relatórios do ZSBMS em .xls (é HTML, não Excel): o <b>Fecho de Caixa</b> (Data / Início / Entradas / Saídas) e, quando não coincide com o dia, a <b>Listagem de Sessões</b>. Ambos aqui; o tipo é detectado pelo cabeçalho. Não entra no casamento — fica só como registo.</p>
+      <div class="rec-upload-row">
+        <input type="file" id="inFecho" multiple accept=".xls,.htm,.html,text/html,application/vnd.ms-excel">
+      </div>
+      <div class="rec-faltam" id="faltaFecho"></div>
+      <ul class="rec-ficheiros" id="listaFecho"></ul>
+    </div>
+  </div>
+
+  <div class="rec-b-topo">
+    <h2 style="margin:0;font-size:16px;font-weight:700;color:var(--ink)">Dias a investigar</h2>
+    <span class="rec-b-total" id="bTotal"></span>
+  </div>
+  <div class="card glass-light" id="cartaoB">
+    <ul class="rec-dias" id="listaDiasB"></ul>
+    <div class="rec-vazio" id="diasBVazio">A carregar…</div>
+  </div>
+</main>
+
+    </div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('load', function () {
+
+  /* ============================================================
+     CRITÉRIOS DE ESTADO DO CARTÃO A (corrigidos Set/2026, a pedido do Manel)
+     Δ = Creditado Banco − Faturado POS (NUNCA o inverso): falta dinheiro
+     → Δ negativo; o banco creditou mais do que o faturado → Δ positivo.
+     É cru, sem repor comissão nenhuma — o crédito do banco vem sempre um
+     pouco abaixo do faturado por causa da comissão do terminal, e é por
+     isso que o cartão mostra ao lado do filtro a comissão típica
+     observada por TPA (COMISSAO_OBSERVADA / meio.comissaoObservada): a
+     distinção entre "isto é só a comissão" e "isto é um problema" é do
+     Manel, lendo o Δ% contra essa referência — a página NÃO decide isso
+     escondendo linhas atrás de "OK".
+     Por isso OK exige Δ EXACTO 0,00 € (à unidade do cêntimo — cents()),
+     nunca uma banda: qualquer Δ, por pequeno que seja, é A Menos (Δ<0) ou
+     A Mais (Δ>0). Ambíguo é só para o que não se consegue classificar:
+       · a atribuição crédito↔dia não resolveu 1:1 (uma componente com
+         vários dias E vários créditos sem correspondência clara — ver
+         atribuirCreditos()/emparelhar);
+       · o crédito ainda está dentro da janela de espera do banco (pode
+         chegar nos próximos dias) ou o dia é anterior ao início do
+         extrato bancário disponível — antes eram "não verificável ainda"
+         e ficavam de fora da lista por completo; agora entram como
+         Ambíguo, para que a data continue a ter as suas linhas (ver a
+         simetria de linhas por TPA em renderCartaoA).
+     ============================================================ */
+
+  /* ============================================================
+     CASAMENTO DO CARTÃO B — ordem exacta (spec do Manel, Set/2026):
+       1. Valor exacto, atribuição GLOBAL por menor distância temporal,
+          ±60 min: gera todos os pares (documento, transação) com o mesmo
+          valor, ordena por distância crescente, atribui saltando os já
+          usados. Nunca greedy por documento em ordem cronológica.
+       2. Valor alterado no terminal (gorjeta): ±3 min, valores diferentes,
+          só quando sobra exactamente 1 candidato de cada lado. Corre SÓ
+          sobre o que sobrou do passo 1.
+       3. Conta dividida: N transações em ±5 min cuja soma bate com um
+          documento, tolerância 5 cêntimos por parcela. Corre SÓ sobre o
+          que sobrou do passo 1 (não do 2 — os dois partem do mesmo
+          resíduo, como o Manel especificou).
+       4. O que sobra dos passos 1–3, confirmado que também não existe no
+          extrato do OUTRO terminal com o mesmo valor (±60 min): venda sem
+          cobrança.
+     ============================================================ */
+  var JANELA_GLOBAL_MIN = 60;
+  var JANELA_ALTERADO_MIN = 3;
+  var JANELA_DIVIDIDA_MIN = 5;
+  var TOLERANCIA_DIVISAO_CENTS_POR_PARCELA = 5;
+  var MAX_PARCELAS_DIVISAO = 6;
+
+  // Primeiro mês com vendas importadas no OS (para o selector de meses).
+  var PRIMEIRO_MES = '2026-05';
+
+  /* ============================================================
+     TERMINAIS — nomes visíveis: POS, TPA ABANCA, TPA VERIFONE, CAIXA.
+     Os códigos do SAF-T (OU, CD) e os descritivos bancários (INTERCARD,
+     FECHO TPA) são chaves internas e nunca aparecem.
+       OU = TPA ABANCA   (código literal no PaymentMechanism)
+       CD = TPA VERIFONE (terminal INTERCARD/Verifone)
+     ============================================================ */
+  var MEIOS = [
+    { mec:'OU', origem:'ABANCA', label:'TPA ABANCA',   labelCurto:'TPA ABANCA',
+      creditoRegex:/^FECHO TPA/i, janelaBanco:0, comissaoObservada:'0,53 %–0,83 % (27/08–05/09)' },
+    { mec:'CD', origem:'CD',     label:'TPA VERIFONE', labelCurto:'TPA VERIFONE',
+      creditoRegex:/INTERCARD/i,  janelaBanco:5, comissaoObservada:'0 % (crédito bruto, 73 de 87 dias ao cêntimo)' }
+  ];
+  var MEIO_POR_MEC = {};
+  MEIOS.forEach(function(m){ MEIO_POR_MEC[m.mec] = m; });
+  // Ordem de exibição das duas linhas por data no cartão A: sempre ABANCA
+  // antes de VERIFONE (a ordem do array acima), nunca alfabética por 'mec'
+  // ('CD' < 'OU' inverteria a ordem à letra).
+  var MEIO_ORDEM = {};
+  MEIOS.forEach(function(m, i){ MEIO_ORDEM[m.mec] = i; });
+  var ORIGEM_LABEL = { ABANCA:'TPA ABANCA', CD:'TPA VERIFONE' };
+  function labelMeio(meio){ return meio.label; }
+  function labelCurtoMeio(meio){ return meio.labelCurto; }
+  function outroMeio(meio){ for (var i = 0; i < MEIOS.length; i++){ if (MEIOS[i] !== meio) return MEIOS[i]; } return null; }
+
+  var INTERCARD_STATUS_VALIDO = { 'SALE SETTLED':true, 'SALE AUTHORISED':true };
+  var INTERCARD_STATUS_EXCLUIDO = { 'SALE DECLINED':true, 'CANCEL DECLINED':true, 'CANCEL REJECTED':true };
+  var INTERCARD_FUSO_ESPERADO = '+01:00';
+
+  var NOMES_MEIO = { NU:'CAIXA (numerário)', OU:'TPA ABANCA', CD:'TPA VERIFONE', CC:'Cartão crédito', TB:'Transferência', MB:'Multibanco', CH:'Cheque', CO:'Consignação', CS:'Compensação', DE:'Dinheiro eletrónico', LC:'Letra', PR:'Permuta', TR:'Ticket restaurante' };
+
+  /* ---------- estado (só memória para ficheiros; Firebase à parte) ---------- */
+  var docs = {};             // InvoiceNo → documento do SAF-T
+  var saftFicheiros = [];    // { nome, res:{inicio, fim, docs}, novos, repetidos, erro }
+  var saftCobertura = {};    // dia 'AAAA-MM-DD' → true
+  var terminal = {};         // origem → { nOperacao → transação }
+  var termFicheiros = [];    // { nome, origem, res:{inicio, fim, txs, avisos}, novos, repetidos, fora, erro }
+  var termCobertura = {};    // origem → { dia → true }
+  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } — só registo, não entra no casamento
+  var fechoFicheiros = [];   // { nome, tipo:'fecho'|'sessoes', res, novos, repetidos, erro }
+  var sessoes = [];          // Listagem de Sessões — só registo
+
+  var banco = { abanca:{}, revolut:{} };   // contasBancarias/{conta}/movimentos
+  var vendasMes = {};        // mês → { dia → porPagamento }
+  var mesesComErro = {};
+  var baseCarregada = false;
+  var baseErros = [];
+
+  var descartes = {};        // reconciliacaoDescartes/{chave} → registo
+  var resolvidos = {};       // reconciliacaoResolvidos/{chave} → registo
+
+  var filtroA = 'naoReconciliados';   // 'naoReconciliados' | '' (todos os meses) | 'AAAA-MM'
+  var mostrarDescartados = false;
+  var diaAbertoB = null;
+  var db = null;
+
+  /* ---------- helpers ---------- */
+  function esc(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function round2(n){ return Math.round(n * 100) / 100; }
+  function cents(n){ return Math.round(n * 100); }
+  function fmtEuro(n){
+    if (n == null || isNaN(n)) return '—';
+    var neg = n < 0; var abs = Math.abs(n);
+    var s = abs.toFixed(2).replace('.', ',');
+    s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return (neg ? '−' : '') + s + ' €';
+  }
+  function fmtEuroSinal(n){ return (n > 0 ? '+' : '') + fmtEuro(n); }
+  function fmtPct(n){
+    if (n == null || isNaN(n)) return '—';
+    return (n > 0 ? '+' : '') + n.toFixed(2).replace('.', ',') + ' %';
+  }
+  function fmtHora(seg){
+    if (seg == null || isNaN(seg)) return '—';
+    var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
+    return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+  }
+  function fmtDelta(seg){
+    var a = Math.abs(seg);
+    if (a < 60) return a + ' s';
+    var m = Math.round(a / 60);
+    return m + ' min';
+  }
+  var DIAS_SEMANA = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  var MESES_NOME = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  function fmtDia(iso){
+    var p = iso.split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function fmtDias(dias){
+    if (!dias.length) return '—';
+    if (dias.length === 1) return fmtDia(dias[0]);
+    return fmtDia(dias[0]).slice(0, 5) + ' → ' + fmtDia(dias[dias.length - 1]);
+  }
+  function diaSemana(iso){
+    var d = new Date(iso + 'T12:00:00');
+    return isNaN(d.getTime()) ? '' : DIAS_SEMANA[d.getDay()];
+  }
+  function fmtMes(mes){
+    var p = mes.split('-');
+    return MESES_NOME[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  }
+  function horaParaSeg(hms){
+    var m = String(hms || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + (m[3] ? parseInt(m[3], 10) : 0);
+  }
+  function diasEntre(inicio, fim){
+    var out = [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fim)) return out;
+    var d = new Date(inicio + 'T12:00:00'), f = new Date(fim + 'T12:00:00');
+    var guard = 0;
+    while (d <= f && guard++ < 400){
+      out.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  function mesDeHoje(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+  }
+  function mesSeguinte(mes){
+    var p = mes.split('-'); var a = parseInt(p[0], 10), m = parseInt(p[1], 10) + 1;
+    if (m > 12){ m = 1; a++; }
+    return a + '-' + pad2(m);
+  }
+  function numPt(s){
+    s = String(s == null ? '' : s).trim();
+    if (!s) return null;
+    if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  function diaLocal(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function addDias(iso, n){ var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return diaLocal(d); }
+  function fmtDataHora(d){ return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function normData(s){
+    s = String(s || '').trim();
+    var m;
+    if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+    if ((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) return m[3] + '-' + m[2] + '-' + m[1];
+    return null;
+  }
+  function plural(n, s, p){ return n + ' ' + (n === 1 ? s : p); }
+  function perto(a, b, seg){ return a.hora != null && b.hora != null && Math.abs(a.hora - b.hora) <= seg; }
+
+  /* ============================================================
+     SAF-T (mesmo padrão do vendas.html: ZIP → XML Windows-1252 → DOM).
+     Set/2026: cada Invoice passa a trazer também `linhas` (artigos, de
+     <Line><ProductDescription>/<Quantity>) — precisos para identificar a
+     venda sem cobrança nas câmaras (Cartão B).
+     ============================================================ */
+  function kid(el, name){
+    if (!el) return null;
+    for (var i = 0; i < el.children.length; i++){
+      if (el.children[i].localName === name) return el.children[i];
+    }
+    return null;
+  }
+  function kids(el, name){
+    var out = [];
+    if (!el) return out;
+    for (var i = 0; i < el.children.length; i++){
+      if (el.children[i].localName === name) out.push(el.children[i]);
+    }
+    return out;
+  }
+  function txt(el, name){
+    var k = kid(el, name);
+    return k && k.textContent != null ? k.textContent.trim() : '';
+  }
+
+  function lerFicheiroSaft(file){
+    var nome = file.name || '';
+    var pXml;
+    if (/\.xml$/i.test(nome)){
+      pXml = file.arrayBuffer();
+    } else {
+      if (typeof JSZip === 'undefined') return Promise.reject(new Error('A biblioteca JSZip não carregou. Verifica a ligação e recarrega.'));
+      pXml = file.arrayBuffer().then(function(buf){
+        return JSZip.loadAsync(buf).then(function(zip){
+          var xmlNome = null;
+          zip.forEach(function(path, entry){
+            if (xmlNome || entry.dir) return;
+            if (/\.xml$/i.test(path)) xmlNome = path;
+          });
+          if (!xmlNome) throw new Error('O ZIP não contém nenhum ficheiro .xml.');
+          return zip.file(xmlNome).async('arraybuffer');
+        });
+      });
+    }
+    return pXml.then(descodificar).then(parseSaft);
+  }
+
+  function descodificar(buffer){
+    var decoder;
+    try { decoder = new TextDecoder('windows-1252'); } catch (e){ decoder = new TextDecoder('iso-8859-1'); }
+    var texto = decoder.decode(buffer);
+    var m = texto.slice(0, 200).match(/encoding=["']([^"']+)["']/i);
+    if (m && /utf-?8/i.test(m[1])){
+      try { texto = new TextDecoder('utf-8').decode(buffer); } catch (e2){}
+    }
+    return texto;
+  }
+
+  // → { inicio, fim, docs:[{no, tipo, dia, entrada, hora, status, gross, pagamentos:[{mec, valor}], linhas:[{descricao, quantidade}]}] }
+  function parseSaft(xmlText){
+    var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('O XML não é válido. Confirma que é o SAF-T exportado do ZoneSoft.');
+    var root = doc.documentElement;
+    if (!root || root.localName !== 'AuditFile') throw new Error('Isto não é um SAF-T: a raiz é <' + (root ? root.localName : '?') + '>.');
+    var header = kid(root, 'Header');
+    var inicio = header ? txt(header, 'StartDate') : '';
+    var fim = header ? txt(header, 'EndDate') : '';
+    var src = kid(root, 'SourceDocuments');
+    var sales = src ? kid(src, 'SalesInvoices') : null;
+    if (!sales) throw new Error('O SAF-T não tem SourceDocuments > SalesInvoices.');
+    var invoices = kids(sales, 'Invoice');
+    var out = [];
+    for (var i = 0; i < invoices.length; i++){
+      var inv = invoices[i];
+      var no = txt(inv, 'InvoiceNo');
+      var invoiceDate = txt(inv, 'InvoiceDate');
+      var entrada = txt(inv, 'SystemEntryDate');
+      var status = kid(inv, 'DocumentStatus');
+      var st = status ? txt(status, 'InvoiceStatus') : '';
+      var dia = (invoiceDate || entrada.slice(0, 10)).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) continue;
+      var totais = kid(inv, 'DocumentTotals');
+      var gross = totais ? (numPt(txt(totais, 'GrossTotal')) || 0) : 0;
+      var pags = totais ? kids(totais, 'Payment') : [];
+      var pagamentos = [];
+      for (var p = 0; p < pags.length; p++){
+        var mec = txt(pags[p], 'PaymentMechanism');
+        var valor = numPt(txt(pags[p], 'PaymentAmount'));
+        pagamentos.push({ mec: mec || '', valor: valor == null ? 0 : valor });
+      }
+      var linhasXml = kids(inv, 'Line');
+      var linhas = [];
+      for (var li = 0; li < linhasXml.length; li++){
+        var desc = txt(linhasXml[li], 'ProductDescription') || txt(linhasXml[li], 'Description');
+        if (!desc) continue;
+        linhas.push({ descricao: desc, quantidade: numPt(txt(linhasXml[li], 'Quantity')) });
+      }
+      var hm = entrada.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+      var hora = hm ? parseInt(hm[1], 10) * 3600 + parseInt(hm[2], 10) * 60 + (hm[3] ? parseInt(hm[3], 10) : 0) : null;
+      out.push({ no: no || ('sem-numero-' + i), tipo: txt(inv, 'InvoiceType') || '?', dia: dia, entrada: entrada, hora: hora, status: st, gross: gross, pagamentos: pagamentos, linhas: linhas });
+    }
+    return { inicio: inicio, fim: fim, docs: out };
+  }
+
+  /* ============================================================
+     EXTRATO DO TERMINAL
+     ============================================================ */
+  function normCabecalho(s){
+    return String(s || '').replace(/^﻿/, '').trim().toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  function parseAbanca(texto){
+    texto = texto.replace(/^﻿/, '');
+    var linhas = texto.split(/\r?\n/);
+    var idx = -1;
+    for (var i = 0; i < linhas.length; i++){
+      if (/^ESTABELECIMENTO;NOME ESTABELECIMENTO/i.test(linhas[i].replace(/^﻿/, ''))){ idx = i; break; }
+    }
+    if (idx < 0) throw new Error('Não encontrei o cabeçalho "ESTABELECIMENTO;NOME ESTABELECIMENTO". É mesmo o CSV de movimentos do TPA da ABANCA?');
+    var inicio = null, fim = null;
+    for (var j = 0; j < idx; j++){
+      var mp = linhas[j].match(/PER[ÍI]ODO:?;\s*(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/i);
+      if (mp){ inicio = mp[1]; fim = mp[2]; }
+    }
+    var cab = linhas[idx].split(';').map(normCabecalho);
+    function col(nome){
+      var alvo = normCabecalho(nome);
+      for (var c = 0; c < cab.length; c++){ if (cab[c] === alvo) return c; }
+      return -1;
+    }
+    var C = {
+      nOp: col('Nº OPERAÇÃO'), dia: col('DATA DA OPERAÇÃO'), hora: col('HORA DA OPERAÇÃO'),
+      tipo: col('TIPO DE TRANSAÇÃO'), marca: col('MARCA CARTÃO'), cartao: col('CARTÃO'),
+      montante: col('MONTANTE'), comissao: col('TSC/RSC'), taxaInterc: col('TAXA INTERCÂMBIO'),
+      moeda: col('MOEDA'), liquidacao: col('DATA DE LIQUIDAÇÃO')
+    };
+    var obrig = ['nOp','dia','hora','montante'];
+    for (var o = 0; o < obrig.length; o++){
+      if (C[obrig[o]] < 0) throw new Error('Falta a coluna "' + obrig[o] + '" no cabeçalho do CSV.');
+    }
+    var txs = [];
+    for (var r = idx + 1; r < linhas.length; r++){
+      var linha = linhas[r];
+      if (!linha || !linha.replace(/;/g, '').trim()) continue;
+      var f = linha.split(';');
+      var dia = normData(f[C.dia]);
+      var montante = numPt(f[C.montante]);
+      if (!dia || montante == null) continue;
+      txs.push({
+        nOp: (f[C.nOp] || '').trim(),
+        dia: dia,
+        hora: horaParaSeg(f[C.hora]),
+        horaTexto: (f[C.hora] || '').trim(),
+        categoria: 'valida',
+        tipo: (f[C.tipo] || '').trim(),
+        marca: (f[C.marca] || '').trim(),
+        cartao: (f[C.cartao] || '').trim(),
+        montante: montante,
+        comissao: C.comissao >= 0 ? (numPt(f[C.comissao]) || 0) : 0,
+        taxaInterc: C.taxaInterc >= 0 ? numPt(f[C.taxaInterc]) : null,
+        moeda: C.moeda >= 0 ? (f[C.moeda] || '').trim() : '',
+        liquidacao: C.liquidacao >= 0 ? (normData(f[C.liquidacao]) || (f[C.liquidacao] || '').trim()) : ''
+      });
+    }
+    if (!txs.length) throw new Error('O CSV não tem nenhuma linha de movimento.');
+    var cob = coberturaExtrato(inicio, fim, txs);
+    return { inicio: cob.inicio, fim: cob.fim, txs: txs, avisos: [] };
+  }
+
+  function coberturaExtrato(inicio, fim, txs){
+    var dias = txs.map(function(t){ return t.dia; }).sort();
+    var hoje = diaLocal(new Date());
+    var ini = dias[0], f = dias[dias.length - 1];
+    if (inicio && inicio > ini) ini = inicio;
+    if (fim && fim > f) f = fim < hoje ? fim : hoje;
+    return { inicio: ini, fim: f };
+  }
+
+  function parseCsvAspas(texto, sep){
+    var linhas = [], linha = [], campo = '', i = 0, n = texto.length, dentro = false;
+    while (i < n){
+      var ch = texto[i];
+      if (dentro){
+        if (ch === '"'){
+          if (texto[i + 1] === '"'){ campo += '"'; i += 2; continue; }
+          dentro = false; i++; continue;
+        }
+        campo += ch; i++; continue;
+      }
+      if (ch === '"'){ dentro = true; i++; continue; }
+      if (ch === sep){ linha.push(campo); campo = ''; i++; continue; }
+      if (ch === '\r'){ i++; continue; }
+      if (ch === '\n'){ linha.push(campo); linhas.push(linha); linha = []; campo = ''; i++; continue; }
+      campo += ch; i++;
+    }
+    if (campo !== '' || linha.length){ linha.push(campo); linhas.push(linha); }
+    return linhas;
+  }
+
+  function parseIntercard(texto){
+    texto = texto.replace(/^﻿/, '');
+    var linhas = parseCsvAspas(texto, ',');
+    if (!linhas.length) throw new Error('CSV vazio.');
+    var cab = linhas[0].map(function(c){ return c.trim(); });
+    function col(nome){ return cab.indexOf(nome); }
+    var C = {
+      dia: col('created_at_date'), hora: col('created_at_time'), fuso: col('created_at_timezone'),
+      montante: col('Curr.amount'), status: col('status'), marca: col('Product'), metodo: col('payment_method'),
+      cartao: col('masked_card_number'), auth: col('authorisation_code'), id: col('_id'),
+      lote: col('batch_id'), liquidacao: col('settlement_date'), fee: col('payment_processing_fee_amount'), moeda: col('Curr.currency')
+    };
+    var obrig = ['dia','hora','montante','status','id'];
+    var nomes = { dia:'created_at_date', hora:'created_at_time', montante:'Curr.amount', status:'status', id:'_id' };
+    for (var o = 0; o < obrig.length; o++){
+      if (C[obrig[o]] < 0) throw new Error('Falta a coluna "' + nomes[obrig[o]] + '" no cabeçalho. É mesmo a exportação de transações do Verifone?');
+    }
+    var txs = [], fusos = {}, comFee = 0;
+    for (var r = 1; r < linhas.length; r++){
+      var f = linhas[r];
+      if (f.length < 2 || !f.join('').trim()) continue;
+      var dia = normData(f[C.dia]);
+      var montante = parseFloat(String(f[C.montante] || '').trim());
+      if (!dia || isNaN(montante)) continue;
+      var status = (f[C.status] || '').trim();
+      var fuso = C.fuso >= 0 ? (f[C.fuso] || '').trim() : '';
+      if (fuso && fuso !== INTERCARD_FUSO_ESPERADO) fusos[fuso] = (fusos[fuso] || 0) + 1;
+      var fee = C.fee >= 0 ? String(f[C.fee] || '').trim() : '';
+      if (fee) comFee++;
+      var liq = C.liquidacao >= 0 ? normData(f[C.liquidacao]) : null;
+      txs.push({
+        nOp: (f[C.id] || '').trim(),
+        dia: dia,
+        hora: horaParaSeg(f[C.hora]),
+        horaTexto: (f[C.hora] || '').trim(),
+        fuso: fuso,
+        tipo: status,
+        categoria: INTERCARD_STATUS_VALIDO[status] ? 'valida' : (INTERCARD_STATUS_EXCLUIDO[status] ? 'excluida' : 'desconhecida'),
+        marca: C.marca >= 0 ? (f[C.marca] || '').trim() : '',
+        metodo: C.metodo >= 0 ? (f[C.metodo] || '').trim() : '',
+        cartao: C.cartao >= 0 ? (f[C.cartao] || '').trim() : '',
+        autorizacao: C.auth >= 0 ? (f[C.auth] || '').trim() : '',
+        montante: montante,
+        comissao: fee ? parseFloat(fee) : null,
+        taxaInterc: null,
+        moeda: C.moeda >= 0 ? (f[C.moeda] || '').trim() : 'EUR',
+        liquidacao: liq || '',
+        lote: C.lote >= 0 ? (f[C.lote] || '').trim() : ''
+      });
+    }
+    if (!txs.length) throw new Error('O CSV não tem nenhuma linha de transação.');
+    var dias = txs.map(function(t){ return t.dia; }).sort();
+    var avisos = [];
+    Object.keys(fusos).forEach(function(z){ avisos.push(fusos[z] + ' linha' + (fusos[z] === 1 ? '' : 's') + ' com fuso ' + z + ' (esperado ' + INTERCARD_FUSO_ESPERADO + ') — a hora foi usada tal como está'); });
+    if (comFee) avisos.push(comFee + ' linha' + (comFee === 1 ? '' : 's') + ' com comissão por transação preenchida — o Verifone costuma cobrar por débito mensal');
+    var desconhecidas = txs.filter(function(t){ return t.categoria === 'desconhecida'; }).length;
+    if (desconhecidas) avisos.push(desconhecidas + ' linha' + (desconhecidas === 1 ? '' : 's') + ' com estado não reconhecido (fora das somas)');
+    return { inicio: dias[0], fim: dias[dias.length - 1], txs: txs, avisos: avisos };
+  }
+
+  var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
+
+  /* ============================================================
+     FECHO DE CAIXA (ZSBMS) — só registo neste cartão, não entra no
+     casamento (a reconciliação da caixa saiu desta página).
+     ============================================================ */
+  function numZs(s){
+    s = String(s == null ? '' : s).replace(/€/g, '').replace(/&euro;/g, '').replace(/\s| /g, '').trim();
+    if (!s) return null;
+    s = s.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  function lerHtmlZsbms(buffer){
+    var texto;
+    try { texto = new TextDecoder('iso-8859-1').decode(buffer); } catch (e){ texto = new TextDecoder('windows-1252').decode(buffer); }
+    return new DOMParser().parseFromString(texto, 'text/html');
+  }
+  function cabecalhoTabela(tabela){
+    var ths = tabela.getElementsByTagName('th');
+    var cab = [];
+    if (ths.length){ for (var i = 0; i < ths.length; i++) cab.push(normCabecalho(ths[i].textContent)); return cab; }
+    var tr = tabela.getElementsByTagName('tr')[0];
+    if (!tr) return cab;
+    var tds = tr.getElementsByTagName('td');
+    for (var j = 0; j < tds.length; j++) cab.push(normCabecalho(tds[j].textContent));
+    return cab;
+  }
+  function parseFechoCaixaDoc(doc){
+    var tabelas = doc.getElementsByTagName('table');
+    var alvo = null, C = null;
+    for (var t = 0; t < tabelas.length && !alvo; t++){
+      var cab = cabecalhoTabela(tabelas[t]);
+      var c = { dia: cab.indexOf('DATA'), inicio: cab.indexOf('INICIO'), entradas: cab.indexOf('ENTRADAS'), saidas: cab.indexOf('SAIDAS'), movimento: cab.indexOf('MOVIMENTO'), fecho: cab.indexOf('FECHO') };
+      if (c.dia >= 0 && c.inicio >= 0 && c.saidas >= 0){ alvo = tabelas[t]; C = c; }
+    }
+    if (!alvo) return null;
+    var trs = alvo.getElementsByTagName('tr');
+    var dias = [];
+    for (var r = 0; r < trs.length; r++){
+      var tds = trs[r].getElementsByTagName('td');
+      if (tds.length < 2) continue;
+      var dia = normData((tds[C.dia] || {}).textContent);
+      if (!dia) continue;
+      dias.push({
+        dia: dia,
+        inicio: numZs(tds[C.inicio].textContent),
+        entradas: C.entradas >= 0 ? numZs(tds[C.entradas].textContent) : 0,
+        saidas: numZs(tds[C.saidas].textContent),
+        movimento: C.movimento >= 0 ? numZs(tds[C.movimento].textContent) : null,
+        fecho: C.fecho >= 0 ? numZs(tds[C.fecho].textContent) : null
+      });
+    }
+    if (!dias.length) throw new Error('O relatório Fecho de Caixa não tem nenhuma linha de dia.');
+    dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
+    return { inicio: dias[0].dia, fim: dias[dias.length - 1].dia, dias: dias };
+  }
+  function dataHoraZs(texto){
+    var t = String(texto || '').trim(), m;
+    if ((m = t.match(/(\d{2})[-\/.](\d{2})[-\/.](\d{4})[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/)))
+      return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], m[6] ? +m[6] : 0);
+    if ((m = t.match(/(\d{4})-(\d{2})-(\d{2})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?/)))
+      return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], m[6] ? +m[6] : 0);
+    return null;
+  }
+  function juntaDataHora(dataTxt, horaTxt){
+    var d = normData(dataTxt); var h = String(horaTxt || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!d || !h) return null;
+    var p = d.split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2], +h[1], +h[2], h[3] ? +h[3] : 0);
+  }
+  function parseSessoesDoc(doc){
+    var tabelas = doc.getElementsByTagName('table');
+    var vistos = [];
+    for (var t = 0; t < tabelas.length; t++){
+      var cab = cabecalhoTabela(tabelas[t]);
+      if (!cab.length) continue;
+      vistos.push(cab.join(' | '));
+      function idx(re){ for (var i = 0; i < cab.length; i++){ if (re.test(cab[i])) return i; } return -1; }
+      var C = {
+        abertura: idx(/ABERTURA|^INICIO$|INICIO SESSAO|DATA INICIO|DATA\/HORA INICIO/), fecho: idx(/FECHO|^FIM$|FIM SESSAO|DATA FIM|ENCERRAMENTO/),
+        dataAb: idx(/DATA.*ABERTURA|DATA.*INICIO/), horaAb: idx(/HORA.*ABERTURA|HORA.*INICIO/),
+        dataFe: idx(/DATA.*FECHO|DATA.*FIM/), horaFe: idx(/HORA.*FECHO|HORA.*FIM/),
+        operador: idx(/OPERADOR|UTILIZADOR|ABERTO POR|EMPREGADO/), saldoIni: idx(/SALDO.*INICIAL|SALDO.*ABERTURA/), saldoFim: idx(/SALDO.*FINAL|SALDO.*FECHO/)
+      };
+      var temAb = C.abertura >= 0 || (C.dataAb >= 0 && C.horaAb >= 0);
+      if (!temAb) continue;
+      var trs = tabelas[t].getElementsByTagName('tr');
+      var out = [];
+      for (var r = 0; r < trs.length; r++){
+        var tds = trs[r].getElementsByTagName('td');
+        if (tds.length < 2) continue;
+        function cel(i){ return i >= 0 && tds[i] ? tds[i].textContent : ''; }
+        var ab = C.dataAb >= 0 && C.horaAb >= 0 ? juntaDataHora(cel(C.dataAb), cel(C.horaAb)) : dataHoraZs(cel(C.abertura));
+        if (!ab) continue;
+        var fe = C.dataFe >= 0 && C.horaFe >= 0 ? juntaDataHora(cel(C.dataFe), cel(C.horaFe)) : dataHoraZs(cel(C.fecho));
+        out.push({ abertura: ab, fecho: fe, operador: cel(C.operador).trim(), saldoInicial: numZs(cel(C.saldoIni)), saldoFinal: numZs(cel(C.saldoFim)) });
+      }
+      if (out.length){
+        out.sort(function(a, b){ return a.abertura - b.abertura; });
+        return { inicio: diaLocal(out[0].abertura), fim: diaLocal(out[out.length - 1].abertura), sessoes: out };
+      }
+    }
+    return vistos.length ? { erroCabecalhos: vistos } : null;
+  }
+  function parseZsbms(buffer){
+    var doc = lerHtmlZsbms(buffer);
+    var fechoRes = parseFechoCaixaDoc(doc);
+    if (fechoRes) return { tipo: 'fecho', res: fechoRes };
+    var ses = parseSessoesDoc(doc);
+    if (ses && !ses.erroCabecalhos) return { tipo: 'sessoes', res: ses };
+    var vistos = ses && ses.erroCabecalhos ? ' Cabeçalhos encontrados: ' + ses.erroCabecalhos.map(function(v){ return '[' + v + ']'; }).join(' ') : ' O ficheiro não tem tabelas com cabeçalho.';
+    throw new Error('Não é o Fecho de Caixa ("Data | Inicio | Entradas | Saidas | Movimento | Fecho") nem uma Listagem de Sessões com coluna de abertura.' + vistos);
+  }
+
+  /* ============================================================
+     CARREGAMENTO, ACUMULAÇÃO E REMOÇÃO DE FICHEIROS
+     ============================================================ */
+  function reconstruir(){
+    docs = {}; saftCobertura = {}; terminal = {}; termCobertura = {}; fecho = {};
+    memoMeio = {};
+    saftFicheiros.forEach(function(f){
+      if (f.erro) return;
+      f.novos = 0; f.repetidos = 0;
+      f.res.docs.forEach(function(d){
+        if (docs[d.no]){ f.repetidos++; return; }
+        docs[d.no] = d; f.novos++;
+      });
+      var dias = diasEntre(f.res.inicio, f.res.fim);
+      if (!dias.length) dias = f.res.docs.map(function(d){ return d.dia; });
+      dias.forEach(function(dia){ saftCobertura[dia] = true; });
+    });
+    termFicheiros.forEach(function(f){
+      if (f.erro) return;
+      var mapa = terminal[f.origem] || (terminal[f.origem] = {});
+      var cob = termCobertura[f.origem] || (termCobertura[f.origem] = {});
+      f.novos = 0; f.repetidos = 0;
+      f.res.txs.forEach(function(tx){
+        var chave = tx.nOp || (tx.dia + '|' + tx.horaTexto + '|' + tx.montante + '|' + tx.cartao);
+        if (mapa[chave]){ f.repetidos++; return; }
+        tx.id = f.origem + '|' + chave;
+        mapa[chave] = tx; f.novos++;
+      });
+      var dias = diasEntre(f.res.inicio, f.res.fim);
+      if (!dias.length) dias = f.res.txs.map(function(t){ return t.dia; });
+      dias.forEach(function(dia){ cob[dia] = true; });
+    });
+    sessoes = [];
+    var sesVistas = {};
+    fechoFicheiros.forEach(function(f){
+      if (f.erro) return;
+      f.novos = 0; f.repetidos = 0;
+      if (f.tipo === 'sessoes'){
+        f.res.sessoes.forEach(function(x){
+          var k = x.abertura.getTime();
+          if (sesVistas[k]){ f.repetidos++; return; }
+          sesVistas[k] = true; sessoes.push(x); f.novos++;
+        });
+        return;
+      }
+      f.res.dias.forEach(function(d){
+        if (fecho[d.dia]) f.repetidos++; else f.novos++;
+        fecho[d.dia] = d;
+      });
+    });
+    sessoes.sort(function(a, b){ return a.abertura - b.abertura; });
+  }
+
+  function depoisDeCarregar(){
+    reconstruir();
+    renderFicheiros(); renderTudo(); garantirMesesDosFicheiros().then(renderTudo);
+  }
+
+  document.getElementById('inSaft').addEventListener('change', function(e){
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = '';
+    files.reduce(function(p, file){
+      return p.then(function(){
+        return lerFicheiroSaft(file).then(function(res){
+          saftFicheiros.push({ nome: file.name, res: res });
+        }).catch(function(err){
+          saftFicheiros.push({ nome: file.name, erro: err && err.message ? err.message : String(err) });
+        });
+      });
+    }, Promise.resolve()).then(depoisDeCarregar);
+  });
+
+  function ligarInputTerminal(id, origem){
+    document.getElementById(id).addEventListener('change', function(e){
+      var files = Array.prototype.slice.call(e.target.files || []);
+      e.target.value = '';
+      files.reduce(function(p, file){
+        return p.then(function(){
+          return file.text().then(function(texto){
+            var parser = PARSERS[origem];
+            if (!parser) throw new Error('Origem desconhecida: ' + origem);
+            var res = parser(texto);
+            var fora = res.txs.filter(function(t){ return t.categoria !== 'valida'; }).length;
+            termFicheiros.push({ nome: file.name, origem: origem, res: res, fora: fora });
+          }).catch(function(err){
+            termFicheiros.push({ nome: file.name, origem: origem, erro: err && err.message ? err.message : String(err) });
+          });
+        });
+      }, Promise.resolve()).then(depoisDeCarregar);
+    });
+  }
+  ligarInputTerminal('inAbanca', 'ABANCA');
+  ligarInputTerminal('inVerifone', 'CD');
+
+  document.getElementById('inFecho').addEventListener('change', function(e){
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = '';
+    files.reduce(function(p, file){
+      return p.then(function(){
+        return file.arrayBuffer().then(function(buf){
+          var z = parseZsbms(buf);
+          fechoFicheiros.push({ nome: file.name, tipo: z.tipo, res: z.res });
+        }).catch(function(err){
+          fechoFicheiros.push({ nome: file.name, erro: err && err.message ? err.message : String(err) });
+        });
+      });
+    }, Promise.resolve()).then(depoisDeCarregar);
+  });
+
+  var LISTAS = { saft: saftFicheiros, term: termFicheiros, fecho: fechoFicheiros };
+  ['listaSaft', 'listaAbanca', 'listaVerifone', 'listaFecho'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', function(e){
+      var btn = e.target.closest('.rec-remover');
+      if (!btn) return;
+      var lista = LISTAS[btn.getAttribute('data-lista')];
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      if (!lista || isNaN(idx) || !lista[idx]) return;
+      lista.splice(idx, 1);
+      depoisDeCarregar();
+    });
+  });
+
+  function btnRemover(lista, idx){
+    return '<button type="button" class="rec-remover" data-lista="' + lista + '" data-idx="' + idx + '" title="Tirar este ficheiro da memória">remover</button>';
+  }
+
+  function renderFicheiros(){
+    var a = document.getElementById('listaSaft');
+    a.innerHTML = saftFicheiros.map(function(f, i){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('saft', i) + '</li>';
+      return '<li><b>' + esc(f.nome) + '</b><span>' + (f.res.inicio ? fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' : '') +
+        plural(f.novos, 'doc', 'docs') + (f.repetidos ? ' · ' + f.repetidos + ' repetidos ignorados' : '') + '</span>' + btnRemover('saft', i) + '</li>';
+    }).join('');
+    ['ABANCA', 'CD'].forEach(function(origem){
+      var el = document.getElementById(origem === 'CD' ? 'listaVerifone' : 'listaAbanca');
+      el.innerHTML = termFicheiros.map(function(f, i){
+        if (f.origem !== origem) return '';
+        var tag = '<span class="rec-origem">' + esc(ORIGEM_LABEL[f.origem] || f.origem) + '</span>';
+        if (f.erro) return '<li><b>' + esc(f.nome) + '</b>' + tag + '<span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('term', i) + '</li>';
+        return '<li><b>' + esc(f.nome) + '</b>' + tag + '<span>' + (f.res.inicio ? fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' : '') +
+          plural(f.novos, 'transação', 'transações') + (f.fora ? ' (' + f.fora + ' fora das somas)' : '') + (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span>' +
+          (f.res.avisos || []).map(function(av){ return '<span class="rec-erro">' + esc(av) + '</span>'; }).join('') + btnRemover('term', i) + '</li>';
+      }).join('');
+    });
+    var c = document.getElementById('listaFecho');
+    c.innerHTML = fechoFicheiros.map(function(f, i){
+      if (f.erro) return '<li><b>' + esc(f.nome) + '</b><span class="rec-erro">' + esc(f.erro) + '</span>' + btnRemover('fecho', i) + '</li>';
+      if (f.tipo === 'sessoes'){
+        return '<li><b>' + esc(f.nome) + '</b><span class="rec-origem">Sessões</span><span>' + fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' + plural(f.res.sessoes.length, 'sessão', 'sessões') +
+          (f.repetidos ? ' · ' + f.repetidos + ' repetidas ignoradas' : '') + '</span>' + btnRemover('fecho', i) + '</li>';
+      }
+      return '<li><b>' + esc(f.nome) + '</b><span class="rec-origem">Fecho de Caixa</span><span>' + fmtDia(f.res.inicio) + ' → ' + fmtDia(f.res.fim) + ' · ' + plural(f.res.dias.length, 'dia', 'dias') +
+        (f.repetidos ? ' · ' + f.repetidos + ' já carregados (leitura substituída)' : '') + '</span>' + btnRemover('fecho', i) + '</li>';
+    }).join('');
+
+    var faltas = diasFaltamCartaoB();
+    function faltaHtml(id, dias){
+      var el = document.getElementById(id);
+      if (!dias.length){ el.className = 'rec-faltam ok'; el.textContent = dias === null ? '' : 'Nada em falta.'; return; }
+      el.className = 'rec-faltam';
+      el.innerHTML = '<b>' + dias.length + '</b> dia' + (dias.length === 1 ? '' : 's') + ' A Menos ainda sem ficheiro: ' + dias.slice(0, 12).map(fmtDia).join(', ') + (dias.length > 12 ? '…' : '');
+    }
+    faltaHtml('faltaSaft', faltas.saft);
+    faltaHtml('faltaAbanca', faltas.abanca);
+    faltaHtml('faltaVerifone', faltas.verifone);
+    faltaHtml('faltaFecho', faltas.fecho);
+  }
+
+  /* ============================================================
+     FIREBASE — vendasDiario e contasBancarias (Cartão A)
+     ============================================================ */
+  function carregarMes(mes){
+    if (vendasMes[mes] || !db) return Promise.resolve();
+    return db.ref('vendasDiario/' + mes).once('value').then(function(snap){
+      var v = snap.val() || {};
+      var out = {};
+      Object.keys(v).forEach(function(dia){
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dia)) out[dia] = (v[dia] && v[dia].porPagamento) || {};
+      });
+      vendasMes[mes] = out;
+      delete mesesComErro[mes];
+    }).catch(function(err){
+      console.error('vendasDiario/' + mes, err);
+      mesesComErro[mes] = err && err.message ? err.message : String(err);
+      vendasMes[mes] = vendasMes[mes] || {};
+    });
+  }
+  function listaMeses(){
+    var meses = {};
+    var m = PRIMEIRO_MES, hoje = mesDeHoje(), guard = 0;
+    while (m <= hoje && guard++ < 240){ meses[m] = true; m = mesSeguinte(m); }
+    Object.keys(saftCobertura).forEach(function(d){ meses[d.slice(0, 7)] = true; });
+    Object.keys(termCobertura).forEach(function(o){ Object.keys(termCobertura[o]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
+    return Object.keys(meses).sort().reverse();
+  }
+  function carregarAtivo(){
+    return Promise.all(listaMeses().map(carregarMes));
+  }
+  function carregarBase(){
+    if (!db) return Promise.resolve();
+    function le(caminho, poe){
+      return db.ref(caminho).once('value').then(function(snap){ poe(snap.val() || {}); }).catch(function(err){
+        console.error(caminho, err); baseErros.push(caminho + ': ' + (err && err.message ? err.message : String(err)));
+      });
+    }
+    return Promise.all([
+      le('contasBancarias/abanca/movimentos', function(v){ banco.abanca = v; }),
+      le('contasBancarias/revolut/movimentos', function(v){ banco.revolut = v; }),
+      le('reconciliacaoDescartes', function(v){ descartes = v; }),
+      le('reconciliacaoResolvidos', function(v){ resolvidos = v; })
+    ]).then(function(){ baseCarregada = true; });
+  }
+
+  /* ============================================================
+     LINHAS DO POS / TERMINAL, por dia e meio
+     ============================================================ */
+  function linhasPos(dia, mec){
+    var out = [];
+    Object.keys(docs).forEach(function(no){
+      var d = docs[no];
+      if (d.dia !== dia || d.status === 'A') return;
+      d.pagamentos.forEach(function(p, i){
+        if (p.mec !== mec) return;
+        out.push({ id: 'pos|' + no + '|' + i, doc: d, no: no, tipo: d.tipo, hora: d.hora, valor: p.valor, cents: cents(p.valor) });
+      });
+    });
+    out.sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+    return out;
+  }
+  function transacoesTerminal(dia, origem){
+    var mapa = terminal[origem] || {};
+    return Object.keys(mapa).map(function(k){ return mapa[k]; })
+      .filter(function(t){ return t.dia === dia && t.categoria === 'valida'; })
+      .map(function(t){ t.cents = cents(t.montante); return t; })
+      .sort(function(a, b){ return (a.hora || 0) - (b.hora || 0); });
+  }
+
+  /* ============================================================
+     CARTÃO A — atribuição de créditos do banco a dias de POS
+     (algoritmo de atribuição verbatim do que já existia; a diferença é
+     só na classificação final — ver classificarItemA acima).
+     ============================================================ */
+  function creditosBanco(meio){
+    var out = [];
+    Object.keys(banco).forEach(function(conta){
+      var movs = banco[conta] || {};
+      Object.keys(movs).forEach(function(k){
+        var m = movs[k]; if (!m || m.credit_debit_indicator !== 'CRDT') return;
+        var desc = m.remittance_information || '';
+        if (!meio.creditoRegex.test(desc)) return;
+        var dia = String(m.booking_date || '').slice(0, 10); var c = Math.round(parseFloat(m.amount) * 100);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || isNaN(c)) return;
+        out.push({ dia: dia, cents: c, valor: c / 100, conta: conta, key: k, desc: desc });
+      });
+    });
+    out.sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : (a.key < b.key ? -1 : 1)); });
+    return out;
+  }
+  function limitesBanco(contas){
+    var min = null, max = null;
+    (contas || Object.keys(banco)).forEach(function(conta){
+      var movs = banco[conta] || {};
+      Object.keys(movs).forEach(function(k){
+        var d = movs[k] && String(movs[k].booking_date || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+        if (min === null || d < min) min = d;
+        if (max === null || d > max) max = d;
+      });
+    });
+    return min ? { min: min, max: max } : null;
+  }
+  // Usado só como HEURÍSTICA de atribuição (agrupar créditos aos dias certos,
+  // ver comps/emparelhar abaixo) — nunca para classificar o resultado final,
+  // que é sempre o Δ cru (ver classificarItemA).
+  function custoAtribuicao(posC, credC){
+    return Math.abs(posC - credC) / 100;
+  }
+  function posDiaCents(dia, mec){
+    var mes = dia.slice(0, 7);
+    var fb = vendasMes[mes] && vendasMes[mes][dia] && vendasMes[mes][dia][mec];
+    return fb && fb.bruto != null ? cents(fb.bruto) : null;
+  }
+
+  function atribuirCreditos(meio){
+    var creds = creditosBanco(meio), usado = {};
+    var contasDoMeio = creds.map(function(c){ return c.conta; }).filter(function(v, i, a){ return a.indexOf(v) === i; });
+    var lim = limitesBanco(contasDoMeio.length ? contasDoMeio : null);
+    var res = { meio: meio, itens: [], semBanco: !lim, lim: lim };
+    if (!lim) return res;
+    var dias = [];
+    var j = meio.janelaBanco;
+    var desde = addDias(lim.min, -j);
+    Object.keys(vendasMes).forEach(function(m){ Object.keys(vendasMes[m]).forEach(function(d){ var c = posDiaCents(d, meio.mec); if (c && d >= desde) dias.push({ dia: d, cents: c }); }); });
+    dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
+    function item(diasI, credsI){
+      var pos = diasI.reduce(function(t, x){ return t + x.cents; }, 0), cred = credsI.reduce(function(t, c){ return t + c.cents; }, 0);
+      return { meio: meio, dias: diasI.map(function(x){ return x.dia; }), pos: pos / 100, creditos: credsI, credito: cred / 100 };
+    }
+    var restam = [];
+    dias.forEach(function(x){
+      var fim = addDias(x.dia, j), cand = [];
+      creds.forEach(function(c, i){ if (!usado[i] && c.dia >= x.dia && c.dia <= fim) cand.push(i); });
+      // atribuição rápida: um único candidato exacto ao cêntimo.
+      for (var k = 0; k < cand.length; k++){
+        if (creds[cand[k]].cents === x.cents){ usado[cand[k]] = true; res.itens.push(item([x], [creds[cand[k]]])); return; }
+      }
+      restam.push(x);
+    });
+    restam = restam.filter(function(x){
+      if (x.dia >= lim.min) return true;
+      var it = item([x], []); it.antesBanco = true; res.itens.push(it);
+      return false;
+    });
+    var livres = []; creds.forEach(function(c, i){ if (!usado[i]) livres.push(i); });
+    var pai = {};
+    function raiz(n){ while (pai[n] !== n){ pai[n] = pai[pai[n]]; n = pai[n]; } return n; }
+    function une(a, b){ a = raiz(a); b = raiz(b); if (a !== b) pai[a] = b; }
+    restam.forEach(function(x, di){ pai['d' + di] = 'd' + di; });
+    livres.forEach(function(i){ pai['c' + i] = 'c' + i; });
+    restam.forEach(function(x, di){
+      var fim = addDias(x.dia, j);
+      livres.forEach(function(i){ if (creds[i].dia >= x.dia && creds[i].dia <= fim) une('d' + di, 'c' + i); });
+    });
+    var comps = {};
+    restam.forEach(function(x, di){ var r = raiz('d' + di); (comps[r] || (comps[r] = { dias: [], creds: [] })).dias.push(x); });
+    livres.forEach(function(i){ var r = raiz('c' + i); (comps[r] || (comps[r] = { dias: [], creds: [] })).creds.push(creds[i]); });
+    function permutacoes(arr){
+      if (arr.length <= 1) return [arr.slice()];
+      var out = [];
+      arr.forEach(function(x, i){ permutacoes(arr.slice(0, i).concat(arr.slice(i + 1))).forEach(function(r){ out.push([x].concat(r)); }); });
+      return out;
+    }
+    function emparelhar(diasC, credsC){
+      var grupos = [], i = 0;
+      while (i < credsC.length){ var j2 = i; while (j2 + 1 < credsC.length && credsC[j2 + 1].dia === credsC[i].dia) j2++; grupos.push(credsC.slice(i, j2 + 1)); i = j2 + 1; }
+      var ordens = [[]];
+      grupos.forEach(function(g){
+        var perms = g.length <= 4 ? permutacoes(g) : [g];
+        var nova = [];
+        ordens.forEach(function(o){ perms.forEach(function(pm){ nova.push(o.concat(pm)); }); });
+        ordens = nova.length > 500 ? nova.slice(0, 500) : nova;
+      });
+      var melhor = null, melhorCusto = Infinity;
+      ordens.forEach(function(o){
+        var custo = 0;
+        for (var q = 0; q < diasC.length; q++){ custo += custoAtribuicao(diasC[q].cents, o[q].cents); }
+        if (custo < melhorCusto){ melhorCusto = custo; melhor = o; }
+      });
+      var pares = diasC.map(function(x, q){ return { dia: x, cred: melhor[q], diff: (x.cents - melhor[q].cents) / 100 }; });
+      var out = [];
+      for (var q = 0; q < pares.length; q++){
+        var pq = pares[q];
+        if (q + 1 < pares.length && pq.diff !== 0 && Math.abs(pq.diff + pares[q + 1].diff) < 0.005){
+          out.push(item([pq.dia, pares[q + 1].dia], [pq.cred, pares[q + 1].cred])); q++;
+          continue;
+        }
+        out.push(item([pq.dia], [pq.cred]));
+      }
+      return out;
+    }
+    Object.keys(comps).forEach(function(k){
+      var c = comps[k];
+      c.dias.sort(function(a, b){ return a.dia < b.dia ? -1 : 1; });
+      c.creds.sort(function(a, b){ return a.dia < b.dia ? -1 : (a.dia > b.dia ? 1 : 0); });
+      if (!c.creds.length){
+        var ultimo = c.dias[c.dias.length - 1].dia;
+        var it = item(c.dias, []);
+        if (addDias(ultimo, j) > (lim.max)){ it.aguarda = true; }
+        else if (c.dias[0].dia < lim.min){ it.antesBanco = true; }
+        else { it.semCredito = true; }
+        res.itens.push(it);
+        return;
+      }
+      if (!c.dias.length){ res.itens.push(item([], c.creds)); return; }
+      if (c.dias.length === c.creds.length && c.dias.length > 1){
+        emparelhar(c.dias, c.creds).forEach(function(it){ res.itens.push(it); });
+        return;
+      }
+      res.itens.push(item(c.dias, c.creds));
+    });
+    res.itens.sort(function(a, b){ var da = a.dias.length ? a.dias[a.dias.length - 1] : a.creditos[0].dia, db2 = b.dias.length ? b.dias[b.dias.length - 1] : b.creditos[0].dia; return da < db2 ? 1 : (da > db2 ? -1 : 0); });
+    return res;
+  }
+
+  function classificarItemA(meio, it){
+    if (it.antesBanco || it.aguarda) return 'ambiguo';                     // banco não respondeu ainda / fora do extrato
+    if (!it.dias.length && it.creditos.length) return 'aMais';             // crédito sem venda correspondente
+    if (it.semCredito) return 'aMenos';                                    // sem crédito nenhum, janela já passou
+    if (it.dias.length > 1 && it.creditos.length > 1) return 'ambiguo';    // componente que não resolveu 1:1
+    if (!it.pos) return it.credito ? 'aMais' : 'ok';
+    var deltaCents = cents(it.credito) - cents(it.pos);   // Δ = Banco − POS
+    if (deltaCents === 0) return 'ok';
+    return deltaCents < 0 ? 'aMenos' : 'aMais';
+  }
+
+  function chaveDescarteItem(meio, it){
+    var diaChave = it.dias.length ? it.dias.join('_') : (it.creditos.length ? it.creditos[0].dia : 'sem-data');
+    return diaChave + '~' + meio.mec;
+  }
+
+  var memoA = null;
+  function calcularCartaoA(){
+    if (memoA) return memoA;
+    var out = { OU: null, CD: null };
+    MEIOS.forEach(function(meio){
+      var r = atribuirCreditos(meio);
+      r.itens.forEach(function(it){
+        it.estado = classificarItemA(meio, it);
+        it.chave = chaveDescarteItem(meio, it);
+        var d = descartes[chaveFirebase(it.chave)];
+        it.descartado = !!(d && d.anulado !== true);
+      });
+      out[meio.mec] = r;
+    });
+    memoA = out;
+    return out;
+  }
+  // Chaves de nó do Firebase não podem ter '.', '#', '$', '[', ']' — a chave
+  // já só usa dígitos, '-', '_' e '~', por isso passa tal e qual.
+  function chaveFirebase(k){ return k; }
+
+  /* ============================================================
+     CARTÃO B — casamento por dia (SAF-T ↔ extrato), pela ordem exacta da
+     spec: 1) global por menor distância ±60 min; 2) valor alterado ±3 min
+     (1 candidato de cada lado); 3) conta dividida ±5 min (tolerância 5
+     cêntimos por parcela) — 2 e 3 correm só sobre o resíduo do passo 1;
+     4) o que sobra, confirmado que não está no OUTRO terminal.
+     ============================================================ */
+  function casarGlobal(pos, term, janelaSeg){
+    var pares = [];
+    pos.forEach(function(p){
+      term.forEach(function(t){
+        if (p.cents === t.cents && p.hora != null && t.hora != null && Math.abs(t.hora - p.hora) <= janelaSeg){
+          pares.push({ pos: p, term: t, delta: Math.abs(t.hora - p.hora) });
+        }
+      });
+    });
+    pares.sort(function(a, b){ return a.delta - b.delta; });
+    var usadoP = {}, usadoT = {};
+    pares.forEach(function(pr){
+      if (usadoP[pr.pos.id] || usadoT[pr.term.id]) return;
+      usadoP[pr.pos.id] = true; usadoT[pr.term.id] = true;
+    });
+    return {
+      posLivre: pos.filter(function(p){ return !usadoP[p.id]; }),
+      termLivre: term.filter(function(t){ return !usadoT[t.id]; })
+    };
+  }
+  function casarAlterado(posOrf, termOrf, janelaSeg){
+    var candA = {}, candB = {};
+    posOrf.forEach(function(a){ candA[a.id] = termOrf.filter(function(b){ return perto(a, b, janelaSeg); }); });
+    termOrf.forEach(function(b){ candB[b.id] = posOrf.filter(function(a){ return perto(a, b, janelaSeg); }); });
+    var usadosA = {}, usadosB = {};
+    posOrf.forEach(function(a){
+      if (candA[a.id].length !== 1) return;
+      var b = candA[a.id][0];
+      if (candB[b.id].length !== 1) return;
+      usadosA[a.id] = true; usadosB[b.id] = true;
+    });
+    return {
+      posLivre: posOrf.filter(function(a){ return !usadosA[a.id]; }),
+      termLivre: termOrf.filter(function(b){ return !usadosB[b.id]; })
+    };
+  }
+  function subconjuntos(lista, min, max){
+    var out = [];
+    (function rec(i, atual){
+      if (atual.length >= min && atual.length <= max) out.push(atual.slice());
+      if (atual.length >= max) return;
+      for (var j = i; j < lista.length; j++){ atual.push(lista[j]); rec(j + 1, atual); atual.pop(); }
+    })(0, []);
+    return out;
+  }
+  function casarDividida(posOrf, termOrf, janelaSeg){
+    var livresA = posOrf.slice(), livresB = termOrf.slice();
+    livresA.slice().forEach(function(a){
+      var cand = livresB.filter(function(b){ return perto(a, b, janelaSeg); });
+      if (cand.length < 2) return;
+      var opcoes = subconjuntos(cand, 2, Math.min(MAX_PARCELAS_DIVISAO, cand.length)).filter(function(sub){
+        var soma = sub.reduce(function(t, b){ return t + b.cents; }, 0);
+        return Math.abs(soma - a.cents) <= sub.length * TOLERANCIA_DIVISAO_CENTS_POR_PARCELA;
+      });
+      if (opcoes.length !== 1) return;
+      var sub = opcoes[0];
+      livresA = livresA.filter(function(x){ return x !== a; });
+      livresB = livresB.filter(function(b){ return sub.indexOf(b) < 0; });
+    });
+    return { posLivre: livresA, termLivre: livresB };
+  }
+
+  var memoMeio = {};
+  // Resultado do casamento de um dia/meio: { estado:'sem-saft'|'sem-extrato'|'ok', posOrfas, termOrfas }
+  function casarDiaMeio(dia, meio){
+    var k = dia + '|' + meio.mec;
+    if (memoMeio[k]) return memoMeio[k];
+    var temSaft = !!saftCobertura[dia];
+    var pos = temSaft ? linhasPos(dia, meio.mec) : [];
+    if (!temSaft || !pos.length){
+      return (memoMeio[k] = { estado: temSaft ? 'ok' : 'sem-saft', posOrfas: pos, termOrfas: [] });
+    }
+    var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
+    if (!temTerm){
+      return (memoMeio[k] = { estado: 'sem-extrato', posOrfas: pos, termOrfas: [] });
+    }
+    var term = transacoesTerminal(dia, meio.origem);
+    var p1 = casarGlobal(pos, term, JANELA_GLOBAL_MIN * 60);
+    var p2 = casarAlterado(p1.posLivre, p1.termLivre, JANELA_ALTERADO_MIN * 60);
+    var p3 = casarDividida(p2.posLivre, p2.termLivre, JANELA_DIVIDIDA_MIN * 60);
+    return (memoMeio[k] = { estado: 'ok', posOrfas: p3.posLivre, termOrfas: p3.termLivre });
+  }
+
+  // → [{ dia, linha, meio }] — vendas sem cobrança confirmadas (passo 4).
+  function vendasSemCobrancaDoDia(dia){
+    var resPorMeio = {};
+    MEIOS.forEach(function(meio){ resPorMeio[meio.mec] = casarDiaMeio(dia, meio); });
+    var out = [];
+    MEIOS.forEach(function(meio){
+      var r = resPorMeio[meio.mec];
+      if (r.estado !== 'ok' || !r.posOrfas.length) return;
+      var outro = outroMeio(meio);
+      var rOutro = resPorMeio[outro.mec];
+      var termLivreOutro = rOutro.estado === 'ok' ? rOutro.termOrfas : [];
+      var seg = JANELA_GLOBAL_MIN * 60;
+      r.posOrfas.forEach(function(l){
+        var explicadoNoOutro = termLivreOutro.some(function(t){ return t.cents === l.cents && perto(l, t, seg); });
+        if (!explicadoNoOutro) out.push({ dia: dia, linha: l, meio: meio });
+      });
+    });
+    out.sort(function(a, b){ return (a.linha.hora || 0) - (b.linha.hora || 0); });
+    return out;
+  }
+  function motivoNaoTestavelDia(dia){
+    if (!saftCobertura[dia]) return 'sem SAF-T deste dia';
+    var faltam = [];
+    MEIOS.forEach(function(meio){
+      var temTerm = !!(termCobertura[meio.origem] && termCobertura[meio.origem][dia]);
+      if (!temTerm) faltam.push(labelCurtoMeio(meio));
+    });
+    return faltam.length ? 'sem extrato ' + faltam.join(' e ') : null;
+  }
+
+  /* ---------- dias "A Menos" do Cartão A (o que o Cartão B investiga) ---------- */
+  function diasAMenosPorMeio(){
+    var out = {};
+    var a = calcularCartaoA();
+    MEIOS.forEach(function(meio){
+      var r = a[meio.mec];
+      if (!r || r.semBanco) return;
+      r.itens.forEach(function(it){
+        if (it.estado !== 'aMenos' || it.descartado) return;
+        it.dias.forEach(function(d){ (out[d] || (out[d] = [])).push(meio); });
+      });
+    });
+    return out;
+  }
+  function diasFaltamCartaoB(){
+    var amenos = Object.keys(diasAMenosPorMeio());
+    var pM = diasAMenosPorMeio();
+    var saft = amenos.filter(function(d){ return !saftCobertura[d]; }).sort();
+    var abanca = amenos.filter(function(d){ return pM[d].some(function(m){ return m.mec === 'OU'; }) && !(termCobertura.ABANCA && termCobertura.ABANCA[d]); }).sort();
+    var verifone = amenos.filter(function(d){ return pM[d].some(function(m){ return m.mec === 'CD'; }) && !(termCobertura.CD && termCobertura.CD[d]); }).sort();
+    var fechoF = amenos.filter(function(d){ return !fecho[d]; }).sort();
+    return { saft: saft, abanca: abanca, verifone: verifone, fecho: fechoF };
+  }
+
+  /* ============================================================
+     ESCRITAS NO FIREBASE — reconciliacaoDescartes/ e
+     reconciliacaoResolvidos/. update() por caminho, nunca set() em nó
+     pai, nunca remove(): anular é sempre uma flag.
+     ============================================================ */
+  function autorAtual(){
+    var el = document.getElementById('recAutor');
+    var v = el ? el.value.trim() : '';
+    if (v){ try { localStorage.setItem('reconciliacao.autor', v); } catch (e){} }
+    return v || 'Manel';
+  }
+  function nomeAutorGuardado(){
+    try { return localStorage.getItem('reconciliacao.autor') || ''; } catch (e){ return ''; }
+  }
+
+  function descartarLinha(chave, dataTxt, motivo, autor){
+    if (!db) return Promise.resolve();
+    var registo = { data: dataTxt, motivo: motivo, autor: autor, criadoEm: new Date().toISOString() };
+    descartes[chave] = registo;
+    memoA = null;
+    return db.ref('reconciliacaoDescartes/' + chave).set(registo);
+  }
+  function reativarLinha(chave){
+    if (!db) return Promise.resolve();
+    var anuladoEm = new Date().toISOString();
+    if (descartes[chave]) descartes[chave] = Object.assign({}, descartes[chave], { anulado: true, anuladoEm: anuladoEm });
+    memoA = null;
+    return db.ref('reconciliacaoDescartes/' + chave).update({ anulado: true, anuladoEm: anuladoEm });
+  }
+
+  function resolverVenda(chave, dataTxt, razao, autor){
+    if (!db) return Promise.resolve();
+    var registo = { data: dataTxt, razao: razao, autor: autor, criadoEm: new Date().toISOString() };
+    resolvidos[chave] = registo;
+    return db.ref('reconciliacaoResolvidos/' + chave).set(registo);
+  }
+  function anularResolucao(chave){
+    if (!db) return Promise.resolve();
+    var anuladoEm = new Date().toISOString();
+    if (resolvidos[chave]) resolvidos[chave] = Object.assign({}, resolvidos[chave], { anulado: true, anuladoEm: anuladoEm });
+    return db.ref('reconciliacaoResolvidos/' + chave).update({ anulado: true, anuladoEm: anuladoEm });
+  }
+  function chaveVenda(linha){
+    return String(linha.no || '').replace(/\//g, '~').replace(/\s+/g, ' ').trim();
+  }
+
+  /* ============================================================
+     RENDER — CARTÃO A
+     ============================================================ */
+  function preencherSelectorA(){
+    var sel = document.getElementById('selFiltroA');
+    if (!sel) return;
+    sel.value = filtroA;
+  }
+
+  function renderCartaoA(){
+    var el = document.getElementById('cartaoA');
+    if (!db){ el.innerHTML = '<div class="rec-vazio">A ligar ao Firebase…</div>'; return; }
+    if (!baseCarregada){ el.innerHTML = '<div class="rec-vazio">A ler vendas e banco…</div>'; return; }
+
+    var a = calcularCartaoA();
+    var linhas = [];
+    MEIOS.forEach(function(meio){
+      var r = a[meio.mec];
+      if (!r || r.semBanco) return;
+      r.itens.forEach(function(it){
+        linhas.push({ meio: meio, it: it });
+      });
+    });
+
+    // Simetria: cada data com uma linha resolvida (incluindo Ambíguo) num
+    // TPA tem sempre a linha do outro TPA também — se o outro TPA não tem
+    // item nenhum para essa data exacta (sem vendas e sem crédito), sintetiza
+    // uma linha a zero (Δ 0, estado OK). Não mexe em datas multi-dia (itens
+    // emparelhados) — essas já cobrem as suas próprias datas nos dois lados.
+    if (MEIOS.length === 2){
+      var meioA = MEIOS[0], meioB = MEIOS[1];
+      var diasCobertos = {}; diasCobertos[meioA.mec] = {}; diasCobertos[meioB.mec] = {};
+      linhas.forEach(function(l){
+        var ds = l.it.dias.length ? l.it.dias : (l.it.creditos.length === 1 ? [l.it.creditos[0].dia] : []);
+        ds.forEach(function(d){ diasCobertos[l.meio.mec][d] = true; });
+      });
+      var todasDatas = {};
+      Object.keys(diasCobertos[meioA.mec]).forEach(function(d){ todasDatas[d] = true; });
+      Object.keys(diasCobertos[meioB.mec]).forEach(function(d){ todasDatas[d] = true; });
+      Object.keys(todasDatas).forEach(function(d){
+        [meioA, meioB].forEach(function(meio){
+          if (diasCobertos[meio.mec][d]) return;
+          linhas.push({ meio: meio, it: {
+            meio: meio, dias: [d], pos: 0, creditos: [], credito: 0,
+            estado: 'ok', chave: d + '~' + meio.mec, descartado: false, sintetico: true
+          } });
+        });
+      });
+    }
+
+    var meses = {};
+    linhas.forEach(function(l){ (l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
+    var listaM = Object.keys(meses).sort().reverse();
+
+    // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
+    var totalAMenos = 0, totalAMenosOU = 0, totalAMenosCD = 0;
+    linhas.forEach(function(l){
+      if (l.it.descartado || l.it.estado !== 'aMenos') return;
+      var d = round2(l.it.credito - l.it.pos);
+      totalAMenos = round2(totalAMenos + d);
+      if (l.meio.mec === 'OU') totalAMenosOU = round2(totalAMenosOU + d); else totalAMenosCD = round2(totalAMenosCD + d);
+    });
+
+    var visiveis = linhas.filter(function(l){
+      if (l.it.descartado && !mostrarDescartados) return false;
+      if (l.it.descartado && mostrarDescartados) return true;
+      if (filtroA === 'naoReconciliados') return l.it.estado === 'aMenos';
+      if (filtroA){ var ord = l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]; return ord.some(function(d){ return d.slice(0, 7) === filtroA; }); }
+      return true;
+    });
+    visiveis.sort(function(a2, b2){
+      var da = a2.it.dias.length ? a2.it.dias[a2.it.dias.length - 1] : a2.it.creditos[0].dia;
+      var db2 = b2.it.dias.length ? b2.it.dias[b2.it.dias.length - 1] : b2.it.creditos[0].dia;
+      return da < db2 ? 1 : (da > db2 ? -1 : (MEIO_ORDEM[a2.meio.mec] - MEIO_ORDEM[b2.meio.mec]));
+    });
+
+    var nDescartados = linhas.filter(function(l){ return l.it.descartado; }).length;
+
+    var h = '<div class="rec-a-topo">' +
+      '<div class="rec-a-head' + (totalAMenos ? '' : ' zero') + '"><div class="k">A menos (total)</div><div class="v num">' + fmtEuro(totalAMenos) + '</div>' +
+      '<div class="s">soma dos Δ das linhas <b>A Menos</b>, sem descontar comissão · fora as descartadas</div></div>' +
+      '<div class="rec-a-tipo' + (totalAMenosOU ? '' : ' zero') + '"><div class="k">A menos TPA ABANCA</div><div class="v num">' + fmtEuro(totalAMenosOU) + '</div></div>' +
+      '<div class="rec-a-tipo' + (totalAMenosCD ? '' : ' zero') + '"><div class="k">A menos TPA VERIFONE</div><div class="v num">' + fmtEuro(totalAMenosCD) + '</div></div>' +
+      '</div>';
+
+    h += '<p class="rec-nota-comissao">O crédito do banco vem sempre líquido de comissão do terminal — por isso o Δ deste cartão <b>nunca</b> é o valor exacto em falta, inclui a comissão do dia. O valor exacto está no cartão B, com os extratos dos terminais.</p>';
+
+    h += '<div class="rec-a-barra"><select id="selFiltroA">' +
+      '<option value="naoReconciliados">Não Reconciliados</option>' +
+      '<option value="">Todos os meses</option>' +
+      listaM.map(function(m){ return '<option value="' + m + '">' + fmtMes(m) + '</option>'; }).join('') +
+      '</select><span class="rec-a-legenda">Comissão típica: TPA ABANCA ' + esc(MEIO_POR_MEC.OU.comissaoObservada) + ' · TPA VERIFONE ' + esc(MEIO_POR_MEC.CD.comissaoObservada) + '</span><div class="spacer"></div></div>';
+
+    h += '<div class="rec-a-tabela">';
+    if (!visiveis.length){
+      h += '<div class="rec-vazio">' + (filtroA === 'naoReconciliados' ? 'Nenhuma linha A Menos por reconciliar.' : 'Sem linhas para este filtro.') + '</div>';
+    } else {
+      var ultimaData = null;
+      h += '<table><thead><tr><th>Data</th><th>TPA</th><th class="num">Faturado POS</th><th class="num">Creditado Banco</th><th class="num">Δ</th><th class="num">Δ%</th><th>Estado</th><th></th></tr></thead><tbody>' +
+        visiveis.map(function(l){
+          var it = l.it;
+          var dataTxt = it.dias.length ? fmtDias(it.dias) : fmtDia(it.creditos[0].dia);
+          // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
+          var delta = round2(it.credito - it.pos);
+          var deltaPct = it.pos ? (delta / it.pos * 100) : null;
+          var chave = it.chave;
+          var jaDesc = it.descartado;
+          var dataMostrar = dataTxt === ultimaData ? '' : dataTxt;
+          ultimaData = dataTxt;
+          return '<tr data-chave="' + esc(chave) + '"' + (jaDesc ? ' style="opacity:.55"' : '') + '>' +
+            '<td class="rec-mono">' + esc(dataMostrar) + '</td><td><b>' + esc(labelMeio(l.meio)) + '</b></td>' +
+            '<td class="num">' + fmtEuro(it.pos) + '</td><td class="num">' + fmtEuro(it.credito) + '</td>' +
+            '<td class="num' + (delta < 0 ? ' rec-neg' : '') + '">' + fmtEuroSinal(delta) + '</td>' +
+            '<td class="num">' + fmtPct(deltaPct) + '</td>' +
+            '<td><span class="rec-a-tag ' + it.estado + '">' + { ok:'OK', aMenos:'A Menos', aMais:'A Mais', ambiguo:'Ambíguo' }[it.estado] + '</span></td>' +
+            '<td>' + (it.sintetico ? '' : (
+              (jaDesc
+                ? '<button type="button" class="rec-a-reativar" data-acao="reativar" data-chave="' + esc(chave) + '">reactivar</button>'
+                : '<button type="button" class="rec-a-descartar" data-acao="descartar" data-chave="' + esc(chave) + '" data-data="' + esc(dataTxt) + '">descartar</button>') +
+              '<div class="rec-inline-form" data-form="' + esc(chave) + '" hidden>' +
+                '<input type="text" placeholder="Motivo" data-campo="motivo">' +
+                '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+                '<button type="button" data-confirmar="' + esc(chave) + '">Confirmar</button>' +
+                '<button type="button" class="cancelar" data-cancelar="' + esc(chave) + '">Cancelar</button>' +
+              '</div>'
+            )) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    h += '</div>';
+
+    if (nDescartados){
+      h += '<div class="rec-a-descartados" id="toggleDescartados">' + (mostrarDescartados ? 'Esconder descartados' : 'Ver ' + nDescartados + ' descartado' + (nDescartados === 1 ? '' : 's')) + '</div>';
+    }
+
+    el.innerHTML = h;
+    preencherSelectorA();
+
+    var sel = document.getElementById('selFiltroA');
+    if (sel) sel.addEventListener('change', function(){ filtroA = sel.value; renderCartaoA(); });
+    var toggle = document.getElementById('toggleDescartados');
+    if (toggle) toggle.addEventListener('click', function(){ mostrarDescartados = !mostrarDescartados; renderCartaoA(); });
+
+    el.querySelectorAll('[data-acao="descartar"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-chave');
+        var form = el.querySelector('[data-form="' + CSS.escape(chave) + '"]');
+        if (form) form.hidden = false;
+        btn.hidden = true;
+      });
+    });
+    el.querySelectorAll('[data-cancelar]').forEach(function(btn){
+      btn.addEventListener('click', function(){ renderCartaoA(); });
+    });
+    el.querySelectorAll('[data-confirmar]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-confirmar');
+        var form = el.querySelector('[data-form="' + CSS.escape(chave) + '"]');
+        var motivo = form.querySelector('[data-campo="motivo"]').value.trim();
+        var autorInput = form.querySelector('[data-campo="autor"]').value.trim();
+        if (!motivo){ form.querySelector('[data-campo="motivo"]').focus(); return; }
+        var tr = el.querySelector('tr[data-chave="' + CSS.escape(chave) + '"]');
+        var dataTxt = tr ? tr.querySelector('td').textContent : '';
+        btn.disabled = true;
+        descartarLinha(chave, dataTxt, motivo, autorInput || autorAtual()).then(renderCartaoA).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui gravar o descarte: ' + (err && err.message ? err.message : err));
+        });
+      });
+    });
+    el.querySelectorAll('[data-acao="reativar"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var chave = btn.getAttribute('data-chave');
+        btn.disabled = true;
+        reativarLinha(chave).then(renderCartaoA).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui reactivar: ' + (err && err.message ? err.message : err));
+        });
+      });
+    });
+  }
+
+  /* ============================================================
+     RENDER — CARTÃO B
+     ============================================================ */
+  function renderDiasB(){
+    var ul = document.getElementById('listaDiasB');
+    var vazio = document.getElementById('diasBVazio');
+    var totalEl = document.getElementById('bTotal');
+    var porMeio = diasAMenosPorMeio();
+    var dias = Object.keys(porMeio).sort().reverse();
+
+    if (!baseCarregada){
+      ul.innerHTML = ''; vazio.style.display = ''; vazio.textContent = 'A ler o cartão A…'; totalEl.textContent = '';
+      return;
+    }
+    if (!dias.length){
+      ul.innerHTML = ''; vazio.style.display = ''; vazio.textContent = 'Sem dias A Menos por investigar — o cartão A está limpo.'; totalEl.textContent = '';
+      return;
+    }
+    vazio.style.display = 'none';
+
+    var totalPendente = 0, nPendente = 0;
+    dias.forEach(function(dia){
+      vendasSemCobrancaDoDia(dia).forEach(function(x){
+        var ch = chaveVenda(x.linha);
+        var res = resolvidos[ch];
+        if (res && res.anulado !== true) return;
+        totalPendente = round2(totalPendente + x.linha.valor); nPendente++;
+      });
+    });
+    totalEl.innerHTML = plural(dias.length, 'dia por investigar', 'dias por investigar') + ' · <b>' + plural(nPendente, 'venda sem cobrança por resolver', 'vendas sem cobrança por resolver') + '</b> · ' + fmtEuro(totalPendente);
+
+    ul.innerHTML = dias.map(function(dia){
+      var motivo = motivoNaoTestavelDia(dia);
+      var itens = motivo ? [] : vendasSemCobrancaDoDia(dia);
+      var pendentes = itens.filter(function(x){ var r = resolvidos[chaveVenda(x.linha)]; return !(r && r.anulado !== true); });
+      var soma = round2(pendentes.reduce(function(s, x){ return s + x.linha.valor; }, 0));
+      var resumo = motivo ? ('<span>' + esc(motivo) + '</span>') : (pendentes.length ? '<b class="num">' + fmtEuro(soma) + '</b> · ' + plural(pendentes.length, 'venda', 'vendas') : '<span style="color:var(--green)">sem vendas por resolver</span>');
+      return '<li class="rec-dia' + (diaAbertoB === dia ? ' aberto' : '') + '" data-dia="' + dia + '">' +
+        '<div class="rec-dia-data">' + fmtDia(dia) + '<small>' + diaSemana(dia) + '</small></div>' +
+        '<div class="rec-dia-resumo' + (pendentes.length || motivo ? '' : ' zero') + '">' + resumo + '</div>' +
+        '<div class="rec-dia-seta"><svg class="icon" width="14" height="14"><use href="#i-chevron-' + (diaAbertoB === dia ? 'down' : 'right') + '"/></svg></div>' +
+        '</li>' + (diaAbertoB === dia ? '<div class="rec-detalhe-dia">' + detalheDiaBHtml(dia, motivo, itens) + '</div>' : '');
+    }).join('');
+
+    document.querySelectorAll('#listaDiasB .rec-dia').forEach(function(li){
+      li.addEventListener('click', function(){
+        var dia = li.getAttribute('data-dia');
+        diaAbertoB = diaAbertoB === dia ? null : dia;
+        renderDiasB();
+      });
+    });
+    ligarAcoesResolver();
+  }
+
+  function artigosHtml(linha){
+    var ls = (linha.doc && linha.doc.linhas) || [];
+    if (!ls.length) return '<span class="rec-artigos">sem linhas de artigo no SAF-T</span>';
+    return '<span class="rec-artigos">' + ls.map(function(x){
+      return (x.quantidade != null ? esc(x.quantidade) + '× ' : '') + '<b>' + esc(x.descricao) + '</b>';
+    }).join(', ') + '</span>';
+  }
+
+  function detalheDiaBHtml(dia, motivo, itens){
+    if (motivo){
+      return '<p class="rec-b-nota">Não testável: ' + esc(motivo) + ' — carrega o ficheiro em falta acima.</p>';
+    }
+    if (!itens.length){
+      return '<div class="rec-b-vazio-dia">Nenhuma venda sem cobrança neste dia (com os ficheiros carregados).</div>';
+    }
+    var h = '<div class="rec-vsc-caixa"><table><thead><tr><th class="num">Hora</th><th>Talão</th><th class="num">Valor</th><th>Artigos</th><th>Meio no POS</th><th></th></tr></thead><tbody>';
+    itens.forEach(function(x){
+      var ch = chaveVenda(x.linha);
+      var res = resolvidos[ch];
+      var resolvida = !!(res && res.anulado !== true);
+      h += '<tr' + (resolvida ? ' class="rec-resolvida"' : '') + ' data-venda="' + esc(ch) + '">' +
+        '<td class="num">' + fmtHora(x.linha.hora) + '</td>' +
+        '<td class="rec-mono">' + esc(x.linha.no) + '</td>' +
+        '<td class="num">' + fmtEuro(x.linha.valor) + '</td>' +
+        '<td>' + artigosHtml(x.linha) + '</td>' +
+        '<td>' + esc(labelMeio(x.meio)) + '</td>' +
+        '<td>' + (resolvida
+          ? '<span class="rec-resolvida-razao">Resolvida: ' + esc(res.razao) + ' (' + esc(res.autor || '') + ')</span>'
+          : '<button type="button" class="rec-b-resolver" data-acao="resolver" data-chave="' + esc(ch) + '">Resolvido</button>' +
+            '<div class="rec-inline-form" data-formv="' + esc(ch) + '" hidden>' +
+              '<input type="text" placeholder="Razão (ex: cliente pagou em dinheiro)" data-campo="razao">' +
+              '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+              '<button type="button" data-confirmarv="' + esc(ch) + '">Confirmar</button>' +
+              '<button type="button" class="cancelar" data-cancelarv="' + esc(ch) + '">Cancelar</button>' +
+            '</div>') +
+        '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function ligarAcoesResolver(){
+    var raiz = document.getElementById('cartaoB');
+    raiz.querySelectorAll('[data-acao="resolver"]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var ch = btn.getAttribute('data-chave');
+        var form = raiz.querySelector('[data-formv="' + CSS.escape(ch) + '"]');
+        if (form) form.hidden = false;
+        btn.hidden = true;
+      });
+    });
+    raiz.querySelectorAll('[data-cancelarv]').forEach(function(btn){
+      btn.addEventListener('click', function(){ renderDiasB(); });
+    });
+    raiz.querySelectorAll('[data-confirmarv]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var ch = btn.getAttribute('data-confirmarv');
+        var form = raiz.querySelector('[data-formv="' + CSS.escape(ch) + '"]');
+        var razao = form.querySelector('[data-campo="razao"]').value.trim();
+        var autorInput = form.querySelector('[data-campo="autor"]').value.trim();
+        if (!razao){ form.querySelector('[data-campo="razao"]').focus(); return; }
+        var tr = raiz.querySelector('tr[data-venda="' + CSS.escape(ch) + '"]');
+        var dataTxt = tr ? tr.children[0].textContent : '';
+        btn.disabled = true;
+        resolverVenda(ch, diaAbertoB, razao, autorInput || autorAtual()).then(renderDiasB).catch(function(err){
+          console.error(err); btn.disabled = false; alert('Não consegui gravar a resolução: ' + (err && err.message ? err.message : err));
+        });
+      });
+    });
+  }
+
+  /* ============================================================
+     ORQUESTRAÇÃO
+     ============================================================ */
+  function garantirMesesDosFicheiros(){
+    return carregarAtivo();
+  }
+
+  function renderTudo(){
+    memoMeio = {}; memoA = null;
+    renderCartaoA();
+    renderFicheiros();
+    renderDiasB();
+  }
+
+  /* ============================================================
+     Firebase
+     ============================================================ */
+  firebase.initializeApp({
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  });
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  renderTudo();
+
+  autenticarEContinuar(function () {
+    db = firebase.database();
+    Promise.all([carregarAtivo(), carregarBase()]).then(renderTudo);
+  });
+
+});
+</script>
+</body>
+</html>

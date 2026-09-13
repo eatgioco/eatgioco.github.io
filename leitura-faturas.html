@@ -219,6 +219,32 @@
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
   }
 
+  /* Bloco "Faturas sem fornecedor" (reconciliação retroativa) */
+  .recon{ margin-bottom:22px; color:var(--ink); }
+  .recon > *{ position:relative; z-index:1; }
+  .recon-sumario{ cursor:pointer; display:flex; align-items:center; gap:10px; list-style:none; }
+  .recon-sumario::-webkit-details-marker{ display:none; }
+  .recon-sumario::before{ content:'▸'; color:var(--muted); font-size:12px; }
+  .recon[open] .recon-sumario::before{ content:'▾'; }
+  .recon-titulo{ font-weight:700; font-size:14.5px; }
+  .recon-intro{ font-size:13px; color:var(--muted); margin:10px 0 14px; line-height:1.5; }
+  .recon-grupo{ border-top:1px solid var(--line); padding:12px 0; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; }
+  .recon-grupo-info{ flex:1 1 260px; min-width:0; }
+  .recon-grupo-texto{ font-weight:600; font-size:14px; overflow-wrap:anywhere; }
+  .recon-grupo-acoes{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .recon-grupo-acoes select{ width:auto; flex:1 1 220px; min-width:200px; max-width:340px; }
+  .recon-grupo-aviso{ flex-basis:100%; font-size:12px; color:var(--red-ink); }
+  /* Sub-bloco "Preencher NIFs em falta" (backfill a partir das faturas já ligadas) */
+  .recon-nifs{ border-top:1px solid var(--line); margin-top:14px; padding-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; }
+  .recon-nifs-info{ flex:1 1 260px; min-width:0; font-size:13px; }
+  .recon-nifs-info b{ font-weight:700; }
+  .recon-nifs-prog{ flex-basis:100%; font-size:12.5px; color:var(--muted); display:none; align-items:center; gap:10px; }
+  .recon-nifs-prog .barra{ flex:1 1 160px; height:6px; background:var(--line); border-radius:100px; overflow:hidden; }
+  .recon-nifs-prog .barra > i{ display:block; height:100%; width:0; background:var(--red); transition:width .2s; }
+  .recon-nifs-rel{ flex-basis:100%; font-size:12.5px; line-height:1.55; display:none; }
+  .recon-nifs-rel ul{ margin:4px 0 8px 18px; padding:0; }
+  .recon-nifs-rel .falha{ color:var(--red-ink); }
+
   .card-lines{
     font-size:12px;
     color:var(--ink);
@@ -653,6 +679,7 @@
 <body>
 <script src="gioco-shell.js"></script>
 <script src="gioco-faturas.js"></script>
+<script src="gioco-nif-backfill.js"></script>
 
 <div class="shell">
 
@@ -715,6 +742,29 @@
 <div class="status-msg" id="statusMsg"></div>
 
 <main>
+  <!-- Reconciliação retroativa: só aparece quando há faturas sem fornecedor
+       (ou a apontar para um fornecedor que já não existe). Desenhado por
+       renderReconciliacao(); as escritas são update() em faturasProcessadas/{id}
+       e a aprendizagem (NIF + alias) em suppliers/{id}. -->
+  <details class="panel glass-light recon" id="reconBloco" style="display:none;">
+    <summary class="recon-sumario">
+      <span class="recon-titulo">Faturas sem fornecedor</span>
+      <span class="badge badge-unmatched" id="reconContador">0</span>
+    </summary>
+    <p class="recon-intro">Agrupadas pelo nome lido. Escolhe o fornecedor certo para cada grupo: as faturas ficam ligadas e a ficha do fornecedor aprende o NIF e o nome lido, para os próximos uploads acertarem sozinhos.</p>
+    <div id="reconLista"></div>
+    <!-- Backfill de NIFs: fornecedores SEM nif na ficha mas COM faturas já ligadas.
+         Uma fatura por fornecedor; grátis quando essa fatura já tem nifTexto,
+         senão 1 página Azure. Nunca corre sozinho: clique + confirmação. -->
+    <div class="recon-nifs" id="reconNifs" style="display:none;">
+      <div class="recon-nifs-info" id="reconNifsInfo"></div>
+      <button type="button" class="btn-small" id="reconNifsBtn">Preencher NIFs em falta</button>
+      <button type="button" class="btn-small" id="reconNifsParar" style="display:none;">Parar</button>
+      <div class="recon-nifs-prog" id="reconNifsProg"><span id="reconNifsProgTxt"></span><span class="barra"><i id="reconNifsProgBar"></i></span></div>
+      <div class="recon-nifs-rel" id="reconNifsRel"></div>
+    </div>
+  </details>
+
   <div class="drop-zone" id="dropZone">
     <div class="drop-zone-title">Arrasta aqui o PDF ou foto da fatura</div>
     <div class="drop-zone-sub">ou clica para escolher um ficheiro</div>
@@ -770,13 +820,18 @@
     </div>
 
     <div class="field">
+      <label class="field-label" for="editNifTexto">NIF lido</label>
+      <input type="text" id="editNifTexto" inputmode="numeric" placeholder="9 dígitos">
+    </div>
+
+    <div class="field">
       <label class="field-label" for="editFornecedorId">Fornecedor correspondido</label>
       <select id="editFornecedorId"></select>
     </div>
 
     <div class="field">
       <label class="field-label" for="editMontante">Montante</label>
-      <input type="number" step="0.01" min="0" id="editMontante">
+      <input type="text" inputmode="decimal" autocomplete="off" data-valor id="editMontante" placeholder="0,00">
     </div>
 
     <div class="field">
@@ -1063,6 +1118,8 @@ window.addEventListener('load', function () {
   // ===== Suppliers =====
   suppliersRef.on('value', function (snapshot) {
     allSuppliers = snapshot.val() || {};
+    // O título do cartão, o selo e o bloco de reconciliação dependem das fichas.
+    renderFaturas();
   }, function (error) {
     showStatus("Erro de ligação à base de dados: " + error.message, 'error');
   });
@@ -1095,8 +1152,68 @@ window.addEventListener('load', function () {
     return toISODate(d);
   }
 
-  function findMatchingSupplier(vendorName) {
-    return GiocoFaturas.findMatchingSupplier(vendorName, allSuppliers);
+  // → { id, via: 'nif' | 'nome' | null }. NIF primeiro, nome/aliases depois.
+  function findMatchingSupplierDetalhe(vendorName, nif, nifCandidatos) {
+    return GiocoFaturas.findMatchingSupplierDetalhe(vendorName, allSuppliers, {
+      nif: nif || null,
+      nifCandidatos: Array.isArray(nifCandidatos) ? nifCandidatos : []
+    });
+  }
+
+  // NIF que uma fatura propõe para o fornecedor: o lido, ou o único candidato.
+  // Nunca o NIF próprio nem um inválido.
+  function nifCandidatoDaFatura(fatura) {
+    var cands = Array.isArray(fatura.nifCandidatos) ? fatura.nifCandidatos : [];
+    var cand = fatura.nifTexto || (cands.length === 1 ? cands[0] : null);
+    cand = cand ? GiocoFaturas.soDigitos(cand) : '';
+    if (!cand || !GiocoFaturas.nifValido(cand) || cand === GiocoFaturas.NIF_PROPRIO) return null;
+    return cand;
+  }
+
+  // A ficha do fornecedor tem NIF mas a fatura leu outro: aviso no cartão, nada é escrito.
+  function nifDivergente(supplier, fatura) {
+    var cand = nifCandidatoDaFatura(fatura);
+    var ficha = GiocoFaturas.soDigitos(supplier && supplier.nif);
+    return !!(cand && ficha && ficha !== cand);
+  }
+
+  // APRENDIZAGEM. Chamada depois de um match por nome, quando o utilizador escolhe
+  // um fornecedor à mão no modal, e ao aplicar um grupo da reconciliação.
+  //  - NIF: a ficha sem nif recebe o da fatura (update() só nessa folha) SÓ quando
+  //    a nifOrigem é de confiança (Set/2026). Um nif diferente do lido NUNCA é
+  //    sobrescrito — fica o aviso no cartão.
+  //  - Alias: o texto lido, tal e qual, entra em suppliers/{id}/aliases quando não
+  //    bate nem com o nome nem com nenhum alias (máx. 10, dedupe por normalizeNome).
+  // Devolve uma Promise que resolve quando as escritas locais estiverem feitas.
+  function aprenderFornecedor(supplierId, fatura) {
+    var s = allSuppliers[supplierId];
+    if (!s || !fatura) return Promise.resolve();
+    var sRef = suppliersRef.child(supplierId);
+    var escritas = [];
+
+    // Só com nifOrigem de confiança ('vendorTaxId' | 'etiqueta' | 'pt'); com
+    // 'generico' ou sem origem o cartão mostra a sugestão e o Manel confirma.
+    var cand = nifCandidatoDaFatura(fatura);
+    if (cand && GiocoFaturas.nifOrigemConfiavel(fatura.nifOrigem) && !GiocoFaturas.soDigitos(s.nif)) {
+      escritas.push(sRef.update({ nif: cand }));
+      showStatus('NIF ' + cand + ' guardado na ficha de ' + (s.nome || 'fornecedor') + '.', '');
+    }
+
+    var texto = String(fatura.fornecedorTexto || '').trim();
+    var norm = normalizeNome(texto);
+    if (norm) {
+      var aliases = Array.isArray(s.aliases) ? s.aliases.slice() : [];
+      var conhecidos = [s.nome].concat(aliases).map(normalizeNome);
+      // Só faz falta um alias se o texto ainda não encontrava esta ficha pelo nome.
+      var soEsta = {}; soEsta[supplierId] = s;
+      var jaBate = conhecidos.indexOf(norm) !== -1 ||
+        GiocoFaturas.findMatchingSupplierDetalhe(texto, soEsta).via === 'nome';
+      if (!jaBate && aliases.length < 10) {
+        aliases.push(texto);
+        escritas.push(sRef.update({ aliases: aliases }));
+      }
+    }
+    return Promise.all(escritas);
   }
 
   // ===== Ingredientes =====
@@ -1390,11 +1507,18 @@ window.addEventListener('load', function () {
       var prazoPagamento = lida.prazoPagamento;
       var linhas = lida.linhas;
 
-      var matchId = findMatchingSupplier(fornecedorTexto);
+      var nifCandidatos = Array.isArray(lida.nifCandidatos) ? lida.nifCandidatos : [];
+      var det = findMatchingSupplierDetalhe(fornecedorTexto, lida.nif, nifCandidatos);
+      var matchId = det.id;
 
       var registo = {
         fornecedorTexto: fornecedorTexto || null,
         fornecedorIdEncontrado: matchId || null,
+        fornecedorMatchVia: det.via || null,
+        nifTexto: lida.nif || null,
+        nifCandidatos: nifCandidatos.length ? nifCandidatos : null,
+        nifOrigem: lida.nifOrigem || null,
+        multiPagina: lida.multiPagina ? true : null,
         montante: montante,
         referencia: referencia || null,
         data: data || null,
@@ -1406,6 +1530,9 @@ window.addEventListener('load', function () {
 
       var novaFaturaRef = faturasRef.push(registo);
       showStatus('Fatura lida com sucesso.', '');
+      // Match pelo nome: a ficha aprende o NIF lido (se ainda não tinha) e o texto
+      // como alias. Com match por NIF não há nada a aprender.
+      if (det.via === 'nome' && matchId) aprenderFornecedor(matchId, registo);
 
       prepararArquivoFatura(file).then(function (dataUrl) {
         return faturasArquivoRef.child(novaFaturaRef.key).set(dataUrl);
@@ -1455,16 +1582,40 @@ window.addEventListener('load', function () {
     card.className = 'card';
 
     var matched = !!f.fornecedorIdEncontrado && !!allSuppliers[f.fornecedorIdEncontrado];
+    var supplier = matched ? allSuppliers[f.fornecedorIdEncontrado] : null;
 
     var html = '';
     html += '<div class="card-top">';
-    html += '<h3 class="card-title">' + escapeHtml(f.fornecedorTexto || 'Fornecedor desconhecido') + '</h3>';
+    // Com match, o nome da FICHA; sem match, o que o OCR leu.
+    html += '<h3 class="card-title">' + escapeHtml(matched ? (supplier.nome || 'Fornecedor') : (f.fornecedorTexto || 'Fornecedor desconhecido')) + '</h3>';
     if (matched) {
-      html += '<span class="badge badge-matched">✓ Fornecedor encontrado</span>';
+      var viaLabel = f.fornecedorMatchVia === 'nif' ? 'NIF'
+        : f.fornecedorMatchVia === 'nome' ? 'nome'
+        : f.fornecedorMatchVia === 'manual' ? 'manual' : '';
+      html += '<span class="badge badge-matched">✓ Fornecedor' + (viaLabel ? ' (' + viaLabel + ')' : '') + '</span>';
     } else {
       html += '<span class="badge badge-unmatched">Sem correspondência</span>';
     }
     html += '</div>';
+
+    // O que foi lido, sempre à vista — faturas antigas não têm nifTexto/nifCandidatos.
+    var nifCands = Array.isArray(f.nifCandidatos) ? f.nifCandidatos : [];
+    var nifInfo = f.nifTexto ? escapeHtml(f.nifTexto)
+      : (nifCands.length ? 'não lido (candidatos: ' + escapeHtml(nifCands.join(', ')) + ')' : 'não lido');
+    html += '<div class="card-row"><span>Lido: «' + escapeHtml(f.fornecedorTexto || '—') + '» · NIF ' + nifInfo + '</span></div>';
+    if (matched && nifDivergente(supplier, f)) {
+      html += '<div class="card-row" style="color:var(--red-ink);"><span>⚠ NIF lido não coincide com a ficha (' + escapeHtml(supplier.nif) + ')</span></div>';
+    }
+    // NIF lido sem origem de confiança e ficha sem NIF: sugestão, nunca gravação automática.
+    var nifSugerido = (matched && !GiocoFaturas.soDigitos(supplier.nif) && !GiocoFaturas.nifOrigemConfiavel(f.nifOrigem)) ? nifCandidatoDaFatura(f) : null;
+    if (nifSugerido) {
+      html += '<div class="card-row"><span>NIF sugerido ' + escapeHtml(nifSugerido) + ' (' + (f.nifOrigem === 'generico' ? 'sem etiqueta na fatura' : 'origem não registada') + ')</span>' +
+        '<button type="button" class="btn-mini btn-usar-nif" data-nif="' + escapeHtml(nifSugerido) + '">Usar na ficha</button></div>';
+    }
+    var montanteNum = parseFloat(f.montante);
+    var montanteZero = isNaN(montanteNum) || montanteNum === 0;
+    if (montanteZero) html += '<div class="card-row"><span class="badge badge-unmatched">Total 0,00 € — verificar</span></div>';
+    if (f.multiPagina) html += '<div class="card-row"><span class="badge badge-unmatched">Fatura multi-página — confirmar total</span></div>';
 
     html += '<div class="card-row"><strong>Montante</strong><span>' + formatMontante(f.montante) + '</span></div>';
     html += '<div class="card-row"><strong>Data</strong><span>' + escapeHtml(isoToDDMMYYYY(f.data) || 'n/d') + '</span></div>';
@@ -1544,7 +1695,24 @@ window.addEventListener('load', function () {
     var btnCriar = card.querySelector('.btn-criar-pagamento');
     if (btnCriar) {
       btnCriar.addEventListener('click', function () {
+        var n = parseFloat(f.montante);
+        if (isNaN(n) || n === 0) {
+          if (!confirm('O total lido desta fatura é 0,00 € (ou não foi lido). Pode ser uma oferta com 100 % de desconto, ou uma leitura falhada.\n\nCriar o pedido de pagamento na mesma?')) return;
+        }
         openPaymentModalFromFatura(f);
+      });
+    }
+
+    var btnUsarNif = card.querySelector('.btn-usar-nif');
+    if (btnUsarNif) {
+      btnUsarNif.addEventListener('click', function () {
+        var nif = btnUsarNif.getAttribute('data-nif');
+        if (!supplier || GiocoFaturas.soDigitos(supplier.nif)) return;
+        if (!confirm('Gravar o NIF ' + nif + ' na ficha de "' + (supplier.nome || '') + '"?\n\nConfirma no documento que é o NIF do emissor (não o de um licenciado de software nem de um banco).')) return;
+        btnUsarNif.disabled = true;
+        suppliersRef.child(f.fornecedorIdEncontrado).update({ nif: nif })
+          .then(function () { showStatus('NIF ' + nif + ' guardado na ficha de ' + (supplier.nome || 'fornecedor') + '.', ''); })
+          .catch(function (err) { btnUsarNif.disabled = false; showStatus('Erro ao gravar o NIF: ' + err.message, 'error'); });
       });
     }
 
@@ -1585,6 +1753,7 @@ window.addEventListener('load', function () {
 
   function renderFaturas() {
     if (!faturasGrid) return;
+    renderReconciliacao();
     var entries = Object.keys(allFaturas).map(function (id) {
       return Object.assign({ id: id }, allFaturas[id]);
     });
@@ -1694,7 +1863,7 @@ window.addEventListener('load', function () {
     row.className = 'payment-line';
     row.innerHTML =
       '<select class="payment-fornecedor">' + supplierOptionsHtml() + '</select>' +
-      '<input type="number" class="payment-montante" min="0" step="0.01" placeholder="€">' +
+      '<input type="text" inputmode="decimal" autocomplete="off" data-valor class="payment-montante" placeholder="€">' +
       '<input type="text" class="payment-referencia" placeholder="Referência">' +
       '<input type="date" class="payment-prazo">';
 
@@ -1707,7 +1876,7 @@ window.addEventListener('load', function () {
 
     if (prefill) {
       if (prefill.fornecedorId) select.value = prefill.fornecedorId;
-      if (prefill.montante !== null && prefill.montante !== undefined) row.querySelector('.payment-montante').value = prefill.montante;
+      if (prefill.montante !== null && prefill.montante !== undefined) row.querySelector('.payment-montante').value = isNaN(parseValor(prefill.montante)) ? prefill.montante : formatValor(parseValor(prefill.montante));
       if (prefill.referencia) row.querySelector('.payment-referencia').value = prefill.referencia;
       // O prazo da própria fatura (ex: DueDate lido pelo Azure) é mais fiável
       // do que as condições gerais do fornecedor — só recorre a estas últimas
@@ -1758,9 +1927,16 @@ window.addEventListener('load', function () {
   function getValidPaymentLines() {
     var rows = paymentLines.querySelectorAll('.payment-line');
     var lines = [];
+    var montanteInvalido = false;
     rows.forEach(function (row) {
       var fornecedorId = row.querySelector('.payment-fornecedor').value;
-      var montante = row.querySelector('.payment-montante').value.trim();
+      var montanteInput = row.querySelector('.payment-montante');
+      var montanteBruto = montanteInput.value.trim();
+      var montanteNum = montanteBruto === '' ? NaN : parseValor(montanteBruto);
+      var montante = isNaN(montanteNum) ? '' : String(Math.round(montanteNum * 100) / 100);
+      var montanteMau = montanteBruto !== '' && (isNaN(montanteNum) || montanteNum <= 0);
+      giocoValorErro(montanteInput, montanteMau ? 'Escreve um montante maior do que zero (ex.: 120,50)' : null);
+      if (montanteMau) { montanteInvalido = true; return; }
       var referencia = row.querySelector('.payment-referencia').value.trim();
       var prazoIso = row.querySelector('.payment-prazo').value;
       if (fornecedorId && montante) {
@@ -1775,11 +1951,12 @@ window.addEventListener('load', function () {
         });
       }
     });
-    return lines;
+    return montanteInvalido ? null : lines;
   }
 
   btnEnviarPagamento.addEventListener('click', function () {
     var lines = getValidPaymentLines();
+    if (lines === null) return; // aviso inline já visível na linha
     if (lines.length === 0) {
       alert('Selecione o fornecedor e o montante.');
       return;
@@ -1835,14 +2012,17 @@ window.addEventListener('load', function () {
   var editFornecedorId = document.getElementById('editFornecedorId');
 
   var currentEditFaturaId = null;
+  var currentEditFatura = null;
 
   function openEditFaturaModal(f) {
     currentEditFaturaId = f.id;
+    currentEditFatura = f;
 
     document.getElementById('editFornecedorTexto').value = f.fornecedorTexto || '';
+    document.getElementById('editNifTexto').value = f.nifTexto || '';
     editFornecedorId.innerHTML = '<option value="">Sem correspondência</option>' + supplierOptionsHtml().replace('<option value="">Selecionar fornecedor...</option>', '');
     editFornecedorId.value = f.fornecedorIdEncontrado || '';
-    document.getElementById('editMontante').value = (f.montante === null || f.montante === undefined) ? '' : f.montante;
+    document.getElementById('editMontante').value = (typeof f.montante === 'number') ? formatValor(f.montante) : ((f.montante === null || f.montante === undefined) ? '' : f.montante);
     document.getElementById('editData').value = f.data || '';
     document.getElementById('editReferencia').value = f.referencia || '';
     document.getElementById('editPrazoPagamento').value = f.prazoPagamento || '';
@@ -1853,6 +2033,7 @@ window.addEventListener('load', function () {
   function closeEditFaturaModal() {
     editFaturaModalOverlay.classList.remove('open');
     currentEditFaturaId = null;
+    currentEditFatura = null;
   }
 
   editFaturaModalClose.addEventListener('click', closeEditFaturaModal);
@@ -1865,14 +2046,31 @@ window.addEventListener('load', function () {
     if (!currentEditFaturaId) return;
 
     var montanteVal = document.getElementById('editMontante').value.trim();
+    var montanteNum = montanteVal === '' ? null : parseValor(montanteVal);
+    if (montanteNum !== null && (isNaN(montanteNum) || montanteNum < 0)) {
+      giocoValorErro(document.getElementById('editMontante'), 'Escreve o montante em euros (ex.: 120,50)');
+      return;
+    }
+    giocoValorErro(document.getElementById('editMontante'), null);
+    var antes = currentEditFatura || {};
+    var novoId = editFornecedorId.value || null;
+    var nifEditado = document.getElementById('editNifTexto').value.trim();
     var changes = {
       fornecedorTexto: document.getElementById('editFornecedorTexto').value.trim() || null,
-      fornecedorIdEncontrado: editFornecedorId.value || null,
-      montante: montanteVal === '' ? null : parseFloat(montanteVal),
+      fornecedorIdEncontrado: novoId,
+      // Fornecedor escolhido à mão → 'manual'; mantido → conserva a via de origem;
+      // limpo → null.
+      fornecedorMatchVia: !novoId ? null : (novoId === (antes.fornecedorIdEncontrado || null) ? (antes.fornecedorMatchVia || 'manual') : 'manual'),
+      nifTexto: nifEditado ? (GiocoFaturas.soDigitos(nifEditado) || nifEditado) : null,
+      montante: montanteNum === null ? null : Math.round(montanteNum * 100) / 100,
       data: document.getElementById('editData').value || null,
       referencia: document.getElementById('editReferencia').value.trim() || null,
       prazoPagamento: document.getElementById('editPrazoPagamento').value || null
     };
+    // NIF escrito à mão → origem 'manual' (decisão humana, de confiança para a ficha);
+    // igual ao que estava → conserva a origem; apagado → null.
+    changes.nifOrigem = !changes.nifTexto ? null
+      : (changes.nifTexto === (antes.nifTexto || null) ? (antes.nifOrigem || null) : 'manual');
 
     // Uma chave por escrita: neste RTDB o update() multi-chave não é de confiança.
     var faturaRef = faturasRef.child(currentEditFaturaId);
@@ -1880,8 +2078,330 @@ window.addEventListener('load', function () {
       faturaRef.child(key).set(changes[key]);
     });
 
+    // Com fornecedor escolhido, a ficha aprende o NIF e o texto lido.
+    if (novoId) {
+      aprenderFornecedor(novoId, {
+        fornecedorTexto: changes.fornecedorTexto,
+        nifTexto: changes.nifTexto,
+        nifOrigem: changes.nifOrigem,
+        nifCandidatos: antes.nifCandidatos || null
+      }).then(segundaPassagemPorNif);
+    }
+
     closeEditFaturaModal();
   });
+
+  // ===== Reconciliação retroativa (bloco "Faturas sem fornecedor") =====
+  var reconBloco = document.getElementById('reconBloco');
+  var reconLista = document.getElementById('reconLista');
+  var reconContador = document.getElementById('reconContador');
+  var reconOcupado = false; // um "Reler ficheiro" de cada vez
+
+  // Por resolver = sem fornecedor, ou a apontar para uma ficha que já não existe.
+  function faturasPorResolver() {
+    return Object.keys(allFaturas).map(function (id) {
+      return Object.assign({ id: id }, allFaturas[id]);
+    }).filter(function (f) {
+      return !f.fornecedorIdEncontrado || !allSuppliers[f.fornecedorIdEncontrado];
+    });
+  }
+
+  function gruposPorResolver() {
+    var grupos = {};
+    faturasPorResolver().forEach(function (f) {
+      var chave = normalizeNome(f.fornecedorTexto) || '';
+      if (!grupos[chave]) grupos[chave] = { chave: chave, texto: f.fornecedorTexto || '', faturas: [] };
+      grupos[chave].faturas.push(f);
+    });
+    return Object.keys(grupos).map(function (k) {
+      var g = grupos[k];
+      // Mais recente primeiro: é a que alimenta a aprendizagem.
+      g.faturas.sort(function (a, b) { return (b.criadoEm || 0) - (a.criadoEm || 0); });
+      g.total = g.faturas.reduce(function (acc, f) {
+        var n = parseFloat(f.montante);
+        return acc + (isNaN(n) ? 0 : n);
+      }, 0);
+      g.semNif = g.faturas.filter(function (f) {
+        return !f.nifTexto && !(Array.isArray(f.nifCandidatos) && f.nifCandidatos.length);
+      });
+      return g;
+    }).sort(function (a, b) { return b.faturas.length - a.faturas.length; });
+  }
+
+  function renderReconciliacao() {
+    if (!reconBloco) return;
+    var grupos = gruposPorResolver();
+    var total = grupos.reduce(function (acc, g) { return acc + g.faturas.length; }, 0);
+    var nifs = renderBackfillNifs();
+    if (!total && !nifs) {
+      reconBloco.style.display = 'none';
+      reconLista.innerHTML = '';
+      return;
+    }
+    reconBloco.style.display = '';
+    reconContador.textContent = total + (total === 1 ? ' fatura' : ' faturas') + (nifs ? ' · ' + nifs + (nifs === 1 ? ' NIF em falta' : ' NIFs em falta') : '');
+
+    reconLista.innerHTML = '';
+    grupos.forEach(function (g) {
+      var n = g.faturas.length;
+      var row = document.createElement('div');
+      row.className = 'recon-grupo';
+      var html = '';
+      html += '<div class="recon-grupo-info">';
+      html += '<div class="recon-grupo-texto">«' + escapeHtml(g.texto || '(sem nome lido)') + '»</div>';
+      html += '<div class="card-row"><span>' + n + (n === 1 ? ' fatura' : ' faturas') + ' · ' + formatMontante(g.total) + '</span></div>';
+      html += '</div>';
+      html += '<div class="recon-grupo-acoes">';
+      html += '<select class="recon-select">' + supplierOptionsHtml() + '</select>';
+      html += '<button type="button" class="btn-small recon-aplicar" disabled>Aplicar a ' + n + (n === 1 ? ' fatura' : ' faturas') + '</button>';
+      if (g.semNif.length) {
+        html += '<button type="button" class="btn-small recon-reler" title="Gasta 1 página da quota Azure F0 (500/mês) por fatura">Reler ficheiro (' + g.semNif.length + ' × 1 página Azure)</button>';
+      }
+      html += '</div>';
+      row.innerHTML = html;
+
+      var select = row.querySelector('.recon-select');
+      var btnAplicar = row.querySelector('.recon-aplicar');
+      select.addEventListener('change', function () { btnAplicar.disabled = !select.value; });
+      btnAplicar.addEventListener('click', function () {
+        var supplierId = select.value;
+        var s = allSuppliers[supplierId];
+        if (!s) return;
+        if (!confirm('Ligar ' + n + (n === 1 ? ' fatura' : ' faturas') + ' lidas como «' + (g.texto || '(sem nome)') + '» ao fornecedor "' + (s.nome || '') + '"?')) return;
+        aplicarGrupo(g, supplierId);
+      });
+
+      var btnReler = row.querySelector('.recon-reler');
+      if (btnReler) {
+        btnReler.addEventListener('click', function () { relerGrupo(g); });
+      }
+      reconLista.appendChild(row);
+    });
+  }
+
+  function aplicarGrupo(g, supplierId) {
+    var escritas = g.faturas.map(function (f) {
+      return faturasRef.child(f.id).update({ fornecedorIdEncontrado: supplierId, fornecedorMatchVia: 'manual' });
+    });
+    showStatus(g.faturas.length + ' fatura(s) ligadas a ' + (allSuppliers[supplierId].nome || 'fornecedor') + '.', '');
+    // Uma só aprendizagem, com a fatura mais recente do grupo.
+    Promise.all(escritas)
+      .then(function () { return aprenderFornecedor(supplierId, g.faturas[0]); })
+      .then(segundaPassagemPorNif)
+      .catch(function (err) { showStatus('Erro ao ligar as faturas: ' + err.message, 'error'); });
+  }
+
+  // Segunda passagem, grátis: depois de qualquer aprendizagem, as faturas por
+  // resolver que já têm NIF gravado voltam a passar pelo match — só a via 'nif'
+  // é aplicada sozinha. As antigas sem nifTexto/nifCandidatos ficam de fora.
+  function segundaPassagemPorNif() {
+    var aplicadas = 0;
+    var escritas = [];
+    faturasPorResolver().forEach(function (f) {
+      var cands = Array.isArray(f.nifCandidatos) ? f.nifCandidatos : [];
+      if (!f.nifTexto && !cands.length) return;
+      var det = findMatchingSupplierDetalhe(f.fornecedorTexto, f.nifTexto, cands);
+      if (det.via !== 'nif' || !det.id) return;
+      aplicadas++;
+      escritas.push(faturasRef.child(f.id).update({ fornecedorIdEncontrado: det.id, fornecedorMatchVia: 'nif' }));
+    });
+    if (aplicadas) showStatus(aplicadas + ' fatura(s) ligadas automaticamente pelo NIF.', '');
+    return Promise.all(escritas);
+  }
+
+  function dataUrlParaFile(dataUrl, nome) {
+    var m = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl || '');
+    if (!m) return null;
+    var bytes = atob(m[2]);
+    var arr = new Uint8Array(bytes.length);
+    for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    var ext = m[1] === 'application/pdf' ? 'pdf' : 'jpg';
+    return new File([arr], (nome || 'fatura') + '.' + ext, { type: m[1] });
+  }
+
+  // Relê o ficheiro arquivado de cada fatura do grupo sem NIF gravado, uma de cada
+  // vez, com feedback. Cada leitura gasta 1 página da quota Azure F0 — nunca em
+  // lote sobre tudo, nunca automática.
+  async function relerGrupo(g) {
+    if (reconOcupado) { alert('Já há uma releitura a decorrer. Espera que termine.'); return; }
+    var lista = g.semNif;
+    if (!lista.length) return;
+    if (!confirm('Reler ' + lista.length + ' ficheiro(s) do grupo «' + (g.texto || '(sem nome)') + '» para extrair o NIF?\n\nATENÇÃO: cada releitura gasta 1 página da quota Azure F0 (500 por mês). Total desta operação: ' + lista.length + '.')) return;
+
+    reconOcupado = true;
+    var feitas = 0, semArquivo = 0, erros = 0;
+    try {
+      for (var i = 0; i < lista.length; i++) {
+        var f = lista[i];
+        showStatus('A reler ' + (i + 1) + '/' + lista.length + '…', 'loading');
+        try {
+          var snap = await faturasArquivoRef.child(f.id).once('value');
+          var file = dataUrlParaFile(snap.val(), 'fatura-' + f.id);
+          if (!file) { semArquivo++; continue; }
+          var lida = await GiocoFaturas.ler(file);
+          var cands = Array.isArray(lida.nifCandidatos) ? lida.nifCandidatos : [];
+          // Só o NIF: os restantes campos do registo ficam como estavam.
+          await faturasRef.child(f.id).update({
+            nifTexto: lida.nif || null,
+            nifCandidatos: cands.length ? cands : null,
+            nifOrigem: lida.nifOrigem || null
+          });
+          feitas++;
+        } catch (err) {
+          erros++;
+          console.error('Erro a reler a fatura ' + f.id + ':', err);
+        }
+      }
+    } finally {
+      reconOcupado = false;
+    }
+    var resumo = feitas + ' relida(s)';
+    if (semArquivo) resumo += ', ' + semArquivo + ' sem ficheiro arquivado';
+    if (erros) resumo += ', ' + erros + ' com erro';
+    showStatus('Releitura terminada: ' + resumo + '.', erros ? 'error' : '');
+    segundaPassagemPorNif();
+  }
+
+  // ===== Backfill de NIFs a partir das faturas já ligadas (gioco-nif-backfill.js) =====
+  var NB = giocoNifBackfill(GiocoFaturas);
+  var reconNifs = document.getElementById('reconNifs');
+  var reconNifsInfo = document.getElementById('reconNifsInfo');
+  var reconNifsBtn = document.getElementById('reconNifsBtn');
+  var reconNifsParar = document.getElementById('reconNifsParar');
+  var reconNifsProg = document.getElementById('reconNifsProg');
+  var reconNifsProgTxt = document.getElementById('reconNifsProgTxt');
+  var reconNifsProgBar = document.getElementById('reconNifsProgBar');
+  var reconNifsRel = document.getElementById('reconNifsRel');
+  var backfillACorrer = false;
+  var backfillParar = false;
+
+  function fornecedoresSemNif() {
+    return Object.keys(allSuppliers).filter(function (id) { return !GiocoFaturas.soDigitos(allSuppliers[id].nif); });
+  }
+
+  // Devolve o nº de fornecedores sem NIF (0 esconde o sub-bloco). Enquanto corre,
+  // não mexe no texto — o progresso é que manda.
+  function renderBackfillNifs() {
+    if (!reconNifs) return 0;
+    var n = fornecedoresSemNif().length;
+    if (!n && !backfillACorrer) { reconNifs.style.display = 'none'; return 0; }
+    reconNifs.style.display = '';
+    if (!backfillACorrer) {
+      reconNifsInfo.innerHTML = '<b>' + n + (n === 1 ? ' fornecedor' : ' fornecedores') + ' sem NIF na ficha.</b> ' +
+        'Preenche-os a partir da fatura mais recente já ligada a cada um — uma por fornecedor; só as sem NIF lido gastam 1 página da quota Azure F0 (500/mês).';
+      reconNifsBtn.disabled = false;
+    }
+    return n;
+  }
+
+  // Chaves de faturasArquivo sem descarregar os base64 (REST shallow). null se falhar:
+  // o plano assume que pode haver ficheiro e a execução confirma ao ler.
+  function chavesArquivo() {
+    var url = firebaseConfig.databaseURL + '/faturasArquivo.json?shallow=true';
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (obj) { return obj || {}; }).catch(function (err) {
+      console.warn('faturasArquivo shallow falhou; a execução verifica cada ficheiro:', err);
+      return null;
+    });
+  }
+
+  function nomes(lista) { return lista.map(function (a) { return a.nome; }).join(', '); }
+
+  async function preencherNifsEmFalta() {
+    if (backfillACorrer) return;
+    if (reconOcupado) { alert('Já há uma releitura a decorrer. Espera que termine.'); return; }
+    reconNifsBtn.disabled = true;
+    reconNifsRel.style.display = 'none';
+    var chaves = await chavesArquivo();
+    var plano = NB.planear(allSuppliers, allFaturas, chaves ? function (id) { return Object.prototype.hasOwnProperty.call(chaves, id); } : null);
+    var x = plano.totalSemNif, y = plano.semCusto.length, z = plano.releitura.length;
+    if (!x) { reconNifsBtn.disabled = false; renderBackfillNifs(); return; }
+    var msg = x + (x === 1 ? ' fornecedor' : ' fornecedores') + ' sem NIF. ' +
+      y + ' resolve' + (y === 1 ? '-se' : 'm-se') + ' sem custo; ' +
+      z + ' precisa' + (z === 1 ? '' : 'm') + ' de releitura (' + z + (z === 1 ? ' página' : ' páginas') + ' da quota Azure F0, 500/mês' + (chaves ? '' : '; máximo — a existência do ficheiro só se confirma ao ler') + ').\n';
+    if (y) msg += '\nSem custo: ' + nomes(plano.semCusto);
+    if (z) msg += '\nReleitura: ' + nomes(plano.releitura);
+    if (plano.manuais.length) msg += '\nFicam para preencher à mão em compras.html: ' + plano.manuais.map(function (m) { return m.nome + ' (' + m.motivo + ')'; }).join(', ');
+    msg += '\n\nContinuar?';
+    if (!(y || z) || !confirm(msg)) {
+      reconNifsBtn.disabled = false;
+      if (!(y || z)) mostrarRelatorioNifs({ gravados: [], falhados: [], manuais: plano.manuais, saltados: [], paginasAzure: 0, parado: false });
+      return;
+    }
+
+    await correrFilaNifs(plano);
+  }
+
+  // Corre uma fila (a inicial ou a dos falhados por 429) com pausas de 2 s entre
+  // alvos e retry com backoff no 429 — tudo dentro do gioco-nif-backfill.js; aqui
+  // só se desenha o progresso, incluindo as esperas do rate limit.
+  async function correrFilaNifs(plano) {
+    backfillACorrer = true; backfillParar = false;
+    reconNifsBtn.disabled = true;
+    reconNifsParar.disabled = false;
+    reconNifsParar.style.display = '';
+    reconNifsProg.style.display = 'flex';
+    reconNifsProgBar.style.width = '0%';
+    reconNifsInfo.innerHTML = '<b>A preencher NIFs…</b>';
+    var rel;
+    try {
+      rel = await NB.executar(plano, {
+        getSuppliers: function () { return allSuppliers; },
+        lerArquivo: function (id) { return faturasArquivoRef.child(id).once('value').then(function (snap) { return snap.val(); }); },
+        dataUrlParaFile: dataUrlParaFile,
+        ler: GiocoFaturas.ler,
+        gravarNif: function (id, campos) { return faturasRef.child(id).update(campos); },
+        aprender: aprenderFornecedor,
+        onProgresso: function (p) {
+          var pos = p.indice + ' de ' + p.total + ' — ' + p.nome;
+          if (p.fase === 'espera') reconNifsProgTxt.textContent = 'A aguardar limite do Azure — nova tentativa em ' + p.segundos + 's (' + pos + ')';
+          else if (p.fase === 'pausa') reconNifsProgTxt.textContent = 'Pausa de ' + p.segundos + 's entre pedidos ao Azure (' + pos + ')';
+          else reconNifsProgTxt.textContent = (p.fase === 'ler' ? 'A ler ' : 'A gravar ') + pos;
+          reconNifsProgBar.style.width = Math.round((p.indice - 1) / p.total * 100) + '%';
+        },
+        deveParar: function () { return backfillParar; }
+      });
+    } finally {
+      backfillACorrer = false;
+      reconNifsParar.style.display = 'none';
+      reconNifsProg.style.display = 'none';
+    }
+    mostrarRelatorioNifs(rel);
+    renderBackfillNifs();
+    segundaPassagemPorNif();
+  }
+
+  function mostrarRelatorioNifs(rel) {
+    var html = '<b>' + (rel.parado ? 'Interrompido. ' : 'Terminado. ') + rel.gravados.length + (rel.gravados.length === 1 ? ' NIF gravado' : ' NIFs gravados') +
+      ', ' + rel.falhados.length + (rel.falhados.length === 1 ? ' falhou' : ' falharam') +
+      ', ' + rel.paginasAzure + (rel.paginasAzure === 1 ? ' página' : ' páginas') + ' da quota Azure gastas.</b>';
+    if (rel.gravados.length) html += '<ul>' + rel.gravados.map(function (g) { return '<li>' + escapeHtml(g.nome) + ' → NIF ' + escapeHtml(g.nif) + '</li>'; }).join('') + '</ul>';
+    if (rel.falhados.length) html += 'Falharam (não repetido automaticamente):<ul>' + rel.falhados.map(function (f) { return '<li class="falha">' + escapeHtml(f.nome) + ' — ' + escapeHtml(f.motivo) + '</li>'; }).join('') + '</ul>';
+    if (rel.saltados.length) html += 'Saltados (já tinham NIF): ' + escapeHtml(nomes(rel.saltados)) + '<br>';
+    if (rel.manuais.length) html += 'Não foi possível determinar — preencher à mão em compras.html:<ul>' + rel.manuais.map(function (m) { return '<li>' + escapeHtml(m.nome) + ' — ' + escapeHtml(m.motivo) + '</li>'; }).join('') + '</ul>';
+    var planoRep = NB.planoRepetir(rel);
+    if (planoRep.releitura.length) {
+      html += '<button type="button" class="btn-small" id="reconNifsRepetir">Repetir falhados (' + planoRep.releitura.length + ')</button>';
+    }
+    reconNifsRel.innerHTML = html;
+    reconNifsRel.style.display = 'block';
+    var btnRep = document.getElementById('reconNifsRepetir');
+    if (btnRep) {
+      btnRep.addEventListener('click', function () {
+        if (backfillACorrer) return;
+        var n = planoRep.releitura.length;
+        if (!confirm(n + (n === 1 ? ' fornecedor falhou' : ' fornecedores falharam') + ' pelo limite de pedidos do Azure (F0, ~1 pedido/s). Repetir só esses, com pausas entre pedidos?\n\nCusto: até ' + n + (n === 1 ? ' página' : ' páginas') + ' da quota Azure F0 (500/mês).\n' + nomes(planoRep.releitura) + '\n\nContinuar?')) return;
+        reconNifsRel.style.display = 'none';
+        correrFilaNifs(planoRep);
+      });
+    }
+    showStatus('Preenchimento de NIFs: ' + rel.gravados.length + ' gravado(s), ' + rel.falhados.length + ' falhado(s).', rel.falhados.length ? 'error' : '');
+  }
+
+  if (reconNifsBtn) reconNifsBtn.addEventListener('click', preencherNifsEmFalta);
+  if (reconNifsParar) reconNifsParar.addEventListener('click', function () { backfillParar = true; reconNifsParar.disabled = true; reconNifsProgTxt.textContent += ' — a parar depois desta…'; });
 
   }); // fim de autenticarEContinuar
 });

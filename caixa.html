@@ -217,7 +217,8 @@
     color:var(--ink);
   }
 
-  .field input[type="number"]{
+  .field input[type="number"],
+  .field input[data-valor]{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
     font-weight:700;
@@ -356,6 +357,22 @@
   .mov-tipo-tag.saida{ color:var(--red-ink); }
   .mov-tipo-tag.entrada{ color:var(--green); }
 
+  /* Ícone de tipo (Set/2026): SAÍDA/ENTRADA usam a mesma seta+cor já dadas
+     ao valor do movimento; CONTAGEM (ver .contagem-cabecalho) é um ícone de
+     outra natureza de propósito — não é uma transação, é um evento de
+     verificação. */
+  .mov-tipo-icon{ width:14px; height:14px; flex:none; }
+  .mov-tipo-icon.saida{ color:var(--red-ink); }
+  .mov-tipo-icon.entrada{ color:var(--green); }
+  .mov-tipo-icon.contagem{ color:var(--muted); }
+
+  .mov-valor-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:2px;
+  }
+
   .mov-valor{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
@@ -365,6 +382,15 @@
 
   .mov-valor.saida{ color:var(--red-ink); }
   .mov-valor.entrada{ color:var(--green); }
+
+  /* Saldo corrente por linha (Set/2026): subordinado ao valor do movimento —
+     menor e mais claro, para não competir com ele. */
+  .mov-saldo{
+    font-size:11px;
+    font-weight:400;
+    color:var(--muted);
+    white-space:nowrap;
+  }
 
   .mov-motivo{
     margin:8px 0 4px;
@@ -440,6 +466,21 @@
 
   .troco-ok{ color:var(--green); font-weight:600; }
   .troco-ko{ color:var(--amber); font-weight:600; }
+
+  /* Aviso de registos ignorados no saldo vivo por dataHora inválida (ver
+     gioco-caixa.js). Frase, não badge curto — bloco, não pill do .status. */
+  .saldo-vivo-aviso{
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    line-height:1.4;
+    padding:6px 10px;
+    margin-top:8px;
+    border-radius:8px;
+    background:var(--caixa-warn-bg);
+    color:var(--amber);
+    border:1px solid var(--amber);
+  }
 
   .btn-acertar{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
@@ -598,6 +639,79 @@
     color:var(--muted);
     font-size:13px;
   }
+
+  /* ---------- Movimentos: agrupamento por dia + linhas de contagem ---------- */
+  .dia-grupo{ margin-top:18px; }
+  .dia-grupo:first-child{ margin-top:0; }
+
+  .dia-cabecalho{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin:0 0 8px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .dia-cabecalho .dia-count{
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .mov-row.contagem{
+    border-color:var(--sky, var(--line));
+  }
+
+  .contagem-cabecalho{ cursor:pointer; }
+  .mov-row.contagem .mov-top{ align-items:center; }
+
+  .contagem-chevron{
+    width:16px; height:16px;
+    flex:none;
+    color:var(--muted);
+  }
+
+  .contagem-detalhe{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+    cursor:default;
+  }
+
+  .contagem-denom-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(120px,100%), 1fr));
+    gap:6px 14px;
+    margin-bottom:10px;
+  }
+
+  .contagem-denom-item{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .contagem-denom-item.zero{ opacity:.45; }
+
+  .contagem-denom-item .num{ color:var(--ink); }
+
+  .contagem-diferenca-line{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    margin:6px 0;
+  }
+
+  .contagem-diferenca-line.positiva{ color:var(--green); }
+  .contagem-diferenca-line.negativa{ color:var(--red-ink); }
+  .contagem-diferenca-line.neutra{ color:var(--muted); }
 
   /* ---------- Contar caixa (grelha tátil) ---------- */
   .denom-toolbar{
@@ -1039,6 +1153,7 @@
         <p class="summary-label">Saldo vivo</p>
         <p class="summary-value" id="caixaVivaValue">A carregar…</p>
         <p class="summary-sub" id="caixaVivaSub"></p>
+        <p class="saldo-vivo-aviso" id="caixaVivaAviso" hidden></p>
       </div>
       <div class="summary-card">
         <p class="summary-label">Saldo hoje</p>
@@ -1084,7 +1199,7 @@
 
             <div class="field">
               <label class="field-label" for="valorInput">Valor (€)</label>
-              <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+              <input type="text" id="valorInput" inputmode="decimal" autocomplete="off" data-valor placeholder="0,00">
             </div>
 
             <div class="field">
@@ -1132,6 +1247,12 @@
     <div class="tool-bloco" data-grupo="caixa" data-tool="movimentos" hidden>
       <div class="listing-section">
         <p class="section-title">Todos os movimentos</p>
+
+        <div class="filter-tabs" id="modoListaTabs" style="margin-bottom:10px;">
+          <button type="button" class="filter-tab active" data-modo="tudo">Tudo</button>
+          <button type="button" class="filter-tab" data-modo="contagens">Só contagens</button>
+        </div>
+
         <div class="filter-tabs">
           <button type="button" class="filter-tab active" data-filter="hoje">Hoje</button>
           <button type="button" class="filter-tab" data-filter="7dias">Últimos 7 dias</button>
@@ -1140,7 +1261,7 @@
         </div>
 
         <div class="filter-extra">
-          <input type="month" id="mesFiltroInput" style="display:none;">
+          <select id="mesFiltroInput" style="display:none;"></select>
           <select id="motivoFiltroSelect">
             <option value="">Todos os motivos</option>
             <option value="Compra">Compra</option>
@@ -1790,6 +1911,7 @@
     var contagem = ultimaContagemCaixa();
     var valEl = document.getElementById('caixaVivaValue');
     var subEl = document.getElementById('caixaVivaSub');
+    var avisoEl = document.getElementById('caixaVivaAviso');
     var btnEl = document.getElementById('btnContarCaixa');
     var btnLabelEl = document.getElementById('btnContarCaixaLabel');
     if (valEl && subEl){
@@ -1803,6 +1925,23 @@
         subEl.textContent = 'Última contagem: ' + formatDataHora(contagem.dataHora) + ' · ' + (contagem.pessoa || '');
         if (btnLabelEl) btnLabelEl.textContent = 'Contar caixa';
         if (btnEl) btnEl.classList.remove('destaque');
+      }
+    }
+
+    // Avisa se alguma contagem ou movimento ficou fora do cálculo por ter
+    // dataHora inválida (ver gioco-caixa.js) — sem isto, um registo corrompido
+    // era descartado em silêncio e o saldo vivo parecia certo sem o ser.
+    if (avisoEl){
+      var contagensMas = GiocoCaixa.contagensInvalidas(allContagens);
+      var movsMas = GiocoCaixa.movimentosInvalidos(allContagens, allMovs);
+      if (contagensMas.length || movsMas.length){
+        var partes = [];
+        if (contagensMas.length) partes.push(contagensMas.length + ' ' + (contagensMas.length === 1 ? 'contagem' : 'contagens') + ' com data inválida');
+        if (movsMas.length) partes.push(movsMas.length + ' ' + (movsMas.length === 1 ? 'movimento' : 'movimentos') + ' com data inválida');
+        avisoEl.textContent = '⚠ ' + partes.join(' · ') + ' — ignorados no cálculo';
+        avisoEl.hidden = false;
+      } else {
+        avisoEl.hidden = true;
       }
     }
 
@@ -1821,15 +1960,15 @@
 
   var allMovs = {};
   var activeFilter = 'hoje';
+  var modoLista = 'tudo'; // 'tudo' | 'contagens' — toggle acima dos filter-tabs
   var mesFiltroInput = document.getElementById('mesFiltroInput');
   var motivoFiltroSelect = document.getElementById('motivoFiltroSelect');
   var filterSummaryEl = document.getElementById('filterSummary');
-  // valor default do mês = mês atual, formato YYYY-MM
-  (function(){
-    var d = new Date();
-    var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    mesFiltroInput.value = ym;
-  })();
+  // Mês seleccionado no dropdown: 'AAAA-MM', '' para "Todos os meses", ou null
+  // enquanto não houver registo nenhum. Quem o escolhe é popularMesFiltro(),
+  // SÓ a partir dos meses que têm registos — o mês corrente não é injectado à
+  // força (dava um mês vazio no dropdown no dia 1 de cada mês).
+  var mesFiltroSelecionado = null;
   var formState = { tipo: null, troco: null };
 
   var tipoSaidaBtn = document.getElementById('tipoSaidaBtn');
@@ -1859,7 +1998,11 @@
     return round2(n).toFixed(2).replace('.', ',') + ' €';
   }
 
+  // Data inválida dá '—', nunca 'NaN:NaN' / 'NaN/NaN'. O guarda vive aqui, no
+  // único sítio por onde passam todas as datas da página; para uma data
+  // válida o resultado é exactamente o de sempre.
   function formatHora(iso){
+    if (!dataHoraValida(iso)) return '—';
     var d = new Date(iso);
     var hh = String(d.getHours()).padStart(2, '0');
     var mm = String(d.getMinutes()).padStart(2, '0');
@@ -1867,6 +2010,7 @@
   }
 
   function formatDataHora(iso){
+    if (!dataHoraValida(iso)) return '—';
     var d = new Date(iso);
     var dd = String(d.getDate()).padStart(2, '0');
     var mo = String(d.getMonth() + 1).padStart(2, '0');
@@ -1974,7 +2118,11 @@
     var precisaDetalhe = !!opcao && !!opcao.detailLabel && !opcao.detalheOpcional;
     var motivoValido = !!opcao && (!precisaDetalhe || motivoDetalheInput.value.trim().length > 0);
     var trocoValido = !opcao || !opcao.pergTroco || formState.troco !== null;
-    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido && trocoValido;
+    var valorNum = parseValor(valorInput.value);
+    var valorValido = !isNaN(valorNum) && valorNum > 0;
+    // Mensagem inline só quando há texto e ele não serve — vazio não é erro, é por preencher.
+    giocoValorErro(valorInput, (valorInput.value.trim() !== '' && !valorValido) ? 'Escreve um valor maior do que zero (ex.: 4,50)' : null);
+    var valid = formState.tipo && valorValido && motivoValido && trocoValido;
     registarBtn.disabled = !valid;
   }
 
@@ -1999,7 +2147,8 @@
     if (registarBtn.disabled) return;
 
     var tipo = formState.tipo;
-    var valor = parseFloat(valorInput.value);
+    var valor = round2(parseValor(valorInput.value));
+    if (isNaN(valor) || valor <= 0) { validateForm(); return; }
     var opcao = currentMotivoOpcao();
     var detalhe = motivoDetalheInput.value.trim();
     // Com detalhe opcional em branco fica só o Label — nunca "Label: ".
@@ -2079,17 +2228,30 @@
     });
   });
 
-  document.querySelectorAll('.filter-tab').forEach(function(btn){
+  document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      modoLista = btn.getAttribute('data-modo');
+      document.querySelectorAll('#modoListaTabs .filter-tab').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      motivoFiltroSelect.style.display = (modoLista === 'contagens') ? 'none' : '';
+      renderList();
+    });
+  });
+
+  document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeFilter = btn.getAttribute('data-filter');
       mesFiltroInput.style.display = (activeFilter === 'mes') ? 'inline-block' : 'none';
-      document.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.filter-tabs:not(#modoListaTabs) .filter-tab').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
       renderList();
     });
   });
 
-  mesFiltroInput.addEventListener('change', renderList);
+  mesFiltroInput.addEventListener('change', function(){
+    mesFiltroSelecionado = mesFiltroInput.value;
+    renderList();
+  });
   motivoFiltroSelect.addEventListener('change', renderList);
 
   // ---------- Devolver Troco ----------
@@ -2107,6 +2269,7 @@
       leituraTerminada: false,
       fatura: null,         // resultado do GiocoFaturas.ler
       erroLeitura: null,
+      erroLeituraTipo: null, // 'rede' | 'servico' | 'leitura' (classificarErroLeitura)
       semFatura: false,
       valorDevolvido: '',
       notas: '',
@@ -2158,25 +2321,68 @@
       st.dataUrl = null;
     });
 
+    var inicioLeitura = Date.now();
     GiocoFaturas.ler(file).then(function(lida){
       if (devolver !== st || st.id !== idLeitura) return;
       st.fatura = lida;
       st.erroLeitura = null;
+      st.erroLeituraTipo = null;
     }).catch(function(err){
+      // Diagnóstico (Set/2026): o catch deixou de engolir tudo. Fica na consola o
+      // status HTTP, o corpo da resposta e a duração, e no movimento um ocrErro
+      // (update() só nessa folha) para se perceber a causa a partir do Firebase.
+      var duracaoMs = Date.now() - inicioLeitura;
+      var diag = classificarErroLeitura(err, duracaoMs, file);
+      console.error('[caixa] Leitura da fatura falhou', {
+        status: diag.status, fase: diag.fase, tipo: diag.tipo, duracaoMs: duracaoMs,
+        mensagem: diag.mensagem, corpo: diag.corpo,
+        ficheiro: { nome: file.name, tipo: file.type, bytes: file.size }
+      }, err);
+      movRef.child(idLeitura).update({ ocrErro: {
+        status: diag.status, fase: diag.fase, tipo: diag.tipo, mensagem: diag.mensagem,
+        corpo: diag.corpo, duracaoMs: duracaoMs,
+        ficheiroTipo: file.type || null, ficheiroBytes: file.size || null,
+        timestamp: new Date().toISOString()
+      } }).catch(function(e2){ console.error('[caixa] Não gravou ocrErro:', e2); });
       if (devolver !== st || st.id !== idLeitura) return;
       st.fatura = null;
-      st.erroLeitura = (err && err.message) ? err.message : 'erro desconhecido';
+      st.erroLeitura = diag.mensagem;
+      st.erroLeituraTipo = diag.tipo;
     }).then(function(){
       if (devolver !== st) return;
       st.lendo = false;
       st.leituraTerminada = true;
       var m = allMovs[st.id];
       var esperado = m ? trocoEsperadoDe(m, st) : null;
-      if (esperado !== null && st.valorDevolvido === '') st.valorDevolvido = String(esperado);
+      if (esperado !== null && st.valorDevolvido === '') st.valorDevolvido = formatValor(esperado);
       renderPendentes();
     });
   }
   window.onFicheiroEscolhido = onFicheiroEscolhido;
+
+  // Três causas distintas para a UI (Set/2026), sem mexer no motor:
+  //   'rede'    — o fetch nem chegou a responder (sem rede, DNS, CORS, timeout do polling);
+  //   'servico' — o Azure respondeu com erro de autenticação (401/403), limite (429)
+  //               ou outro HTTP ≠ 2xx/202;
+  //   'leitura' — o serviço respondeu OK mas a análise falhou / não reconheceu a fatura.
+  function classificarErroLeitura(err, duracaoMs, file){
+    var msg = (err && err.message) ? String(err.message) : 'erro desconhecido';
+    var status = (err && typeof err.status === 'number') ? err.status : null;
+    var corpo = (err && typeof err.corpo === 'string') ? err.corpo.slice(0, 2000) : null;
+    var fase = (err && err.fase) ? err.fase : null;
+    var tipo;
+    if (status !== null) tipo = 'servico';
+    else if (/Tempo limite|Failed to fetch|NetworkError|Load failed|network/i.test(msg) || (err && err.name === 'TypeError')) tipo = 'rede';
+    else tipo = 'leitura';
+    return { status: status, corpo: corpo, fase: fase, tipo: tipo, mensagem: msg, duracaoMs: duracaoMs };
+  }
+
+  function mensagemErroLeitura(st){
+    var base = ' — a foto fica guardada; introduz o troco à mão';
+    if (st.erroLeituraTipo === 'rede') return 'Sem ligação ao serviço de leitura' + base;
+    if (st.erroLeituraTipo === 'servico') return 'O serviço de leitura recusou o pedido (autenticação ou limite de utilização)' + base;
+    return 'O serviço leu a foto mas não reconheceu a fatura' + base;
+  }
 
   function onDeclaracaoChange(checkbox){
     if (!devolver) return;
@@ -2201,7 +2407,7 @@
   function conferenciaHtml(m, st){
     var esperado = trocoEsperadoDe(m, st);
     if (esperado === null || st.semFatura) return '';
-    var dev = parseFloat(st.valorDevolvido);
+    var dev = parseValor(st.valorDevolvido);
     if (isNaN(dev)) return '';
     var diff = round2(dev - esperado);
     if (Math.abs(diff) <= TOLERANCIA_TROCO + 1e-9){
@@ -2217,17 +2423,35 @@
     if (el && m) el.innerHTML = conferenciaHtml(m, devolver);
   }
 
+  // Valor devolvido: vazio e 0 são bloqueados (Set/2026) — um troco a zero não se
+  // grava por omissão. A única excepção é a fatura lida dar troco esperado
+  // exactamente 0 (gastou-se tudo): aí o 0 é o valor conferido, não um esquecimento.
+  function erroValorDevolvido(st){
+    var bruto = String(st.valorDevolvido == null ? '' : st.valorDevolvido).trim();
+    if (bruto === '') return null; // por preencher, não é erro — só trava o Guardar
+    var dev = parseValor(bruto);
+    if (isNaN(dev) || dev < 0) return 'Escreve o valor devolvido em euros (ex.: 4,50)';
+    if (dev === 0){
+      var m = allMovs[st.id];
+      var esperado = (m && !st.semFatura) ? trocoEsperadoDe(m, st) : null;
+      if (esperado !== 0) return 'Troco a zero não se grava por omissão — confirma o valor devolvido';
+    }
+    return null;
+  }
+
   function podeGuardar(st){
     if (st.aGuardar) return false;
     var comprovativo = st.semFatura || (st.file && st.leituraTerminada);
-    var dev = parseFloat(st.valorDevolvido);
-    return !!comprovativo && !isNaN(dev) && dev >= 0;
+    var bruto = String(st.valorDevolvido == null ? '' : st.valorDevolvido).trim();
+    return !!comprovativo && bruto !== '' && erroValorDevolvido(st) === null;
   }
 
   function atualizarGuardar(){
     if (!devolver) return;
     var btn = document.getElementById('guardar_' + devolver.id);
     if (btn) btn.disabled = !podeGuardar(devolver);
+    var input = document.getElementById('devolvido_' + devolver.id);
+    if (input) giocoValorErro(input, erroValorDevolvido(devolver));
   }
 
   function devolverFormHtml(m, st){
@@ -2266,7 +2490,7 @@
           html += '<div class="erro">Sem total legível na fatura — introduz o troco à mão</div>';
         }
       } else if (st.erroLeitura){
-        html += '<div class="erro">Não consegui ler a fatura — a foto fica guardada; introduz o troco à mão</div>';
+        html += '<div class="erro">' + escapeHtml(mensagemErroLeitura(st)) + '</div>';
       }
       html += '</div></div>';
     }
@@ -2280,7 +2504,9 @@
     // b) Valor devolvido
     html += '<div class="field" style="margin-top:12px;">';
     html += '  <label class="field-label" for="devolvido_' + id + '">Valor devolvido (€)</label>';
-    html += '  <input type="number" inputmode="decimal" step="0.01" min="0" id="devolvido_' + id + '" value="' + escapeHtml(st.valorDevolvido) + '" oninput="onDevolvidoInput(this)">';
+    html += '  <input type="text" inputmode="decimal" autocomplete="off" data-valor id="devolvido_' + id + '" value="' + escapeHtml(st.valorDevolvido) + '" placeholder="0,00" oninput="onDevolvidoInput(this)">';
+    var erroDev = erroValorDevolvido(st);
+    html += '  <div class="valor-erro"' + (erroDev ? '' : ' hidden') + '>' + (erroDev ? escapeHtml(erroDev) : '') + '</div>';
     html += '  <div class="confere-line" id="confere_' + id + '">' + conferenciaHtml(m, st) + '</div>';
     html += '</div>';
 
@@ -2301,7 +2527,8 @@
     var m = allMovs[st.id];
     if (!m) return;
 
-    var devolvido = round2(parseFloat(st.valorDevolvido));
+    var devolvido = round2(parseValor(st.valorDevolvido));
+    if (isNaN(devolvido)) return;
     var esperado = st.semFatura ? null : trocoEsperadoDe(m, st);
     var confere = (esperado === null) ? null : (Math.abs(devolvido - esperado) <= TOLERANCIA_TROCO + 1e-9);
 
@@ -2323,7 +2550,12 @@
       var f = st.fatura || {};
       atualizacao.fatura = {
         fornecedorTexto: f.fornecedorTexto || null,
-        fornecedorIdEncontrado: f.fornecedorTexto ? (GiocoFaturas.findMatchingSupplier(f.fornecedorTexto, allSuppliers) || null) : null,
+        fornecedorIdEncontrado: (f.fornecedorTexto || f.nif || (f.nifCandidatos && f.nifCandidatos.length))
+          ? (GiocoFaturas.findMatchingSupplier(f.fornecedorTexto, allSuppliers, { nif: f.nif || null, nifCandidatos: f.nifCandidatos || [] }) || null)
+          : null,
+        nif: f.nif || null,
+        nifCandidatos: (f.nifCandidatos && f.nifCandidatos.length) ? f.nifCandidatos : null,
+        nifOrigem: f.nifOrigem || null,
         montante: (typeof f.montante === 'number') ? f.montante : null,
         referencia: f.referencia || null,
         data: f.data || null,
@@ -2448,10 +2680,23 @@
     var sinal = m.tipo === 'saida' ? '−' : '+';
     var horaLabel = opts.soHora ? formatHora(m.dataHora) : formatDataHora(m.dataHora);
 
+    // Ícone + saldo corrente só na listagem de Movimentos (opts.comSaldo) —
+    // nunca em "Por devolver troco" nem no cofre, que reusam este cartão.
+    var iconHtml = '';
+    var saldoHtml = '';
+    if (opts.comSaldo){
+      var iconNome = m.tipo === 'saida' ? 'i-arrow-down' : 'i-arrow-up';
+      iconHtml = '<svg class="icon mov-tipo-icon ' + m.tipo + '" width="14" height="14" aria-hidden="true"><use href="#' + iconNome + '"/></svg>';
+      var saldoTxt;
+      if (opts.saldo === null || opts.saldo === undefined) saldoTxt = '—';
+      else saldoTxt = (opts.saldo < 0 ? '−' + formatEUR(Math.abs(opts.saldo)) : formatEUR(opts.saldo));
+      saldoHtml = '<span class="mov-saldo num">' + saldoTxt + '</span>';
+    }
+
     var html = '<div class="mov-row' + (isAberto ? ' aberto' : '') + '">';
     html += '  <div class="mov-top">';
-    html += '    <div class="mov-tipo-hora"><span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
-    html += '    <div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>';
+    html += '    <div class="mov-tipo-hora">' + iconHtml + '<span class="mov-tipo-tag ' + m.tipo + '">' + tipoLabel + '</span><span>' + horaLabel + '</span></div>';
+    html += '    <div class="mov-valor-wrap"><div class="mov-valor ' + m.tipo + '">' + sinal + formatEUR(m.valor) + '</div>' + saldoHtml + '</div>';
     html += '  </div>';
     html += '  <p class="mov-motivo">' + escapeHtml(m.motivo) + '</p>';
     html += '  <div class="mov-meta">';
@@ -2523,42 +2768,324 @@
     pendingListEl.innerHTML = html;
   }
 
+  // ---------- Listagem completa (Set/2026: agrupada por dia, com toggle
+  // Tudo/Só contagens — dá profundidade à vista de movimentos juntando as
+  // contagens físicas de caixaContagens no mesmo histórico. Tudo leitura;
+  // caixaContagens nunca é editado/apagado a partir daqui). ----------
+
+  // Um registo com dataHora em falta, não-string ou impossível de parsear
+  // (null, 0, 'ontem', '2026-13-45T99:99:99Z') NÃO é descartado nem inventa
+  // uma data: fica fora dos filtros de período e cai no grupo "Sem data" no
+  // fim da lista. Sem isto, new Date(lixo) dava NaN e o cabeçalho do dia saía
+  // "NaN/NaN/NaN" (ou "01/01/1970" para null/0).
+  // Delega no gioco-caixa.js — fonte única, também usada por ultimaContagem()
+  // e saldoVivoCaixa() para a âncora do saldo vivo.
+  function dataHoraValida(iso){
+    return GiocoCaixa.dataHoraValida(iso);
+  }
+
+  // 'AAAA-MM' de um registo, ou null se a data não presta. A fatia é UTC (é o
+  // formato em que dataHora é gravado) e tem de ter mesmo a forma de mês —
+  // sem o teste, um 'ontem' passava a "mês" e ia parar ao dropdown.
+  function mesDe(iso){
+    if (!dataHoraValida(iso)) return null;
+    var ym = iso.slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(ym) ? ym : null;
+  }
+
+  // Chave de dia em hora LOCAL (mesma base de isToday/isWithinLast7Days —
+  // nunca a fatia UTC do ISO, que desalinhava a meia-noite).
+  function dayKeyLocal(input){
+    var d = (input instanceof Date) ? input : new Date(input);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function diaLabel(iso){
+    var chave = dayKeyLocal(iso);
+    if (chave === dayKeyLocal(new Date())) return 'Hoje';
+    var ontemD = new Date();
+    ontemD.setDate(ontemD.getDate() - 1);
+    if (chave === dayKeyLocal(ontemD)) return 'Ontem';
+    var d = new Date(iso);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  }
+
+  // A mais antiga de TODO o nó (nunca só da página filtrada) — é a única sem
+  // base de cálculo para "esperado" (ver contagemDiferencaInfo).
+  function earliestContagemId(){
+    var ids = Object.keys(allContagens);
+    if (!ids.length) return null;
+    ids.sort(function(a, b){ return new Date(allContagens[a].dataHora) - new Date(allContagens[b].dataHora); });
+    return ids[0];
+  }
+
+  // Diferença já vem calculada NO REGISTO (total − esperado no momento da
+  // contagem, contra a contagem anterior + movimentos entre as duas — ver
+  // CLAUDE.md/gioco-caixa.js) — não recalcular. Sem `esperado` (a mais
+  // antiga do nó, ou um registo antigo anómalo) não há base nenhuma: "—",
+  // nunca 0, mesmo que `diferenca` tenha ficado gravada como total − 0.
+  function contagemDiferencaInfo(c, isEarliest){
+    var temBase = !isEarliest && typeof c.esperado === 'number';
+    if (!temBase) return { texto: '—', classe: 'neutra' };
+    var dif = (typeof c.diferenca === 'number') ? c.diferenca : round2((parseFloat(c.total) || 0) - c.esperado);
+    var classe = dif > 0 ? 'positiva' : (dif < 0 ? 'negativa' : 'neutra');
+    var texto = dif === 0 ? 'Diferença: 0,00 €' : ('Diferença: ' + (dif > 0 ? '+' : '−') + formatEUR(Math.abs(dif)));
+    return { texto: texto, classe: classe };
+  }
+
+  function contagemDenomHtml(c){
+    var denom = c.denominacoes || {};
+    var html = '<div class="contagem-denom-grid">';
+    DENOMINACOES.forEach(function(d){
+      var chaveNo = d.chaveDb || d.chave;
+      var q = parseInt(denom[chaveNo], 10);
+      if (isNaN(q)) q = 0;
+      var label = d.tipo === 'nota' ? (d.valor + '€') : formatMoedaLabel(d.valor);
+      html += '<div class="contagem-denom-item' + (q === 0 ? ' zero' : '') + '"><span>' + label + '</span><span class="num">×' + q + ' = ' + formatEUR(round2(q * d.valor)) + '</span></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Uma contagem aberta de cada vez por id — estado de UI, não de dados.
+  var contagensAbertas = {};
+
+  function toggleContagemDetalhe(id){
+    contagensAbertas[id] = !contagensAbertas[id];
+    renderList();
+  }
+  window.toggleContagemDetalhe = toggleContagemDetalhe;
+
+  function contagemCardHtml(id, c, opts){
+    var aberta = !!contagensAbertas[id];
+    var dif = contagemDiferencaInfo(c, opts.isEarliest);
+    var chevronIcon = aberta ? 'i-chevron-down' : 'i-chevron-right';
+
+    // Só o cabeçalho (resumo colapsado) é clicável — nunca a linha inteira:
+    // com o detalhe aberto, a área de detalhe passa a dominar visualmente a
+    // linha, e um clique no "centro" da linha (p.ex. para fechar) caía lá
+    // dentro. Sem onclick no detalhe, esse clique não faz nada (não é uma
+    // zona de toggle) em vez de ficar preso a meio por um stopPropagation.
+    var html = '<div class="mov-row contagem">';
+    html += '  <div class="contagem-cabecalho" onclick="toggleContagemDetalhe(\'' + id + '\')">';
+    html += '    <div class="mov-top">';
+    html += '      <div class="mov-tipo-hora"><svg class="icon mov-tipo-icon contagem" width="14" height="14" aria-hidden="true"><use href="#i-clipboard-check"/></svg><span class="mov-tipo-tag" style="color:var(--red-ink)">CONTAGEM</span><span>' + formatHora(c.dataHora) + '</span></div>';
+    html += '      <div style="display:flex;align-items:center;gap:8px;">';
+    html += '        <span class="mov-valor num">' + formatEUR(c.total) + '</span>';
+    html += '        <svg class="icon contagem-chevron" width="16" height="16" aria-hidden="true"><use href="#' + chevronIcon + '"/></svg>';
+    html += '      </div>';
+    html += '    </div>';
+    html += '    <p class="mov-motivo">Contagem de caixa</p>';
+    html += '    <div class="mov-meta"><span class="mov-pessoa">' + escapeHtml(c.pessoa || '') + '</span></div>';
+    html += '  </div>';
+
+    if (aberta){
+      html += '  <div class="contagem-detalhe">';
+      html += contagemDenomHtml(c);
+      html += '    <p class="contagem-diferenca-line ' + dif.classe + '">' + dif.texto + '</p>';
+      html += '    <p class="mov-pessoa">Autor: ' + escapeHtml(c.pessoa || '—') + ' · ' + formatDataHora(c.dataHora) + '</p>';
+      if (c.motivoDiferenca){
+        html += '    <p class="notas-txt">Porquê: ' + escapeHtml(c.motivoDiferenca) + '</p>';
+      }
+      if (c.notas){
+        html += '    <p class="notas-txt">' + escapeHtml(c.notas) + '</p>';
+      }
+      html += '  </div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // SÓ meses com registos reais (movimentos OU contagens). Nada é injectado à
+  // força: um mês sem um único registo nunca aparece no dropdown.
+  var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  function popularMesFiltro(){
+    var metas = {};
+    Object.keys(allMovs).forEach(function(id){
+      var ym = mesDe(allMovs[id].dataHora);
+      if (ym) metas[ym] = true;
+    });
+    Object.keys(allContagens).forEach(function(id){
+      var ym = mesDe(allContagens[id].dataHora);
+      if (ym) metas[ym] = true;
+    });
+
+    var meses = Object.keys(metas).sort().reverse();
+
+    // Sem registo nenhum não há nada por que filtrar: dropdown desactivado, e
+    // a lista mostra o estado vazio de sempre.
+    if (meses.length === 0){
+      mesFiltroSelecionado = null;
+      mesFiltroInput.innerHTML = '<option value="">Sem registos</option>';
+      mesFiltroInput.disabled = true;
+      return;
+    }
+    mesFiltroInput.disabled = false;
+
+    // '' é "Todos os meses" — uma escolha válida, que tem de sobreviver aos
+    // re-renders. Só se cai para o mês mais recente com registos quando a
+    // escolha anterior não existe (primeira vez, ou o mês perdeu os registos).
+    if (mesFiltroSelecionado !== '' && meses.indexOf(mesFiltroSelecionado) === -1){
+      mesFiltroSelecionado = meses[0];
+    }
+
+    var html = '<option value=""' + (mesFiltroSelecionado === '' ? ' selected' : '') + '>Todos os meses</option>';
+    meses.forEach(function(ym){
+      var partes = ym.split('-');
+      var label = MESES_PT[parseInt(partes[1], 10) - 1] + ' ' + partes[0];
+      html += '<option value="' + ym + '"' + (ym === mesFiltroSelecionado ? ' selected' : '') + '>' + label + '</option>';
+    });
+    mesFiltroInput.innerHTML = html;
+  }
+
+  // ---------- Saldo corrente por linha (Set/2026) ----------
+  // A mesma âncora do GiocoCaixa.saldoVivoCaixa (a contagem mais recente que
+  // precede a linha + os movimentos entre essa contagem e ela, inclusive) —
+  // replicada aqui porque saldoVivoCaixa só devolve o saldo de AGORA, não o
+  // valor histórico linha a linha. Fórmula por movimento IDÊNTICA à do
+  // gioco-caixa.js (entrada: +valor; saída 'acertado': −(valor−valorDevolvido);
+  // qualquer outra saída: −valor) — não reimplementar essa parte com outra
+  // fórmula. Reusa dataHoraValida() para a mesma validação de data (um
+  // registo sem data fica fora do encadeamento — nunca entra no acumulado de
+  // mais ninguém, é o grupo "Sem data"). Sem contagem nenhuma antes da linha,
+  // o saldo é null ("—"), nunca 0 — nunca assumir um ponto de partida.
+  function calcularSaldosPorLinha(){
+    var eventos = [];
+    Object.keys(allContagens).forEach(function(id){
+      var c = allContagens[id];
+      if (!c || !dataHoraValida(c.dataHora)) return;
+      eventos.push({ tipo: 'contagem', id: id, ts: new Date(c.dataHora).getTime() });
+    });
+    Object.keys(allMovs).forEach(function(id){
+      var m = allMovs[id];
+      if (!m || !dataHoraValida(m.dataHora)) return;
+      eventos.push({ tipo: 'mov', id: id, ts: new Date(m.dataHora).getTime() });
+    });
+    eventos.sort(function(a, b){
+      if (a.ts !== b.ts) return a.ts - b.ts;
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+
+    var saldos = {};
+    var ancora = null;
+    eventos.forEach(function(ev){
+      if (ev.tipo === 'contagem'){
+        ancora = round2(parseFloat(allContagens[ev.id].total) || 0);
+        saldos[ev.id] = ancora;
+        return;
+      }
+      var m = allMovs[ev.id];
+      if (ancora === null){
+        saldos[ev.id] = null;
+        return;
+      }
+      var delta;
+      if (m.tipo === 'entrada'){
+        delta = (parseFloat(m.valor) || 0);
+      } else if (m.estado === 'acertado'){
+        delta = -((parseFloat(m.valor) || 0) - (parseFloat(m.valorDevolvido) || 0));
+      } else {
+        delta = -(parseFloat(m.valor) || 0);
+      }
+      ancora = round2(ancora + delta);
+      saldos[ev.id] = ancora;
+    });
+    return saldos;
+  }
+
   // ---------- Listagem completa ----------
   function renderList(){
+    popularMesFiltro();
     var filtro = motivoFiltroSelect.value;
-    var ids = Object.keys(allMovs).filter(function(id){
-      var m = allMovs[id];
-      var passaPeriodo = true;
-      if (activeFilter === 'hoje') passaPeriodo = isToday(m.dataHora);
-      else if (activeFilter === '7dias') passaPeriodo = isWithinLast7Days(m.dataHora);
-      else if (activeFilter === 'mes'){
-        var ym = mesFiltroInput.value;
-        passaPeriodo = !!ym && (m.dataHora || '').slice(0, 7) === ym;
+
+    // Um registo sem data válida fica SEMPRE fora de Hoje / 7 dias / Mês —
+    // explicitamente, não por acidente do NaN. Só aparece em "Tudo" e em
+    // "Todos os meses", no grupo "Sem data" do fim.
+    function passaPeriodo(dataHora){
+      var valida = dataHoraValida(dataHora);
+      if (activeFilter === 'hoje') return valida && isToday(dataHora);
+      if (activeFilter === '7dias') return valida && isWithinLast7Days(dataHora);
+      if (activeFilter === 'mes'){
+        var ym = mesFiltroSelecionado;
+        if (!ym) return true; // '' = Todos os meses (e null = sem registos)
+        return valida && dataHora.slice(0, 7) === ym;
       }
-      if (!passaPeriodo) return false;
+      return true; // 'tudo'
+    }
+
+    var movIds = (modoLista === 'contagens') ? [] : Object.keys(allMovs).filter(function(id){
+      var m = allMovs[id];
+      if (!passaPeriodo(m.dataHora)) return false;
       if (filtro === '__semFatura') return m.semFatura === true;
       if (filtro === '__trocoNaoConferiu') return m.trocoConfere === false;
       return motivoCorrespondeFiltro(m.motivo, filtro);
     });
 
-    ids.sort(function(a, b){
-      return new Date(allMovs[b].dataHora) - new Date(allMovs[a].dataHora);
+    var contagemIds = Object.keys(allContagens).filter(function(id){
+      return passaPeriodo(allContagens[id].dataHora);
     });
 
-    if (ids.length === 0){
+    var entradas = [];
+    movIds.forEach(function(id){ entradas.push({ tipo: 'mov', id: id, dataHora: allMovs[id].dataHora }); });
+    contagemIds.forEach(function(id){ entradas.push({ tipo: 'contagem', id: id, dataHora: allContagens[id].dataHora }); });
+
+    // Os sem data saem da ordenação cronológica (comparar NaN dá uma ordem
+    // arbitrária) e vão para um grupo próprio no fim, por id para ser estável.
+    var semData = entradas.filter(function(e){ return !dataHoraValida(e.dataHora); });
+    entradas = entradas.filter(function(e){ return dataHoraValida(e.dataHora); });
+    entradas.sort(function(a, b){ return new Date(b.dataHora) - new Date(a.dataHora); });
+    semData.sort(function(a, b){ return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+
+    if (entradas.length === 0 && semData.length === 0){
       filterSummaryEl.textContent = '';
-      movListEl.innerHTML = '<div class="empty-state">Sem movimentos neste período.</div>';
+      var msgVazio = (modoLista === 'contagens') ? 'Sem contagens registadas neste período.' : 'Sem movimentos neste período.';
+      movListEl.innerHTML = '<div class="empty-state">' + msgVazio + '</div>';
       return;
     }
 
+    var earliestId = earliestContagemId();
+    var saldosPorLinha = calcularSaldosPorLinha();
     var html = '';
-    var totalValor = 0;
-    ids.forEach(function(id){
-      html += movCardHtml(id, allMovs[id], { comAcao: false, soHora: activeFilter === 'hoje' });
-      totalValor += allMovs[id].valor;
-    });
+    var totalValorMovs = 0;
 
-    filterSummaryEl.textContent = ids.length + (ids.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValor);
+    function cartaoDaEntrada(entrada){
+      if (entrada.tipo === 'mov'){
+        totalValorMovs += allMovs[entrada.id].valor;
+        // soHora só quando o cabeçalho do grupo já diz o dia — num grupo
+        // "Sem data" não diz, mas aí não há hora nenhuma para mostrar.
+        return movCardHtml(entrada.id, allMovs[entrada.id], { comAcao: false, soHora: activeFilter === 'hoje', comSaldo: true, saldo: saldosPorLinha[entrada.id] });
+      }
+      return contagemCardHtml(entrada.id, allContagens[entrada.id], { isEarliest: entrada.id === earliestId });
+    }
+
+    var diaAtual = null;
+    entradas.forEach(function(entrada){
+      var chaveDia = dayKeyLocal(entrada.dataHora);
+      if (chaveDia !== diaAtual){
+        if (diaAtual !== null) html += '</div>';
+        diaAtual = chaveDia;
+        html += '<div class="dia-grupo"><p class="dia-cabecalho">' + diaLabel(entrada.dataHora) + '</p>';
+      }
+      html += cartaoDaEntrada(entrada);
+    });
+    if (diaAtual !== null) html += '</div>';
+
+    if (semData.length){
+      html += '<div class="dia-grupo"><p class="dia-cabecalho">Sem data <span class="dia-count">' +
+              semData.length + (semData.length === 1 ? ' registo' : ' registos') + '</span></p>';
+      semData.forEach(function(entrada){ html += cartaoDaEntrada(entrada); });
+      html += '</div>';
+    }
+
+    var resumoPartes = [];
+    if (modoLista !== 'contagens'){
+      resumoPartes.push(movIds.length + (movIds.length === 1 ? ' movimento' : ' movimentos') + ' · Total: ' + formatEUR(totalValorMovs));
+    }
+    if (contagemIds.length > 0 || modoLista === 'contagens'){
+      resumoPartes.push(contagemIds.length + (contagemIds.length === 1 ? ' contagem' : ' contagens'));
+    }
+    filterSummaryEl.textContent = resumoPartes.join(' · ');
     movListEl.innerHTML = html;
   }
 
@@ -2583,6 +3110,7 @@
   contagensRef.on('value', function(snapshot){
     allContagens = snapshot.val() || {};
     renderSaldosVivos();
+    renderList();
     if (contagemState) atualizarContagemTotais();
   });
 
@@ -2630,7 +3158,7 @@
 
   function podeRetirarCofre(st, saldo){
     if (st.aGuardar) return false;
-    var valor = parseFloat(st.valor);
+    var valor = parseValor(st.valor);
     if (isNaN(valor) || valor <= 0) return false;
     if (valor > saldo + 1e-9) return false;
     var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
@@ -2668,10 +3196,13 @@
   function atualizarRetirarCofre(){
     if (!retirarCofre) return;
     var saldo = saldoCofre();
-    var valor = parseFloat(retirarCofre.valor);
+    var valor = parseValor(retirarCofre.valor);
     var excede = !isNaN(valor) && valor > saldo + 1e-9;
     var msgEl = document.getElementById('retirarMaxMsg');
     if (msgEl) msgEl.innerHTML = excede ? 'Máximo: ' + formatEUR(saldo) : '';
+    var bruto = String(retirarCofre.valor == null ? '' : retirarCofre.valor).trim();
+    var inputEl = document.getElementById('retirarValorInput');
+    if (inputEl) giocoValorErro(inputEl, (bruto !== '' && (isNaN(valor) || valor <= 0)) ? 'Escreve um valor maior do que zero (ex.: 20,00)' : null);
     var btn = document.getElementById('btnConfirmarRetirarCofre');
     if (btn) btn.disabled = !podeRetirarCofre(retirarCofre, saldo);
   }
@@ -2679,7 +3210,7 @@
   function retirarCofreFormHtml(saldo){
     var st = retirarCofre;
     var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
-    var valor = parseFloat(st.valor);
+    var valor = parseValor(st.valor);
     var excede = !isNaN(valor) && valor > saldo + 1e-9;
 
     var html = '<div class="acertar-form">';
@@ -2695,7 +3226,7 @@
     }
 
     html += '<div class="field"><label class="field-label">Valor (€)</label>';
-    html += '<input type="number" inputmode="decimal" step="0.01" min="0" value="' + escapeHtml(st.valor) + '" oninput="onRetirarValorInput(this)"></div>';
+    html += '<input type="text" inputmode="decimal" autocomplete="off" data-valor id="retirarValorInput" placeholder="0,00" value="' + escapeHtml(st.valor) + '" oninput="onRetirarValorInput(this)"></div>';
 
     html += '<div class="field"><label class="field-label">Pessoa</label>';
     html += '<select id="retirarPessoaSelect" onchange="onRetirarPessoaChange(this)">' + pessoasOptionsHtml(st.pessoaId) + '</select></div>';
@@ -2715,7 +3246,8 @@
     var saldo = saldoCofre();
     if (!st || !podeRetirarCofre(st, saldo)) return;
 
-    var valor = round2(parseFloat(st.valor));
+    var valor = round2(parseValor(st.valor));
+    if (isNaN(valor) || valor <= 0) return;
     var pessoaSel = document.getElementById('retirarPessoaSelect');
     var pessoaVal = pessoaSel ? pessoaSel.value : st.pessoaId;
     var found = pessoasAtivas.filter(function(p){ return p.id === pessoaVal; })[0];

@@ -1011,7 +1011,7 @@ window.addEventListener('load', function () {
     row.className = 'payment-line';
     row.innerHTML =
       '<select class="payment-fornecedor">' + supplierOptionsHtml() + '</select>' +
-      '<input type="number" class="payment-montante" min="0" step="0.01" placeholder="€">' +
+      '<input type="text" inputmode="decimal" autocomplete="off" data-valor class="payment-montante" placeholder="€">' +
       '<input type="text" class="payment-referencia" placeholder="Referência">' +
       '<input type="date" class="payment-prazo">';
 
@@ -1038,9 +1038,17 @@ window.addEventListener('load', function () {
     // acrescentadas durante a edição não têm original e ficam pendentes.
     var originais = (editingTicketId && allPaymentRequests[editingTicketId] && allPaymentRequests[editingTicketId].lines) || [];
     var lines = [];
+    var montanteInvalido = false; // texto que não é um montante válido numa das linhas → null
     rows.forEach(function (row, i) {
       var fornecedorId = row.querySelector('.payment-fornecedor').value;
-      var montante = row.querySelector('.payment-montante').value.trim();
+      var montanteInput = row.querySelector('.payment-montante');
+      var montanteBruto = montanteInput.value.trim();
+      // O montante grava-se como string canónica com ponto (a forma que o
+      // type="number" dava), venha escrito com vírgula ou com ponto.
+      var montanteNum = montanteBruto === '' ? NaN : parseValor(montanteBruto);
+      var montante = isNaN(montanteNum) ? '' : String(Math.round(montanteNum * 100) / 100);
+      giocoValorErro(montanteInput, (montanteBruto !== '' && (isNaN(montanteNum) || montanteNum <= 0)) ? 'Escreve um montante maior do que zero (ex.: 120,50)' : null);
+      if (montanteBruto !== '' && (isNaN(montanteNum) || montanteNum <= 0)) { montanteInvalido = true; return; }
       var referencia = row.querySelector('.payment-referencia').value.trim();
       var prazoIso = row.querySelector('.payment-prazo').value;
       if (fornecedorId && montante) {
@@ -1059,7 +1067,7 @@ window.addEventListener('load', function () {
         lines.push(linha);
       }
     });
-    return lines;
+    return montanteInvalido ? null : lines;
   }
 
   function resetAvisoEnvio() {
@@ -1096,7 +1104,7 @@ window.addEventListener('load', function () {
         return allSuppliers[id].nome === l.fornecedor;
       });
       if (matchId) row.querySelector('.payment-fornecedor').value = matchId;
-      row.querySelector('.payment-montante').value = l.montante || "";
+      row.querySelector('.payment-montante').value = (l.montante === null || l.montante === undefined || l.montante === '') ? "" : (isNaN(parseValor(l.montante)) ? l.montante : formatValor(parseValor(l.montante)));
       row.querySelector('.payment-referencia').value = l.referencia || "";
       row.querySelector('.payment-prazo').value = ddmmyyyyToIso(l.prazo);
       paymentLines.appendChild(row);
@@ -1137,6 +1145,7 @@ window.addEventListener('load', function () {
 
   btnEnviarPagamento.addEventListener('click', function () {
     var lines = getValidPaymentLines();
+    if (lines === null) return; // aviso inline já visível na linha
     if (lines.length === 0) {
       alert('Adicione pelo menos uma linha com fornecedor e montante.');
       return;

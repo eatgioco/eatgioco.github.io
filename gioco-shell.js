@@ -82,6 +82,21 @@
     '<symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>',
     '<symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>',
     '<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>',
+    /* Set/2026, videochamada nos eventos do Outlook (calendario.html): */
+    '<symbol id="i-video" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></symbol>',
+    /* Set/2026, «Sugerir passos» (decomposição automática) na obrigacoes.html (traço Lucide): */
+    '<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.9 5.6L19.5 10.5 13.9 12.4 12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></symbol>',
+    /* Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html: */
+    '<symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>',
+    '<symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>',
+    /* Set/2026, UX ao estilo Notion da obrigacoes.html (traço Lucide/Feather): pega de
+       arrastar, menu ⋯ da linha, vista Quadro, procurar/filtrar/ordenar da toolbar, duplicar. */
+    '<symbol id="i-grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>',
+    '<symbol id="i-more-horizontal" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>',
+    '<symbol id="i-columns" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></symbol>',
+    '<symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>',
+    '<symbol id="i-arrow-up-down" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>',
+    '<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -103,7 +118,15 @@
     // Set/2026, cartão Posição Financeira do mrn-dashboard.html (traço Feather/Lucide):
     'wallet',
     // Set/2026, reorganização caixa.html
-    'coins', 'list', 'lock'
+    'coins', 'list', 'lock',
+    // Set/2026, videochamada nos eventos do Outlook (calendario.html):
+    'video',
+    // Set/2026, «Sugerir passos» na obrigacoes.html:
+    'sparkles',
+    // Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html:
+    'arrow-down', 'arrow-up',
+    // Set/2026, UX Notion da obrigacoes.html (pega, menu ⋯, Quadro, toolbar, duplicar):
+    'grip-vertical', 'more-horizontal', 'columns', 'filter', 'arrow-up-down', 'copy'
   ];
 
   function injectSprite() {
@@ -274,6 +297,8 @@
       { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
+      /* Custos: nó canónico custos/ (competência, com IVA) — validação de rubricas. */
+      { href: 'custos.html',     icone: 'wallet',           label: 'Custos' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' },
       /* Centro de controlo: cameras, HACCP, vendas do dia e consumo por loja.
@@ -294,6 +319,9 @@
       { href: 'tesouraria.html', icone: 'receipt',          label: 'Tesouraria' },
       { href: 'calendario.html', icone: 'calendar',         label: 'Calendário' },
       { href: 'tarefas.html',    icone: 'pencil',           label: 'Tarefas' },
+      /* Obrigações: motor de obrigações/projetos do Manel (Fase 1, Set/2026).
+         Página pessoal — só no conjunto privado, nunca no público nem no index. */
+      { href: 'obrigacoes.html', icone: 'clipboard-check',  label: 'Obrigações' },
       /* conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
          é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. */
       { href: 'conta-bancaria.html?conta=abanca', icone: 'trending-up', label: 'Conta bancária' }
@@ -485,6 +513,90 @@
 
   var giocoModal = { open: modalOpen, close: modalClose, isOpen: modalIsOpen };
 
+  /* ---------- CAMPOS DE VALOR (parseValor / formatValor) ----------
+     Set/2026: os campos monetários/decimais do OS deixaram de ser
+     <input type="number">. No iOS com teclado pt-PT o utilizador escreve
+     "4,50", o type="number" só aceita ponto, e o browser devolve "" — o valor
+     perdia-se em silêncio. Passaram a <input type="text" inputmode="decimal"
+     autocomplete="off" data-valor[="casas"]>, e quem lê usa parseValor().
+
+     parseValor(str)  → Number ou NaN. Aceita "4,50", "4.50", "1.234,56",
+                        "1,234.56", "€ 12", "-0,5". Vazio → NaN (nunca 0).
+     formatValor(n, casas=2) → "4,50" (vírgula, sem separador de milhar —
+                        volta a passar por parseValor sem perdas).
+     giocoValorErro(input, msg|null) → mostra/esconde uma mensagem inline
+                        (.valor-erro) logo a seguir ao campo e marca o input.
+     No blur, qualquer input[data-valor] é reformatado com formatValor
+     (data-valor="1" → 1 casa) e dispara 'input' para o estado da página
+     acompanhar; se o texto não for um número, fica como está e marcado
+     .invalido — nunca se inventa um valor. */
+  function parseValor(str) {
+    if (typeof str === 'number') return isFinite(str) ? str : NaN;
+    if (str === null || str === undefined) return NaN;
+    var s = String(str).replace(/[€\s ]/g, '');
+    if (s === '' || s === '-' || /[.,]{2}/.test(s)) return NaN;
+    var ultimaVirg = s.lastIndexOf(',');
+    var ultimoPonto = s.lastIndexOf('.');
+    if (ultimaVirg !== -1 && ultimoPonto !== -1) {
+      // Os dois presentes: o que aparece por último é o decimal, o outro é de milhar.
+      if (ultimaVirg > ultimoPonto) s = s.replace(/\./g, '').replace(',', '.');
+      else s = s.replace(/,/g, '');
+    } else if (ultimaVirg !== -1) {
+      // Só vírgulas: uma = decimal; várias = separadores de milhar.
+      s = (s.indexOf(',') === ultimaVirg) ? s.replace(',', '.') : s.replace(/,/g, '');
+    } else if (ultimoPonto !== -1 && s.indexOf('.') !== ultimoPonto) {
+      s = s.replace(/\./g, '');
+    }
+    if (!/^-?\d+(\.\d+)?$/.test(s) && !/^-?\.\d+$/.test(s)) return NaN;
+    var n = Number(s);
+    return isFinite(n) ? n : NaN;
+  }
+
+  function formatValor(num, casas) {
+    var n = (typeof num === 'number') ? num : parseValor(num);
+    if (typeof n !== 'number' || !isFinite(n)) return '';
+    var c = (typeof casas === 'number') ? casas : 2;
+    return n.toFixed(c).replace('.', ',');
+  }
+
+  function giocoValorErro(input, msg) {
+    if (!input) return;
+    var el = input.nextElementSibling;
+    if (!el || !el.classList || !el.classList.contains('valor-erro')) {
+      if (!msg) { input.classList.remove('invalido'); return; }
+      el = document.createElement('div');
+      el.className = 'valor-erro';
+      input.parentNode.insertBefore(el, input.nextSibling);
+    }
+    if (msg) {
+      el.textContent = msg;
+      el.hidden = false;
+      input.classList.add('invalido');
+    } else {
+      el.textContent = '';
+      el.hidden = true;
+      input.classList.remove('invalido');
+    }
+  }
+
+  function initCamposValor() {
+    document.addEventListener('focusout', function (e) {
+      var input = e.target;
+      if (!input || input.tagName !== 'INPUT' || !input.hasAttribute('data-valor')) return;
+      var bruto = input.value;
+      if (String(bruto).trim() === '') { input.classList.remove('invalido'); return; }
+      var n = parseValor(bruto);
+      if (isNaN(n)) { input.classList.add('invalido'); return; }
+      input.classList.remove('invalido');
+      var casas = parseInt(input.getAttribute('data-valor'), 10);
+      var novo = formatValor(n, isNaN(casas) ? 2 : casas);
+      if (novo !== bruto) {
+        input.value = novo;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+  }
+
   /* ---------- ARRANQUE ---------- */
   function giocoShellInit() {
     injectSprite();
@@ -492,6 +604,7 @@
     initTheme();
     initMenuToque();
     initShellTouch();
+    initCamposValor();
   }
 
   injectSprite(); // o mais cedo possível, para os <use> do markup resolverem
@@ -515,4 +628,7 @@
   window.toggleSidebarPin = toggleSidebarPin;
   window.giocoReadStoredTheme = readStoredTheme;
   window.giocoModal = giocoModal;
+  window.parseValor = parseValor;
+  window.formatValor = formatValor;
+  window.giocoValorErro = giocoValorErro;
 })();

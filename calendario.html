@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#FFEDDA">
 <meta name="apple-mobile-web-app-title" content="Calendário">
-<meta name="viewport" content="width=1200">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO OS · Calendário</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,6 +28,14 @@
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
 <script src="gioco-eventos.js"></script>
+<!-- MSAL Browser 2.38.2 (CDN da Microsoft, mesma classe de confiança do gstatic
+     de onde já vem o Firebase). Versão FIXA e integrity obrigatório: os bytes
+     deste URL foram conferidos contra o tarball oficial do npm. Nunca "latest".
+     É a única dependência de terceiros do OS fora do Firebase/pdf.js. -->
+<script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"
+        integrity="sha384-hhkHFODse2T75wPL7oJ0RZ+0CgRa74LNPhgx6wO6DMNEhU3/fSbTZdVzxsgyUelp"
+        crossorigin="anonymous"></script>
+<script src="gioco-outlook.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -76,6 +84,61 @@
   .camada-btn:hover{ border-color:var(--red); }
   .camada-btn[aria-pressed="false"]{ opacity:.55; }
   .camada-btn[aria-pressed="false"] i{ background:transparent; box-shadow:inset 0 0 0 2px var(--blush); }
+  /* ---------- Camada Outlook ----------
+     Par neutro derivado da família --line / --muted do shell: as seis
+     superfícies de selo (lime, navy, mustard, red, blush, sky) estão todas
+     tomadas pelas categorias e o --blush é dos pagamentos, por isso a camada
+     de leitura do Outlook é cinzenta de propósito — informativa, não
+     acionável, e imediatamente distinta das outras duas. Par claro/escuro
+     obrigatório: é superfície COM texto por cima. */
+  :root{ --out-bg:#ddd8cf; --out-ink:#33302a; }
+  [data-theme="dark"]{ --out-bg:#37332c; --out-ink:#e6e0d4; }
+
+  .camada-btn.out i{ background:var(--out-bg); box-shadow:inset 0 0 0 1px var(--muted); }
+  /* Sem sessão Microsoft o mesmo botão vira "Ligar Outlook": sem ponto de
+     camada e sem o esbatido do aria-pressed="false" (que só faz sentido
+     quando já há camada para ligar/desligar). */
+  .camada-btn.ligar{ opacity:1; padding-left:14px; }
+  .camada-btn.ligar i{ display:none; }
+  .camada-btn.out[aria-pressed="false"] i{ background:transparent; box-shadow:inset 0 0 0 2px var(--out-bg); }
+  /* Abre o painel da conta Microsoft (giocoModal). Colado ao chip da camada. */
+  .camada-mais{
+    background:var(--white); color:var(--muted); border:1.5px solid var(--line);
+    border-radius:100px; width:28px; height:28px; padding:0; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; margin-left:-4px;
+  }
+  .camada-mais:hover{ border-color:var(--red); color:var(--ink); }
+  /* O display:inline-flex das classes acima vence o [hidden] do browser:
+     sem estas duas regras, esconder por hidden não fazia nada. */
+  .camada-btn[hidden], .camada-mais[hidden]{ display:none; }
+  .camada-mais .icon{ width:14px; height:14px; }
+  /* Erro do Graph / do login: discreto ao lado da camada, e CLICÁVEL — no
+     telemóvel não há hover nem consola, por isso o detalhe tem de abrir num
+     painel em vez de viver só num title=. */
+  .out-erro{
+    font-size:11.5px; color:var(--red-ink); cursor:pointer;
+    background:none; border:none; padding:0; font-family:'Inter',sans-serif;
+    text-decoration:underline; text-underline-offset:2px;
+  }
+  .out-erro:hover{ color:var(--ink); }
+  .out-erro[hidden]{ display:none; }
+  /* Painel de diagnóstico do login. */
+  .diag{ color:var(--ink); font-size:13px; }
+  .diag p{ margin:0 0 12px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+  .diag pre{
+    margin:0 0 14px; padding:12px; border-radius:10px;
+    background:var(--dough); border:1px solid var(--line);
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word; max-height:320px; overflow:auto;
+    color:var(--ink); -webkit-user-select:text; user-select:text;
+  }
+  .out-conta{ color:var(--ink); font-size:13px; }
+  .out-conta .out-email{ font-weight:600; margin:0 0 4px; }
+  .out-conta p{ margin:0 0 14px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+
+  .ev-chip.out{ background:var(--out-bg); color:var(--out-ink); }
+  .ev-bloco.out{ background:var(--out-bg); color:var(--out-ink); }
+
   .sem-data{ font-size:11.5px; color:var(--muted); text-decoration:none; border-bottom:1px dotted var(--muted); }
   .sem-data:hover{ color:var(--red-ink); border-bottom-color:var(--red-ink); }
 
@@ -204,14 +267,345 @@
   .pag-detalhe .pag-kv{ display:flex; gap:10px; padding:6px 0; border-top:1px solid var(--line); }
   .pag-detalhe .pag-kv span:first-child{ width:90px; flex-shrink:0; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; padding-top:2px; }
   .pag-detalhe .pag-notas{ white-space:pre-line; line-height:1.45; }
+  /* O detalhe do Outlook tem o rotulo "Videochamada", que nao cabe nos 90px
+     da coluna de labels (o span tem flex-shrink:0 e transbordava por cima do
+     valor). Modificador so para este modal — o dos pagamentos fica igual. */
+  .pag-detalhe.out-detalhe .pag-kv span:first-child{ width:112px; }
   a.btn-add{ text-decoration:none; }
 
   /* O formulário do modal de evento vive em gioco-eventos.css (.ev-*). */
+
+  /* ======================================================================
+     PEÇAS DE TELEMÓVEL — estado de base (desktop): NÃO EXISTEM.
+     Tudo o que é só de telemóvel fica display:none aqui e só ganha layout
+     dentro do @media (max-width:767px) no fim deste <style>. Assim, em
+     >=768px a página fica byte a byte o que era: nem barra de datas, nem
+     bottom sheets, nem botão flutuante, nem vista Agenda.
+     ====================================================================== */
+  .mob-bar, .mob-bg, .mob-sheet, .mob-sheet-cab, .fab, .cal-camadas-btn, .mob-menu{ display:none; }
+  /* Wrapper dos toggles de camadas: em desktop é a linha de chips de sempre
+     (o gap:10px do antigo .cal-dir, para o espaçamento não mudar). */
+  .cal-camadas{ display:flex; align-items:center; gap:10px; }
+
+  /* ======================================================================
+     TELEMÓVEL (< 768px) — esqueleto de navegação do Outlook mobile, com o
+     design system GIOCO (Set/2026, 2.ª versão: a dos pontos foi rejeitada).
+     Regra única para o calendário inteiro. Nada aqui toca no gioco-shell.css
+     nem no gioco-eventos.css — as únicas classes do shell que se redefinem
+     são as do giocoModal (ecrã inteiro), e só dentro desta query.
+
+     Peças: .mob-bar (sticky) = linha 1 (mês + camadas + Hoje) + faixa de
+     datas (.mob-faixa: 1 semana, ou o mês inteiro quando expandida) +
+     puxador + selector Agenda / Dia / Mês. A barra de desktop (.cal-bar),
+     a legenda e a vista Semana deixam de existir abaixo de 768px.
+     ====================================================================== */
+  @media (max-width: 767px){
+
+    .cal-bar, .cal-legenda{ display:none; }
+    .page-subtitle{ display:none; }
+
+    /* ---------- Cabeçalho (cópia estrutural do Outlook mobile) ----------
+       Linha 1: mês + ano grande com chevron; à direita camadas, vistas, Hoje.
+       Linha 2: iniciais dos dias. Nas vistas Agenda e Dia segue-se a faixa com
+       os números da semana e o puxador fino; na vista Mês NÃO há faixa nem
+       puxador — a grelha do mês É a faixa expandida (mesmo componente, dois
+       estados, nunca os dois ao mesmo tempo). */
+    .mob-bar{
+      display:block; position:sticky; top:0; z-index:40;
+      margin:6px -16px 0; padding:4px 12px 0;
+      background:var(--dough); color:var(--ink);
+      border-bottom:1px solid var(--line);
+    }
+    .mob-l1{ position:relative; display:flex; align-items:center; gap:6px; min-height:48px; }
+    .mob-titulo{
+      flex:1; min-width:0; display:inline-flex; align-items:center; gap:4px;
+      background:none; border:none; padding:0 4px; min-height:44px; cursor:pointer;
+      font-family:'Inter',sans-serif; font-size:20px; font-weight:700; color:var(--ink);
+      text-align:left;
+    }
+    .mob-titulo span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mob-titulo .icon{ width:20px; height:20px; flex-shrink:0; color:var(--ink); transition:transform .18s ease; }
+    .mob-bar.vista-mes .mob-titulo .icon{ transform:rotate(180deg); }
+    .mob-l1-dir{ display:flex; align-items:center; gap:2px; flex-shrink:0; }
+    .cal-camadas-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:40px; height:44px; padding:0; flex-shrink:0;
+      background:none; color:var(--ink);
+      border:none; border-radius:100px; cursor:pointer;
+    }
+    .cal-camadas-btn .icon{ width:20px; height:20px; }
+    .cal-camadas-btn[aria-expanded="true"]{ color:var(--red-ink); background:var(--white); }
+    .mob-hoje{ min-height:40px; padding:8px 12px; font-size:12px; }
+    /* Menu de vistas: popover curto por baixo do ícone. */
+    .mob-menu{
+      display:block; position:absolute; right:0; top:calc(100% + 2px); z-index:45;
+      min-width:180px; padding:6px;
+      background:var(--white); color:var(--ink);
+      border:1px solid var(--line); border-radius:12px;
+      box-shadow:0 12px 30px rgba(0,0,0,0.18);
+    }
+    .mob-menu[hidden]{ display:none; }
+    .mob-menu button{
+      display:flex; align-items:center; justify-content:space-between; width:100%;
+      min-height:44px; padding:0 12px; background:none; border:none; border-radius:8px;
+      font-family:'Inter',sans-serif; font-size:14px; font-weight:500; color:var(--ink); cursor:pointer; text-align:left;
+    }
+    .mob-menu button i{ font-style:normal; color:var(--red-ink); visibility:hidden; }
+    .mob-menu button.active{ font-weight:700; }
+    .mob-menu button.active i{ visibility:visible; }
+
+    /* Iniciais (linha 2) — as mesmas para a faixa e para a grelha do mês. */
+    .mob-iniciais{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); }
+    .mob-iniciais span{ text-align:center; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:2px 0 4px; }
+
+    /* Faixa da semana corrente (Agenda / Dia). */
+    .mob-faixa{ touch-action:none; -webkit-user-select:none; user-select:none; }
+    .mob-faixa-linha{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); }
+    .mob-dia{
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+      min-height:44px; padding:0; background:none; border:none; cursor:pointer;
+      font-family:'Inter',sans-serif; color:var(--ink);
+    }
+    .mob-dia b{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:32px; height:32px; border-radius:50%;
+      font-size:15px; font-weight:500; line-height:1; box-sizing:border-box;
+    }
+    .mob-dia.fora b{ color:var(--muted); }
+    /* Seleccionado (não sendo hoje): círculo de contorno --ink. Hoje: círculo
+       cheio --red com número branco. */
+    .mob-dia.sel b{ box-shadow:inset 0 0 0 1.5px var(--ink); }
+    .mob-dia.hoje b{ background:var(--red); color:var(--on-red); box-shadow:none; font-weight:600; }
+    /* Pontinho fino por baixo do número: o dia tem conteúdo. Só aqui, nunca
+       dentro das células do mês. */
+    .mob-dia i{ width:4px; height:4px; border-radius:50%; background:var(--muted); opacity:0; }
+    .mob-dia.tem i{ opacity:1; }
+    .mob-dia.hoje.tem i{ background:var(--red); }
+    /* Puxador fino centrado: arrastar para baixo abre o mês (= vista Mês). */
+    .mob-puxador{
+      display:flex; align-items:center; justify-content:center;
+      width:100%; height:18px; margin:0; padding:0;
+      background:none; border:none; cursor:grab; touch-action:none;
+    }
+    .mob-puxador span{ width:36px; height:4px; border-radius:2px; background:var(--line); }
+    .mob-puxador:active span{ background:var(--muted); }
+    .mob-bar.vista-mes .mob-faixa, .mob-bar.vista-mes .mob-puxador{ display:none; }
+    .mob-bar.vista-mes{ padding-bottom:0; }
+    /* O segmented control de desktop não existe em telemóvel. */
+    .mob-seg{ display:none; }
+
+    .cal-vista{ padding:10px; }
+    /* A vista Agenda tem cabeçalhos de dia sticky: o overflow:hidden do
+       .glass-light prendia-os (mesma razão da .vista-mes em desktop). */
+    .cal-vista.vista-agenda{ overflow:visible; padding:0 12px 6px; }
+
+    /* ---------- Vista Agenda ---------- */
+    .ag-cab{
+      position:sticky; top:var(--mob-bar-h, 168px); z-index:2;
+      display:flex; align-items:baseline; gap:6px; width:100%;
+      margin:0; padding:10px 4px 6px; cursor:pointer;
+      background:var(--white); border:none; border-bottom:1px solid var(--line);
+      font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:var(--muted); text-align:left;
+    }
+    .ag-cab b{ font-size:15px; font-weight:700; color:var(--ink); }
+    .ag-dia.hoje .ag-cab b{ color:var(--red-ink); }
+    .ag-dia.hoje .ag-cab::after{ content:'Hoje'; margin-left:auto; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--red-ink); }
+    .ag-item{ display:flex; align-items:center; gap:10px; min-height:52px; padding:8px 4px; }
+    .ag-item .ag-hora{ width:46px; flex-shrink:0; display:flex; flex-direction:column; line-height:1.15; }
+    .ag-item .ag-hora b{ font-size:13px; font-weight:600; color:var(--ink); }
+    .ag-item .ag-hora small{ font-size:11px; color:var(--muted); }
+    .ag-item .ag-ponto{ width:8px; height:8px; border-radius:50%; flex-shrink:0; align-self:center; }
+    .ag-item .ag-txt{ flex:1; min-width:0; }
+    .ag-item .dia-item-t{ font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ag-item .dia-item-h{ font-size:12px; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ag-item .dia-pag-v{ font-weight:600; color:var(--ink); }
+    .ag-item.pago .dia-item-t, .ag-item.pago .dia-item-h{ opacity:.6; }
+    .ag-vazio{ padding:28px 4px; text-align:center; }
+    .ag-fim{ display:flex; justify-content:center; padding:14px 0 8px; }
+    .ag-fim .btn{ min-height:44px; }
+
+    /* Anulados / cancelados (qualquer fonte que os traga marcados). */
+    .dia-item.cancelado .dia-item-t, .dia-pag.cancelado .dia-pag-t{ text-decoration:line-through; }
+    .dia-item.cancelado, .dia-pag.cancelado{ opacity:.55; }
+    .ev-chip.cancelado{
+      background:transparent !important; color:var(--red) !important;
+      box-shadow:inset 0 0 0 1.5px var(--red); text-decoration:line-through;
+    }
+
+    /* ---------- Vista Mês: grelha do Outlook ----------
+       Sem cartões, sem raio, sem margens: só linhas de 1px em --line. Ocupa
+       toda a altura entre o cabeçalho e o fundo (ajustarAlturaMes); as
+       semanas dividem-na por igual e só se desenham as que o mês ocupa. */
+    .mes-layout{ display:block; }
+    .mes-grelha-wrap{ min-width:0; }
+    .mes-layout .dia-painel{ display:none; }
+    /* O cabeçalho de iniciais da grelha é o da barra (linha 2). */
+    .mes-cab{ display:none; }
+    /* A vista deixa de ser cartão: a grelha encosta às margens do ecrã. */
+    .cal-vista.vista-mes{ padding:0; margin:0 -16px; background:none; border:none; box-shadow:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
+    .cal-vista.vista-mes::before{ display:none; }
+    .mes-grelha{ gap:0; grid-template-rows:repeat(var(--nlinhas, 5), minmax(0,1fr)); border-top:1px solid var(--line); }
+    .mes-cel{
+      padding:2px 2px 0; gap:2px; min-height:0;
+      border:none; border-right:1px solid var(--line); border-bottom:1px solid var(--line); border-radius:0;
+      background:transparent; overflow:hidden; transition:none;
+    }
+    .mes-cel:nth-child(7n){ border-right:none; }
+    .mes-cel:hover{ border-color:var(--line); }
+    .mes-cel.fds{ background:transparent; }
+    /* Dias de outro mês: número e chips esbatidos, sem fundo diferente. */
+    .mes-cel.fora{ opacity:1; }
+    .mes-cel.fora .mes-num{ color:var(--muted); opacity:.6; }
+    .mes-cel.fora .ev-chip{ opacity:.45; }
+    /* Coluna do dia seleccionado: fundo subtil de alto a baixo. */
+    .mes-cel.col-sel{ background:rgba(20,20,20,0.07); }
+    [data-theme="dark"] .mes-cel.col-sel{ background:rgba(255,255,255,0.08); }
+    .mes-cel.sel{ box-shadow:none; }
+    .mes-num{ align-self:flex-start; font-size:12px; font-weight:500; padding:1px 5px; line-height:16px; white-space:nowrap; }
+    /* Chips: altura fixa, uma linha, ellipsis, encostados às margens da
+       célula. Os que não cabem por inteiro ficam display:none (JS), nunca
+       cortados a meio. */
+    .mes-cel .ev-chip{ height:16px; line-height:16px; font-size:10px; padding:0 4px; border-radius:3px; flex-shrink:0; }
+    .mes-cel .ev-chip .num, .mes-cel .ev-chip .icon{ display:none; }
+    .mes-cel .ev-chip.escondido{ display:none; }
+    .mes-cel .mes-mais{ display:none; }
+
+    /* ---------- Vista Dia: uma coluna, "Todo o dia" no topo ---------- */
+    .dia-layout{ display:block; }
+    .dia-painel{ width:auto; min-width:0; margin-top:12px; padding:14px; }
+    .sem-cab{ display:none; }
+    .sem-inteiro .sem-lbl{ font-size:0; }
+    .sem-inteiro .sem-lbl::before{ content:'Todo o dia'; font-size:10.5px; }
+    .sem-inteiro .sem-di-col{ min-height:24px; }
+    .sem-scroll{ max-height:calc(100dvh - var(--mob-bar-h, 168px) - 120px); min-height:320px; }
+    .hora-cel:hover{ background:none; }
+
+    /* Alvos de toque: 44px efectivos nas listas. */
+    .dia-item, .dia-pag{ min-height:44px; padding:11px 0; align-items:center; }
+
+    /* ---------- Bottom sheets ----------
+       Um fundo partilhado e duas folhas: o dia (#diaSheet) e as camadas
+       (o próprio #calCamadas, que em desktop é a linha de chips). */
+    /* A linha de chips sai da barra: ao telemóvel este elemento só existe
+       como folha, aberta pelo botão de camadas. */
+    .cal-camadas{ display:none; }
+    .mob-bg.aberto{
+      display:block; position:fixed; inset:0;
+      background:rgba(20,20,20,0.45); z-index:75;
+    }
+    .mob-sheet.aberta, .cal-camadas.aberta{
+      display:flex; flex-direction:column; align-items:stretch;
+      position:fixed; left:0; right:0; bottom:0; z-index:76;
+      max-height:82dvh;
+      padding:0 0 calc(8px + env(safe-area-inset-bottom));
+      background:var(--white); color:var(--ink);
+      border-top:1px solid var(--line);
+      border-radius:18px 18px 0 0;
+      box-shadow:0 -18px 50px rgba(0,0,0,0.28);
+      /* O arrasto escreve --mob-y; sem arrasto é 0. */
+      transform:translateY(var(--mob-y, 0px));
+    }
+    .cal-camadas.aberta{ gap:10px; padding:0 16px calc(14px + env(safe-area-inset-bottom)); }
+    .cal-camadas.aberta .camada-btn, .cal-camadas.aberta .camada-mais{ min-height:44px; }
+    .cal-camadas.aberta .camada-btn{ justify-content:flex-start; }
+    .cal-camadas.aberta .camada-mais{ width:auto; padding:0 16px; margin-left:0; }
+    /* São botões/links: sem isto o texto ficava centrado na folha. O erro
+       do Outlook mostra o texto completo, a quebrar linha — no telemóvel é
+       o único sítio onde o Manel o vê. */
+    .cal-camadas.aberta .out-erro, .cal-camadas.aberta .sem-data{ padding:10px 0; text-align:left; align-self:flex-start; }
+    .cal-camadas.aberta .out-erro{ white-space:normal; line-height:1.45; font-size:12.5px; }
+    .mob-sheet-cab{
+      display:flex; align-items:center; gap:10px;
+      padding:14px 16px 10px; margin:0 -16px 0;
+      border-bottom:1px solid var(--line);
+      touch-action:none; cursor:grab;
+    }
+    .mob-sheet .mob-sheet-cab{ margin:0; }
+    .mob-sheet-cab h3{
+      flex:1; min-width:0; margin:0;
+      font-family:'Inter',sans-serif; font-size:14.5px; font-weight:700; color:var(--ink);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .mob-sheet-cab .icon-btn{ width:40px; height:40px; padding:0; flex-shrink:0; font:inherit; }
+    /* Puxador: o affordance de arrastar para baixo. */
+    .mob-sheet-cab .mob-sheet-puxador{
+      position:absolute; top:6px; left:50%; transform:translateX(-50%);
+      width:38px; height:4px; border-radius:2px; background:var(--line);
+    }
+    .mob-sheet-cab{ position:relative; }
+    .mob-sheet-corpo{
+      flex:1 1 auto; min-height:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; padding:4px 16px 12px;
+    }
+    /* Dentro da folha o painel do dia é conteúdo, não cartão. */
+    .mob-sheet-corpo .dia-painel{
+      margin:0; padding:0; background:none; border:none;
+      box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none;
+    }
+    .mob-sheet-corpo .dia-painel::before{ display:none; }
+
+    /* ---------- Botão flutuante "Novo evento" ---------- */
+    .fab{
+      display:flex; align-items:center; justify-content:center;
+      position:fixed; right:16px; z-index:60;
+      bottom:calc(16px + env(safe-area-inset-bottom));
+      width:56px; height:56px; border-radius:50%;
+      background:var(--red); color:var(--on-red);
+      border:none; cursor:pointer;
+      box-shadow:0 10px 24px rgba(0,0,0,0.28);
+    }
+    .fab:active{ transform:scale(0.94); }
+    /* Com a barra do shell no fundo (só em ecrãs sem hover) o botão sobe. */
+    body.shell-touch .fab{ bottom:calc(70px + env(safe-area-inset-bottom)); }
+
+    /* ---------- giocoModal em ecrã inteiro ----------
+       Única redefinição de classes do shell nesta página, confinada a esta
+       media query: ao telemóvel um modal centrado com 88dvh e margens deixava
+       o formulário de evento a meio do ecrã e com os botões fora de vista. */
+    .gioco-modal-overlay{ padding:0; align-items:stretch; }
+    .gioco-modal{
+      width:100%; max-width:none;
+      height:100dvh; max-height:100dvh;
+      border-radius:0; padding:0; overflow:hidden;
+      display:flex; flex-direction:column;
+    }
+    .gioco-modal-head{
+      margin:0; padding:14px 16px; flex-shrink:0;
+      border-bottom:1px solid var(--line);
+      padding-top:calc(14px + env(safe-area-inset-top));
+    }
+    .gioco-modal-close{ width:40px; height:40px; }
+    .gioco-modal-body{
+      flex:1 1 auto; min-height:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; padding:16px;
+    }
+    /* Botões de acção sempre à vista, no fundo do corpo que faz scroll.
+       Duas peças: o corpo vira coluna e o conteúdo estica (para o
+       margin-top:auto encostar as acções ao fundo quando o formulário é
+       curto) e o sticky trata do caso em que o conteúdo passa o ecrã. Só uma
+       das duas não chegava — sem a coluna ficava um vazio branco por baixo
+       dos botões, sem o sticky os botões saíam do ecrã ao fazer scroll. */
+    .gioco-modal-body{ display:flex; flex-direction:column; }
+    .gioco-modal-body > div{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+    .gioco-modal-body .ev-form{ flex:1 1 auto; min-height:0; }
+    .ev-actions{
+      /* margin-top:auto encosta ao fundo; -16px anula o padding do corpo. */
+      position:sticky; bottom:0; margin:auto -16px -16px; padding:12px 16px;
+      padding-bottom:calc(12px + env(safe-area-inset-bottom));
+      background:var(--white); border-top:1px solid var(--line);
+    }
+    .ev-actions .btn-add, .ev-actions .ev-btn-outline, .ev-actions a.btn-add{ min-height:44px; }
+    .ev-form input, .ev-form select, .ev-form textarea{ font-size:16px; min-height:44px; }
+    .ev-swatch{ min-width:44px; min-height:44px; justify-content:center; }
+  }
 </style>
 </head>
 
-<body>
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
+
+<!-- Menu ao toque do shell (opt-in): sem hover a sidebar vira barra no fundo. -->
+<div class="nav-overlay" id="navOverlay"></div>
 
 <div class="shell">
 
@@ -237,7 +631,7 @@
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-calendar"/></svg>GIOCO · <b>Calendário</b></h1>
@@ -260,6 +654,36 @@
         </div>
       </div>
 
+      <!-- ================= TELEMÓVEL: barra de datas (< 768px) =================
+           display:none em desktop (ver o fim do <style>). Linha 1: mês + ano
+           (toca para expandir), botão de camadas, Hoje. Linha 2: a faixa de
+           datas (uma semana; o mês inteiro quando expandida) — o mecanismo
+           principal de navegação nas três vistas de telemóvel. Depois o
+           puxador e o selector Agenda / Dia / Mês. -->
+      <div class="mob-bar" id="mobBar">
+        <div class="mob-l1">
+          <button type="button" class="mob-titulo" id="mobTitulo" aria-expanded="false" title="Mês inteiro / vista anterior">
+            <span id="mobTituloTxt">—</span>
+            <svg class="icon" width="18" height="18"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div class="mob-l1-dir">
+            <button type="button" class="cal-camadas-btn" id="btnCamadas" title="Camadas" aria-label="Camadas" aria-expanded="false"><svg class="icon" width="16" height="16"><use href="#i-sliders"/></svg></button>
+            <button type="button" class="cal-camadas-btn" id="btnVistas" title="Vista" aria-label="Vista" aria-expanded="false" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-calendar"/></svg></button>
+            <button type="button" class="btn mob-hoje" id="mobHoje" title="Hoje">Hoje</button>
+          </div>
+          <!-- Menu curto de vistas (atrás do ícone), com visto na activa. -->
+          <div class="mob-menu" id="mobMenu" role="menu" aria-label="Vista" hidden>
+            <button type="button" role="menuitemradio" data-vista="agenda"><span>Agenda</span><i>✓</i></button>
+            <button type="button" role="menuitemradio" data-vista="dia"><span>Dia</span><i>✓</i></button>
+            <button type="button" role="menuitemradio" data-vista="mes"><span>Mês</span><i>✓</i></button>
+          </div>
+        </div>
+        <!-- Iniciais dos dias: são o cabeçalho da faixa E da grelha do mês (um só). -->
+        <div class="mob-iniciais" id="mobIniciais" aria-hidden="true"></div>
+        <div class="mob-faixa" id="mobFaixa"></div>
+        <button type="button" class="mob-puxador" id="mobPuxador" aria-label="Abrir o mês inteiro" title="Mês inteiro"><span></span></button>
+      </div>
+
       <div class="panel glass-light cal-bar" id="calBar">
         <div class="cal-nav">
           <button type="button" class="icon-btn" id="btnAnterior" title="Período anterior (←)"><svg class="icon" width="18" height="18"><use href="#i-chevron-left"/></svg></button>
@@ -268,8 +692,23 @@
         </div>
         <div class="cal-titulo" id="calTitulo">—</div>
         <div class="cal-dir">
-          <button type="button" class="camada-btn" id="camadaPag" aria-pressed="true" title="Mostrar ou esconder os pagamentos (só leitura)"><i></i>Pagamentos</button>
-          <a class="sem-data" id="semData" href="tesouraria.html" hidden title="Linhas de pedidos sem prazo — ver na Tesouraria"></a>
+          <!-- Os toggles das camadas vivem neste wrapper desde Set/2026. Em
+               desktop é uma linha de chips igual à de sempre; abaixo de 768px o
+               MESMO elemento passa a bottom sheet (ver @media no fim do <style>),
+               para os botões e os handlers serem exactamente os mesmos — nada é
+               movido no DOM nem duplicado. -->
+          <div class="cal-camadas" id="calCamadas">
+            <div class="mob-sheet-cab">
+              <span class="mob-sheet-puxador"></span>
+              <h3>Camadas</h3>
+              <button type="button" class="icon-btn" data-acao="fechar-camadas" title="Fechar" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>
+            </div>
+            <button type="button" class="camada-btn" id="camadaPag" aria-pressed="true" title="Mostrar ou esconder os pagamentos (só leitura)"><i></i>Pagamentos</button>
+            <button type="button" class="camada-btn out" id="camadaOut" aria-pressed="false" title="Mostrar ou esconder o calendário do Outlook (só leitura)"><i></i><span id="camadaOutTxt">Outlook</span></button>
+            <button type="button" class="camada-mais" id="outConta" title="Conta Microsoft" aria-label="Conta Microsoft" hidden><svg class="icon"><use href="#i-more-vertical"/></svg></button>
+            <button type="button" class="out-erro" id="outErro" hidden title="Ver detalhe">Outlook indisponível</button>
+            <a class="sem-data" id="semData" href="tesouraria.html" hidden title="Linhas de pedidos sem prazo — ver na Tesouraria"></a>
+          </div>
           <div class="seg" id="segVista" role="group" aria-label="Vista">
             <button type="button" data-vista="mes" title="Mês (M)">Mês</button>
             <button type="button" data-vista="semana" title="Semana (S)">Semana</button>
@@ -286,6 +725,24 @@
     </div>
   </div>
 </div>
+
+<!-- ================= TELEMÓVEL (< 768px) =================
+     Estes três elementos (e a .mob-bar lá em cima) estão display:none por
+     omissão e só ganham layout dentro do @media (max-width:767px) no fim do
+     <style>. Em desktop não existem visualmente — o painel lateral e o
+     "Novo evento" da barra continuam a ser o caminho. -->
+<div class="mob-bg" id="mobBg"></div>
+<div class="mob-sheet" id="diaSheet" role="dialog" aria-modal="true" aria-labelledby="diaSheetTitulo">
+  <div class="mob-sheet-cab" id="diaSheetCab">
+    <span class="mob-sheet-puxador"></span>
+    <h3 id="diaSheetTitulo"></h3>
+    <button type="button" class="icon-btn" data-acao="fechar-dia-sheet" title="Fechar" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="mob-sheet-corpo" id="diaSheetCorpo"></div>
+</div>
+<button type="button" class="fab" id="fabNovo" title="Novo evento" aria-label="Novo evento">
+  <svg class="icon" width="22" height="22"><use href="#i-plus"/></svg>
+</button>
 
 <script>
   var firebaseConfig = {
@@ -361,6 +818,16 @@
       autenticarEContinuar(null);
     });
   })();
+
+  /* ---------- MSAL: arranca em PARALELO com o Firebase ----------
+     As duas autenticações são independentes e nenhuma pode esperar pela outra.
+     Antes disto o GiocoOutlook.init() vivia dentro do callback do
+     autenticarEContinuar, o que atrasava o handleRedirectPromise até 8 s (ou
+     para sempre, se o Firebase falhasse) — e o regresso do login da Microsoft
+     ficava por processar sem ter nada a ver com a Microsoft.
+     Se o Firebase falhar, a camada Outlook continua a funcionar; se o MSAL
+     falhar, o calendário continua a funcionar. */
+  try { GiocoOutlook.init(); } catch (e) { console.error('[outlook] init:', e); }
 
   autenticarEContinuar(function () {
   var db = firebase.database();
@@ -488,7 +955,7 @@
   function diaDe(iso) { return parseInt(iso.slice(8, 10), 10); }
 
   function tituloPeriodo(vista, ref) {
-    if (vista === 'mes') return mesLongo(ref) + ' ' + anoDe(ref);
+    if (vista === 'mes' || vista === 'agenda') return mesLongo(ref) + ' ' + anoDe(ref);
     if (vista === 'semana') {
       var s = semanaDe(ref), a = s[0], b = s[6];
       if (mesDe(a) === mesDe(b)) return diaDe(a) + '–' + diaDe(b) + ' ' + mesCurto(a) + ' ' + anoDe(a);
@@ -504,17 +971,60 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  /* ---------- Telemóvel: UM só limite ----------
+     O MESMO limite da @media (max-width:767px) do <style>, lido do
+     matchMedia a cada chamada (Set/2026: sem número repetido em mais lado
+     nenhum do JS). A decisão de layout vive no CSS; o JS só precisa de saber
+     quando a vista Semana dá lugar à Agenda, quando um dia abre em bottom
+     sheet, e quando a grelha do mês tem de encher o ecrã. Nunca se usa o
+     user agent nem (hover:none) — aqui o critério é de LARGURA de propósito,
+     para bater certo com o CSS. */
+  var MQ_MOBILE = '(max-width: 767px)';
+  function ehMobile() { return !!(window.matchMedia && window.matchMedia(MQ_MOBILE).matches); }
+
   /* ---------- Estado ---------- */
-  var VISTAS = ['mes', 'semana', 'dia'];
+  /* 'agenda' só existe em telemóvel; 'semana' só em desktop. vistaEfetiva()
+     traduz a vista guardada para a que o ecrã actual consegue mostrar, sem
+     partir: 'semana' num telemóvel cai para 'agenda', 'agenda' num
+     computador cai para 'mes'. A guardada fica como está. */
+  var VISTAS = ['mes', 'semana', 'dia', 'agenda'];
   var vistaGuardada = null;
   try { vistaGuardada = localStorage.getItem('calendario.vista'); } catch (e) {}
   var estado = {
-    vista: VISTAS.indexOf(vistaGuardada) >= 0 ? vistaGuardada : 'mes',
+    vista: VISTAS.indexOf(vistaGuardada) >= 0 ? vistaGuardada : (ehMobile() ? 'agenda' : 'mes'),
     dataRef: hojeISO(),
     diaSelecionado: null, // vista Mês: dia com o painel de detalhe aberto ("AAAA-MM-DD" | null)
     eventos: [],          // lista normalizada (todas as fontes)
     carregado: false
   };
+  function vistaEfetiva() {
+    var v = estado.vista;
+    if (ehMobile()) return v === 'semana' ? 'agenda' : v;
+    return v === 'agenda' ? 'mes' : v;
+  }
+  /* Vista Agenda (telemóvel): lista contínua a partir de dataRef, com
+     agendaDias dias à frente — começa em 30 e cresce 30 a cada vez que o
+     scroll chega ao fim (tecto AGENDA_MAX). Mudar o dia de partida repõe. */
+  var AGENDA_PASSO = 30, AGENDA_MAX = 366;
+  var agendaDias = AGENDA_PASSO, agendaBase = null;
+  function agendaDiasDe(ref) {
+    if (agendaBase !== ref) { agendaBase = ref; agendaDias = AGENDA_PASSO; }
+    return agendaDias;
+  }
+  /* As datas que a vista efectiva mostra — a ÚNICA definição, usada pela
+     fonte de pagamentos (meses) e pela camada Outlook (intervalo). */
+  function datasVisiveis() {
+    var v = vistaEfetiva(), ref = estado.dataRef;
+    if (v === 'mes') return monthGrid(parseInt(anoDe(ref), 10), mesDe(ref));
+    if (v === 'semana') return semanaDe(ref);
+    if (v === 'agenda') {
+      var n = agendaDiasDe(ref), out = [];
+      for (var i = 0; i < n; i++) out.push(addDays(ref, i));
+      return out;
+    }
+    return [ref];
+  }
+
   var eventosPorDia = new Map();
   var eventosPorId = {};   // só a fonte manual (nó bruto), para o modal de edição
   var itensPorId = {};     // todos os itens normalizados da última lista (todas as fontes)
@@ -526,6 +1036,58 @@
     render();
   }
 
+  /* ---------- Camada 'outlook' (SÓ LEITURA) ----------
+     Segunda camada, no mesmo padrão da dos pagamentos (.camada-btn +
+     aria-pressed + localStorage), mas DESLIGADA por omissão: obriga a uma
+     sessão Microsoft e não deve ir buscar nada sem o Manel pedir.
+     Os eventos vivem só aqui em memória, por intervalo visível — NUNCA são
+     escritos no nó eventos/ (ver gioco-outlook.js).
+     A estrutura aguenta uma terceira camada sem refactor: uma fonteX(), um
+     flag próprio e mais uma entrada em listaParaRender(). */
+  var camadaOut = false;
+  try { camadaOut = localStorage.getItem('calendario.camada.outlook') === '1'; } catch (e) {}
+  var outEventos = [];      // itens normalizados do intervalo já carregado
+  var outIntervalo = null;  // 'ini|fim' ja pedido (evita repetir o mesmo GET)
+  var outErro = '';         // mensagem discreta; nunca bloqueia o render
+  var outErroObj = null;    // o objecto de erro INTEIRO (nunca uma string derivada)
+  var outAPedir = false;
+  var outCache = {};        // 'ini|fim' -> lista
+
+  function setCamadaOut(on) {
+    camadaOut = !!on;
+    try { localStorage.setItem('calendario.camada.outlook', camadaOut ? '1' : '0'); } catch (e) {}
+    if (!camadaOut) { outErro = ''; outErroObj = null; }
+    render();
+  }
+  function outlookLigado() { return GiocoOutlook.disponivel() && GiocoOutlook.estaLigado(); }
+  function fonteOutlook() { return (camadaOut && outlookLigado()) ? outEventos : []; }
+  function ehOutlook(item) { return item.origem === 'outlook'; }
+
+  // Intervalo que a vista mostra, fim EXCLUSIVO (a janela do calendarView).
+  function intervaloVisivel() {
+    var datas = datasVisiveis();
+    return { ini: datas[0], fim: addDays(datas[datas.length - 1], 1) };
+  }
+
+  /* Chamado a cada render: só vai à rede quando o intervalo muda de facto
+     (mudar de mês/semana/dia). Um erro fixa o intervalo na mesma, para não
+     martelar o Graph em ciclo com o render que ele próprio provoca. */
+  function atualizarOutlook() {
+    if (!camadaOut || !outlookLigado()) return;
+    var iv = intervaloVisivel(), chave = iv.ini + '|' + iv.fim;
+    if (chave === outIntervalo) return;
+    if (outCache[chave]) { outIntervalo = chave; outEventos = outCache[chave]; outErro = ''; render(); return; }
+    if (outAPedir) return;   // o render do fim do pedido volta a passar por aqui
+    outAPedir = true;
+    GiocoOutlook.carregarEventos(iv.ini, iv.fim).then(function (lista) {
+      outCache[chave] = lista;
+      outIntervalo = chave; outEventos = lista; outErro = ''; outErroObj = null;
+    })['catch'](function (e) {
+      outIntervalo = chave; outEventos = [];
+      registarErroOutlook(e, false);
+    }).then(function () { outAPedir = false; render(); });
+  }
+
   function setVista(v) {
     if (VISTAS.indexOf(v) < 0 || v === estado.vista) return;
     estado.vista = v;
@@ -534,8 +1096,9 @@
   }
   function setDataRef(iso) { estado.dataRef = iso; render(); }
   function navegar(dir) {
-    if (estado.vista === 'mes') setDataRef(addMonths(estado.dataRef, dir));
-    else if (estado.vista === 'semana') setDataRef(addDays(estado.dataRef, 7 * dir));
+    var v = vistaEfetiva();
+    if (v === 'mes') setDataRef(addMonths(estado.dataRef, dir));
+    else if (v === 'semana' || v === 'agenda') setDataRef(addDays(estado.dataRef, 7 * dir));
     else setDataRef(addDays(estado.dataRef, dir));
   }
 
@@ -586,12 +1149,8 @@
 
   // Datas que a vista atual mostra → meses distintos, para a fonte de pagamentos.
   function mesesVisiveis() {
-    var datas;
-    if (estado.vista === 'mes') datas = monthGrid(parseInt(anoDe(estado.dataRef), 10), mesDe(estado.dataRef));
-    else if (estado.vista === 'semana') datas = semanaDe(estado.dataRef);
-    else datas = [estado.dataRef];
     var vistos = {}, out = [];
-    datas.forEach(function (iso) {
+    datasVisiveis().forEach(function (iso) {
       var k = iso.slice(0, 7);
       if (!vistos[k]) { vistos[k] = true; out.push({ ano: parseInt(anoDe(iso), 10), mes: mesDe(iso) }); }
     });
@@ -604,6 +1163,7 @@
   function listaParaRender() {
     var lista = estado.eventos.slice();
     if (camadaPag) lista = lista.concat(fontePagamentos(mesesVisiveis()));
+    lista = lista.concat(fonteOutlook());
     return lista;
   }
 
@@ -631,6 +1191,19 @@
   }
   function eventosDoDia(iso) { return eventosPorDia.get(iso) || []; }
 
+  /* Mudança de lado do limite (rodar o ecrã, redimensionar a janela): fecha
+     as folhas e volta a desenhar com a vista efectiva do novo lado. */
+  (function () {
+    var mq = window.matchMedia ? window.matchMedia(MQ_MOBILE) : null;
+    if (!mq) return;
+    var aoMudarLargura = function () { fecharSheets(); render(); };
+    if (mq.addEventListener) mq.addEventListener('change', aoMudarLargura);
+    else if (mq.addListener) mq.addListener(aoMudarLargura);
+  })();
+  // Em telemóvel a grelha do mês enche o que sobra do ecrã: recalcula ao
+  // mudar a altura (teclado, barra do browser a recolher, rotação).
+  window.addEventListener('resize', function () { if (ehMobile() && vistaEfetiva() === 'mes') ajustarAlturaMes(); });
+
   /* ---------- Render ---------- */
   var vistaEl = document.getElementById('calVista');
   var tituloEl = document.getElementById('calTitulo');
@@ -638,19 +1211,117 @@
 
   function render() {
     indexarEventos();   // a lista depende da vista (meses visíveis) e da camada
-    tituloEl.textContent = tituloPeriodo(estado.vista, estado.dataRef);
+    var vista = vistaEfetiva();
+    tituloEl.textContent = tituloPeriodo(vista, estado.dataRef);
     var btnCamada = document.getElementById('camadaPag');
     btnCamada.setAttribute('aria-pressed', camadaPag ? 'true' : 'false');
+    renderCamadaOutlook();
+    atualizarOutlook();
     var semData = document.getElementById('semData');
     var nSem = linhasSemData();
     semData.hidden = nSem === 0;
     semData.textContent = nSem + ' sem data';
+    // Os dois selectores (desktop e telemóvel) reflectem a vista EFECTIVA.
     var botoes = document.querySelectorAll('#segVista button');
-    for (var i = 0; i < botoes.length; i++) botoes[i].classList.toggle('active', botoes[i].getAttribute('data-vista') === estado.vista);
-    vistaEl.classList.toggle('vista-mes', estado.vista === 'mes');
-    if (estado.vista === 'mes') renderMes();
-    else if (estado.vista === 'semana') renderGrelhaHoraria(semanaDe(estado.dataRef));
+    for (var i = 0; i < botoes.length; i++) botoes[i].classList.toggle('active', botoes[i].getAttribute('data-vista') === vista);
+    vistaEl.classList.toggle('vista-mes', vista === 'mes');
+    vistaEl.classList.toggle('vista-agenda', vista === 'agenda');
+    renderFaixa();   // antes da vista: no Mês esconde a faixa e a grelha mede a altura certa
+    if (vista === 'mes') renderMes();
+    else if (vista === 'semana') renderGrelhaHoraria(semanaDe(estado.dataRef));
+    else if (vista === 'agenda') renderAgenda();
     else renderDia();
+    atualizarSheetDia();
+    var btnCam = document.getElementById('btnCamadas');
+    if (btnCam) btnCam.setAttribute('aria-expanded', camadasAbertas() ? 'true' : 'false');
+  }
+
+  /* paleta(item): a cor de um item por FONTE, num só sítio.
+     Manual → a cor da categoria; Outlook → o par neutro --out-*.
+     Os pagamentos não passam por aqui (têm chip próprio, --blush). */
+  function paleta(ev) {
+    if (ehOutlook(ev)) return { cor: 'var(--out-bg)', texto: 'var(--out-ink)', label: 'Outlook', classe: ' out' };
+    var c = categoria(ev.categoria);
+    return { cor: c.cor, texto: c.texto, label: c.label, classe: '' };
+  }
+
+  /* Barra: o mesmo botão serve de toggle da camada e, sem sessão, de
+     "Ligar Outlook". O botão ao lado abre o painel da conta (giocoModal). */
+  function renderCamadaOutlook() {
+    var btn = document.getElementById('camadaOut');
+    var txt = document.getElementById('camadaOutTxt');
+    var mais = document.getElementById('outConta');
+    var erro = document.getElementById('outErro');
+    if (!btn) return;
+    var est = GiocoOutlook.estado();
+    var ligado = est === 'ligado';
+    btn.hidden = false;
+    btn.disabled = false;
+    mais.hidden = !ligado;
+    erro.hidden = true;
+
+    /* 'webview': a Microsoft bloqueia o login dentro de browsers embutidos.
+       Não se tenta nada — diz-se o que fazer, e o detalhe abre no painel. */
+    if (est === 'webview') {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.disabled = true;
+      btn.title = 'Abre a página no Safari para ligares o Outlook';
+      txt.textContent = 'Abre no Safari';
+      erro.hidden = false;
+      erro.textContent = 'Porquê?';
+      return;
+    }
+    if (est === 'indisponivel') {
+      btn.hidden = true;
+      erro.hidden = false;
+      erro.textContent = 'Outlook indisponível';
+      return;
+    }
+    /* 'a-verificar': o handleRedirectPromise ainda não assentou. NUNCA dizer
+       aqui que não há sessão — era isso que, no regresso do redirect, punha o
+       botão a pedir login por cima de um login que tinha corrido bem. */
+    if (est === 'a-verificar') {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.disabled = true;
+      btn.title = 'A verificar a sessão da Microsoft…';
+      txt.textContent = 'A verificar…';
+      return;
+    }
+    if (est === 'desligado') {
+      btn.classList.add('ligar');
+      btn.removeAttribute('aria-pressed');
+      btn.title = 'Ligar a conta Microsoft para ver o calendário do Outlook';
+      txt.textContent = 'Ligar Outlook';
+    } else {
+      btn.classList.remove('ligar');
+      btn.setAttribute('aria-pressed', camadaOut ? 'true' : 'false');
+      btn.title = 'Mostrar ou esconder o calendário do Outlook (só leitura)';
+      txt.textContent = 'Outlook';
+    }
+    // Erro (login, regresso do redirect ou Graph): clicável e com o TEXTO do
+    // erro à vista (Set/2026 — antes dizia três palavras e o detalhe só se
+    // via abrindo o painel; no telemóvel ninguém o abria). Nunca bloqueia o
+    // render. O objecto inteiro fica em outErroObj para o diagnóstico.
+    if (outErro) {
+      erro.hidden = false;
+      var prefixo = outErroObj && outErroObj.__login ? 'Login falhou' : 'Outlook sem resposta';
+      var detalhe = String(outErro).replace(/\s+/g, ' ').trim();
+      if (detalhe.length > 140) detalhe = detalhe.slice(0, 140) + '…';
+      erro.textContent = prefixo + (detalhe ? ': ' + detalhe : '');
+      erro.title = 'Ver o diagnóstico completo';
+    }
+  }
+  /* Um erro de login ou de Graph passa SEMPRE por aqui: consola com o
+     objecto inteiro + estado para o #outErro e para o painel de diagnóstico. */
+  function registarErroOutlook(e, login) {
+    console.error('[outlook]' + (login ? ' login:' : ''), e);
+    if (e && login) { try { e.__login = true; } catch (err) {} }
+    outErroObj = e || null;
+    GiocoOutlook.guardarErro(e);
+    outErro = (e && (e.errorMessage || e.message)) ? String(e.errorMessage || e.message) : (login ? 'Falha no login.' : 'Falha a ler o calendário.');
+    if (e && e.errorCode && outErro.indexOf(e.errorCode) < 0) outErro = e.errorCode + ' — ' + outErro;
   }
 
   /* chipDe(item): o único sítio onde um chip sabe de que fonte vem. */
@@ -661,46 +1332,413 @@
       return '<button type="button" class="ev-chip pag' + (pago ? ' pago' : '') + '" data-id="' + escapeHtml(ev.id) + '" title="' + escapeHtml(titulo) + '">' +
         (pago ? '✓ ' : '') + escapeHtml(ev.titulo) + ' ·<span class="num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span></button>';
     }
-    var c = categoria(ev.categoria);
+    var c = paleta(ev);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
-    return '<button type="button" class="ev-chip" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(ev.titulo) + '">' +
-      hora + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</button>';
+    var dica = ev.titulo + (temReuniao(ev) ? ' · ' + ev.extra.reuniao.servico : '');
+    return '<button type="button" class="ev-chip' + c.classe + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(dica) + '">' +
+      hora + iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo) + '</button>';
   }
   var chipHtml = chipDe;
+  /* Item anulado/cancelado, de QUALQUER fonte que o traga marcado (anulado
+     na fonte manual, cancelado/extra.cancelado numa fonte futura). Hoje as
+     duas fontes filtram-nos antes de chegarem à lista (EV.normalizar devolve
+     null a um anulado; o gioco-outlook.js salta os isCancelled), por isso a
+     classe só existe para o dia em que se decidir mostrá-los riscados — o
+     CSS (line-through + esbatido; chip só com contorno --red) já lá está. */
+  function ehCancelado(ev) { return !!(ev && (ev.anulado === true || ev.cancelado === true || (ev.extra && ev.extra.cancelado === true))); }
+  function classeCancelado(ev) { return ehCancelado(ev) ? ' cancelado' : ''; }
   // Evento ligado a um pedido da loja: ícone store (14px) antes do título, sem categoria nova.
   function ehPedidoLoja(ev) { return !!(ev && ev.ligacao && ev.ligacao.tipo === 'lojaPedido'); }
   function iconeLigacao(ev) { return ehPedidoLoja(ev) ? '<svg class="icon" width="14" height="14"><use href="#i-store"/></svg>' : ''; }
+  /* Evento do Outlook com link de videochamada (extra.reuniao, detectado no
+     gioco-outlook.js): ícone i-video pela mesma porta do i-store — 14px inline,
+     já com CSS em `.ev-chip .icon, .ev-bloco .icon, .dia-item-t .icon`. Não
+     empurra o texto: o chip trunca com ellipsis, como sempre. */
+  function temReuniao(ev) { return !!(ev && ev.extra && ev.extra.reuniao && ev.extra.reuniao.url); }
+  function iconeReuniao(ev) {
+    if (!temReuniao(ev)) return '';
+    return '<svg class="icon" width="14" height="14"><use href="#i-video"/></svg>';
+  }
 
+  /* Ao telemóvel a célula é mais pequena: 2 chips de texto truncado e, com
+     mais, uma terceira linha "+N" (em desktop 3 chips, ou 2 + "+N mais"). A
+     coluna do dia seleccionado (o da faixa de datas) leva .col-sel. Ambas as
+     coisas só quando ehMobile(): o DOM de desktop fica exactamente o mesmo. */
   function renderMes() {
-    var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref);
+    var ref = estado.dataRef, hoje = hojeISO(), mes = mesDe(ref), mob = ehMobile();
     var dias = monthGrid(parseInt(anoDe(ref), 10), mes);
+    // Telemóvel: só as semanas que o mês ocupa (5 ou 6), nunca 6 à força.
+    if (mob && mesDe(dias[35]) !== mes) dias = dias.slice(0, 35);
     // A seleção sobrevive à mudança de mês só enquanto o dia continuar na grelha.
     if (estado.diaSelecionado && dias.indexOf(estado.diaSelecionado) < 0) estado.diaSelecionado = null;
     var sel = estado.diaSelecionado;
+    var colSel = mob ? (parseISO(ref).getDay() + 6) % 7 : -1;
     var html = '<div class="mes-layout"><div class="mes-grelha-wrap"><div class="mes-cab">';
     DIAS_CURTOS.forEach(function (d) { html += '<div>' + d + '</div>'; });
-    html += '</div><div class="mes-grelha">';
+    html += '</div><div class="mes-grelha" style="--nlinhas:' + (dias.length / 7) + '">';
     dias.forEach(function (iso, i) {
       var cls = 'mes-cel';
       if (i % 7 >= 5) cls += ' fds';
       if (mesDe(iso) !== mes) cls += ' fora';
       if (iso === hoje) cls += ' hoje';
       if (iso === sel) cls += ' sel';
+      if (i % 7 === colSel) cls += ' col-sel';
       var evs = eventosDoDia(iso);
       html += '<div class="' + cls + '" data-dia="' + iso + '">';
-      html += '<span class="mes-num num" data-dia-num="' + iso + '">' + diaDe(iso) + '</span>';
-      var visiveis = evs.length > MAX_CHIPS_MES ? MAX_CHIPS_MES - 1 : evs.length;
+      // Telemóvel: o dia 1 escreve-se "1 Set", como no Outlook.
+      var rotulo = (mob && diaDe(iso) === 1) ? '1 ' + escapeHtml(mesCurto(iso)) : diaDe(iso);
+      html += '<span class="mes-num num" data-dia-num="' + iso + '">' + rotulo + '</span>';
+      var visiveis;
+      // Telemóvel: todos os chips no DOM; ajustarAlturaMes() esconde os que
+      // não cabem por inteiro na célula. Sem "+N" (o Outlook não o tem).
+      if (mob) visiveis = evs.length;
+      else visiveis = evs.length > MAX_CHIPS_MES ? MAX_CHIPS_MES - 1 : evs.length;
       for (var k = 0; k < visiveis; k++) html += chipHtml(evs[k]);
-      if (evs.length > visiveis) html += '<button type="button" class="mes-mais" data-mais="' + iso + '">+' + (evs.length - visiveis) + ' mais</button>';
+      if (!mob && evs.length > visiveis) html += '<button type="button" class="mes-mais" data-mais="' + iso + '">+' + (evs.length - visiveis) + ' mais</button>';
       html += '</div>';
     });
     html += '</div></div>';
     if (sel) html += renderPainelDia(sel, { fechar: true, abrirDia: true });
     html += '</div>';
     vistaEl.innerHTML = html;
+    if (mob) ajustarAlturaMes();
   }
-  function selecionarDia(iso) { estado.diaSelecionado = iso; render(); }
-  function fecharPainelDia() { if (estado.diaSelecionado) { estado.diaSelecionado = null; render(); } }
+  /* Telemóvel: a grelha do mês enche o que sobra do ecrã por baixo da barra
+     sticky (sem scroll vertical dentro da vista, nem horizontal). A altura
+     é medida em runtime: a barra de datas muda de altura ao expandir, e a
+     barra do shell no fundo (shell-touch) só existe sem hover. */
+  function ajustarAlturaMes() {
+    var g = vistaEl.querySelector('.mes-grelha');
+    if (!g) return;
+    if (!ehMobile()) { g.style.removeProperty('height'); return; }
+    var topo = g.getBoundingClientRect().top;
+    var fundo = document.body.classList.contains('shell-touch') ? 64 : 8;
+    var alto = Math.floor(window.innerHeight - topo - fundo);
+    g.style.height = Math.max(300, alto) + 'px';
+    // Chips: mostra os que cabem POR INTEIRO na altura real da célula; os
+    // restantes ficam escondidos — nunca um chip cortado ao meio.
+    var cels = g.querySelectorAll('.mes-cel');
+    for (var i = 0; i < cels.length; i++) {
+      var cel = cels[i], chips = cel.querySelectorAll('.ev-chip');
+      if (!chips.length) continue;
+      var num = cel.querySelector('.mes-num');
+      var livre = cel.clientHeight - 2 - (num ? num.offsetHeight + 2 : 0);
+      var cabem = Math.max(0, Math.floor((livre + 2) / (16 + 2)));
+      for (var k = 0; k < chips.length; k++) chips[k].classList.toggle('escondido', k >= cabem);
+    }
+  }
+
+  /* ---------- Vista Agenda (telemóvel) ----------
+     Lista vertical contínua a partir do dia seleccionado na faixa (dataRef):
+     só os dias COM conteúdo aparecem, cada um com cabeçalho sticky e as
+     linhas no MESMO componente do painel do dia (itemDiaHtml / pagDiaHtml,
+     em modo agenda) — respeita as camadas activas e abre os mesmos modais.
+     Um sentinela no fim (IntersectionObserver) pede mais 30 dias ao chegar
+     lá; sem observer, o botão "Ver mais dias" faz o mesmo. */
+  function renderAgenda() {
+    var ref = estado.dataRef, n = agendaDiasDe(ref), hoje = hojeISO();
+    var html = '<div class="ag-lista">', dias = 0;
+    for (var i = 0; i < n; i++) {
+      var iso = addDays(ref, i), evs = eventosDoDia(iso);
+      if (!evs.length) continue;
+      dias++;
+      html += '<div class="ag-dia' + (iso === hoje ? ' hoje' : '') + '">' +
+        '<button type="button" class="ag-cab" data-acao="abrir-dia" data-dia="' + iso + '" title="Abrir vista Dia">' +
+          '<span>' + diaSemanaCurto(iso) + ',</span><b class="num">' + diaDe(iso) + '</b><span>' + escapeHtml(mesCurto(iso)) + '</span>' +
+        '</button>';
+      html += evs.map(function (ev) { return itemDiaHtml(ev, { agenda: true }); }).join('');
+      html += '</div>';
+    }
+    var ultimo = addDays(ref, n - 1);
+    if (!dias) html += '<p class="dia-vazio ag-vazio">Sem eventos entre ' + diaDe(ref) + ' ' + escapeHtml(mesCurto(ref)) + ' e ' + diaDe(ultimo) + ' ' + escapeHtml(mesCurto(ultimo)) + '.</p>';
+    if (n < AGENDA_MAX) html += '<div class="ag-fim" id="agFim"><button type="button" class="btn" data-acao="agenda-mais">Ver mais dias</button></div>';
+    vistaEl.innerHTML = html + '</div>';
+    observarFimAgenda();
+  }
+  var agObserver = null;
+  function observarFimAgenda() {
+    if (agObserver) { agObserver.disconnect(); agObserver = null; }
+    var fim = document.getElementById('agFim');
+    if (!fim || !window.IntersectionObserver) return;
+    agObserver = new IntersectionObserver(function (entradas) {
+      if (!entradas.some(function (e) { return e.isIntersecting; })) return;
+      if (vistaEfetiva() !== 'agenda') return;
+      // Só cresce sozinha quando há mesmo scroll a fazer: com a lista mais
+      // curta que o ecrã o sentinela está sempre à vista e a lista crescia
+      // em cascata até ao tecto (12 pedidos ao Graph com a camada Outlook
+      // ligada). Aí fica o botão "Ver mais dias".
+      if (document.documentElement.scrollHeight <= window.innerHeight + 40) return;
+      agendaMais();
+    }, { rootMargin: '200px 0px' });
+    agObserver.observe(fim);
+  }
+  function agendaMais() {
+    if (agendaDias >= AGENDA_MAX) return;
+    agendaDias = Math.min(AGENDA_MAX, agendaDias + AGENDA_PASSO);
+    render();
+  }
+  // "45m", "1h", "1h30" — a duração em texto curto da vista Agenda.
+  function duracaoCurta(hi, hf) {
+    if (!hi || !hf) return '';
+    var m = minutos(hf) - minutos(hi);
+    if (m <= 0) return '';
+    if (m < 60) return m + 'm';
+    return Math.floor(m / 60) + 'h' + (m % 60 ? pad2(m % 60) : '');
+  }
+  // Segunda linha discreta de um item da Agenda: pessoa / local / notas.
+  function subtituloAgenda(ev) {
+    if (ehOutlook(ev)) {
+      var x = ev.extra || {};
+      var localSoLink = !!(x.reuniao && String(x.local || '').trim() === x.reuniao.url);
+      var partes = [];
+      if (x.local && !localSoLink) partes.push(x.local);
+      else if (x.reuniao) partes.push(x.reuniao.servico);
+      if (x.organizador) partes.push(x.organizador);
+      return partes.join(' · ') || 'Outlook';
+    }
+    if (ev.notas) return String(ev.notas).split('\n')[0];
+    return paleta(ev).label;
+  }
+
+  function selecionarDia(iso) {
+    estado.diaSelecionado = iso;
+    // Ao telemóvel o painel lateral está display:none: o dia abre em folha,
+    // e o dia seleccionado passa também a ser o da faixa de datas.
+    if (ehMobile()) estado.dataRef = iso;
+    render();
+    if (ehMobile()) abrirSheetDia(iso);
+  }
+
+  /* ---------- Cabeçalho de telemóvel (cópia estrutural do Outlook) ----------
+     Linha 1 (mês + ano, camadas, vistas, Hoje), linha 2 (iniciais) e, nas
+     vistas Agenda e Dia, a faixa com os 7 dias da semana de dataRef e o
+     puxador. A faixa e a grelha do mês são o MESMO componente em dois
+     estados: arrastar o puxador para baixo abre o mês (= vista Mês), arrastar
+     o cabeçalho ou a grelha para cima volta à vista anterior. Hoje = círculo
+     cheio --red; seleccionado (= dataRef) = contorno --ink; pontinho quando o
+     dia tem itens nas camadas activas. */
+  var faixaEl = document.getElementById('mobFaixa');
+  var mobBarEl = document.getElementById('mobBar');
+  var vistaAntesMes = 'agenda';   // para onde "fechar o mês" volta
+  var INICIAIS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+  document.getElementById('mobIniciais').innerHTML = INICIAIS.map(function (l) { return '<span>' + l + '</span>'; }).join('');
+  function renderFaixa() {
+    if (!faixaEl || !ehMobile()) return;
+    var ref = estado.dataRef, hoje = hojeISO(), vista = vistaEfetiva();
+    mobBarEl.classList.toggle('vista-mes', vista === 'mes');
+    if (vista !== 'mes') vistaAntesMes = vista;
+    var html = '<div class="mob-faixa-linha">';
+    semanaDe(ref).forEach(function (iso) {
+      var cls = 'mob-dia';
+      if (iso === hoje) cls += ' hoje';
+      else if (iso === ref) cls += ' sel';
+      if (mesDe(iso) !== mesDe(ref)) cls += ' fora';
+      if (eventosDoDia(iso).length) cls += ' tem';
+      html += '<button type="button" class="' + cls + '" data-faixa-dia="' + iso + '" aria-label="' + escapeHtml(tituloDia(iso)) + '"' + (iso === ref ? ' aria-current="date"' : '') + '><b class="num">' + diaDe(iso) + '</b><i></i></button>';
+    });
+    faixaEl.innerHTML = html + '</div>';
+    document.getElementById('mobTituloTxt').textContent = mesLongo(ref) + ' ' + anoDe(ref);
+    document.getElementById('mobTitulo').setAttribute('aria-expanded', vista === 'mes' ? 'true' : 'false');
+    var itens = document.querySelectorAll('#mobMenu button');
+    for (var i = 0; i < itens.length; i++) itens[i].classList.toggle('active', itens[i].getAttribute('data-vista') === vista);
+    // Os cabeçalhos sticky da Agenda e a grelha do Dia dependem da altura da barra.
+    document.documentElement.style.setProperty('--mob-bar-h', mobBarEl.offsetHeight + 'px');
+  }
+  function abrirMes() { if (vistaEfetiva() !== 'mes') setVista('mes'); }
+  function fecharMes() { if (vistaEfetiva() === 'mes') setVista(vistaAntesMes === 'mes' ? 'agenda' : vistaAntesMes); }
+  // Swipe horizontal na faixa: uma semana.
+  function navegarFaixa(dir) { setDataRef(addDays(estado.dataRef, 7 * dir)); }
+  /* Gestos (pointer events: toque, rato, caneta). Depois de um gesto o click
+     que o browser dispara a seguir é ignorado (gestoAte). */
+  var gestoAte = 0;
+  function tocarDiaFaixa(iso) { setDataRef(iso); }
+  /* O toque num dia é resolvido AQUI, no pointerup, e não no click: com o
+     ponteiro capturado o browser retarget-a o click para o elemento que
+     capturou (a faixa), e o botão do dia nunca era encontrado. O handler de
+     click fica só para o teclado (Enter/Espaço não geram pointer events).
+     opts: { horizontal: swipe navega a semana, baixo: abre o mês,
+             cima: fecha o mês, aoTocar: toque simples } */
+  function ligarGestos(alvo, opts) {
+    if (!alvo) return;
+    var x0 = 0, y0 = 0, activo = false, alvoToque = null;
+    alvo.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.target.closest && e.target.closest('.ev-chip, .mob-l1-dir, .mob-menu')) return;
+      if (opts.soMes && vistaEfetiva() !== 'mes') return;
+      activo = true; x0 = e.clientX; y0 = e.clientY;
+      alvoToque = e.target.closest ? e.target.closest('[data-faixa-dia]') : null;
+      // Sem captura na vista (semCaptura): capturar retargetava o click das
+      // células e dos chips para o contentor e partia os toques normais.
+      if (!opts.semCaptura) { try { alvo.setPointerCapture(e.pointerId); } catch (err) {} }
+    });
+    function largar(e) {
+      if (!activo) return;
+      activo = false;
+      var dx = e.clientX - x0, dy = e.clientY - y0;
+      var horizontal = Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2;
+      var vertical = Math.abs(dy) > 36 && Math.abs(dy) > Math.abs(dx) * 1.2;
+      if (horizontal && opts.horizontal) { gestoAte = performance.now() + 400; navegarFaixa(dx < 0 ? 1 : -1); return; }
+      if (vertical) {
+        if (dy > 0 && opts.baixo) { gestoAte = performance.now() + 400; abrirMes(); }
+        else if (dy < 0 && opts.cima) { gestoAte = performance.now() + 400; fecharMes(); }
+        return;
+      }
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) return;   // arrasto curto: nada
+      if (alvoToque) { gestoAte = performance.now() + 400; tocarDiaFaixa(alvoToque.getAttribute('data-faixa-dia')); }
+      else if (opts.aoTocar) { gestoAte = performance.now() + 400; opts.aoTocar(); }
+    }
+    alvo.addEventListener('pointerup', largar);
+    alvo.addEventListener('pointercancel', function () { activo = false; alvoToque = null; });
+  }
+  ligarGestos(faixaEl, { horizontal: true, baixo: true });
+  ligarGestos(document.getElementById('mobPuxador'), { baixo: true, cima: true, aoTocar: abrirMes });
+  ligarGestos(document.getElementById('mobIniciais'), { baixo: true, cima: true });
+  // Na vista Mês, arrastar a grelha para cima fecha o mês (volta à vista anterior).
+  ligarGestos(vistaEl, { cima: true, soMes: true, semCaptura: true });
+  if (faixaEl) faixaEl.addEventListener('click', function (e) {
+    if (performance.now() < gestoAte) return;   // já tratado no pointerup
+    var b = e.target.closest('[data-faixa-dia]');
+    if (b) tocarDiaFaixa(b.getAttribute('data-faixa-dia'));
+  });
+  document.getElementById('mobPuxador').addEventListener('click', function () {
+    if (performance.now() < gestoAte) return;
+    abrirMes();
+  });
+  document.getElementById('mobTitulo').addEventListener('click', function () {
+    if (vistaEfetiva() === 'mes') fecharMes(); else abrirMes();
+  });
+  /* Menu de vistas: atrás do ícone, fecha ao escolher ou ao tocar fora. */
+  var mobMenu = document.getElementById('mobMenu');
+  var btnVistas = document.getElementById('btnVistas');
+  function fecharMenuVistas() { mobMenu.hidden = true; btnVistas.setAttribute('aria-expanded', 'false'); }
+  btnVistas.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var abrir = mobMenu.hidden;
+    mobMenu.hidden = !abrir;
+    btnVistas.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  });
+  mobMenu.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-vista]');
+    if (!b) return;
+    e.stopPropagation();
+    fecharMenuVistas();
+    setVista(b.getAttribute('data-vista'));
+  });
+  document.addEventListener('click', function (e) { if (!mobMenu.hidden && !e.target.closest('#mobMenu')) fecharMenuVistas(); });
+  document.getElementById('mobHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
+  function fecharPainelDia() {
+    if (sheetDiaAberta()) { fecharSheetDia(); return; }
+    if (estado.diaSelecionado) { estado.diaSelecionado = null; render(); }
+  }
+
+  /* ---------- Bottom sheets de telemóvel ----------
+     Duas folhas e um fundo partilhado, definidos no HTML e sem layout nenhum
+     fora da @media (max-width:767px). A do dia usa renderPainelDia() tal e
+     qual — nenhuma lógica de render é duplicada — e o clique dentro dela
+     passa pelo MESMO handler delegado das vistas (cliqueVista). */
+  var mobBg = document.getElementById('mobBg');
+  var diaSheet = document.getElementById('diaSheet');
+  var diaSheetCorpo = document.getElementById('diaSheetCorpo');
+  var diaSheetTitulo = document.getElementById('diaSheetTitulo');
+  var calCamadas = document.getElementById('calCamadas');
+  /* O #calCamadas TEM de sair da barra para ser folha: o .cal-bar é
+     .glass-light (backdrop-filter) e, em telemóvel, sticky com z-index — as
+     duas coisas fazem dele o bloco contentor de um position:fixed filho e
+     prendem-no ao seu nível de empilhamento, por isso a folha aparecia dentro
+     da barra e por baixo do fundo escurecido. Move-se para o <body> ao abrir e
+     volta ao lugar exacto (antes do #btnCamadas) ao fechar — os botões são os
+     mesmos elementos, com os mesmos handlers, e em desktop nada muda. */
+  var camadasCasa = calCamadas ? calCamadas.parentNode : null;
+  // O vizinho é o selector de vistas de desktop (o #btnCamadas vive na
+  // .mob-bar desde Set/2026).
+  var camadasVizinho = document.getElementById('segVista');
+  function camadasParaFolha() { if (calCamadas && calCamadas.parentNode !== document.body) document.body.appendChild(calCamadas); }
+  function camadasParaBarra() { if (calCamadas && camadasCasa && calCamadas.parentNode !== camadasCasa) camadasCasa.insertBefore(calCamadas, camadasVizinho); }
+
+  function sheetDiaAberta() { return !!(diaSheet && diaSheet.classList.contains('aberta')); }
+  function camadasAbertas() { return !!(calCamadas && calCamadas.classList.contains('aberta')); }
+  function atualizarFundo() {
+    if (mobBg) mobBg.classList.toggle('aberto', sheetDiaAberta() || camadasAbertas());
+  }
+  function limparArrasto(el) { if (el) el.style.removeProperty('--mob-y'); }
+
+  function abrirSheetDia(iso) {
+    if (!diaSheet) return;
+    fecharCamadas();
+    diaSheetTitulo.textContent = tituloDia(iso);
+    diaSheetCorpo.innerHTML = renderPainelDia(iso, { abrirDia: true, semCab: true, semZonaLivre: true });
+    diaSheetCorpo.scrollTop = 0;
+    limparArrasto(diaSheet);
+    diaSheet.classList.add('aberta');
+    atualizarFundo();
+  }
+  function fecharSheetDia() {
+    if (!sheetDiaAberta()) return;
+    diaSheet.classList.remove('aberta');
+    limparArrasto(diaSheet);
+    estado.diaSelecionado = null;
+    atualizarFundo();
+    render();
+  }
+  // Um render (mudança de camada, snapshot novo do Firebase) tem de refrescar
+  // o conteúdo da folha aberta, senão ficava a mostrar dados velhos.
+  function atualizarSheetDia() {
+    if (!sheetDiaAberta()) return;
+    if (!ehMobile() || !estado.diaSelecionado) { fecharSheetDia(); return; }
+    diaSheetTitulo.textContent = tituloDia(estado.diaSelecionado);
+    diaSheetCorpo.innerHTML = renderPainelDia(estado.diaSelecionado, { abrirDia: true, semCab: true, semZonaLivre: true });
+  }
+  function abrirCamadas() {
+    if (!calCamadas) return;
+    fecharSheetDia();
+    camadasParaFolha();
+    limparArrasto(calCamadas);
+    calCamadas.classList.add('aberta');
+    atualizarFundo();
+    var b = document.getElementById('btnCamadas');
+    if (b) b.setAttribute('aria-expanded', 'true');
+  }
+  function fecharCamadas() {
+    if (!camadasAbertas()) return;
+    calCamadas.classList.remove('aberta');
+    limparArrasto(calCamadas);
+    camadasParaBarra();
+    atualizarFundo();
+    var b = document.getElementById('btnCamadas');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  }
+  function fecharSheets() { fecharCamadas(); camadasParaBarra(); if (sheetDiaAberta()) { diaSheet.classList.remove('aberta'); limparArrasto(diaSheet); } atualizarFundo(); }
+
+  if (mobBg) mobBg.addEventListener('click', function () { fecharCamadas(); fecharSheetDia(); });
+
+  /* Arrastar o cabeçalho para baixo fecha a folha (> 80px, ou um gesto
+     rápido). Pointer events: cobre toque, rato e caneta com um só código. */
+  function ligarArrasto(folha, fechar) {
+    var cab = folha ? folha.querySelector('.mob-sheet-cab') : null;
+    if (!cab) return;
+    var y0 = 0, t0 = 0, arrastando = false;
+    cab.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('[data-acao]')) return;   // o × é botão, não puxador
+      arrastando = true; y0 = e.clientY; t0 = Date.now();
+      try { cab.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    cab.addEventListener('pointermove', function (e) {
+      if (!arrastando) return;
+      var dy = Math.max(0, e.clientY - y0);
+      folha.style.setProperty('--mob-y', dy + 'px');
+    });
+    function largar(e) {
+      if (!arrastando) return;
+      arrastando = false;
+      var dy = Math.max(0, e.clientY - y0), dt = Date.now() - t0;
+      folha.style.removeProperty('--mob-y');
+      if (dy > 80 || (dy > 30 && dt < 250)) fechar();
+    }
+    cab.addEventListener('pointerup', largar);
+    cab.addEventListener('pointercancel', function () { arrastando = false; folha.style.removeProperty('--mob-y'); });
+  }
+  ligarArrasto(diaSheet, fecharSheetDia);
+  ligarArrasto(calCamadas, fecharCamadas);
 
   /* Colunas por clusters de sobreposição: eventos que se tocam no tempo
      partilham a largura em partes iguais. */
@@ -733,7 +1771,7 @@
 
   /* blocoDe(item): bloco na grelha horária (só itens com hora; os pagamentos são de dia inteiro). */
   function blocoDe(it) {
-    var c = categoria(it.ev.categoria);
+    var c = paleta(it.ev);
     var base = HORA_INICIO_GRELHA * 60;
     var top = Math.max(0, (it.ini - base) / 60 * PX_HORA);
     var altura = Math.max(24, (it.fim - Math.max(it.ini, base)) / 60 * PX_HORA);
@@ -741,8 +1779,8 @@
     if (top + altura > ALTURA_GRELHA) altura = Math.max(24, ALTURA_GRELHA - top);
     var largura = 100 / it.ncols, left = largura * it.col;
     var horas = it.ev.horaInicio + (it.ev.horaFim ? '–' + it.ev.horaFim : '');
-    return '<button type="button" class="ev-bloco" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
-      '<b>' + iconeLigacao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
+    return '<button type="button" class="ev-bloco' + c.classe + '" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
+      '<b>' + iconeLigacao(it.ev) + iconeReuniao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
   }
 
   function horaColHtml() {
@@ -786,6 +1824,12 @@
     if (chave === ultimoScrollChave) { sc.scrollTop = ultimoScrollTop; return; }
     ultimoScrollChave = chave;
     var alvo = 8 * 60;
+    /* Telemóvel, vista Dia de HOJE: começa 1 hora antes da hora actual (ou
+       no primeiro evento do dia, se for mais cedo — o Math.min a seguir). */
+    if (ehMobile() && dias.length === 1 && dias[0] === hojeISO()) {
+      var agora = new Date();
+      alvo = Math.max(HORA_INICIO_GRELHA * 60, agora.getHours() * 60 + agora.getMinutes() - 60);
+    }
     dias.forEach(function (iso) {
       eventosDoDia(iso).forEach(function (ev) { if (!ev.diaInteiro && ev.horaInicio) alvo = Math.min(alvo, minutos(ev.horaInicio)); });
     });
@@ -810,10 +1854,7 @@
     pags.forEach(function (ev) {
       var pago = ev.extra.estado === 'pago';
       if (!pago) pendente += ev.extra.valor;
-      h += '<button type="button" class="dia-pag' + (pago ? ' pago' : '') + '" data-id="' + escapeHtml(ev.id) + '"><i></i>' +
-        '<span class="dia-pag-t">' + escapeHtml(ev.titulo) + '</span>' +
-        '<span class="dia-pag-v num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span>' +
-        '<span class="status ' + (pago ? 'ok' : 'warn') + '">' + (pago ? 'Pago' : 'Pendente') + '</span></button>';
+      h += pagDiaHtml(ev);
     });
     h += '<div class="dia-pag-total"><span>Pendente no dia</span><b class="num">' + escapeHtml(formatEuro(pendente)) + '</b></div>';
     return h;
@@ -822,6 +1863,45 @@
   /* Painel "Neste dia" — o mesmo nas vistas Mês (lateral, com ×) e Dia.
      opts.fechar → botão × (só faz sentido no Mês); opts.abrirDia → link para a vista Dia. */
   function tituloDia(iso) { return diaSemanaLongo(iso) + ', ' + diaDe(iso) + ' ' + mesCurto(iso); }
+  /* Linha de um item no painel do dia. Extraído em Set/2026 para a vista
+     Semana de telemóvel (faixas empilhadas) reutilizar o MESMO componente —
+     nenhum markup de evento é duplicado por vista. */
+  /* opts.agenda (telemóvel, vista Agenda): o MESMO item, noutra arrumação —
+     hora + duração à esquerda, ponto de 8px com a cor da camada, título a
+     peso médio e uma segunda linha discreta. Sem opts, o markup de sempre. */
+  function itemDiaHtml(ev, opts) {
+    if (ehPagamento(ev)) return pagDiaHtml(ev, opts);
+    var c = paleta(ev);
+    var titulo = iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo);
+    if (opts && opts.agenda) {
+      var hora = ev.diaInteiro || !ev.horaInicio
+        ? '<b>Dia</b><small>inteiro</small>'
+        : '<b>' + escapeHtml(ev.horaInicio) + '</b><small>' + escapeHtml(duracaoCurta(ev.horaInicio, ev.horaFim)) + '</small>';
+      return '<button type="button" class="dia-item ag-item' + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '">' +
+        '<span class="ag-hora num">' + hora + '</span><i class="ag-ponto" style="background:' + c.cor + '"></i>' +
+        '<div class="ag-txt"><div class="dia-item-t">' + titulo + '</div>' +
+        '<div class="dia-item-h">' + escapeHtml(subtituloAgenda(ev)) + '</div></div></button>';
+    }
+    var horas = ev.diaInteiro ? 'Dia inteiro' : (ev.horaInicio || '') + (ev.horaFim ? '–' + ev.horaFim : '');
+    return '<button type="button" class="dia-item' + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '"><i style="background:' + c.cor + '"></i><div style="min-width:0;flex:1">' +
+      '<div class="dia-item-t">' + titulo + '</div>' +
+      '<div class="dia-item-h num">' + escapeHtml(horas) + ' · ' + c.label + '</div>' +
+      (ev.notas ? '<div class="dia-item-n">' + escapeHtml(ev.notas) + '</div>' : '') +
+      '</div></button>';
+  }
+  function pagDiaHtml(ev, opts) {
+    var pago = ev.extra.estado === 'pago';
+    if (opts && opts.agenda) {
+      return '<button type="button" class="dia-pag ag-item' + (pago ? ' pago' : '') + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '">' +
+        '<span class="ag-hora num"><b>Dia</b><small>inteiro</small></span><i class="ag-ponto" style="background:var(--blush)"></i>' +
+        '<div class="ag-txt"><div class="dia-item-t">' + (pago ? '✓ ' : '') + escapeHtml(ev.titulo) + '</div>' +
+        '<div class="dia-item-h"><span class="dia-pag-v num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span> · ' + (pago ? 'Pago' : 'Pendente') + '</div></div></button>';
+    }
+    return '<button type="button" class="dia-pag' + (pago ? ' pago' : '') + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '"><i></i>' +
+      '<span class="dia-pag-t">' + escapeHtml(ev.titulo) + '</span>' +
+      '<span class="dia-pag-v num">' + escapeHtml(formatEuro(ev.extra.valor)) + '</span>' +
+      '<span class="status ' + (pago ? 'ok' : 'warn') + '">' + (pago ? 'Pago' : 'Pendente') + '</span></button>';
+  }
   function renderPainelDia(iso, opts) {
     opts = opts || {};
     var todos = eventosDoDia(iso);
@@ -831,24 +1911,22 @@
     if (!evs.length) {
       lista = '<p class="dia-vazio">Sem eventos neste dia.</p>';
     } else {
-      evs.forEach(function (ev) {
-        var c = categoria(ev.categoria);
-        var horas = ev.diaInteiro ? 'Dia inteiro' : (ev.horaInicio || '') + (ev.horaFim ? '–' + ev.horaFim : '');
-        lista += '<button type="button" class="dia-item" data-id="' + escapeHtml(ev.id) + '"><i style="background:' + c.cor + '"></i><div style="min-width:0;flex:1">' +
-          '<div class="dia-item-t">' + iconeLigacao(ev) + escapeHtml(ev.titulo) + '</div>' +
-          '<div class="dia-item-h num">' + escapeHtml(horas) + ' · ' + c.label + '</div>' +
-          (ev.notas ? '<div class="dia-item-n">' + escapeHtml(ev.notas) + '</div>' : '') +
-          '</div></button>';
-      });
+      evs.forEach(function (ev) { lista += itemDiaHtml(ev); });
     }
-    var cab = '<div class="dia-painel-cab"><h3>' + escapeHtml(tituloDia(iso)) + '</h3>' +
+    /* opts.semCab: na bottom sheet de telemóvel o título da data já vive no
+       cabeçalho da folha — dois títulos seguidos era ruído. */
+    var cab = opts.semCab ? '' : ('<div class="dia-painel-cab"><h3>' + escapeHtml(tituloDia(iso)) + '</h3>' +
       (opts.fechar ? '<button type="button" class="icon-btn" data-acao="fechar" title="Fechar (Esc)" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>' : '') +
-      '</div>';
+      '</div>');
     var rodape = '<div class="dia-rodape">' +
       '<button type="button" class="btn-add" data-acao="novo" data-dia="' + iso + '"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Novo evento</button>' +
       (opts.abrirDia ? '<button type="button" class="dia-abrir" data-acao="abrir-dia" data-dia="' + iso + '">Abrir vista Dia →</button>' : '') +
       '</div>';
-    return '<div class="panel glass-light dia-painel"' + (opts.abrirDia ? ' data-abrir-dia="' + iso + '" title="Abrir vista Dia"' : '') + '>' + cab + lista + seccaoPagamentosHtml(pags) + rodape + '</div>';
+    /* opts.semZonaLivre: dentro da folha do dia a zona livre NÃO abre a vista
+       Dia — ao toque, um toque a meio da lista caía nessa zona sem querer. O
+       botão "Abrir vista Dia →" do rodapé continua lá. */
+    var zonaLivre = opts.abrirDia && !opts.semZonaLivre;
+    return '<div class="panel glass-light dia-painel"' + (zonaLivre ? ' data-abrir-dia="' + iso + '" title="Abrir vista Dia"' : '') + '>' + cab + lista + seccaoPagamentosHtml(pags) + rodape + '</div>';
   }
 
   // Novo evento a partir do painel: se for hoje, começa na próxima hora cheia.
@@ -872,15 +1950,23 @@
   /* ---------- Legenda ---------- */
   document.getElementById('calLegenda').innerHTML = CATEGORIAS.map(function (c) {
     return '<span><i style="background:' + c.cor + '"></i>' + c.label + '</span>';
-  }).join('') + '<span><i style="background:var(--blush)"></i>Pagamentos (Tesouraria, só leitura)</span>';
+  }).join('') + '<span><i style="background:var(--blush)"></i>Pagamentos (Tesouraria, só leitura)</span>' +
+    '<span><i style="background:var(--out-bg)"></i>Outlook (só leitura)</span>';
 
   /* ---------- Interação nas vistas ---------- */
-  vistaEl.addEventListener('click', function (e) {
+  /* Handler delegado das vistas. Ligado a #calVista E ao corpo da bottom
+     sheet do dia — a folha mostra o mesmo markup do painel, por isso responde
+     aos mesmos data-id / data-acao sem uma linha de lógica duplicada. */
+  function cliqueVista(e) {
     var chip = e.target.closest('[data-id]');
     if (chip) {
       e.stopPropagation();
+      // Ramifica por ORIGEM (e não por !editavel): a próxima camada só de
+      // leitura acrescenta um ramo aqui, sem mexer nas outras.
       var item = itensPorId[chip.getAttribute('data-id')];
-      if (item && !item.editavel) abrirDetalhePagamento(item);
+      var org = item ? item.origem : 'manual';
+      if (org === 'pagamentos') abrirDetalhePagamento(item);
+      else if (org === 'outlook') abrirDetalheOutlook(item);
       else abrirEditar(chip.getAttribute('data-id'));
       return;
     }
@@ -888,9 +1974,10 @@
     if (acao) {
       e.stopPropagation();
       var a = acao.getAttribute('data-acao'), d = acao.getAttribute('data-dia');
-      if (a === 'fechar') fecharPainelDia();
+      if (a === 'fechar' || a === 'fechar-dia-sheet') fecharPainelDia();
       else if (a === 'novo') novoNoDia(d);
-      else if (a === 'abrir-dia') { estado.dataRef = d; setVista('dia'); render(); }
+      else if (a === 'abrir-dia') { fecharSheets(); estado.dataRef = d; setVista('dia'); render(); }
+      else if (a === 'agenda-mais') agendaMais();
       return;
     }
     // Zona livre do painel (fora de chips, botões e ×): abre a vista Dia.
@@ -911,6 +1998,16 @@
     // selecionado não fecha. Criar evento passa a ser pelo painel ou pelo N.
     var mesCel = e.target.closest('.mes-cel');
     if (mesCel) { selecionarDia(mesCel.getAttribute('data-dia')); }
+  }
+  vistaEl.addEventListener('click', cliqueVista);
+  if (diaSheetCorpo) diaSheetCorpo.addEventListener('click', cliqueVista);
+  if (diaSheet) diaSheet.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-acao="fechar-dia-sheet"]');
+    if (a) { e.stopPropagation(); fecharSheetDia(); }
+  });
+  if (calCamadas) calCamadas.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-acao="fechar-camadas"]');
+    if (a) { e.stopPropagation(); fecharCamadas(); }
   });
   vistaEl.addEventListener('dblclick', function (e) {
     var num = e.target.closest('[data-dia-num]');
@@ -922,6 +2019,41 @@
   document.getElementById('btnHoje').addEventListener('click', function () { setDataRef(hojeISO()); });
   document.getElementById('btnNovo').addEventListener('click', function () { abrirNovo({ data: estado.dataRef }); });
   document.getElementById('camadaPag').addEventListener('click', function () { setCamadaPag(!camadaPag); });
+  document.getElementById('outConta').addEventListener('click', abrirContaOutlook);
+  document.getElementById('outErro').addEventListener('click', abrirDiagnosticoOutlook);
+  document.getElementById('camadaOut').addEventListener('click', function () {
+    var est = GiocoOutlook.estado();
+    // 'a-verificar', 'webview' e 'indisponivel' não fazem nada: o botão está
+    // desactivado nesses estados e o detalhe abre pelo link ao lado.
+    if (est !== 'ligado' && est !== 'desligado') return;
+    if (est === 'ligado') { setCamadaOut(!camadaOut); return; }
+    // Sem sessão: o botão é "Ligar Outlook". Um erro aqui fica na barra e
+    // não mexe em mais nada do calendário.
+    var btn = this, txt = document.getElementById('camadaOutTxt');
+    btn.disabled = true; txt.textContent = 'A ligar…';
+    outErro = ''; outErroObj = null;
+    GiocoOutlook.ligar().then(function (c) {
+      btn.disabled = false;
+      if (c) setCamadaOut(true);   // ligou agora: mostra logo a camada
+      else render();               // caiu para redirect: a página vai embora
+    })['catch'](function (e) {
+      btn.disabled = false;
+      // Guarda-se o objecto INTEIRO: o errorMessage do MSAL é o que diz mesmo
+      // o que se passou, e antes era deitado fora em favor do errorCode.
+      registarErroOutlook(e, true);
+      render();
+    });
+  });
+  /* Telemóvel: o botão de camadas (na .mob-bar) abre/fecha a folha com os
+     MESMOS toggles (#calCamadas), e o flutuante cria no dia selecionado (ou
+     no dia de referência). O formulário é o do gioco-eventos.js, como em
+     desktop. */
+  document.getElementById('btnCamadas').addEventListener('click', function () {
+    if (camadasAbertas()) fecharCamadas(); else abrirCamadas();
+  });
+  document.getElementById('fabNovo').addEventListener('click', function () {
+    novoNoDia(estado.diaSelecionado || estado.dataRef);
+  });
   document.getElementById('segVista').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-vista]');
     if (b) setVista(b.getAttribute('data-vista'));
@@ -933,7 +2065,11 @@
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var k = e.key;
-    if (k === 'Escape') { if (estado.vista === 'mes' && estado.diaSelecionado) { e.preventDefault(); fecharPainelDia(); } }
+    if (k === 'Escape') {
+      if (camadasAbertas()) { e.preventDefault(); fecharCamadas(); }
+      else if (sheetDiaAberta()) { e.preventDefault(); fecharSheetDia(); }
+      else if (estado.vista === 'mes' && estado.diaSelecionado) { e.preventDefault(); fecharPainelDia(); }
+    }
     else if (k === 'ArrowLeft') { e.preventDefault(); navegar(-1); }
     else if (k === 'ArrowRight') { e.preventDefault(); navegar(1); }
     else if (k === 't' || k === 'T') { e.preventDefault(); setDataRef(hojeISO()); }
@@ -963,6 +2099,143 @@
     fechar.addEventListener('click', function () { giocoModal.close(); });
     corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, abrir])]));
     giocoModal.open({ titulo: 'Pagamento', conteudo: corpo });
+  }
+
+  /* ---------- Detalhe só de leitura de um evento do Outlook ----------
+     Mesmo padrão do detalhe dos pagamentos (.pag-detalhe + .ev-actions).
+     NUNCA abre o formulário de edição: a fonte é o Outlook, e o OS não
+     escreve lá nem copia o evento para o nó eventos/. */
+  function abrirDetalheOutlook(item) {
+    var x = item.extra || {};
+    var corpo = el('div', { 'class': 'pag-detalhe out-detalhe' });
+    corpo.appendChild(el('p', { 'class': 'pag-titulo', text: item.titulo }));
+    function kv(k, v) { corpo.appendChild(el('div', { 'class': 'pag-kv' }, [el('span', { text: k }), v])); }
+    var dia = diaSemanaLongo(item.data) + ', ' + diaDe(item.data) + ' ' + mesCurto(item.data) + ' ' + anoDe(item.data);
+    var horas = item.diaInteiro ? 'Dia inteiro' : (item.horaInicio || '') + (item.horaFim ? '–' + item.horaFim : '');
+    kv('Quando', el('span', { 'class': 'num', text: dia + ' · ' + horas }));
+    /* O campo Local quando é SÓ o URL da reunião não se mostra: fica
+       redundante ao lado do botão "Entrar na reunião". Com texto à volta
+       ("Sala 2 · https://…"), mostra-se o texto como sempre. */
+    var localSoLink = !!(x.reuniao && String(x.local || '').trim() === x.reuniao.url);
+    if (x.local && !localSoLink) kv('Local', el('span', { text: x.local }));
+    if (x.reuniao) kv('Videochamada', el('span', { text: x.reuniao.servico }));
+    if (x.organizador) kv('Organizador', el('span', { text: x.organizador }));
+    kv('Origem', el('span', { text: 'Outlook · só leitura' }));
+
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    /* Ordem visual: [Fechar] [Entrar na reunião] [Abrir no Outlook].
+       Com link de reunião, a acção provável é ENTRAR, não ir ver o convite:
+       o "Entrar" fica com o .btn-add cheio e o "Abrir no Outlook" desce a
+       .ev-btn-outline, para não haver dois botões vermelhos indistintos. Sem
+       reunião, o "Abrir no Outlook" continua a ser o primário, como sempre. */
+    var direita = [fechar];
+    if (x.reuniao) {
+      direita.push(el('a', {
+        'class': 'btn-add', href: x.reuniao.url, target: '_blank', rel: 'noopener noreferrer',
+        title: 'Abrir ' + x.reuniao.servico + ' em nova janela', text: 'Entrar na reunião'
+      }));
+    }
+    if (x.webLink) {
+      direita.push(el('a', {
+        'class': x.reuniao ? 'ev-btn-outline' : 'btn-add',
+        href: x.webLink, target: '_blank', rel: 'noopener noreferrer', text: 'Abrir no Outlook'
+      }));
+    }
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, direita)]));
+    giocoModal.open({ titulo: 'Evento do Outlook', conteudo: corpo });
+  }
+
+  /* Painel de diagnóstico do Outlook (giocoModal).
+     Existe porque o telemóvel não tem consola nem hover: sem isto, um login
+     falhado em iOS mostrava três palavras e mais nada. Mostra o errorCode E o
+     errorMessage completos, o redirectUri resolvido em runtime (a causa número
+     um de redirect_uri_mismatch), o ambiente detectado e o user agent. */
+  function textoDiagnostico() {
+    var d = GiocoOutlook.diagnostico();
+    var e = outErroObj || {};
+    var linhas = [
+      'GIOCO OS · diagnóstico do Outlook',
+      new Date().toISOString(),
+      '',
+      'errorCode:    ' + (e.errorCode || d.errorCode || '—'),
+      'errorMessage: ' + (e.errorMessage || e.message || d.errorMessage || '—'),
+      'subError:     ' + (e.subError || d.subError || '—'),
+      'correlationId:' + (e.correlationId || d.correlationId || '—'),
+      '',
+      'estado:       ' + d.estado,
+      'redirectUri:  ' + d.redirectUri,
+      'href:         ' + window.location.href,
+      'ambiente:     ios=' + d.ambiente.ios + ' webview=' + d.ambiente.webview +
+        (d.ambiente.motivo ? ' (' + d.ambiente.motivo + ')' : ''),
+      'MSAL:         ' + d.sdk,
+      'redirect deu sessão: ' + d.redirectTrouxeSessao,
+      '',
+      'userAgent:',
+      d.ua
+    ];
+    if (e.stack) linhas.push('', 'stack:', String(e.stack));
+    return linhas.join('\n');
+  }
+
+  function abrirDiagnosticoOutlook() {
+    var texto = textoDiagnostico();
+    var corpo = el('div', { 'class': 'diag' });
+    var est = GiocoOutlook.estado();
+    if (est === 'webview') {
+      corpo.appendChild(el('p', { text: 'Estás a ver esta página dentro de um browser embutido numa app. ' +
+        'A Microsoft bloqueia o login nestes browsers, por isso nem se tenta. ' +
+        'Abre a página no Safari (menu ··· → "Abrir no Safari") e liga aí a conta — ' +
+        'a sessão fica guardada e o resto do calendário funciona na mesma aqui.' }));
+    } else {
+      corpo.appendChild(el('p', { text: 'Detalhe técnico do último erro. Copia e envia isto se for preciso perceber o que falhou.' }));
+    }
+    corpo.appendChild(el('pre', { text: texto }));
+
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    var copiar = el('button', { type: 'button', 'class': 'btn-add', text: 'Copiar' });
+    copiar.addEventListener('click', function () {
+      function feito() { copiar.textContent = 'Copiado ✓'; setTimeout(function () { copiar.textContent = 'Copiar'; }, 2000); }
+      function falhou() {
+        // Sem clipboard (contexto não seguro, permissão negada): seleciona o
+        // texto para o utilizador copiar à mão, que em iOS é um toque longo.
+        copiar.textContent = 'Seleciona e copia';
+        var pre = corpo.querySelector('pre');
+        try {
+          var r = document.createRange(); r.selectNodeContents(pre);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        } catch (err) {}
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(feito, falhou);
+      } else { falhou(); }
+    });
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, copiar])]));
+    giocoModal.open({ titulo: est === 'webview' ? 'Abre no Safari' : 'Diagnóstico do Outlook', conteudo: corpo });
+  }
+
+  /* Painel da conta Microsoft: quem está ligado e o botão de desligar.
+     Desligar é LOCAL — limpa a cache do MSAL neste browser e não manda o
+     Manel para a página de logout da Microsoft (ver gioco-outlook.js). */
+  function abrirContaOutlook() {
+    var c = GiocoOutlook.conta() || { email: '', nome: '' };
+    var corpo = el('div', { 'class': 'out-conta' });
+    corpo.appendChild(el('p', { 'class': 'out-email', text: c.email || c.nome || 'Conta ligada' }));
+    corpo.appendChild(el('p', { text: 'O calendário é lido em Calendars.Read. O GIOCO OS nunca escreve no Outlook nem copia estes eventos para a agenda do OS.' }));
+    var desligar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Desligar conta' });
+    var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });
+    fechar.addEventListener('click', function () { giocoModal.close(); });
+    desligar.addEventListener('click', function () {
+      desligar.disabled = true; desligar.textContent = 'A desligar…';
+      GiocoOutlook.desligar().then(function () {
+        outEventos = []; outCache = {}; outIntervalo = null; outErro = '';
+        setCamadaOut(false);
+        giocoModal.close();
+      });
+    });
+    corpo.appendChild(el('div', { 'class': 'ev-actions' }, [el('div', { 'class': 'ev-actions-right' }, [fechar, desligar])]));
+    giocoModal.open({ titulo: 'Conta Microsoft', conteudo: corpo });
   }
 
   /* ---------- Modais de evento (gioco-eventos.js) ----------
@@ -1019,7 +2292,9 @@
       var qs = new URLSearchParams(window.location.search);
       var dia = qs.get('dia');
       if (dia && isoValida(dia)) {
-        estado.vista = 'mes';
+        // Ao telemóvel a Agenda a partir desse dia diz o mesmo que o painel
+        // lateral do Mês diz em desktop — e a folha do dia abre por cima.
+        estado.vista = ehMobile() ? 'agenda' : 'mes';
         estado.dataRef = dia;
         estado.diaSelecionado = dia;
       }
@@ -1055,7 +2330,27 @@
   recibosRef.on('value', function (s) { allRecibos = s.val() || {}; carregado.recibos = true; render(); });
   pessoasRef.on('value', function (s) { allPessoas = s.val() || {}; carregado.pessoas = true; render(); });
 
+  /* O MSAL JÁ arrancou lá em cima, em paralelo com o Firebase (ver o bloco
+     antes do autenticarEContinuar). Aqui só nos ligamos à promessa para voltar
+     a desenhar quando o estado deixar de ser 'a-verificar'. */
+  GiocoOutlook.pronto().then(function (resultado) {
+    /* Regresso do redirect (telemóvel): dois casos que antes ficavam mudos.
+       1) Trouxe sessão → o Manel tinha carregado em "Ligar Outlook" antes
+          de a página ir embora, por isso liga-se a camada de imediato, tal
+          como o ramo do popup faz (senão voltava com o botão em "Outlook"
+          desligado e parecia que o login não tinha feito nada).
+       2) Trouxe um erro (state perdido pelo ITP, redirect_uri_mismatch,
+          consentimento recusado…) → vai para o #outErro e para a consola,
+          em vez de morrer dentro do handleRedirectPromise. */
+    if (resultado && GiocoOutlook.estaLigado()) { setCamadaOut(true); return; }
+    var erroRed = GiocoOutlook.erroDoRedirect();
+    if (erroRed) registarErroOutlook(erroRed, true);
+    render();
+  }, function () { render(); });
+
   render();
+  // Deep-link ?dia= ao telemóvel: o painel lateral não existe, abre a folha.
+  if (ehMobile() && estado.diaSelecionado) abrirSheetDia(estado.diaSelecionado);
   }); // fim de autenticarEContinuar
 </script>
 

@@ -70,9 +70,9 @@ for f in *.html; do
 done
 
 # 9. Fuga do link privado (regra da navegação).
-fuga=$(grep -rln 'href=[^>]*mrn-dashboard' --include='*.html' . | grep -vE 'tesouraria.html|conta-bancaria.html|calendario.html' || true)
+fuga=$(grep -rln 'href=[^>]*mrn-dashboard' --include='*.html' . | grep -vE 'tesouraria.html|conta-bancaria.html|calendario.html|reconciliacao.html' || true)
 if [ -n "$fuga" ]; then
-  erro "link privado mrn-dashboard fora de tesouraria/conta-bancaria: $fuga"
+  erro "link privado mrn-dashboard fora de tesouraria/conta-bancaria/calendario/reconciliacao: $fuga"
 fi
 
 # 10. index.html tem de linkar todas as páginas públicas da nav partilhada.
