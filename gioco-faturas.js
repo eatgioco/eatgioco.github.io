@@ -295,7 +295,14 @@
     });
   }
 
-  function compressImageDataUrl(file, maxWidth, quality) {
+  // Limites de imagem do Azure Document Intelligence: cada lado entre 50 e 10000 px.
+  var IMG_LADO_MIN = 50;
+  var IMG_LADO_MAX = 10000;
+
+  // Redimensiona pelo LADO MAIOR (Set/2026 — antes só a largura contava, e uma foto
+  // ao alto de 3000×4000 ficava em 1600×2133) e sai sempre JPEG. `info` (opcional)
+  // recebe {largura, altura, qualidade} da imagem produzida.
+  function compressImageDataUrl(file, maxLado, quality, info) {
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onload = function (e) {
@@ -303,14 +310,23 @@
         img.onload = function () {
           var w = img.width;
           var h = img.height;
-          if (w > maxWidth) {
-            h = Math.round(h * maxWidth / w);
-            w = maxWidth;
+          var maior = Math.max(w, h);
+          var tecto = Math.min(maxLado, IMG_LADO_MAX);
+          if (maior > tecto) {
+            var f = tecto / maior;
+            w = Math.round(w * f);
+            h = Math.round(h * f);
+          }
+          if (w < IMG_LADO_MIN || h < IMG_LADO_MIN) {
+            var g = IMG_LADO_MIN / Math.min(w, h);
+            w = Math.ceil(w * g);
+            h = Math.ceil(h * g);
           }
           var canvas = document.createElement('canvas');
           canvas.width = w;
           canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          if (info) { info.largura = w; info.altura = h; info.qualidade = quality; }
           resolve(canvas.toDataURL('image/jpeg', quality));
         };
         img.onerror = function () { reject(new Error('Não foi possível processar a imagem.')); };
@@ -319,6 +335,55 @@
       reader.onerror = function () { reject(new Error('Não foi possível ler o ficheiro.')); };
       reader.readAsDataURL(file);
     });
+  }
+
+  // ===== Payload para o Azure (Set/2026) =====
+  // O tier F0 recusa ficheiros acima de 4 MB e uma foto de iPhone tem 3–5 MB — o
+  // OCR mandava o ficheiro ORIGINAL em base64 (+33 %) e o POST era rejeitado. Agora
+  // vai a MESMA imagem comprimida do arquivo (compressImageDataUrl, 1600 px, 0.8) e,
+  // se o base64 ainda passar dos 4 MB, desce-se por passos: qualidade 0.8 → 0.6 →
+  // 0.5, depois 1200 px (mínimo, para o texto continuar legível) com os mesmos
+  // três níveis. Se nem assim couber, NÃO se envia — falha cedo sem gastar quota.
+  // PDFs vão tal e qual, com o mesmo tecto.
+  var OCR_MAX_BASE64_BYTES = 4 * 1024 * 1024;
+  var OCR_PASSOS = [
+    { lado: 1600, qualidade: 0.8 }, { lado: 1600, qualidade: 0.6 }, { lado: 1600, qualidade: 0.5 },
+    { lado: 1200, qualidade: 0.8 }, { lado: 1200, qualidade: 0.6 }, { lado: 1200, qualidade: 0.5 }
+  ];
+
+  function base64DeDataUrl(dataUrl) {
+    var comma = String(dataUrl || "").indexOf(',');
+    return comma === -1 ? String(dataUrl || "") : dataUrl.substring(comma + 1);
+  }
+
+  function erroImagemGrande(imagem) {
+    var e = new Error('Imagem demasiado grande para o serviço de leitura');
+    e.codigo = 'demasiadoGrande';
+    e.fase = 'preparacao';
+    e.imagem = imagem;
+    return e;
+  }
+
+  // → { base64, imagem: { mime, largura, altura, qualidade, bytesBase64, bytesOriginal, passos } }
+  // Lança erroImagemGrande (codigo 'demasiadoGrande') sem tocar na rede.
+  async function prepararImagemParaOcr(file) {
+    var ehImagem = !!(file.type && file.type.indexOf('image/') === 0);
+    if (!ehImagem) {
+      var b64 = await fileToBase64(file);
+      var infoPdf = { mime: file.type || null, largura: null, altura: null, qualidade: null, bytesBase64: b64.length, bytesOriginal: file.size || null, passos: 0 };
+      if (b64.length > OCR_MAX_BASE64_BYTES) throw erroImagemGrande(infoPdf);
+      return { base64: b64, imagem: infoPdf };
+    }
+    var ultimo = null;
+    for (var i = 0; i < OCR_PASSOS.length; i++) {
+      var passo = OCR_PASSOS[i];
+      var info = {};
+      var dataUrl = await compressImageDataUrl(file, passo.lado, passo.qualidade, info);
+      var base64 = base64DeDataUrl(dataUrl);
+      ultimo = { mime: 'image/jpeg', largura: info.largura, altura: info.altura, qualidade: info.qualidade, bytesBase64: base64.length, bytesOriginal: file.size || null, passos: i + 1 };
+      if (base64.length <= OCR_MAX_BASE64_BYTES) return { base64: base64, imagem: ultimo };
+    }
+    throw erroImagemGrande(ultimo);
   }
 
   function prepararArquivoFatura(file) {
@@ -387,24 +452,80 @@
     } catch (e) { return null; }
   }
 
+  // ===== Timeouts (Set/2026) =====
+  // Antes não havia nenhum: um POST pendurado ficava pendurado. Agora o POST tem
+  // 20 s e cada GET do polling 10 s (AbortController); o tecto de 30 s do ciclo de
+  // polling (POLL_TIMEOUT_MS) mantém-se. Um timeout sai com codigo 'timeout' e a
+  // fase, distinguível do "sem rede" na UI e no ocrErro.
+  var POST_TIMEOUT_MS = 20000;
+  var POLL_FETCH_TIMEOUT_MS = 10000;
+
+  function erroTimeout(fase, ms) {
+    var e = new Error('O serviço de leitura não respondeu a tempo (' + Math.round(ms / 1000) + ' s, ' + fase + ')');
+    e.codigo = 'timeout';
+    e.fase = fase;
+    return e;
+  }
+
+  async function fetchComTimeout(url, init, ms, fase) {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms) : null;
+    try {
+      return await fetch(url, Object.assign({}, init, ctrl ? { signal: ctrl.signal } : {}));
+    } catch (err) {
+      if (ctrl && ctrl.signal.aborted) throw erroTimeout(fase, ms);
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  // ===== 1 pedido de cada vez (Set/2026) =====
+  // O F0 aceita ~1 transação por segundo. Todas as chamadas a analyzeInvoice da
+  // MESMA página entram numa fila: a seguinte só arranca quando a anterior acaba
+  // (com sucesso ou erro), e nunca menos de 1 s depois do último POST.
+  var filaOcr = Promise.resolve();
+  var ultimoPostEm = 0;
+  var INTERVALO_MIN_POST_MS = 1000;
+
+  function analyzeInvoice(file, opts) {
+    var corrida = filaOcr.then(function () { return analyzeInvoiceAgora(file, opts); });
+    filaOcr = corrida.catch(function () {}); // um erro não trava a fila
+    return corrida;
+  }
+
   // opts (opcional): { sleep(ms), onEspera({ms, tentativa, fase}) } — o sleep injectável
   // é para os testes; onEspera alimenta o indicador de progresso da página.
-  async function analyzeInvoice(file, opts) {
+  // Qualquer erro lançado depois da preparação leva err.imagem (o que se ia enviar).
+  async function analyzeInvoiceAgora(file, opts) {
     opts = opts || {};
     var dormir = opts.sleep || sleep;
     var onEspera = opts.onEspera || function () {};
-    var base64 = await fileToBase64(file);
+    var preparado = await prepararImagemParaOcr(file); // pode lançar 'demasiadoGrande' sem rede
+    var imagem = preparado.imagem;
+    try {
+      return await enviarEEsperar(preparado.base64, dormir, onEspera);
+    } catch (err) {
+      if (err && typeof err === 'object' && !err.imagem) err.imagem = imagem;
+      throw err;
+    }
+  }
+
+  async function enviarEEsperar(base64, dormir, onEspera) {
     var analyzeUrl = AZURE_ENDPOINT + "documentintelligence/documentModels/" + AZURE_MODEL_ID +
       ":analyze?api-version=" + AZURE_API_VERSION;
 
-    var postResp = await fetch(analyzeUrl, {
+    var desdeUltimo = Date.now() - ultimoPostEm;
+    if (ultimoPostEm && desdeUltimo < INTERVALO_MIN_POST_MS) await dormir(INTERVALO_MIN_POST_MS - desdeUltimo);
+    ultimoPostEm = Date.now();
+    var postResp = await fetchComTimeout(analyzeUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Ocp-Apim-Subscription-Key': AZURE_KEY
       },
       body: JSON.stringify({ base64Source: base64 })
-    });
+    }, POST_TIMEOUT_MS, 'post');
 
     if (postResp.status !== 202) {
       // O 429 no POST não é repetido AQUI: quem chama decide (o backfill repete com a
@@ -426,13 +547,13 @@
     var tentativas429 = 0;
     while (true) {
       if (Date.now() - start > POLL_TIMEOUT_MS) {
-        throw new Error('Tempo limite excedido a ler a fatura.');
+        throw erroTimeout('ciclo', POLL_TIMEOUT_MS);
       }
       await dormir(POLL_INTERVAL_MS);
 
-      var pollResp = await fetch(operationLocation, {
+      var pollResp = await fetchComTimeout(operationLocation, {
         headers: { 'Ocp-Apim-Subscription-Key': AZURE_KEY }
-      });
+      }, POLL_FETCH_TIMEOUT_MS, 'poll');
       if (pollResp.status === 429) {
         // A análise JÁ está a correr no Azure (a página já contou): repetir o GET com
         // backoff é o que evita reiniciar e gastar outra página.
@@ -539,6 +660,11 @@
     AZURE_MODEL_ID: AZURE_MODEL_ID,
     ler: ler,
     analyzeInvoice: analyzeInvoice,
+    prepararImagemParaOcr: prepararImagemParaOcr,
+    OCR_MAX_BASE64_BYTES: OCR_MAX_BASE64_BYTES,
+    OCR_PASSOS: OCR_PASSOS,
+    POST_TIMEOUT_MS: POST_TIMEOUT_MS,
+    POLL_FETCH_TIMEOUT_MS: POLL_FETCH_TIMEOUT_MS,
     RETRY_429: RETRY_429,
     esperaRetry429: esperaRetry429,
     erroHttp: erroHttp,

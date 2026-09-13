@@ -2342,6 +2342,7 @@
         status: diag.status, fase: diag.fase, tipo: diag.tipo, mensagem: diag.mensagem,
         corpo: diag.corpo, duracaoMs: duracaoMs,
         ficheiroTipo: file.type || null, ficheiroBytes: file.size || null,
+        imagem: diag.imagem,
         timestamp: new Date().toISOString()
       } }).catch(function(e2){ console.error('[caixa] Não gravou ocrErro:', e2); });
       if (devolver !== st || st.id !== idLeitura) return;
@@ -2360,25 +2361,36 @@
   }
   window.onFicheiroEscolhido = onFicheiroEscolhido;
 
-  // Três causas distintas para a UI (Set/2026), sem mexer no motor:
-  //   'rede'    — o fetch nem chegou a responder (sem rede, DNS, CORS, timeout do polling);
+  // Cinco causas distintas para a UI (Set/2026), sem mexer no motor:
+  //   'tamanho' — a imagem não coube nos 4 MB do F0 nem com a compressão máxima;
+  //               nada foi enviado (err.codigo 'demasiadoGrande');
+  //   'timeout' — o POST (20 s) ou um GET do polling (10 s) ou o ciclo (30 s)
+  //               não respondeu a tempo (err.codigo 'timeout');
+  //   'rede'    — o fetch nem chegou a responder (sem rede, DNS, CORS);
   //   'servico' — o Azure respondeu com erro de autenticação (401/403), limite (429)
   //               ou outro HTTP ≠ 2xx/202;
   //   'leitura' — o serviço respondeu OK mas a análise falhou / não reconheceu a fatura.
+  // `imagem` = o que se enviou (ou se ia enviar): mime, largura, altura, qualidade,
+  // bytesBase64, bytesOriginal, passos — vem do gioco-faturas.js (err.imagem).
   function classificarErroLeitura(err, duracaoMs, file){
     var msg = (err && err.message) ? String(err.message) : 'erro desconhecido';
     var status = (err && typeof err.status === 'number') ? err.status : null;
     var corpo = (err && typeof err.corpo === 'string') ? err.corpo.slice(0, 2000) : null;
     var fase = (err && err.fase) ? err.fase : null;
+    var imagem = (err && err.imagem && typeof err.imagem === 'object') ? err.imagem : null;
     var tipo;
-    if (status !== null) tipo = 'servico';
-    else if (/Tempo limite|Failed to fetch|NetworkError|Load failed|network/i.test(msg) || (err && err.name === 'TypeError')) tipo = 'rede';
+    if (err && err.codigo === 'demasiadoGrande') tipo = 'tamanho';
+    else if (err && err.codigo === 'timeout') tipo = 'timeout';
+    else if (status !== null) tipo = 'servico';
+    else if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg) || (err && err.name === 'TypeError')) tipo = 'rede';
     else tipo = 'leitura';
-    return { status: status, corpo: corpo, fase: fase, tipo: tipo, mensagem: msg, duracaoMs: duracaoMs };
+    return { status: status, corpo: corpo, fase: fase, tipo: tipo, mensagem: msg, duracaoMs: duracaoMs, imagem: imagem };
   }
 
   function mensagemErroLeitura(st){
     var base = ' — a foto fica guardada; introduz o troco à mão';
+    if (st.erroLeituraTipo === 'tamanho') return 'Imagem demasiado grande para o serviço de leitura' + base;
+    if (st.erroLeituraTipo === 'timeout') return 'O serviço de leitura não respondeu a tempo' + base;
     if (st.erroLeituraTipo === 'rede') return 'Sem ligação ao serviço de leitura' + base;
     if (st.erroLeituraTipo === 'servico') return 'O serviço de leitura recusou o pedido (autenticação ou limite de utilização)' + base;
     return 'O serviço leu a foto mas não reconheceu a fatura' + base;
