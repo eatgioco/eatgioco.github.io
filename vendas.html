@@ -3090,8 +3090,8 @@
   var SEM_CATEGORIA = 'Sem categoria';
   var SEM_SUBCATEGORIA = 'Sem subcategoria';
   var VISTAS_TOP = [
-    { id:'produtos',      icone:'Produtos',      titulo:'Uma linha por produto' },
     { id:'subcategorias', icone:'Subcategorias', titulo:'Produtos agregados por subcategoria' },
+    { id:'produtos',      icone:'Produtos',      titulo:'Uma linha por produto' },
     { id:'categorias',    icone:'Categorias',    titulo:'Produtos agregados por categoria' }
   ];
 
@@ -3122,8 +3122,10 @@
   }
 
   function vistaTopDe(){
+    // Subcategorias por omissão (pedido do Manel, Set/2026); só uma escolha
+    // explícita guardada em vistasGrafico muda para Produtos ou Categorias.
     var v = estado.vistasGrafico.topProdutos;
-    return (v === 'subcategorias' || v === 'categorias') ? v : 'produtos';
+    return (v === 'produtos' || v === 'categorias') ? v : 'subcategorias';
   }
 
   function vistaProdutos(p){
