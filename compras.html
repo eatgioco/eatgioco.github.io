@@ -2507,6 +2507,21 @@ window.addEventListener('load', function () {
     return m ? decodeURIComponent(m[1]) : null;
   })();
 
+  // Deep-link ?pesquisa=texto (vindo do botão "Comprar" de uma falta em texto
+  // livre na loja-sao-bento.html): abre a aba "Por ingrediente" com esse texto
+  // na pesquisa. Só uma vez, na primeira carga; não escreve nada.
+  // Com origem=falta (botão "Comprar" de uma falta da loja-sao-bento.html) o
+  // destino é a FICHA DE LEITURA na aba "Por ingrediente" — a que tem o
+  // "Comprar agora" com o fornecedor resolvido e o carrinho — e não o modal de
+  // edição da gestao.html. O carrinho já foi escrito pela loja; aqui só se lê.
+  var deepLinkOrigemFalta = /[?&]origem=falta(?:&|$)/.test(window.location.search);
+
+  var deepLinkPesquisa = (function () {
+    var m = /[?&]pesquisa=([^&]*)/.exec(window.location.search);
+    if (!m) return null;
+    try { return decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() || null; } catch (e) { return null; }
+  })();
+
   ingredientesRef.on('value', function (snapshot) {
     allIngredientes = snapshot.val() || {};
     if (ingredientesSection && ingredientesSection.style.display !== 'none') {
@@ -2519,7 +2534,22 @@ window.addEventListener('load', function () {
     if (deepLinkIngrediente && allIngredientes[deepLinkIngrediente]) {
       var alvo = deepLinkIngrediente;
       deepLinkIngrediente = null;
-      setTimeout(function () { openIngModal(alvo); }, 0);
+      if (deepLinkOrigemFalta) {
+        setTimeout(function () { activarAba(tabIngrediente); renderIngGrid(); openIngSheet(alvo); }, 0);
+      } else {
+        setTimeout(function () { openIngModal(alvo); }, 0);
+      }
+    }
+    if (deepLinkPesquisa) {
+      var texto = deepLinkPesquisa;
+      deepLinkPesquisa = null;
+      setTimeout(function () {
+        activarAba(tabIngrediente);
+        ingSearchInput.value = texto;
+        ingCurrentSearch = texto.toLowerCase();
+        renderIngGrid();
+        ingSearchInput.focus();
+      }, 0);
     }
   }, function (error) {
     ingStatusMsg.textContent = "Erro de ligação à base de dados: " + error.message;
