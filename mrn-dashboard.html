@@ -1913,7 +1913,8 @@
     margin-bottom:6px;
   }
 
-  .modal-campo input[type="number"]{
+  .modal-campo input[type="number"],
+  .modal-campo input[data-valor]{
     width:100%;
     font-family:'Inter', sans-serif;
     font-variant-numeric:tabular-nums;
@@ -1926,7 +1927,8 @@
     color:var(--ink);
   }
 
-  .modal-campo input[type="number"]:focus{
+  .modal-campo input[type="number"]:focus,
+  .modal-campo input[data-valor]:focus{
     outline:none;
     border-color:var(--red);
   }
@@ -2490,7 +2492,7 @@
       </div>
       <div class="field">
         <label class="field-label">Montante (€) *</label>
-        <input type="number" id="npMontante" min="0" step="0.01">
+        <input type="text" inputmode="decimal" autocomplete="off" data-valor id="npMontante" placeholder="0,00">
       </div>
       <div class="field">
         <label class="field-label">Prazo *</label>
@@ -2574,7 +2576,7 @@
     <p class="modal-contexto" id="devolucaoContexto"></p>
     <div class="modal-campo">
       <label for="devolucaoValor">Valor a devolver (€)</label>
-      <input type="number" id="devolucaoValor" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      <input type="text" id="devolucaoValor" inputmode="decimal" autocomplete="off" data-valor placeholder="0,00">
     </div>
     <p class="modal-erro" id="devolucaoErro"></p>
     <div class="modal-actions">
@@ -3513,7 +3515,14 @@ window.addEventListener('load', function () {
 
   btnGuardarNovoPagamento.addEventListener('click', function () {
     var descricao = document.getElementById('npDescricao').value.trim();
-    var montante = document.getElementById('npMontante').value.trim();
+    var npMontanteEl = document.getElementById('npMontante');
+    var montanteBruto = npMontanteEl.value.trim();
+    var montanteNum = montanteBruto === '' ? NaN : parseValor(montanteBruto);
+    var montanteMau = montanteBruto !== '' && (isNaN(montanteNum) || montanteNum <= 0);
+    giocoValorErro(npMontanteEl, montanteMau ? 'Escreve um montante maior do que zero (ex.: 120,50)' : null);
+    if (montanteMau) return;
+    // Forma canónica com ponto, a mesma que o type="number" dava (o resto do OS lê com parseMontante).
+    var montante = isNaN(montanteNum) ? '' : String(Math.round(montanteNum * 100) / 100);
     var prazoIso = document.getElementById('npPrazo').value;
     var referencia = document.getElementById('npReferencia').value.trim();
     var iban = document.getElementById('npIban').value.trim();
@@ -5572,7 +5581,7 @@ window.addEventListener('load', function () {
       formatDataCurta(mov.dataHora) + ' — ' + (mov.pessoa || '—') + ' — ' +
       'por depositar ' + formatEuro(devolucaoMaximo);
     devolucaoValorInput.value = '';
-    devolucaoValorInput.max = devolucaoMaximo;
+    giocoValorErro(devolucaoValorInput, null);
     devolucaoErroEl.textContent = '';
     devolucaoSimBtn.disabled = true;
     devolucaoSimBtn.textContent = '↩ Confirmar devolução';
@@ -5586,9 +5595,10 @@ window.addEventListener('load', function () {
   }
 
   function validarDevolucao(){
-    var valor = parseFloat(devolucaoValorInput.value);
+    var bruto = devolucaoValorInput.value.trim();
+    var valor = parseValor(bruto);
     if (!(valor > 0)){
-      devolucaoErroEl.textContent = '';
+      devolucaoErroEl.textContent = (bruto !== '') ? 'Escreve um valor maior do que zero (ex.: 20,00)' : '';
       devolucaoSimBtn.disabled = true;
       return null;
     }

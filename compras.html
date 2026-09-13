@@ -2168,7 +2168,7 @@
         </div>
         <div class="field">
           <label class="field-label">Preço última compra (€)</label>
-          <input type="number" step="0.01" min="0" id="ingFPrecoUltimaCompra" placeholder="ex: 3.45">
+          <input type="text" inputmode="decimal" autocomplete="off" data-valor id="ingFPrecoUltimaCompra" placeholder="ex: 3,45">
         </div>
         <div class="field">
           <label class="field-label">Data da última compra</label>
@@ -2926,7 +2926,7 @@ window.addEventListener('load', function () {
     ingFCategoria.value = ing.categoria || "";
     renderIngFornecedorOptions(ing.fornecedor);
     ingFUnidade.value = ing.unidade || "";
-    ingFPrecoUltimaCompra.value = (ing.precoUltimaCompra === null || ing.precoUltimaCompra === undefined) ? "" : ing.precoUltimaCompra;
+    ingFPrecoUltimaCompra.value = (typeof ing.precoUltimaCompra === 'number') ? formatValor(ing.precoUltimaCompra) : "";
     ingFDataUltimaCompra.value = ing.dataUltimaCompra || "";
     ingModalAliases = Array.isArray(ing.aliases) ? ing.aliases.slice() : [];
     ingFAliasInput.value = "";
@@ -2986,8 +2986,14 @@ window.addEventListener('load', function () {
     });
 
     var precoVal = ingFPrecoUltimaCompra.value.trim();
-    var preco = precoVal === '' ? null : parseFloat(precoVal);
-    if (preco !== null && isNaN(preco)) preco = null;
+    var preco = precoVal === '' ? null : parseValor(precoVal);
+    // Texto que não é um número nunca grava null em silêncio: bloqueia com aviso inline.
+    if (preco !== null && (isNaN(preco) || preco < 0)) {
+      giocoValorErro(ingFPrecoUltimaCompra, 'Escreve o preço em euros (ex.: 3,45)');
+      ingFPrecoUltimaCompra.focus();
+      return;
+    }
+    giocoValorErro(ingFPrecoUltimaCompra, null);
 
     var data = {
       nome: ingFNome.value.trim(),

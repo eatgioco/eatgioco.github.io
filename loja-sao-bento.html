@@ -448,7 +448,8 @@
     color:var(--ink);
   }
 
-  .field input[type="number"]{
+  .field input[type="number"],
+  .field input[data-valor]{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
     font-weight:700;
@@ -1747,7 +1748,7 @@
 
         <div class="field">
           <label class="field-label" for="temp-valor">Temperatura (°C)</label>
-          <input type="number" id="temp-valor" inputmode="decimal" step="0.1" placeholder="0.0">
+          <input type="text" id="temp-valor" inputmode="decimal" autocomplete="off" data-valor="1" placeholder="0,0">
         </div>
 
         <div class="field">
@@ -2817,7 +2818,9 @@
     e.preventDefault();
 
     var equipamento = document.getElementById('temp-equipamento').value;
-    var temperatura = parseFloat(document.getElementById('temp-valor').value);
+    var tempEl = document.getElementById('temp-valor');
+    var temperatura = parseValor(tempEl.value);
+    giocoValorErro(tempEl, (tempEl.value.trim() !== '' && isNaN(temperatura)) ? 'Escreve a temperatura em °C (ex.: 3,5 ou -18)' : null);
     var pessoaSelecao = resolvePessoaSelecao(document.getElementById('temp-pessoa'));
     var notas = document.getElementById('temp-notas').value.trim();
     var fileInput = document.getElementById('temp-foto');
@@ -3075,8 +3078,8 @@
   function onEquipTipoChange(){
     var tipo = document.getElementById('equipEdit-tipo').value;
     var def = EQUIP_TIPO_LIMITES_DEFAULT[tipo] || { min: null, max: null };
-    document.getElementById('equipEdit-limiteMin').value = (def.min === null || def.min === undefined) ? '' : def.min;
-    document.getElementById('equipEdit-limiteMax').value = (def.max === null || def.max === undefined) ? '' : def.max;
+    document.getElementById('equipEdit-limiteMin').value = (typeof def.min === 'number') ? formatValor(def.min, 1) : '';
+    document.getElementById('equipEdit-limiteMax').value = (typeof def.max === 'number') ? formatValor(def.max, 1) : '';
   }
   window.onEquipTipoChange = onEquipTipoChange;
 
@@ -3095,10 +3098,12 @@
     }
 
     function numOrNull(elId){
-      var raw = document.getElementById(elId).value.trim();
-      if (raw === '') return null;
-      var n = parseFloat(raw);
-      if (isNaN(n)) throw new Error('Valor numérico inválido.');
+      var el = document.getElementById(elId);
+      var raw = el.value.trim();
+      if (raw === '') { giocoValorErro(el, null); return null; }
+      var n = parseValor(raw);
+      if (isNaN(n)) { giocoValorErro(el, 'Escreve um número (ex.: 12,5)'); throw new Error('Valor numérico inválido.'); }
+      giocoValorErro(el, null);
       return n;
     }
 
@@ -3267,6 +3272,7 @@
     var isNovo = !eq;
     var d = equipDraft || {};
     var val = function(v){ return (v === null || v === undefined) ? '' : v; };
+    var valNum = function(v, casas){ return (typeof v === 'number') ? formatValor(v, casas) : val(v); };
     var html = '<div class="equip-manage-panel">';
 
     if (!isNovo){
@@ -3310,17 +3316,17 @@
       html += '<option value="' + t + '"' + (d.tipo === t ? ' selected' : '') + '>' + EQUIP_TIPO_LABELS[t] + '</option>';
     });
     html += '</select></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMin">Limite mínimo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMin" step="0.1" value="' + val(d.limiteMin) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMax">Limite máximo (°C, vazio = sem limite)</label><input type="number" id="equipEdit-limiteMax" step="0.1" value="' + val(d.limiteMax) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMin">Limite mínimo (°C, vazio = sem limite)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-limiteMin" value="' + valNum(d.limiteMin, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-limiteMax">Limite máximo (°C, vazio = sem limite)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-limiteMax" value="' + valNum(d.limiteMax, 1) + '"></div>';
 
     html += '<p class="equip-manage-zona-title">Ficha</p>';
     html += '<div class="equip-ficha-grid">';
-    html += '<div class="field"><label class="field-label" for="equipEdit-largura">Largura (cm)</label><input type="number" id="equipEdit-largura" step="0.1" value="' + val(d.largura) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-profundidade">Profundidade (cm)</label><input type="number" id="equipEdit-profundidade" step="0.1" value="' + val(d.profundidade) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-altura">Altura (cm)</label><input type="number" id="equipEdit-altura" step="0.1" value="' + val(d.altura) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-largura">Largura (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-largura" value="' + valNum(d.largura, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-profundidade">Profundidade (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-profundidade" value="' + valNum(d.profundidade, 1) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-altura">Altura (cm)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="1" id="equipEdit-altura" value="' + valNum(d.altura, 1) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-potencia">Potência (W)</label><input type="number" id="equipEdit-potencia" step="1" value="' + val(d.potencia) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-fornecedor">Fornecedor</label><input type="text" id="equipEdit-fornecedor" value="' + escapeHtml(val(d.fornecedor)) + '"></div>';
-    html += '<div class="field"><label class="field-label" for="equipEdit-valorAquisicao">Valor de aquisição (€)</label><input type="number" id="equipEdit-valorAquisicao" step="0.01" value="' + val(d.valorAquisicao) + '"></div>';
+    html += '<div class="field"><label class="field-label" for="equipEdit-valorAquisicao">Valor de aquisição (€)</label><input type="text" inputmode="decimal" autocomplete="off" data-valor="2" id="equipEdit-valorAquisicao" value="' + valNum(d.valorAquisicao, 2) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-dataAquisicao">Data de aquisição</label><input type="date" id="equipEdit-dataAquisicao" value="' + val(d.dataAquisicao) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-garantiaAte">Garantia até</label><input type="date" id="equipEdit-garantiaAte" value="' + val(d.garantiaAte) + '"></div>';
     html += '<div class="field"><label class="field-label" for="equipEdit-periodicidadeManutencao">Manutenção a cada (meses)</label><input type="number" id="equipEdit-periodicidadeManutencao" step="1" value="' + val(d.periodicidadeManutencao) + '"></div>';

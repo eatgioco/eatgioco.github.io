@@ -379,6 +379,14 @@
     return RETRY_429.esperasMs[Math.min(tentativa - 1, RETRY_429.esperasMs.length - 1)];
   }
 
+  // Corpo de uma resposta de erro, para diagnóstico — nunca falha (devolve null).
+  async function lerCorpoResposta(resp) {
+    try {
+      var t = await resp.text();
+      return t ? String(t).slice(0, 2000) : null;
+    } catch (e) { return null; }
+  }
+
   // opts (opcional): { sleep(ms), onEspera({ms, tentativa, fase}) } — o sleep injectável
   // é para os testes; onEspera alimenta o indicador de progresso da página.
   async function analyzeInvoice(file, opts) {
@@ -401,8 +409,11 @@
     if (postResp.status !== 202) {
       // O 429 no POST não é repetido AQUI: quem chama decide (o backfill repete com a
       // mesma política; o upload manual mostra o erro). Vai com status e Retry-After.
+      // Diagnóstico (Set/2026): o corpo da resposta segue em err.corpo (até 2000
+      // caracteres) — antes ficava por ler e o erro era sempre "HTTP N" e mais nada.
       var ePost = erroHttp('Pedido inicial ao Azure falhou (HTTP ' + postResp.status + ')', postResp.status, postResp.headers.get('Retry-After'));
       ePost.fase = 'post';
+      ePost.corpo = await lerCorpoResposta(postResp);
       throw ePost;
     }
 
@@ -435,11 +446,19 @@
         continue;
       }
       if (!pollResp.ok) {
-        throw erroHttp('Erro a consultar o resultado (HTTP ' + pollResp.status + ')', pollResp.status, null);
+        var ePoll = erroHttp('Erro a consultar o resultado (HTTP ' + pollResp.status + ')', pollResp.status, null);
+        ePoll.fase = 'poll';
+        ePoll.corpo = await lerCorpoResposta(pollResp);
+        throw ePoll;
       }
       var pollJson = await pollResp.json();
       if (pollJson.status === 'succeeded') return pollJson.analyzeResult;
-      if (pollJson.status === 'failed') throw new Error('A análise da fatura falhou no Azure.');
+      if (pollJson.status === 'failed') {
+        var eFalha = new Error('A análise da fatura falhou no Azure.');
+        eFalha.fase = 'analise';
+        eFalha.corpo = pollJson.error ? JSON.stringify(pollJson.error).slice(0, 2000) : null;
+        throw eFalha;
+      }
       // running / notStarted -> continua a fazer polling
     }
   }

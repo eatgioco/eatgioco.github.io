@@ -513,6 +513,90 @@
 
   var giocoModal = { open: modalOpen, close: modalClose, isOpen: modalIsOpen };
 
+  /* ---------- CAMPOS DE VALOR (parseValor / formatValor) ----------
+     Set/2026: os campos monetários/decimais do OS deixaram de ser
+     <input type="number">. No iOS com teclado pt-PT o utilizador escreve
+     "4,50", o type="number" só aceita ponto, e o browser devolve "" — o valor
+     perdia-se em silêncio. Passaram a <input type="text" inputmode="decimal"
+     autocomplete="off" data-valor[="casas"]>, e quem lê usa parseValor().
+
+     parseValor(str)  → Number ou NaN. Aceita "4,50", "4.50", "1.234,56",
+                        "1,234.56", "€ 12", "-0,5". Vazio → NaN (nunca 0).
+     formatValor(n, casas=2) → "4,50" (vírgula, sem separador de milhar —
+                        volta a passar por parseValor sem perdas).
+     giocoValorErro(input, msg|null) → mostra/esconde uma mensagem inline
+                        (.valor-erro) logo a seguir ao campo e marca o input.
+     No blur, qualquer input[data-valor] é reformatado com formatValor
+     (data-valor="1" → 1 casa) e dispara 'input' para o estado da página
+     acompanhar; se o texto não for um número, fica como está e marcado
+     .invalido — nunca se inventa um valor. */
+  function parseValor(str) {
+    if (typeof str === 'number') return isFinite(str) ? str : NaN;
+    if (str === null || str === undefined) return NaN;
+    var s = String(str).replace(/[€\s ]/g, '');
+    if (s === '' || s === '-' || /[.,]{2}/.test(s)) return NaN;
+    var ultimaVirg = s.lastIndexOf(',');
+    var ultimoPonto = s.lastIndexOf('.');
+    if (ultimaVirg !== -1 && ultimoPonto !== -1) {
+      // Os dois presentes: o que aparece por último é o decimal, o outro é de milhar.
+      if (ultimaVirg > ultimoPonto) s = s.replace(/\./g, '').replace(',', '.');
+      else s = s.replace(/,/g, '');
+    } else if (ultimaVirg !== -1) {
+      // Só vírgulas: uma = decimal; várias = separadores de milhar.
+      s = (s.indexOf(',') === ultimaVirg) ? s.replace(',', '.') : s.replace(/,/g, '');
+    } else if (ultimoPonto !== -1 && s.indexOf('.') !== ultimoPonto) {
+      s = s.replace(/\./g, '');
+    }
+    if (!/^-?\d+(\.\d+)?$/.test(s) && !/^-?\.\d+$/.test(s)) return NaN;
+    var n = Number(s);
+    return isFinite(n) ? n : NaN;
+  }
+
+  function formatValor(num, casas) {
+    var n = (typeof num === 'number') ? num : parseValor(num);
+    if (typeof n !== 'number' || !isFinite(n)) return '';
+    var c = (typeof casas === 'number') ? casas : 2;
+    return n.toFixed(c).replace('.', ',');
+  }
+
+  function giocoValorErro(input, msg) {
+    if (!input) return;
+    var el = input.nextElementSibling;
+    if (!el || !el.classList || !el.classList.contains('valor-erro')) {
+      if (!msg) { input.classList.remove('invalido'); return; }
+      el = document.createElement('div');
+      el.className = 'valor-erro';
+      input.parentNode.insertBefore(el, input.nextSibling);
+    }
+    if (msg) {
+      el.textContent = msg;
+      el.hidden = false;
+      input.classList.add('invalido');
+    } else {
+      el.textContent = '';
+      el.hidden = true;
+      input.classList.remove('invalido');
+    }
+  }
+
+  function initCamposValor() {
+    document.addEventListener('focusout', function (e) {
+      var input = e.target;
+      if (!input || input.tagName !== 'INPUT' || !input.hasAttribute('data-valor')) return;
+      var bruto = input.value;
+      if (String(bruto).trim() === '') { input.classList.remove('invalido'); return; }
+      var n = parseValor(bruto);
+      if (isNaN(n)) { input.classList.add('invalido'); return; }
+      input.classList.remove('invalido');
+      var casas = parseInt(input.getAttribute('data-valor'), 10);
+      var novo = formatValor(n, isNaN(casas) ? 2 : casas);
+      if (novo !== bruto) {
+        input.value = novo;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+  }
+
   /* ---------- ARRANQUE ---------- */
   function giocoShellInit() {
     injectSprite();
@@ -520,6 +604,7 @@
     initTheme();
     initMenuToque();
     initShellTouch();
+    initCamposValor();
   }
 
   injectSprite(); // o mais cedo possível, para os <use> do markup resolverem
@@ -543,4 +628,7 @@
   window.toggleSidebarPin = toggleSidebarPin;
   window.giocoReadStoredTheme = readStoredTheme;
   window.giocoModal = giocoModal;
+  window.parseValor = parseValor;
+  window.formatValor = formatValor;
+  window.giocoValorErro = giocoValorErro;
 })();

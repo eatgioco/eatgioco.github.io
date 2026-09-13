@@ -396,6 +396,15 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 .cat-chip .circle{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
 .cat-chip span{ font-weight:600; font-size:13.5px; white-space:nowrap; }
 
+/* ===== CAMPOS DE VALOR (parseValor / formatValor, gioco-shell.js) =====
+   input[data-valor] é o campo monetário/decimal do OS (type="text",
+   inputmode="decimal"). Números em Inter + tabular-nums; .invalido quando o
+   texto não é um número; .valor-erro é a mensagem inline logo a seguir. */
+input[data-valor]{ font-variant-numeric:tabular-nums; }
+input[data-valor].invalido{ border-color:var(--red) !important; }
+.valor-erro{ color:var(--red-ink); font-size:12px; font-weight:600; margin-top:6px; }
+.valor-erro:empty, .valor-erro[hidden]{ display:none; }
+
 /* ===== MODAL (giocoModal, gioco-shell.js) =====
    Painel sobreposto genérico. Sem tokens novos: superfície --white (que no
    tema escuro resolve para a superfície escura), texto --ink, rebordos --line.

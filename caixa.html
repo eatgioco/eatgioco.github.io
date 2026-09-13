@@ -217,7 +217,8 @@
     color:var(--ink);
   }
 
-  .field input[type="number"]{
+  .field input[type="number"],
+  .field input[data-valor]{
     font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
     font-size:18px;
     font-weight:700;
@@ -1198,7 +1199,7 @@
 
             <div class="field">
               <label class="field-label" for="valorInput">Valor (€)</label>
-              <input type="number" id="valorInput" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+              <input type="text" id="valorInput" inputmode="decimal" autocomplete="off" data-valor placeholder="0,00">
             </div>
 
             <div class="field">
@@ -2117,7 +2118,11 @@
     var precisaDetalhe = !!opcao && !!opcao.detailLabel && !opcao.detalheOpcional;
     var motivoValido = !!opcao && (!precisaDetalhe || motivoDetalheInput.value.trim().length > 0);
     var trocoValido = !opcao || !opcao.pergTroco || formState.troco !== null;
-    var valid = formState.tipo && parseFloat(valorInput.value) > 0 && motivoValido && trocoValido;
+    var valorNum = parseValor(valorInput.value);
+    var valorValido = !isNaN(valorNum) && valorNum > 0;
+    // Mensagem inline só quando há texto e ele não serve — vazio não é erro, é por preencher.
+    giocoValorErro(valorInput, (valorInput.value.trim() !== '' && !valorValido) ? 'Escreve um valor maior do que zero (ex.: 4,50)' : null);
+    var valid = formState.tipo && valorValido && motivoValido && trocoValido;
     registarBtn.disabled = !valid;
   }
 
@@ -2142,7 +2147,8 @@
     if (registarBtn.disabled) return;
 
     var tipo = formState.tipo;
-    var valor = parseFloat(valorInput.value);
+    var valor = round2(parseValor(valorInput.value));
+    if (isNaN(valor) || valor <= 0) { validateForm(); return; }
     var opcao = currentMotivoOpcao();
     var detalhe = motivoDetalheInput.value.trim();
     // Com detalhe opcional em branco fica só o Label — nunca "Label: ".
@@ -2263,6 +2269,7 @@
       leituraTerminada: false,
       fatura: null,         // resultado do GiocoFaturas.ler
       erroLeitura: null,
+      erroLeituraTipo: null, // 'rede' | 'servico' | 'leitura' (classificarErroLeitura)
       semFatura: false,
       valorDevolvido: '',
       notas: '',
@@ -2314,25 +2321,68 @@
       st.dataUrl = null;
     });
 
+    var inicioLeitura = Date.now();
     GiocoFaturas.ler(file).then(function(lida){
       if (devolver !== st || st.id !== idLeitura) return;
       st.fatura = lida;
       st.erroLeitura = null;
+      st.erroLeituraTipo = null;
     }).catch(function(err){
+      // Diagnóstico (Set/2026): o catch deixou de engolir tudo. Fica na consola o
+      // status HTTP, o corpo da resposta e a duração, e no movimento um ocrErro
+      // (update() só nessa folha) para se perceber a causa a partir do Firebase.
+      var duracaoMs = Date.now() - inicioLeitura;
+      var diag = classificarErroLeitura(err, duracaoMs, file);
+      console.error('[caixa] Leitura da fatura falhou', {
+        status: diag.status, fase: diag.fase, tipo: diag.tipo, duracaoMs: duracaoMs,
+        mensagem: diag.mensagem, corpo: diag.corpo,
+        ficheiro: { nome: file.name, tipo: file.type, bytes: file.size }
+      }, err);
+      movRef.child(idLeitura).update({ ocrErro: {
+        status: diag.status, fase: diag.fase, tipo: diag.tipo, mensagem: diag.mensagem,
+        corpo: diag.corpo, duracaoMs: duracaoMs,
+        ficheiroTipo: file.type || null, ficheiroBytes: file.size || null,
+        timestamp: new Date().toISOString()
+      } }).catch(function(e2){ console.error('[caixa] Não gravou ocrErro:', e2); });
       if (devolver !== st || st.id !== idLeitura) return;
       st.fatura = null;
-      st.erroLeitura = (err && err.message) ? err.message : 'erro desconhecido';
+      st.erroLeitura = diag.mensagem;
+      st.erroLeituraTipo = diag.tipo;
     }).then(function(){
       if (devolver !== st) return;
       st.lendo = false;
       st.leituraTerminada = true;
       var m = allMovs[st.id];
       var esperado = m ? trocoEsperadoDe(m, st) : null;
-      if (esperado !== null && st.valorDevolvido === '') st.valorDevolvido = String(esperado);
+      if (esperado !== null && st.valorDevolvido === '') st.valorDevolvido = formatValor(esperado);
       renderPendentes();
     });
   }
   window.onFicheiroEscolhido = onFicheiroEscolhido;
+
+  // Três causas distintas para a UI (Set/2026), sem mexer no motor:
+  //   'rede'    — o fetch nem chegou a responder (sem rede, DNS, CORS, timeout do polling);
+  //   'servico' — o Azure respondeu com erro de autenticação (401/403), limite (429)
+  //               ou outro HTTP ≠ 2xx/202;
+  //   'leitura' — o serviço respondeu OK mas a análise falhou / não reconheceu a fatura.
+  function classificarErroLeitura(err, duracaoMs, file){
+    var msg = (err && err.message) ? String(err.message) : 'erro desconhecido';
+    var status = (err && typeof err.status === 'number') ? err.status : null;
+    var corpo = (err && typeof err.corpo === 'string') ? err.corpo.slice(0, 2000) : null;
+    var fase = (err && err.fase) ? err.fase : null;
+    var tipo;
+    if (status !== null) tipo = 'servico';
+    else if (/Tempo limite|Failed to fetch|NetworkError|Load failed|network/i.test(msg) || (err && err.name === 'TypeError')) tipo = 'rede';
+    else tipo = 'leitura';
+    return { status: status, corpo: corpo, fase: fase, tipo: tipo, mensagem: msg, duracaoMs: duracaoMs };
+  }
+
+  function mensagemErroLeitura(st){
+    var base = ' — a foto fica guardada; introduz o troco à mão';
+    if (st.erroLeituraTipo === 'rede') return 'Sem ligação ao serviço de leitura' + base;
+    if (st.erroLeituraTipo === 'servico') return 'O serviço de leitura recusou o pedido (autenticação ou limite de utilização)' + base;
+    return 'O serviço leu a foto mas não reconheceu a fatura' + base;
+  }
 
   function onDeclaracaoChange(checkbox){
     if (!devolver) return;
@@ -2357,7 +2407,7 @@
   function conferenciaHtml(m, st){
     var esperado = trocoEsperadoDe(m, st);
     if (esperado === null || st.semFatura) return '';
-    var dev = parseFloat(st.valorDevolvido);
+    var dev = parseValor(st.valorDevolvido);
     if (isNaN(dev)) return '';
     var diff = round2(dev - esperado);
     if (Math.abs(diff) <= TOLERANCIA_TROCO + 1e-9){
@@ -2373,17 +2423,35 @@
     if (el && m) el.innerHTML = conferenciaHtml(m, devolver);
   }
 
+  // Valor devolvido: vazio e 0 são bloqueados (Set/2026) — um troco a zero não se
+  // grava por omissão. A única excepção é a fatura lida dar troco esperado
+  // exactamente 0 (gastou-se tudo): aí o 0 é o valor conferido, não um esquecimento.
+  function erroValorDevolvido(st){
+    var bruto = String(st.valorDevolvido == null ? '' : st.valorDevolvido).trim();
+    if (bruto === '') return null; // por preencher, não é erro — só trava o Guardar
+    var dev = parseValor(bruto);
+    if (isNaN(dev) || dev < 0) return 'Escreve o valor devolvido em euros (ex.: 4,50)';
+    if (dev === 0){
+      var m = allMovs[st.id];
+      var esperado = (m && !st.semFatura) ? trocoEsperadoDe(m, st) : null;
+      if (esperado !== 0) return 'Troco a zero não se grava por omissão — confirma o valor devolvido';
+    }
+    return null;
+  }
+
   function podeGuardar(st){
     if (st.aGuardar) return false;
     var comprovativo = st.semFatura || (st.file && st.leituraTerminada);
-    var dev = parseFloat(st.valorDevolvido);
-    return !!comprovativo && !isNaN(dev) && dev >= 0;
+    var bruto = String(st.valorDevolvido == null ? '' : st.valorDevolvido).trim();
+    return !!comprovativo && bruto !== '' && erroValorDevolvido(st) === null;
   }
 
   function atualizarGuardar(){
     if (!devolver) return;
     var btn = document.getElementById('guardar_' + devolver.id);
     if (btn) btn.disabled = !podeGuardar(devolver);
+    var input = document.getElementById('devolvido_' + devolver.id);
+    if (input) giocoValorErro(input, erroValorDevolvido(devolver));
   }
 
   function devolverFormHtml(m, st){
@@ -2422,7 +2490,7 @@
           html += '<div class="erro">Sem total legível na fatura — introduz o troco à mão</div>';
         }
       } else if (st.erroLeitura){
-        html += '<div class="erro">Não consegui ler a fatura — a foto fica guardada; introduz o troco à mão</div>';
+        html += '<div class="erro">' + escapeHtml(mensagemErroLeitura(st)) + '</div>';
       }
       html += '</div></div>';
     }
@@ -2436,7 +2504,9 @@
     // b) Valor devolvido
     html += '<div class="field" style="margin-top:12px;">';
     html += '  <label class="field-label" for="devolvido_' + id + '">Valor devolvido (€)</label>';
-    html += '  <input type="number" inputmode="decimal" step="0.01" min="0" id="devolvido_' + id + '" value="' + escapeHtml(st.valorDevolvido) + '" oninput="onDevolvidoInput(this)">';
+    html += '  <input type="text" inputmode="decimal" autocomplete="off" data-valor id="devolvido_' + id + '" value="' + escapeHtml(st.valorDevolvido) + '" placeholder="0,00" oninput="onDevolvidoInput(this)">';
+    var erroDev = erroValorDevolvido(st);
+    html += '  <div class="valor-erro"' + (erroDev ? '' : ' hidden') + '>' + (erroDev ? escapeHtml(erroDev) : '') + '</div>';
     html += '  <div class="confere-line" id="confere_' + id + '">' + conferenciaHtml(m, st) + '</div>';
     html += '</div>';
 
@@ -2457,7 +2527,8 @@
     var m = allMovs[st.id];
     if (!m) return;
 
-    var devolvido = round2(parseFloat(st.valorDevolvido));
+    var devolvido = round2(parseValor(st.valorDevolvido));
+    if (isNaN(devolvido)) return;
     var esperado = st.semFatura ? null : trocoEsperadoDe(m, st);
     var confere = (esperado === null) ? null : (Math.abs(devolvido - esperado) <= TOLERANCIA_TROCO + 1e-9);
 
@@ -3087,7 +3158,7 @@
 
   function podeRetirarCofre(st, saldo){
     if (st.aGuardar) return false;
-    var valor = parseFloat(st.valor);
+    var valor = parseValor(st.valor);
     if (isNaN(valor) || valor <= 0) return false;
     if (valor > saldo + 1e-9) return false;
     var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
@@ -3125,10 +3196,13 @@
   function atualizarRetirarCofre(){
     if (!retirarCofre) return;
     var saldo = saldoCofre();
-    var valor = parseFloat(retirarCofre.valor);
+    var valor = parseValor(retirarCofre.valor);
     var excede = !isNaN(valor) && valor > saldo + 1e-9;
     var msgEl = document.getElementById('retirarMaxMsg');
     if (msgEl) msgEl.innerHTML = excede ? 'Máximo: ' + formatEUR(saldo) : '';
+    var bruto = String(retirarCofre.valor == null ? '' : retirarCofre.valor).trim();
+    var inputEl = document.getElementById('retirarValorInput');
+    if (inputEl) giocoValorErro(inputEl, (bruto !== '' && (isNaN(valor) || valor <= 0)) ? 'Escreve um valor maior do que zero (ex.: 20,00)' : null);
     var btn = document.getElementById('btnConfirmarRetirarCofre');
     if (btn) btn.disabled = !podeRetirarCofre(retirarCofre, saldo);
   }
@@ -3136,7 +3210,7 @@
   function retirarCofreFormHtml(saldo){
     var st = retirarCofre;
     var opcao = RETIRAR_MOTIVO_OPTIONS.filter(function(o){ return o.value === st.motivo; })[0];
-    var valor = parseFloat(st.valor);
+    var valor = parseValor(st.valor);
     var excede = !isNaN(valor) && valor > saldo + 1e-9;
 
     var html = '<div class="acertar-form">';
@@ -3152,7 +3226,7 @@
     }
 
     html += '<div class="field"><label class="field-label">Valor (€)</label>';
-    html += '<input type="number" inputmode="decimal" step="0.01" min="0" value="' + escapeHtml(st.valor) + '" oninput="onRetirarValorInput(this)"></div>';
+    html += '<input type="text" inputmode="decimal" autocomplete="off" data-valor id="retirarValorInput" placeholder="0,00" value="' + escapeHtml(st.valor) + '" oninput="onRetirarValorInput(this)"></div>';
 
     html += '<div class="field"><label class="field-label">Pessoa</label>';
     html += '<select id="retirarPessoaSelect" onchange="onRetirarPessoaChange(this)">' + pessoasOptionsHtml(st.pessoaId) + '</select></div>';
@@ -3172,7 +3246,8 @@
     var saldo = saldoCofre();
     if (!st || !podeRetirarCofre(st, saldo)) return;
 
-    var valor = round2(parseFloat(st.valor));
+    var valor = round2(parseValor(st.valor));
+    if (isNaN(valor) || valor <= 0) return;
     var pessoaSel = document.getElementById('retirarPessoaSelect');
     var pessoaVal = pessoaSel ? pessoaSel.value : st.pessoaId;
     var found = pessoasAtivas.filter(function(p){ return p.id === pessoaVal; })[0];

@@ -2071,11 +2071,11 @@
       </div>
       <div class="field">
         <label class="field-label">Valor (€)</label>
-        <input type="number" id="cfValor" min="0" step="0.01">
+        <input type="text" inputmode="decimal" autocomplete="off" data-valor id="cfValor" placeholder="0,00">
       </div>
       <div class="field">
         <label class="field-label">Valor diário (€)</label>
-        <input type="number" id="cfValorDiario" min="0" step="0.01">
+        <input type="text" inputmode="decimal" autocomplete="off" data-valor id="cfValorDiario" placeholder="0,00">
         <span class="field-hint">Opcional, para valores tipo subsídio de refeição calculados por dias úteis do mês. Preenchido, substitui o «Valor (€)».</span>
       </div>
       <div class="field">
@@ -4388,8 +4388,8 @@ window.addEventListener('load', function () {
     document.getElementById('cfParteRecibo').value = c.parteRecibo || '';
     document.getElementById('cfDerivaTsu').checked = derivaTSU(c);
     atualizarVisibilidadePessoaCompromisso();
-    document.getElementById('cfValor').value = (c.valor === undefined || c.valor === null) ? '' : c.valor;
-    document.getElementById('cfValorDiario').value = (c.valorDiario === undefined || c.valorDiario === null) ? '' : c.valorDiario;
+    document.getElementById('cfValor').value = (typeof c.valor === 'number') ? formatValor(c.valor) : ((c.valor === undefined || c.valor === null) ? '' : c.valor);
+    document.getElementById('cfValorDiario').value = (typeof c.valorDiario === 'number') ? formatValor(c.valorDiario) : ((c.valorDiario === undefined || c.valorDiario === null) ? '' : c.valorDiario);
     document.getElementById('cfPeriodicidade').value = c.periodicidade || 'mensal';
     document.getElementById('cfTipo').value = tipoDe(c);
     document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
@@ -4508,6 +4508,15 @@ window.addEventListener('load', function () {
 
     var valorRaw = document.getElementById('cfValor').value.trim();
     var valorDiarioRaw = document.getElementById('cfValorDiario').value.trim();
+    // Vazio continua a valer 0 (compromisso ligado a pessoa / valorDiario); texto
+    // que não é um número bloqueia com aviso inline em vez de gravar 0 em silêncio.
+    var cfValorEl = document.getElementById('cfValor');
+    var cfValorDiarioEl = document.getElementById('cfValorDiario');
+    var valorMau = valorRaw !== '' && (isNaN(parseValor(valorRaw)) || parseValor(valorRaw) < 0);
+    var valorDiarioMau = valorDiarioRaw !== '' && (isNaN(parseValor(valorDiarioRaw)) || parseValor(valorDiarioRaw) < 0);
+    giocoValorErro(cfValorEl, valorMau ? 'Escreve o valor em euros (ex.: 1250,00)' : null);
+    giocoValorErro(cfValorDiarioEl, valorDiarioMau ? 'Escreve o valor diário em euros (ex.: 7,63)' : null);
+    if (valorMau || valorDiarioMau) return;
     var notas = document.getElementById('cfNotas').value.trim();
     var metodoPagamento = document.getElementById('cfMetodoPagamento').value;
     var ibanRaw = document.getElementById('cfIban').value.trim();
@@ -4515,7 +4524,7 @@ window.addEventListener('load', function () {
     var registo = {
       nome: nome,
       categoria: document.getElementById('cfCategoria').value,
-      valor: valorRaw === '' ? 0 : parseMontante(valorRaw),
+      valor: valorRaw === '' ? 0 : Math.round(parseValor(valorRaw) * 100) / 100,
       periodicidade: document.getElementById('cfPeriodicidade').value,
       tipo: document.getElementById('cfTipo').value,
       dia: dia,
@@ -4525,8 +4534,8 @@ window.addEventListener('load', function () {
     };
     // Só grava 'valorDiario' quando tem valor útil — assim os compromissos
     // normais mantêm exactamente a forma que já tinham no nó.
-    if (valorDiarioRaw !== '' && parseMontante(valorDiarioRaw) > 0){
-      registo.valorDiario = parseMontante(valorDiarioRaw);
+    if (valorDiarioRaw !== '' && parseValor(valorDiarioRaw) > 0){
+      registo.valorDiario = Math.round(parseValor(valorDiarioRaw) * 100) / 100;
     }
     // 'pessoaId' só existe quando a categoria é Pessoal E foi escolhida uma
     // pessoa. Fora disso não é gravado, e os compromissos sem ele mantêm
