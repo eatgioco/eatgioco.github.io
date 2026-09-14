@@ -709,12 +709,44 @@
     color:var(--white);
   }
 
+  /* Pedidos & Sugestões (Set/2026): só nesta secção o split-grid passa a uma
+     coluna, para a grelha de cartões ter a largura toda. A .split-grid fica
+     intacta — é partilhada por outras secções da página. Efeito lateral
+     positivo: a 375px deixa de transbordar pela coluna fixa de 380px. */
+  .pedidos-split{
+    grid-template-columns:minmax(0,1fr);
+    gap:20px;
+  }
+
+  .pedidos-split > .form-card{ max-width:420px; }
+
+  /* A partir de 900px de viewport o formulário vai para baixo da lista: em
+     desktop a ação frequente é ler/responder, não submeter. Em telemóvel fica
+     em cima, que é onde o staff submete. Para reverter, apaga este @media. */
+  @media (min-width:900px){
+    .pedidos-split > .form-card{ order:2; }
+  }
+
+  /* Grelha de cartões: colunas reagem à largura do CONTENTOR (auto-fill), não
+     do ecrã. max-width limita a 4 colunas em ecrãs largos. align-items:start
+     para que abrir comentários/sub-itens de um cartão não estique os vizinhos. */
+  .pedidos-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:10px;
+    align-items:start;
+    max-width:1250px;
+    margin-top:10px;
+  }
+
   .pedido-card{
     background:var(--white);
     border:2px solid var(--line);
     padding:14px;
     margin-top:10px;
   }
+
+  .pedidos-grid > .pedido-card{ margin-top:0; }
 
   .pedido-top{
     display:flex;
@@ -1923,7 +1955,7 @@
     <p class="section-title">Pedidos &amp; Sugestões</p>
     <p class="pedidos-counter" id="pedidosCounter">0 por responder</p>
 
-    <div class="split-grid">
+    <div class="split-grid pedidos-split">
     <div class="form-card">
       <div class="field">
         <label class="field-label" for="pedido-descricao">Descrição</label>
@@ -3940,6 +3972,13 @@
 
     var html = '';
 
+    function gridDePedidos(lista){
+      if (!lista.length) return '';
+      var inner = '';
+      lista.forEach(function(id){ inner += buildPedidoCardHtml(id, pedidos[id]); });
+      return '<div class="pedidos-grid">' + inner + '</div>';
+    }
+
     if (pedidosFilterAtual === 'fechados'){
       var recentes = [];
       var arquivo = [];
@@ -3951,7 +3990,7 @@
         }
       });
 
-      recentes.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+      html += gridDePedidos(recentes);
 
       if (recentes.length === 0 && arquivo.length > 0){
         html += '<p class="empty-state">Sem fechados recentes — ver arquivo abaixo.</p>';
@@ -3961,11 +4000,11 @@
         html += '<button type="button" class="link-btn pedidos-archive-toggle" onclick="toggleArquivoPedidos()">' +
           (pedidosArquivoAberto ? '▾ Esconder arquivo' : '▸ Arquivo (' + arquivo.length + ')') + '</button>';
         if (pedidosArquivoAberto){
-          arquivo.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+          html += gridDePedidos(arquivo);
         }
       }
     } else {
-      ids.forEach(function(id){ html += buildPedidoCardHtml(id, pedidos[id]); });
+      html += gridDePedidos(ids);
     }
 
     listEl.innerHTML = html;
