@@ -1313,6 +1313,12 @@
   .topo-grid > .section, .topo-grid > #faltas-section{ margin-top:0; min-width:0; max-width:100%; }
   @media (min-width:900px){
     .topo-grid{ grid-template-columns:minmax(0,2fr) minmax(0,3fr); }
+    /* Esta semana na loja: grelha de 7 colunas em vez da lista empilhada
+       (as regras base .semana-* vivem mais abaixo; a especificidade extra
+       do .semana-card ganha ao display:none de base). */
+    .semana-card .semana-grelha{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:0; align-items:stretch; }
+    .semana-card #semanaLista{ display:none; }
+    .semana-card .semana-grelha-vazio:not([hidden]){ display:block; }
   }
   #faltas-section{ margin-top:8px; }
   .faltas-card{
@@ -1546,6 +1552,59 @@
   .semana-oferta{ font-size:15px; font-weight:700; color:var(--red-ink); }
   .semana-oferta b{ color:var(--ink); }
 
+  /* Navegação de semana (Set/2026): ‹ › + Hoje, no mesmo contorno do Copiar.
+     Abre sempre na semana corrente; as setas valem para as duas vistas. */
+  .semana-nav{ display:inline-flex; align-items:center; gap:4px; }
+  .semana-nav-btn{
+    min-width:36px; min-height:36px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    border-radius:100px; border:2px solid var(--line); background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .semana-nav-btn .icon{ width:16px; height:16px; }
+  .semana-nav-btn:hover{ border-color:var(--ink); }
+  .semana-nav-btn:disabled{ opacity:.4; cursor:default; }
+  .semana-nav-btn:disabled:hover{ border-color:var(--line); }
+
+  /* Vista de CALENDÁRIO SEMANAL (Set/2026), só a partir de 900px de viewport —
+     vive no MESMO @media do .topo-grid, mais abaixo. Fora dele a grelha nasce
+     display:none e a vista empilhada por dia (#semanaLista) fica tal e qual:
+     sem grelha de 7 colunas em ecrã estreito, sem scroll horizontal.
+     7 colunas segunda a domingo, sempre visíveis (mesmo vazias) para se ler
+     como uma semana; altura mínima igual e scroll INTERNO por coluna, para o
+     card não crescer sem limite. Expandir um chip é só UI (classe .aberto). */
+  .semana-grelha{ display:none; }
+  .semana-col{
+    min-width:0; min-height:220px; max-height:420px; overflow-y:auto; overflow-x:hidden;
+    border-left:1px solid var(--line); padding:0 6px 6px;
+  }
+  .semana-col:first-child{ border-left:none; padding-left:0; }
+  .semana-col-t{
+    position:sticky; top:0; z-index:1; background:var(--white);
+    display:flex; align-items:baseline; gap:5px; padding:2px 0 8px; margin-bottom:4px;
+    font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+    border-bottom:2px solid var(--line);
+  }
+  .semana-col-t b{ font-size:16px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; padding:0 6px; border-radius:100px; }
+  .semana-col.hoje .semana-col-t{ color:var(--red-ink); border-bottom-color:var(--red); }
+  .semana-col.hoje .semana-col-t b{ background:var(--red); color:var(--on-red); }
+  .semana-col.passado{ opacity:.45; }
+  .semana-chip{
+    display:block; width:100%; text-align:left; margin-top:6px; padding:6px 8px;
+    border:1.5px solid var(--line); border-radius:8px; background:var(--dough); color:var(--ink);
+    font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .semana-chip:hover{ border-color:var(--ink); }
+  .semana-chip.aberto{ border-color:var(--ink); background:var(--white); }
+  .semana-chip-cab{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .semana-chip-hora{ font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .semana-chip .semana-titulo{ font-size:13px; display:block; margin-top:3px; }
+  .semana-chip .semana-badge{ font-size:9px; padding:2px 6px; }
+  .semana-chip-det{ display:none; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
+  .semana-chip.aberto .semana-chip-det{ display:block; }
+  .semana-chip-det .semana-visita{ margin-top:6px; padding:6px 8px; }
+  .semana-chip-det .semana-oferta{ font-size:14px; }
+  .semana-grelha-vazio{ display:none; margin:8px 0 0; font-size:14px; color:var(--muted); }
+
 </style>
 </head>
 <body class="shell-mobile">
@@ -1691,10 +1750,17 @@
     <p class="section-title">Esta semana na loja</p>
     <div class="semana-card" id="semanaCard">
       <div class="semana-top">
-        <h2>Esta semana</h2>
+        <h2 id="semanaTitulo">Esta semana</h2>
         <span class="semana-intervalo" id="semanaIntervalo"></span>
-        <button type="button" class="semana-copiar" id="semanaCopiar" title="Copiar a semana em texto para colar no WhatsApp"><svg class="icon"><use href="#i-copy"/></svg><span>Copiar semana</span></button>
+        <div class="semana-nav">
+          <button type="button" class="semana-nav-btn" id="semanaAnterior" title="Semana anterior" aria-label="Semana anterior"><svg class="icon"><use href="#i-chevron-left"/></svg></button>
+          <button type="button" class="semana-nav-btn" id="semanaHoje" title="Voltar à semana corrente">Hoje</button>
+          <button type="button" class="semana-nav-btn" id="semanaSeguinte" title="Semana seguinte" aria-label="Semana seguinte"><svg class="icon"><use href="#i-chevron-right"/></svg></button>
+        </div>
+        <button type="button" class="semana-copiar" id="semanaCopiar" title="Copiar a semana visível em texto para colar no WhatsApp"><svg class="icon"><use href="#i-copy"/></svg><span>Copiar semana</span></button>
       </div>
+      <div class="semana-grelha" id="semanaGrelha"></div>
+      <p class="semana-grelha-vazio" id="semanaGrelhaVazio" hidden>Nada marcado para esta semana.</p>
       <div id="semanaLista"><p class="semana-vazio">Nada marcado para esta semana.</p></div>
     </div>
   </div>
@@ -4603,16 +4669,29 @@
   /* ---------- Esta semana na loja (Set/2026) ----------
      SÓ LEITURA. Lê eventos/ com on('value') e mostra apenas os eventos com o
      sub-objeto `comunicado` (normalizado pelo gioco-eventos.js) e não anulados,
-     na semana corrente (segunda a domingo), agrupados por dia e ordenados por
-     hora. Não escreve uma única vez em nó nenhum; não há botões de editar,
-     anular ou concluir. A categoria do evento (incluindo 'loja') NUNCA é
-     critério — só a presença do sub-objeto. */
+     na semana VISÍVEL (abre na corrente; setas ‹ › e Hoje mudam `deslocamento`),
+     segunda a domingo, ordenados por hora. Duas vistas do MESMO markup de
+     evento: grelha de 7 colunas (>= 900px, chips que expandem ao clicar) e
+     lista empilhada por dia (abaixo). Não escreve uma única vez em nó nenhum;
+     não há botões de editar, anular ou concluir. A categoria do evento
+     (incluindo 'loja') NUNCA é critério — só a presença do sub-objeto. */
   (function semanaModulo(){
     var EV = giocoEventosEngine({ eventosRef: db.ref('eventos') });
     var lista = document.getElementById('semanaLista');
+    var grelha = document.getElementById('semanaGrelha');
+    var grelhaVazio = document.getElementById('semanaGrelhaVazio');
+    var tituloEl = document.getElementById('semanaTitulo');
     var intervaloEl = document.getElementById('semanaIntervalo');
     var btnCopiar = document.getElementById('semanaCopiar');
+    var btnAnterior = document.getElementById('semanaAnterior');
+    var btnSeguinte = document.getElementById('semanaSeguinte');
+    var btnHoje = document.getElementById('semanaHoje');
     var eventosBrutos = {};
+    // Semana visível, em semanas a contar da corrente (0 = esta). Só UI.
+    var deslocamento = 0;
+    // Chips abertos na grelha (ids de eventos), para sobreviverem ao re-render
+    // do on('value') e do refresh de minuto a minuto. Só UI, nunca escrita.
+    var abertos = {};
     var DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
     var DIAS_LONGO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -4621,12 +4700,15 @@
     function isoLocal(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
     function deIso(iso){ var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
     function rotuloTipo(c){ return EV.comunicadoTipo(c.tipo).label; }
-    // Semana corrente: segunda a domingo, em datas LOCAIS.
+    // Semana visível: segunda a domingo, em datas LOCAIS, deslocada
+    // `deslocamento` semanas da corrente. `dias` = os 7 ISO da semana.
     function semanaAtual(){
       var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-      var seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7));
+      var seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7) + deslocamento * 7);
       var dom = new Date(seg); dom.setDate(seg.getDate() + 6);
-      return { hoje: isoLocal(hoje), inicio: isoLocal(seg), fim: isoLocal(dom), seg: seg, dom: dom };
+      var dias = [];
+      for (var i = 0; i < 7; i++) { var d = new Date(seg); d.setDate(seg.getDate() + i); dias.push(isoLocal(d)); }
+      return { hoje: isoLocal(hoje), inicio: isoLocal(seg), fim: isoLocal(dom), seg: seg, dom: dom, dias: dias };
     }
     function rotuloIntervalo(s){
       if (s.seg.getMonth() === s.dom.getMonth()) return s.seg.getDate() + ' a ' + s.dom.getDate() + ' ' + MESES[s.dom.getMonth()];
@@ -4655,16 +4737,11 @@
       return porDia;
     }
 
-    function linhaHtml(ev){
-      var c = ev.comunicado;
-      var hora = horaTexto(ev);
-      var h = '<div class="semana-item">' +
-        '<div class="semana-hora">' + (hora ? escapeHtml(hora) : '<small>dia inteiro</small>') + '</div>' +
-        '<div class="semana-main">' +
-          '<div class="semana-linha1">' +
-            '<span class="semana-badge semana-badge-' + escapeHtml(c.tipo) + '">' + escapeHtml(rotuloTipo(c)) + '</span>' +
-            '<span class="semana-titulo">' + escapeHtml(c.titulo) + '</span>' +
-          '</div>';
+    // Detalhes completos de um comunicado (quem · handle · subtipo · pessoas,
+    // detalhe, "Fazer:", bloco de visita). Partilhado pela linha empilhada e
+    // pelo chip da grelha — o markup do evento não é duplicado por vista.
+    function detalhesHtml(c){
+      var h = '';
       var quem = [];
       // "quem" igual ao título não se repete (ex.: visita cujo título é o nome da pessoa).
       var quemDistinto = c.quem && c.quem.trim().toLowerCase() !== c.titulo.trim().toLowerCase();
@@ -4682,26 +4759,85 @@
         if (c.anfitriao) h += '<div><b>Recebe:</b> ' + escapeHtml(c.anfitriao) + '</div>';
         h += '</div>';
       }
-      h += '</div></div>';
       return h;
     }
+    function badgeHtml(c){
+      return '<span class="semana-badge semana-badge-' + escapeHtml(c.tipo) + '">' + escapeHtml(rotuloTipo(c)) + '</span>';
+    }
+
+    // Linha da vista empilhada (telemóvel / < 900px): tal e qual.
+    function linhaHtml(ev){
+      var c = ev.comunicado;
+      var hora = horaTexto(ev);
+      return '<div class="semana-item">' +
+        '<div class="semana-hora">' + (hora ? escapeHtml(hora) : '<small>dia inteiro</small>') + '</div>' +
+        '<div class="semana-main">' +
+          '<div class="semana-linha1">' + badgeHtml(c) + '<span class="semana-titulo">' + escapeHtml(c.titulo) + '</span></div>' +
+          detalhesHtml(c) +
+        '</div></div>';
+    }
+
+    // Chip da grelha (>= 900px): hora | badge | título; clicar abre os
+    // detalhes completos (só UI — classe .aberto, nada é escrito).
+    function chipHtml(ev){
+      var c = ev.comunicado;
+      var hora = horaTexto(ev);
+      var det = detalhesHtml(c);
+      return '<button type="button" class="semana-chip' + (abertos[ev.id] ? ' aberto' : '') + '" data-id="' + escapeHtml(ev.id) + '" aria-expanded="' + (abertos[ev.id] ? 'true' : 'false') + '">' +
+        '<span class="semana-chip-cab">' + (hora ? '<span class="semana-chip-hora">' + escapeHtml(hora) + '</span>' : '') + badgeHtml(c) + '</span>' +
+        '<span class="semana-titulo">' + escapeHtml(c.titulo) + '</span>' +
+        (det ? '<span class="semana-chip-det">' + det + '</span>' : '') +
+        '</button>';
+    }
+
+    function classeDia(dia, s){ return dia === s.hoje ? ' hoje' : (dia < s.hoje ? ' passado' : ''); }
 
     function render(){
       var s = semanaAtual();
       intervaloEl.textContent = rotuloIntervalo(s);
+      tituloEl.textContent = deslocamento === 0 ? 'Esta semana' : 'Semana';
+      btnHoje.disabled = deslocamento === 0;
       var porDia = itensDaSemana(s);
       var dias = Object.keys(porDia).sort();
+
+      // Grelha semanal: os 7 dias sempre presentes, vazios ou não.
+      var g = '';
+      s.dias.forEach(function(dia){
+        var d = deIso(dia);
+        g += '<div class="semana-col' + classeDia(dia, s) + '"><div class="semana-col-t">' + DIAS[d.getDay()] + ' <b>' + d.getDate() + '</b></div>';
+        (porDia[dia] || []).forEach(function(ev){ g += chipHtml(ev); });
+        g += '</div>';
+      });
+      grelha.innerHTML = g;
+      grelhaVazio.hidden = dias.length > 0;
+
+      // Vista empilhada por dia (só os dias com comunicados): inalterada.
       if (!dias.length) { lista.innerHTML = '<p class="semana-vazio">Nada marcado para esta semana.</p>'; return; }
       var html = '';
       dias.forEach(function(dia){
         var d = deIso(dia);
-        var cls = dia === s.hoje ? ' hoje' : (dia < s.hoje ? ' passado' : '');
-        html += '<div class="semana-dia' + cls + '"><p class="semana-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>';
+        html += '<div class="semana-dia' + classeDia(dia, s) + '"><p class="semana-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>';
         porDia[dia].forEach(function(ev){ html += linhaHtml(ev); });
         html += '</div>';
       });
       lista.innerHTML = html;
     }
+
+    // Expandir/recolher um chip da grelha: só UI.
+    grelha.addEventListener('click', function(e){
+      var chip = e.target.closest('.semana-chip');
+      if (!chip) return;
+      var id = chip.getAttribute('data-id');
+      if (abertos[id]) delete abertos[id]; else abertos[id] = true;
+      chip.classList.toggle('aberto', !!abertos[id]);
+      chip.setAttribute('aria-expanded', abertos[id] ? 'true' : 'false');
+    });
+
+    // Navegação de semana: setas e Hoje, nas duas vistas.
+    function mudarSemana(n){ deslocamento = n; abertos = {}; render(); }
+    btnAnterior.addEventListener('click', function(){ mudarSemana(deslocamento - 1); });
+    btnSeguinte.addEventListener('click', function(){ mudarSemana(deslocamento + 1); });
+    btnHoje.addEventListener('click', function(){ mudarSemana(0); });
 
     // Texto simples pronto a colar no WhatsApp.
     function textoSemana(){
