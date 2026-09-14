@@ -308,6 +308,10 @@
       /* Padrões: vendas × contexto externo (calendário + meteo), só leitura.
          'layout-dashboard' é o mais próximo de uma grelha/calendário no sprite. */
       { href: 'padroes.html',    icone: 'layout-dashboard', label: 'Padrões' },
+      /* Social: Instagram (só leitura de social/instagram/) e calendário de
+         publicações (social/calendario/). 'message-square' é o ícone de
+         conversa do sprite — o mais próximo de rede social. */
+      { href: 'social.html',     icone: 'message-square',   label: 'Social' },
       /* Definições ainda não tem página. Link morto de propósito: fica à vista
          no menu, mas não navega para lado nenhum. Com os Resultados a lista
          passou a 10 entradas: é o link morto que fica na 10ª, a única sem

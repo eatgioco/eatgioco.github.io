@@ -671,6 +671,31 @@ contextoDiario        — contexto externo por dia, chave AAAA-MM-DD, escrito S�
                          marketing, operacao, fluxo, parlamento. Ler por intervalo
                          (orderByKey().startAt/endAt), nunca o nó todo, excepto o cruzamento
                          histórico da padroes.html (startAt 2026-05-01)
+social                — Instagram + calendário de publicações (social.html, Set/2026).
+                         social/instagram/{perfil, diario/{AAAA-MM-DD}, posts/{id}, meta}
+                         é escrito SÓ pelo job ig_sync.py do repo mreymao/gioco-bank-sync
+                         (de hora a hora; histórico desde 14/09/2026) — no OS é SÓ
+                         leitura. perfil = { seguidores, aSeguir, totalPosts, username,
+                         atualizadoEm }; diario/{dia} = { seguidores, alcance,
+                         visualizacoes, visitasPerfil, interacoes, cliquesSite,
+                         contasEnvolvidas, alcanceFimPeriodo, atualizadoEm }; posts/{id} =
+                         { id, dataHora, tipo (VIDEO|CAROUSEL_ALBUM|IMAGE), tipoProduto
+                         (REELS|FEED), legenda, permalink, thumbnail (URL do CDN da Meta,
+                         EXPIRA — a página trata o onerror com placeholder), likes,
+                         comentarios, alcance, guardados, partilhas, visualizacoes,
+                         interacoes, atualizadoEm, insightsAtualizadosEm }; meta =
+                         { ultimaSync (ISO), estado ('ok'|'erro'), erro, versao, … }.
+                         A Meta devolve mais posts (37) do que o perfil conta (28) —
+                         conta de forma diferente; a página mostra todos.
+                         social/calendario/{pushId} — o ÚNICO nó onde a social.html
+                         escreve: { data 'AAAA-MM-DD', canal (Feed|Reel|Story|Carrossel),
+                         tema, notas, link ('' ou URL https:, validado antes de gravar),
+                         estado (ideia|pronto|aprovado|publicado), responsavel (nome),
+                         responsavelId (chave de pessoas/ ou ''), criadoEm, atualizadoEm
+                         (ISO) }. Criar = push().set() completo; editar = update() no
+                         registo; apagar = remove() com confirmação (é planeamento, não
+                         registo de negócio — a única excepção à regra "nunca remove()"
+                         ao lado do lojaPedidos)
 mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          escrita SÓ pela foodcost.html. O código é o das chaves de
                          vendasDiario/{AAAA-MM}/{dia}/produtos.

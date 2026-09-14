@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Social">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Social</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  /* ======================================================================
+     social.html — Instagram (só leitura de social/instagram/, escrito pelo
+     job ig_sync.py do repo mreymao/gioco-bank-sync) + calendário de
+     publicações (social/calendario/, o ÚNICO nó onde esta página escreve).
+     Shell e convenções copiadas da loja-sao-bento.html.
+     ====================================================================== */
+
+  body{ -webkit-font-smoothing:antialiased; }
+
+  h1,h2,h3,.mono{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+  }
+
+  main{
+    display:block;
+    margin:0;
+    padding:8px 0 40px;
+  }
+
+  .section{ margin-top:40px; }
+  .section:first-child{ margin-top:8px; }
+
+  .hidden{ display:none !important; }
+
+  .section-title{
+    margin:0 0 12px;
+    font-size:13px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  /* Cabeçalho de secção com título à esquerda e nota discreta à direita
+     ("Atualizado há X min", contadores, navegação de mês). */
+  .section-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .section-head .section-title{ margin:0; }
+  .section-nota{
+    font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;
+  }
+
+  .page-subtitle{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* ---------- Formulário (padrão da loja) ---------- */
+  .form-card{
+    background:var(--white);
+    border:1px solid var(--line);
+    padding:16px;
+  }
+
+  .field{ margin-bottom:12px; }
+
+  .field-label{
+    display:block;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+
+  .field input[type="text"],
+  .field input[type="date"],
+  .field input[type="url"],
+  .field select,
+  .field textarea{
+    width:100%;
+    padding:10px 12px;
+    border:2px solid var(--line);
+    background:var(--dough);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+  }
+
+  .field textarea{ resize:vertical; min-height:72px; }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus{
+    outline:none;
+    border-color:var(--ink);
+  }
+
+  .field-nota{ font-size:11px; color:var(--muted); margin-top:4px; }
+  .field-nota a{ color:var(--red-ink); }
+
+  .btn-registar{
+    width:100%;
+    padding:12px;
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:var(--ink);
+    color:var(--white);
+    border:1px solid var(--line);
+    cursor:pointer;
+  }
+
+  .btn-registar:not(:disabled):hover{
+    background:var(--red);
+    border-color:var(--red);
+  }
+
+  .btn-registar:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+  }
+
+  .btn{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:12px;
+    font-weight:700;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    padding:9px 14px;
+    cursor:pointer;
+    letter-spacing:0.3px;
+    white-space:nowrap;
+  }
+
+  .btn:hover{ background:var(--ink); color:var(--white); }
+  .btn:disabled{ opacity:0.6; cursor:default; }
+
+  .btn-primary{
+    background:var(--red);
+    border-color:var(--red);
+    color:var(--on-red);
+  }
+
+  .btn-primary:hover{
+    background:var(--ink);
+    border-color:var(--ink);
+  }
+
+  .btn-perigo{ color:var(--red-ink); }
+  .btn-perigo:hover{ background:var(--red); border-color:var(--red); color:var(--on-red); }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+
+  .modal-actions .esq{ margin-right:auto; }
+
+  .form-erro{ color:var(--red-ink); font-size:13px; margin:0 0 8px; }
+
+  .empty-state{
+    text-align:center;
+    padding:20px 16px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+
+  .auth-box{
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+
+  .auth-box h2{
+    margin:0 0 8px;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--red-ink);
+  }
+
+  .auth-box p{
+    margin:0 0 16px;
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.55;
+  }
+
+  /* ======================================================================
+     SECÇÃO 1 — Números
+     ====================================================================== */
+  .social-aviso{
+    display:none;
+    border-left:4px solid var(--red);
+    background:var(--white);
+    border-radius:12px;
+    padding:14px 16px;
+    margin:0 0 14px;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .social-aviso.on{ display:block; }
+  .social-aviso b{ color:var(--red-ink); }
+
+  .num-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(170px,100%), 1fr));
+    gap:12px;
+  }
+
+  /* .kpi do shell: raio, folga e o vidro vêm de lá. */
+  .num-grid .kpi{ padding:16px 18px; min-width:0; }
+  .num-grid .kpi > *{ position:relative; z-index:1; }
+  .num-grid .k-label{ margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .num-grid .k-value{ font-size:26px; line-height:1.1; font-variant-numeric:tabular-nums; }
+  .num-grid .k-trend{ color:var(--green); }
+  .num-grid .k-trend.down{ color:var(--red-ink); }
+  .num-grid .k-trend.neutro{ color:var(--muted); }
+  .num-grid .k-sub{ font-size:10.5px; color:var(--muted); margin-top:4px; }
+  .num-grid .k-sub.insuf{ font-style:italic; }
+
+  .grafico-card{
+    margin-top:16px;
+    padding:18px 20px 12px;
+  }
+  .grafico-card > *{ position:relative; z-index:1; }
+  .grafico-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .grafico-head h3{ margin:0; font-size:14px; font-weight:700; }
+  .grafico-host{ width:100%; min-height:200px; }
+  .grafico-host svg{ display:block; width:100%; height:auto; }
+  .grafico-vazio{ font-size:13px; color:var(--muted); padding:24px 0; }
+
+  /* ======================================================================
+     SECÇÃO 2 — Posts (grelha no padrão dos Pedidos da loja)
+     ====================================================================== */
+  .posts-filter-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+
+  .posts-filter-label{
+    font-size:11px; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; margin-right:4px;
+  }
+
+  .pedidos-filter-chip{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:11px;
+    font-weight:700;
+    padding:8px 12px;
+    border:1px solid var(--line);
+    background:var(--white);
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  .pedidos-filter-chip.active{
+    background:var(--ink);
+    color:var(--white);
+  }
+
+  /* Colunas reagem à largura do CONTENTOR (auto-fill). align-items:stretch
+     + cartão em flex column com os números colados ao fundo: todos os
+     cartões da mesma linha ficam com a mesma altura, sem buracos. */
+  .posts-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(280px,100%), 1fr));
+    gap:10px;
+    align-items:stretch;
+    max-width:1250px;
+  }
+
+  .post-card{
+    background:var(--white);
+    border:2px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    color:var(--ink);
+  }
+
+  .post-thumb-link{ display:block; background:var(--dough); }
+
+  .post-thumb,
+  .post-thumb-ph{
+    display:block;
+    width:100%;
+    aspect-ratio:1 / 1;
+    object-fit:cover;
+    background:var(--dough);
+  }
+
+  /* Placeholder discreto quando o URL do CDN da Meta expirou. */
+  .post-thumb-ph{
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px;
+    color:var(--muted); font-size:11px; letter-spacing:.5px; text-transform:uppercase;
+    border-bottom:1px solid var(--line);
+  }
+  .post-thumb-ph .icon{ width:22px; height:22px; opacity:.5; }
+
+  .post-corpo{
+    display:flex; flex-direction:column; flex:1 1 auto; min-height:0;
+    padding:12px 14px 14px;
+  }
+
+  .post-top{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+
+  .post-tipo{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:9px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    padding:3px 7px; border:1px solid var(--line); border-radius:100px; color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .post-data{
+    font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;
+  }
+
+  .post-legenda{
+    margin:10px 0 0;
+    font-size:13px;
+    line-height:1.4;
+    min-height:calc(1.4em * 2);
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden; overflow-wrap:anywhere;
+  }
+  .post-legenda.vazia{ color:var(--muted); font-style:italic; }
+
+  .post-nums{
+    margin-top:auto;
+    padding-top:12px;
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:8px 6px;
+  }
+
+  .post-num{ min-width:0; }
+  .post-num b{
+    display:block; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.15;
+  }
+  .post-num span{
+    display:block; font-size:10px; color:var(--muted); letter-spacing:.3px; text-transform:uppercase;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .post-link{
+    display:inline-flex; align-items:center; gap:4px;
+    margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);
+    font-size:12px; font-weight:600; color:var(--red-ink); text-decoration:none;
+  }
+  .post-link:hover{ text-decoration:underline; }
+  .post-link .icon{ width:12px; height:12px; }
+
+  /* ======================================================================
+     SECÇÃO 3 — Calendário de publicações
+     ====================================================================== */
+  .cal-card{
+    background:var(--white);
+    border:2px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    color:var(--ink);
+  }
+
+  .cal-top{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .cal-top h2{ margin:0; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase; min-width:150px; }
+  .cal-nav{ display:inline-flex; align-items:center; gap:4px; }
+  .cal-nav-btn{
+    min-width:36px; min-height:36px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    border-radius:100px; border:2px solid var(--line); background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .cal-nav-btn .icon{ width:16px; height:16px; }
+  .cal-nav-btn:hover{ border-color:var(--ink); }
+  .cal-nav-btn:disabled{ opacity:.4; cursor:default; }
+  .cal-nav-btn:disabled:hover{ border-color:var(--line); }
+  .cal-novo{
+    min-height:36px; padding:0 14px; display:inline-flex; align-items:center; gap:6px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    border-radius:100px; border:2px solid var(--ink); background:var(--ink); color:var(--white); cursor:pointer;
+    margin-left:auto;
+  }
+  .cal-novo .icon{ width:14px; height:14px; }
+  .cal-novo:hover{ background:var(--red); border-color:var(--red); color:var(--on-red); }
+
+  .cal-legenda{ display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin:0 0 10px; }
+  .cal-legenda span{ display:inline-flex; align-items:center; gap:5px; }
+  .cal-legenda i{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+  .cal-semana{
+    display:grid; grid-template-columns:repeat(7, minmax(0,1fr));
+    font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+    padding:0 0 6px;
+  }
+  .cal-semana span{ padding:0 6px; }
+
+  .cal-grelha{
+    display:grid; grid-template-columns:repeat(7, minmax(0,1fr));
+    border-top:1px solid var(--line); border-left:1px solid var(--line);
+  }
+  .cal-dia{
+    min-height:96px; min-width:0;
+    border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:6px; cursor:pointer;
+    transition:background .12s ease;
+  }
+  .cal-dia:hover{ background:var(--dough); }
+  .cal-dia.fora{ opacity:.4; }
+  .cal-dia-n{
+    display:inline-block; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums;
+    min-width:22px; height:22px; line-height:22px; text-align:center; border-radius:100px;
+  }
+  .cal-dia.hoje .cal-dia-n{ background:var(--red); color:var(--on-red); }
+  .cal-ents{ display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+
+  /* Bloco de entrada: cor por ESTADO (superfícies de selo do shell, texto
+     fixo #141414 — o padrão de .status.* do shell). */
+  .cal-ent{
+    display:block; width:100%; text-align:left; min-width:0;
+    padding:3px 6px; border:none; border-radius:6px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:11px; line-height:1.3; color:#141414;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .cal-ent b{ font-weight:700; margin-right:3px; }
+  .cal-ent:hover{ outline:2px solid var(--ink); outline-offset:-1px; }
+  .cal-ent-ideia{ background:var(--line); color:var(--ink); }
+  .cal-ent-pronto{ background:var(--mustard); }
+  .cal-ent-aprovado{ background:var(--sky); }
+  .cal-ent-publicado{ background:var(--lime); }
+  [data-theme="dark"] .cal-ent-ideia{ color:var(--ink); }
+
+  .cal-legenda .l-ideia{ background:var(--line); }
+  .cal-legenda .l-pronto{ background:var(--mustard); }
+  .cal-legenda .l-aprovado{ background:var(--sky); }
+  .cal-legenda .l-publicado{ background:var(--lime); }
+
+  /* Lista do mês (telemóvel): nasce escondida; troca com a grelha abaixo
+     de 700px, tal como a grelha de Pedidos da loja perde a altura fixa. */
+  .cal-lista{ display:none; }
+  .cal-lista-dia{ padding:10px 0 6px; border-top:1px solid var(--line); }
+  .cal-lista-dia:first-child{ border-top:none; padding-top:2px; }
+  .cal-lista-dia-t{
+    display:flex; align-items:center; gap:8px; margin:0 0 6px;
+    font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  }
+  .cal-lista-dia.hoje .cal-lista-dia-t{ color:var(--red-ink); }
+  .cal-lista .cal-ent{ font-size:13px; padding:8px 10px; margin-top:4px; white-space:normal; min-height:44px; }
+  .cal-lista-add{
+    display:inline-block; margin-top:4px; background:none; border:none; padding:6px 0;
+    font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;
+  }
+  .cal-vazio{ margin:6px 0 4px; font-size:14px; color:var(--muted); }
+
+  @media (max-width:700px){
+    .cal-semana, .cal-grelha{ display:none; }
+    .cal-lista{ display:block; }
+  }
+
+  /* Modal (giocoModal do shell) — conteúdo do formulário. */
+  .cal-modal{ font-size:13px; color:var(--ink); }
+  .cal-modal .field{ margin-bottom:12px; }
+  .cal-modal-2col{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(180px,100%),1fr)); gap:0 12px; }
+  .cal-modal-meta{ font-size:11px; color:var(--muted); margin:0 0 12px; }
+
+  /* Arredondamento (Fase 3 da loja). */
+  .btn, .btn-registar, .pedidos-filter-chip{ border-radius:100px; }
+  input, select, textarea, .form-card{ border-radius:12px; }
+</style>
+</head>
+<body class="shell-mobile">
+<div class="nav-overlay" id="navOverlay"></div>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('social.html');</script>
+    <div class="sidebar-foot">
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-message-square"/></svg>GIOCO · <b>Social</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Instagram e calendário de publicações</p>
+
+      <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+           falhar; ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main>
+
+  <!-- ===================== SECÇÃO 1: Números ===================== -->
+  <div class="section" id="numeros-section">
+    <div class="section-head">
+      <p class="section-title">Números</p>
+      <span class="section-nota" id="numerosSync"></span>
+    </div>
+    <div class="social-aviso" id="numerosAviso"></div>
+    <div class="num-grid" id="numGrid">
+      <div class="kpi glass-light"><div class="k-label">A carregar…</div></div>
+    </div>
+    <div class="card glass-light grafico-card">
+      <div class="grafico-head">
+        <h3>Seguidores por dia</h3>
+        <span class="section-nota" id="graficoNota"></span>
+      </div>
+      <div class="grafico-host" id="graficoSeguidores"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SECÇÃO 2: Posts ===================== -->
+  <div class="section" id="posts-section">
+    <div class="section-head">
+      <p class="section-title">Posts</p>
+      <span class="section-nota" id="postsContador"></span>
+    </div>
+    <div class="posts-filter-row" id="postsOrdemRow">
+      <span class="posts-filter-label">Ordenar por</span>
+      <button type="button" class="pedidos-filter-chip active" data-ordem="data">Data</button>
+      <button type="button" class="pedidos-filter-chip" data-ordem="alcance">Alcance</button>
+      <button type="button" class="pedidos-filter-chip" data-ordem="likes">Likes</button>
+      <button type="button" class="pedidos-filter-chip" data-ordem="interacoes">Interações</button>
+    </div>
+    <div id="postsGrid"><p class="empty-state">A carregar…</p></div>
+  </div>
+
+  <!-- ===================== SECÇÃO 3: Calendário ===================== -->
+  <div class="section" id="calendario-section">
+    <p class="section-title">Calendário de publicações</p>
+    <div class="cal-card">
+      <div class="cal-top">
+        <h2 id="calTitulo">—</h2>
+        <div class="cal-nav">
+          <button type="button" class="cal-nav-btn" id="calAnterior" title="Mês anterior" aria-label="Mês anterior"><svg class="icon"><use href="#i-chevron-left"/></svg></button>
+          <button type="button" class="cal-nav-btn" id="calHoje" title="Voltar ao mês corrente">Hoje</button>
+          <button type="button" class="cal-nav-btn" id="calSeguinte" title="Mês seguinte" aria-label="Mês seguinte"><svg class="icon"><use href="#i-chevron-right"/></svg></button>
+        </div>
+        <button type="button" class="cal-novo" id="calNovo"><svg class="icon"><use href="#i-plus"/></svg><span>Nova entrada</span></button>
+      </div>
+      <div class="cal-legenda">
+        <span><i class="l-ideia"></i>ideia</span>
+        <span><i class="l-pronto"></i>pronto</span>
+        <span><i class="l-aprovado"></i>aprovado</span>
+        <span><i class="l-publicado"></i>publicado</span>
+      </div>
+      <div class="cal-semana"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+      <div class="cal-grelha" id="calGrelha"></div>
+      <div class="cal-lista" id="calLista"></div>
+    </div>
+  </div>
+
+</main>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  autenticarEContinuar(function () {
+  var db = firebase.database();
+
+  /* SÓ LEITURA — escritos pelo job ig_sync.py (repo mreymao/gioco-bank-sync),
+     de hora a hora. Esta página nunca escreve em social/instagram/. */
+  var perfilRef = db.ref('social/instagram/perfil');
+  var diarioRef = db.ref('social/instagram/diario');
+  var metaRef = db.ref('social/instagram/meta');
+  var postsRef = db.ref('social/instagram/posts');
+  /* O ÚNICO nó onde esta página escreve. */
+  var calRef = db.ref('social/calendario');
+  var pessoasRef = db.ref('pessoas');
+
+  /* ---------- Helpers partilhados (padrão da loja-sao-bento.html) ---------- */
+  function escapeHtml(str){
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function isoLocal(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function deIso(iso){ var p = String(iso).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function todayStr(){ return isoLocal(new Date()); }
+  function somarDias(iso, n){ var d = deIso(iso); d.setDate(d.getDate() + n); return isoLocal(d); }
+  function nowIso(){ return new Date().toISOString(); }
+
+  function fmtNum(v){
+    if (v === null || v === undefined || isNaN(Number(v))) return '—';
+    return Number(v).toLocaleString('pt-PT');
+  }
+
+  function fmtDataCurta(iso){
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+
+  function tempoRelativo(iso){
+    var t = new Date(iso).getTime();
+    if (!isFinite(t)) return '';
+    var diff = Math.max(0, Date.now() - t);
+    var min = Math.round(diff / 60000);
+    if (min < 1) return 'agora';
+    if (min < 60) return 'há ' + min + ' min';
+    var h = Math.round(min / 60);
+    if (h < 24) return 'há ' + h + 'h';
+    var d = Math.round(h / 24);
+    return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+  }
+
+  var DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+  var DIAS_LONGO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var MESES_LONGO = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  /* ---------- Pessoas (padrão da loja) ---------- */
+  var pessoasAtivas = [];
+  var pessoasCarregadas = false;
+
+  function carregarPessoas(onUpdate){
+    pessoasRef.on('value', function(snapshot){
+      var val = snapshot.val() || {};
+      pessoasAtivas = Object.keys(val)
+        .map(function(id){ return Object.assign({ id: id }, val[id]); })
+        .filter(function(p){ return p.ativo !== false; })
+        .sort(function(a, b){ return (a.nome || '').localeCompare(b.nome || ''); });
+      pessoasCarregadas = true;
+      onUpdate();
+    });
+  }
+
+  function buildPessoaOptionsHtml(){
+    if (!pessoasCarregadas){
+      return '<option>A carregar...</option>';
+    }
+    var html = '';
+    pessoasAtivas.forEach(function(p){
+      html += '<option value="' + p.id + '">' + escapeHtml(p.nome) + '</option>';
+    });
+    html += '<option value="outro">Outro</option>';
+    return html;
+  }
+
+  function popularSelectPessoas(selectEl){
+    if (!pessoasCarregadas){
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option>A carregar...</option>';
+      return;
+    }
+    selectEl.disabled = false;
+    selectEl.innerHTML = buildPessoaOptionsHtml();
+  }
+
+  function resolvePessoaSelecao(selectEl){
+    var val = selectEl.value;
+    var found = pessoasAtivas.filter(function(p){ return p.id === val; })[0];
+    return {
+      pessoaId: found ? found.id : null,
+      pessoaNome: found ? found.nome : 'Outro'
+    };
+  }
+
+  /* =====================================================================
+     SECÇÃO 1 — Números (só leitura de perfil, diario e meta)
+     ===================================================================== */
+  var perfil = null;
+  var diario = {};
+  var meta = null;
+  var diarioCarregado = false;
+
+  var METRICAS = [
+    { chave: 'alcance',       label: 'Alcance' },
+    { chave: 'visualizacoes', label: 'Visualizações' },
+    { chave: 'visitasPerfil', label: 'Visitas ao perfil' },
+    { chave: 'interacoes',    label: 'Interações' },
+    { chave: 'cliquesSite',   label: 'Cliques no site' }
+  ];
+
+  function diasOrdenados(){
+    return Object.keys(diario).filter(function(k){ return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort();
+  }
+
+  function somaJanela(chave, inicio, fim){
+    var total = 0, n = 0;
+    Object.keys(diario).forEach(function(dia){
+      if (dia < inicio || dia > fim) return;
+      var v = diario[dia] && diario[dia][chave];
+      if (typeof v === 'number' && isFinite(v)){ total += v; n++; }
+    });
+    return { total: total, n: n };
+  }
+
+  // Variação em % de `atual` face a `anterior`. null = não calculável.
+  function variacaoPct(atual, anterior){
+    if (typeof atual !== 'number' || typeof anterior !== 'number') return null;
+    if (!isFinite(atual) || !isFinite(anterior) || anterior === 0) return null;
+    return (atual - anterior) / anterior * 100;
+  }
+
+  function trendHtml(pct, suficiente){
+    if (!suficiente) return '<div class="k-sub insuf">histórico insuficiente</div>';
+    if (pct === null) return '<div class="k-sub">sem base de comparação</div>';
+    var cls = pct > 0 ? '' : (pct < 0 ? ' down' : ' neutro');
+    var seta = pct > 0 ? '▲' : (pct < 0 ? '▼' : '=');
+    var txt = (pct > 0 ? '+' : '') + pct.toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    return '<div class="k-trend' + cls + '">' + seta + ' ' + txt + '</div><div class="k-sub">vs. 7 dias anteriores</div>';
+  }
+
+  function renderNumeros(){
+    var grid = document.getElementById('numGrid');
+    if (!diarioCarregado && !perfil){
+      grid.innerHTML = '<div class="kpi glass-light"><div class="k-label">A carregar…</div></div>';
+      return;
+    }
+
+    var hoje = todayStr();
+    var dias = diasOrdenados();
+    var primeiro = dias.length ? dias[0] : null;
+    // Janela atual = últimos 7 dias (hoje-6 .. hoje); anterior = os 7 antes.
+    var atualIni = somarDias(hoje, -6), antIni = somarDias(hoje, -13), antFim = somarDias(hoje, -7);
+    // Só há comparação a 7 dias quando o histórico já cobre os 14 dias.
+    var suficiente = !!primeiro && primeiro <= antIni;
+
+    var html = '';
+
+    // Seguidores: valor atual do perfil; variação face ao valor de há 7 dias.
+    var segAtual = perfil && typeof perfil.seguidores === 'number' ? perfil.seguidores : null;
+    var segAntes = diario[antFim] && typeof diario[antFim].seguidores === 'number' ? diario[antFim].seguidores : null;
+    html += '<div class="kpi glass-light">' +
+      '<div class="k-label">Seguidores</div>' +
+      '<div class="k-value">' + fmtNum(segAtual) + '</div>' +
+      trendHtml(variacaoPct(segAtual, segAntes), suficiente && segAntes !== null) +
+      '</div>';
+
+    METRICAS.forEach(function(m){
+      var a = somaJanela(m.chave, atualIni, hoje);
+      var b = somaJanela(m.chave, antIni, antFim);
+      html += '<div class="kpi glass-light">' +
+        '<div class="k-label" title="' + escapeHtml(m.label) + ' · soma dos últimos 7 dias">' + escapeHtml(m.label) + '</div>' +
+        '<div class="k-value">' + (a.n ? fmtNum(a.total) : '—') + '</div>' +
+        trendHtml(variacaoPct(a.n ? a.total : null, b.n ? b.total : null), suficiente && b.n > 0) +
+        '</div>';
+    });
+
+    grid.innerHTML = html;
+    desenharGrafico();
+  }
+
+  function renderMeta(){
+    var nota = document.getElementById('numerosSync');
+    var aviso = document.getElementById('numerosAviso');
+    if (!meta){ nota.textContent = ''; aviso.classList.remove('on'); return; }
+    nota.textContent = meta.ultimaSync ? 'Atualizado ' + tempoRelativo(meta.ultimaSync) : '';
+    nota.title = meta.ultimaSync ? String(meta.ultimaSync) : '';
+    if (meta.estado === 'erro'){
+      aviso.innerHTML = '<b>A sincronização com o Instagram está em erro.</b> ' + escapeHtml(meta.erro || 'Sem detalhe.') +
+        (meta.ultimaSync ? ' <span style="color:var(--muted)">(última sync ' + escapeHtml(fmtDataCurta(meta.ultimaSync)) + ')</span>' : '');
+      aviso.classList.add('on');
+    } else {
+      aviso.classList.remove('on');
+      aviso.innerHTML = '';
+    }
+  }
+
+  /* ---------- Gráfico de seguidores: SVG inline desenhado à mão ----------
+     Sem bibliotecas. Segue o estilo dos gráficos do OS: gridlines ténues,
+     escala em valores redondos (nunca presa ao máximo exacto), uma única cor
+     de destaque. viewBox = largura real do host (escala 1:1), redesenhado ao
+     redimensionar. */
+  function escalaBonita(min, max, nAlvo){
+    if (max <= min){ max = min + 1; }
+    var amplitude = max - min;
+    var passoBruto = amplitude / nAlvo;
+    var potencia = Math.pow(10, Math.floor(Math.log(passoBruto) / Math.LN10));
+    var candidatos = [1, 2, 2.5, 5, 10];
+    var passo = candidatos[candidatos.length - 1] * potencia;
+    for (var i = 0; i < candidatos.length; i++){
+      if (passoBruto <= candidatos[i] * potencia + 1e-9){ passo = candidatos[i] * potencia; break; }
+    }
+    var lo = Math.floor(min / passo) * passo;
+    var hi = Math.ceil(max / passo) * passo;
+    if (hi === lo) hi = lo + passo;
+    var marcas = [];
+    for (var v = lo; v <= hi + 1e-9; v += passo) marcas.push(Math.round(v * 1000) / 1000);
+    return { min: lo, max: hi, marcas: marcas };
+  }
+
+  function tok(nome, fallback){
+    var v = getComputedStyle(document.body).getPropertyValue(nome);
+    return (v && v.trim()) || fallback;
+  }
+
+  function desenharGrafico(){
+    var host = document.getElementById('graficoSeguidores');
+    var nota = document.getElementById('graficoNota');
+    if (!host) return;
+    var dias = diasOrdenados().filter(function(d){ return typeof diario[d].seguidores === 'number'; });
+    if (!dias.length){
+      host.innerHTML = '<p class="grafico-vazio">Sem histórico ainda — o primeiro dia entra na próxima sincronização.</p>';
+      nota.textContent = '';
+      return;
+    }
+    var W = host.clientWidth || 600;
+    var A = 240;
+    var PADL = 56, PADR = 16, PADT = 18, PADB = 34;
+    var plotW = W - PADL - PADR, plotH = A - PADT - PADB;
+    var n = dias.length;
+    var valores = dias.map(function(d){ return diario[d].seguidores; });
+    var vMin = Math.min.apply(null, valores), vMax = Math.max.apply(null, valores);
+    // Folga de 2 % (mínimo 2 seguidores) para a linha não colar às bordas.
+    var folga = Math.max(2, Math.round((vMax - vMin) * 0.1));
+    var esc = escalaBonita(vMin - folga, vMax + folga, 4);
+
+    var corLinha = tok('--red', '#D91124');
+    var corGrid = 'rgba(128,128,128,0.18)';
+    var corEixo = tok('--muted', '#6b6660');
+    var fonte = "'Inter', sans-serif";
+
+    function px(i){ return n > 1 ? PADL + i * plotW / (n - 1) : PADL + plotW / 2; }
+    function py(v){ return PADT + (1 - (v - esc.min) / (esc.max - esc.min)) * plotH; }
+
+    var svg = '';
+    esc.marcas.forEach(function(v){
+      var y = py(v);
+      svg += '<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + corGrid + '" stroke-width="1"/>';
+      svg += '<text x="' + (PADL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-family="' + fonte + '" font-size="10" fill="' + corEixo + '">' + escapeHtml(fmtNum(v)) + '</text>';
+    });
+
+    // Rótulos do eixo X: no máximo ~8, o primeiro e o último sempre.
+    var salto = Math.max(1, Math.ceil(n / 8));
+    dias.forEach(function(d, i){
+      if (i % salto !== 0 && i !== n - 1) return;
+      var dt = deIso(d);
+      svg += '<text x="' + px(i).toFixed(1) + '" y="' + (A - PADB + 16) + '" text-anchor="middle" font-family="' + fonte + '" font-size="10" fill="' + corEixo + '">' + dt.getDate() + ' ' + MESES[dt.getMonth()] + '</text>';
+    });
+
+    if (n > 1){
+      var caminho = valores.map(function(v, i){ return (i ? 'L' : 'M') + px(i).toFixed(1) + ' ' + py(v).toFixed(1); }).join(' ');
+      svg += '<path d="' + caminho + '" fill="none" stroke="' + corLinha + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+    // Pontos (com tooltip nativo) — só até 60 dias, depois apenas o último.
+    dias.forEach(function(d, i){
+      if (n > 60 && i !== n - 1) return;
+      var dt = deIso(d);
+      svg += '<circle cx="' + px(i).toFixed(1) + '" cy="' + py(valores[i]).toFixed(1) + '" r="' + (n > 30 ? 2.5 : 3.5) + '" fill="' + corLinha + '">' +
+        '<title>' + pad2(dt.getDate()) + '/' + pad2(dt.getMonth() + 1) + ': ' + escapeHtml(fmtNum(valores[i])) + ' seguidores</title></circle>';
+    });
+
+    host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + A + '" width="' + W + '" height="' + A + '" role="img" aria-label="Seguidores por dia">' + svg + '</svg>';
+    var d0 = deIso(dias[0]);
+    nota.textContent = 'desde ' + pad2(d0.getDate()) + '/' + pad2(d0.getMonth() + 1) + '/' + d0.getFullYear() + ' · ' + n + (n === 1 ? ' dia' : ' dias');
+  }
+
+  var redesenhoTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(redesenhoTimer);
+    redesenhoTimer = setTimeout(desenharGrafico, 120);
+  });
+  // O tema muda as cores lidas dos tokens: redesenhar quando o body muda.
+  if (window.MutationObserver){
+    new MutationObserver(function(){ desenharGrafico(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  perfilRef.on('value', function(s){ perfil = s.val() || null; renderNumeros(); });
+  diarioRef.on('value', function(s){ diario = s.val() || {}; diarioCarregado = true; renderNumeros(); });
+  metaRef.on('value', function(s){ meta = s.val() || null; renderMeta(); });
+  // "há X min" envelhece: refrescar de minuto a minuto.
+  setInterval(renderMeta, 60000);
+
+  /* =====================================================================
+     SECÇÃO 2 — Posts (só leitura de social/instagram/posts)
+     ===================================================================== */
+  var posts = {};
+  var postsCarregados = false;
+  var postsOrdem = 'data';
+  var LEGENDA_MAX = 80;
+
+  function tipoPost(p){
+    if (p.tipoProduto === 'REELS') return 'Reel';
+    if (p.tipo === 'CAROUSEL_ALBUM') return 'Carrossel';
+    if (p.tipo === 'IMAGE') return 'Imagem';
+    if (p.tipo === 'VIDEO') return 'Vídeo';
+    return p.tipo || '—';
+  }
+
+  function legendaCurta(txt){
+    var s = String(txt || '').replace(/\s+/g, ' ').trim();
+    if (s.length <= LEGENDA_MAX) return s;
+    var corte = s.lastIndexOf(' ', LEGENDA_MAX);
+    if (corte < LEGENDA_MAX * 0.6) corte = LEGENDA_MAX;
+    return s.slice(0, corte) + '…';
+  }
+
+  function num(v){ return typeof v === 'number' && isFinite(v) ? v : 0; }
+
+  function ordenarPosts(ids){
+    var chave = postsOrdem;
+    return ids.sort(function(a, b){
+      var pa = posts[a], pb = posts[b];
+      if (chave === 'data') return String(pb.dataHora || '').localeCompare(String(pa.dataHora || ''));
+      var d = num(pb[chave]) - num(pa[chave]);
+      if (d !== 0) return d;
+      return String(pb.dataHora || '').localeCompare(String(pa.dataHora || ''));
+    });
+  }
+
+  // Miniatura que falhou (URL do CDN da Meta expirado): placeholder discreto,
+  // nunca o ícone de imagem partida do browser.
+  function socialThumbFalhou(img){
+    if (!img || !img.parentNode) return;
+    img.onerror = null;
+    var ph = document.createElement('div');
+    ph.className = 'post-thumb-ph';
+    ph.innerHTML = '<svg class="icon"><use href="#i-scan"/></svg><span>sem pré-visualização</span>';
+    img.parentNode.replaceChild(ph, img);
+  }
+  window.socialThumbFalhou = socialThumbFalhou;
+
+  function linkSeguro(url){
+    try {
+      var u = new URL(String(url || ''));
+      return u.protocol === 'https:' ? u.href : null;
+    } catch (e) { return null; }
+  }
+
+  function buildPostCardHtml(id, p){
+    var permalink = linkSeguro(p.permalink);
+    var thumb = linkSeguro(p.thumbnail);
+    var legenda = legendaCurta(p.legenda);
+    var html = '<div class="post-card" data-id="' + escapeHtml(id) + '">';
+    var thumbHtml = thumb
+      ? '<img class="post-thumb" src="' + escapeHtml(thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="socialThumbFalhou(this)">'
+      : '<div class="post-thumb-ph"><svg class="icon"><use href="#i-scan"/></svg><span>sem pré-visualização</span></div>';
+    if (permalink){
+      html += '<a class="post-thumb-link" href="' + escapeHtml(permalink) + '" target="_blank" rel="noopener noreferrer" title="Ver no Instagram">' + thumbHtml + '</a>';
+    } else {
+      html += '<div class="post-thumb-link">' + thumbHtml + '</div>';
+    }
+    html += '<div class="post-corpo">';
+    html += '<div class="post-top"><span class="post-tipo">' + escapeHtml(tipoPost(p)) + '</span><span class="post-data">' + escapeHtml(fmtDataCurta(p.dataHora)) + '</span></div>';
+    html += '<p class="post-legenda' + (legenda ? '' : ' vazia') + '">' + (legenda ? escapeHtml(legenda) : 'sem legenda') + '</p>';
+    html += '<div class="post-nums">';
+    [['likes', 'likes'], ['comentarios', 'comentários'], ['alcance', 'alcance'], ['guardados', 'guardados'], ['partilhas', 'partilhas'], ['visualizacoes', 'visualizações']].forEach(function(par){
+      html += '<div class="post-num"><b>' + fmtNum(p[par[0]]) + '</b><span>' + par[1] + '</span></div>';
+    });
+    html += '</div>';
+    if (permalink){
+      html += '<a class="post-link" href="' + escapeHtml(permalink) + '" target="_blank" rel="noopener noreferrer">ver no Instagram <svg class="icon"><use href="#i-arrow-up"/></svg></a>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderPosts(){
+    var grid = document.getElementById('postsGrid');
+    var contador = document.getElementById('postsContador');
+    if (!postsCarregados){ grid.innerHTML = '<p class="empty-state">A carregar…</p>'; contador.textContent = ''; return; }
+    var ids = ordenarPosts(Object.keys(posts).filter(function(id){ return posts[id] && typeof posts[id] === 'object'; }));
+    contador.textContent = ids.length + (ids.length === 1 ? ' post' : ' posts') + ' no Firebase' +
+      (perfil && typeof perfil.totalPosts === 'number' ? ' · perfil diz ' + perfil.totalPosts : '');
+    if (!ids.length){ grid.innerHTML = '<p class="empty-state">Sem posts sincronizados ainda.</p>'; return; }
+    var html = '';
+    ids.forEach(function(id){ html += buildPostCardHtml(id, posts[id]); });
+    grid.innerHTML = '<div class="posts-grid">' + html + '</div>';
+  }
+
+  document.getElementById('postsOrdemRow').addEventListener('click', function(e){
+    var btn = e.target.closest('.pedidos-filter-chip');
+    if (!btn) return;
+    postsOrdem = btn.getAttribute('data-ordem');
+    document.querySelectorAll('#postsOrdemRow .pedidos-filter-chip').forEach(function(b){ b.classList.toggle('active', b === btn); });
+    renderPosts();
+  });
+
+  postsRef.on('value', function(s){ posts = s.val() || {}; postsCarregados = true; renderPosts(); });
+  perfilRef.on('value', function(){ if (postsCarregados) renderPosts(); });
+
+  /* =====================================================================
+     SECÇÃO 3 — Calendário de publicações (social/calendario/{id})
+     { data 'AAAA-MM-DD', canal, tema, notas, link, estado, responsavel,
+       responsavelId, criadoEm, atualizadoEm }
+     Escritas: criar = push().set() do objecto completo; editar = update()
+     em social/calendario/{id} com os campos do formulário + atualizadoEm;
+     apagar = remove() com confirmação (decisão desta página: é planeamento,
+     não registo de negócio).
+     ===================================================================== */
+  var CANAIS = ['Feed', 'Reel', 'Story', 'Carrossel'];
+  var ESTADOS = [
+    { v: 'ideia',     label: 'Ideia' },
+    { v: 'pronto',    label: 'Pronto' },
+    { v: 'aprovado',  label: 'Aprovado' },
+    { v: 'publicado', label: 'Publicado' }
+  ];
+
+  var entradas = {};
+  var calCarregado = false;
+  var hojeD = new Date();
+  var mesRef = { ano: hojeD.getFullYear(), mes: hojeD.getMonth() }; // mes 0-11
+
+  var calGrelha = document.getElementById('calGrelha');
+  var calLista = document.getElementById('calLista');
+  var calTitulo = document.getElementById('calTitulo');
+
+  function estadoValido(e){ return ESTADOS.some(function(x){ return x.v === e; }) ? e : 'ideia'; }
+
+  function entradasPorDia(){
+    var porDia = {};
+    Object.keys(entradas).forEach(function(id){
+      var e = entradas[id];
+      if (!e || typeof e !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.data || ''))) return;
+      (porDia[e.data] = porDia[e.data] || []).push(Object.assign({ id: id }, e));
+    });
+    Object.keys(porDia).forEach(function(d){
+      porDia[d].sort(function(a, b){
+        var c = String(a.canal || '').localeCompare(String(b.canal || ''), 'pt');
+        if (c !== 0) return c;
+        return String(a.criadoEm || '').localeCompare(String(b.criadoEm || ''));
+      });
+    });
+    return porDia;
+  }
+
+  function entHtml(e){
+    return '<button type="button" class="cal-ent cal-ent-' + estadoValido(e.estado) + '" data-id="' + escapeHtml(e.id) + '" title="' + escapeHtml((e.canal || '') + ' · ' + (e.tema || '') + ' · ' + estadoValido(e.estado)) + '">' +
+      '<b>' + escapeHtml(e.canal || '—') + '</b>' + escapeHtml(e.tema || '(sem tema)') + '</button>';
+  }
+
+  function renderCalendario(){
+    var hoje = todayStr();
+    var primeiro = new Date(mesRef.ano, mesRef.mes, 1);
+    var nDias = new Date(mesRef.ano, mesRef.mes + 1, 0).getDate();
+    var mesIso = mesRef.ano + '-' + pad2(mesRef.mes + 1);
+    calTitulo.textContent = MESES_LONGO[mesRef.mes] + ' ' + mesRef.ano;
+    document.getElementById('calHoje').disabled = (mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth());
+
+    var porDia = entradasPorDia();
+
+    // Grelha: começa na segunda-feira; células "fora" do mês a cinzento.
+    var offset = (primeiro.getDay() + 6) % 7;
+    var inicio = new Date(mesRef.ano, mesRef.mes, 1 - offset);
+    var total = Math.ceil((offset + nDias) / 7) * 7;
+    var g = '';
+    for (var i = 0; i < total; i++){
+      var d = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i);
+      var iso = isoLocal(d);
+      var fora = d.getMonth() !== mesRef.mes;
+      g += '<div class="cal-dia' + (fora ? ' fora' : '') + (iso === hoje ? ' hoje' : '') + '" data-dia="' + iso + '" title="Nova entrada em ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '">' +
+        '<span class="cal-dia-n">' + d.getDate() + '</span><div class="cal-ents">' +
+        (porDia[iso] || []).map(entHtml).join('') + '</div></div>';
+    }
+    calGrelha.innerHTML = g;
+
+    // Lista do mês (telemóvel): só os dias com entradas.
+    var diasComEntradas = Object.keys(porDia).filter(function(d){ return d.indexOf(mesIso) === 0; }).sort();
+    if (!calCarregado){
+      calLista.innerHTML = '<p class="cal-vazio">A carregar…</p>';
+    } else if (!diasComEntradas.length){
+      calLista.innerHTML = '<p class="cal-vazio">Nada planeado para este mês.</p>';
+    } else {
+      calLista.innerHTML = diasComEntradas.map(function(iso){
+        var d = deIso(iso);
+        return '<div class="cal-lista-dia' + (iso === hoje ? ' hoje' : '') + '"><p class="cal-lista-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>' +
+          porDia[iso].map(entHtml).join('') +
+          '<button type="button" class="cal-lista-add" data-dia="' + iso + '">+ adicionar neste dia</button></div>';
+      }).join('');
+    }
+  }
+
+  // Clique numa entrada → editar; clique num dia → criar nesse dia.
+  function calClick(e){
+    var ent = e.target.closest('.cal-ent');
+    if (ent){ abrirModal(ent.getAttribute('data-id'), null); return; }
+    var add = e.target.closest('.cal-lista-add');
+    if (add){ abrirModal(null, add.getAttribute('data-dia')); return; }
+    var dia = e.target.closest('.cal-dia');
+    if (dia){ abrirModal(null, dia.getAttribute('data-dia')); }
+  }
+  calGrelha.addEventListener('click', calClick);
+  calLista.addEventListener('click', calClick);
+
+  function mudarMes(delta){
+    var d = new Date(mesRef.ano, mesRef.mes + delta, 1);
+    mesRef = { ano: d.getFullYear(), mes: d.getMonth() };
+    renderCalendario();
+  }
+  document.getElementById('calAnterior').addEventListener('click', function(){ mudarMes(-1); });
+  document.getElementById('calSeguinte').addEventListener('click', function(){ mudarMes(1); });
+  document.getElementById('calHoje').addEventListener('click', function(){
+    mesRef = { ano: hojeD.getFullYear(), mes: hojeD.getMonth() }; renderCalendario();
+  });
+  document.getElementById('calNovo').addEventListener('click', function(){
+    // No mês corrente abre em hoje; noutro mês, no dia 1 desse mês.
+    var noCorrente = mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth();
+    abrirModal(null, noCorrente ? todayStr() : mesRef.ano + '-' + pad2(mesRef.mes + 1) + '-01');
+  });
+
+  /* ---------- Modal de criar/editar (giocoModal do shell) ---------- */
+  function optionsHtml(lista, atual){
+    return lista.map(function(o){
+      var v = typeof o === 'string' ? o : o.v, l = typeof o === 'string' ? o : o.label;
+      return '<option value="' + escapeHtml(v) + '"' + (v === atual ? ' selected' : '') + '>' + escapeHtml(l) + '</option>';
+    }).join('');
+  }
+
+  function respOptionsHtml(atualId, atualNome){
+    var html = '<option value="">— sem responsável —</option>';
+    var encontrado = false;
+    pessoasAtivas.forEach(function(p){
+      if (p.id === atualId) encontrado = true;
+      html += '<option value="' + escapeHtml(p.id) + '"' + (p.id === atualId ? ' selected' : '') + '>' + escapeHtml(p.nome) + '</option>';
+    });
+    // Responsável gravado que já não está ativo: continua visível na edição.
+    if (atualId && !encontrado) html += '<option value="' + escapeHtml(atualId) + '" selected>' + escapeHtml(atualNome || atualId) + ' (inativo)</option>';
+    return html;
+  }
+
+  function abrirModal(id, dia){
+    if (!window.giocoModal) return;
+    var e = id ? entradas[id] : null;
+    if (id && !e) return;
+    var editar = !!e;
+    var d = editar ? e : { data: dia || todayStr(), canal: 'Feed', tema: '', notas: '', link: '', estado: 'ideia', responsavel: '', responsavelId: '' };
+    var linkOk = linkSeguro(d.link);
+
+    var html = '<div class="cal-modal">';
+    if (editar){
+      html += '<p class="cal-modal-meta">Criada ' + escapeHtml(fmtDataCurta(e.criadoEm)) + (e.atualizadoEm && e.atualizadoEm !== e.criadoEm ? ' · atualizada ' + escapeHtml(fmtDataCurta(e.atualizadoEm)) : '') + '</p>';
+    }
+    html += '<div class="cal-modal-2col">';
+    html += '<div class="field"><label class="field-label" for="calData">Data</label><input type="date" id="calData" value="' + escapeHtml(d.data || '') + '"></div>';
+    html += '<div class="field"><label class="field-label" for="calCanal">Canal</label><select id="calCanal">' + optionsHtml(CANAIS, CANAIS.indexOf(d.canal) !== -1 ? d.canal : 'Feed') + '</select></div>';
+    html += '</div>';
+    html += '<div class="field"><label class="field-label" for="calTema">Tema</label><input type="text" id="calTema" maxlength="120" value="' + escapeHtml(d.tema || '') + '" placeholder="ex: focaccia de figo, bastidores da cozinha"></div>';
+    html += '<div class="cal-modal-2col">';
+    html += '<div class="field"><label class="field-label" for="calEstado">Estado</label><select id="calEstado">' + optionsHtml(ESTADOS, estadoValido(d.estado)) + '</select></div>';
+    html += '<div class="field"><label class="field-label" for="calResp">Responsável</label><select id="calResp"' + (pessoasCarregadas ? '' : ' disabled') + '>' + (pessoasCarregadas ? respOptionsHtml(d.responsavelId, d.responsavel) : '<option>A carregar...</option>') + '</select></div>';
+    html += '</div>';
+    html += '<div class="field"><label class="field-label" for="calLink">Link (Drive, Canva…)</label><input type="url" id="calLink" value="' + escapeHtml(d.link || '') + '" placeholder="https://…" inputmode="url">' +
+      (linkOk ? '<p class="field-nota"><a href="' + escapeHtml(linkOk) + '" target="_blank" rel="noopener noreferrer">abrir material ↗</a></p>' : '') + '</div>';
+    html += '<div class="field"><label class="field-label" for="calNotas">Notas (o porquê do post)</label><textarea id="calNotas" rows="3" maxlength="2000" placeholder="objetivo, referências, o que se quer comunicar">' + escapeHtml(d.notas || '') + '</textarea></div>';
+    html += '<p class="form-erro hidden" id="calErro"></p>';
+    html += '<div class="modal-actions">';
+    if (editar) html += '<button type="button" class="btn btn-perigo esq" id="calApagar">Apagar</button>';
+    html += '<button type="button" class="btn" id="calCancelar">Cancelar</button>';
+    html += '<button type="button" class="btn btn-primary" id="calGuardar">' + (editar ? 'Guardar' : 'Criar entrada') + '</button>';
+    html += '</div></div>';
+
+    var body = giocoModal.open({ titulo: editar ? 'Editar publicação' : 'Nova publicação', conteudo: html });
+    var erroEl = body.querySelector('#calErro');
+    function erro(msg){ erroEl.textContent = msg; erroEl.classList.toggle('hidden', !msg); }
+
+    body.querySelector('#calCancelar').addEventListener('click', function(){ giocoModal.close(); });
+
+    body.querySelector('#calGuardar').addEventListener('click', function(){
+      var data = body.querySelector('#calData').value;
+      var tema = body.querySelector('#calTema').value.trim();
+      var link = body.querySelector('#calLink').value.trim();
+      var respSel = body.querySelector('#calResp');
+      var respId = respSel.disabled ? (d.responsavelId || '') : respSel.value;
+      var respNome = '';
+      if (respId){
+        var p = pessoasAtivas.filter(function(x){ return x.id === respId; })[0];
+        respNome = p ? p.nome : (d.responsavel || '');
+      }
+      erro('');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)){ erro('Indica a data.'); return; }
+      if (!tema){ erro('Escreve o tema.'); body.querySelector('#calTema').focus(); return; }
+      if (link && !linkSeguro(link)){ erro('O link tem de ser um URL https:// válido.'); return; }
+      var campos = {
+        data: data,
+        canal: body.querySelector('#calCanal').value,
+        tema: tema,
+        notas: body.querySelector('#calNotas').value.trim(),
+        link: link ? linkSeguro(link) : '',
+        estado: estadoValido(body.querySelector('#calEstado').value),
+        responsavel: respNome,
+        responsavelId: respId || '',
+        atualizadoEm: nowIso()
+      };
+      var btn = this; btn.disabled = true;
+      var escrita = editar
+        ? calRef.child(id).update(campos)
+        : calRef.push().set(Object.assign({ criadoEm: campos.atualizadoEm }, campos));
+      escrita.then(function(){ giocoModal.close(); })
+        .catch(function(err){ btn.disabled = false; erro('Erro ao guardar: ' + err.message); });
+    });
+
+    var apagarBtn = body.querySelector('#calApagar');
+    if (apagarBtn){
+      apagarBtn.addEventListener('click', function(){
+        if (!confirm('Apagar "' + (e.tema || 'esta entrada') + '" de ' + fmtDataCurta(e.data + 'T12:00:00') + '? Esta ação não pode ser desfeita.')) return;
+        apagarBtn.disabled = true;
+        calRef.child(id).remove().then(function(){ giocoModal.close(); })
+          .catch(function(err){ apagarBtn.disabled = false; erro('Erro ao apagar: ' + err.message); });
+      });
+    }
+
+    setTimeout(function(){ var t = body.querySelector('#calTema'); if (t && !editar) t.focus(); }, 50);
+  }
+
+  calRef.on('value', function(s){ entradas = s.val() || {}; calCarregado = true; renderCalendario(); });
+  carregarPessoas(function(){
+    // O select do modal é construído na abertura; nada a repovoar aqui.
+  });
+  renderCalendario();
+
+  }); // fim de autenticarEContinuar
+</script>
+
+</body>
+</html>
