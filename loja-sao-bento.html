@@ -720,21 +720,19 @@
 
   .pedidos-split > .form-card{ max-width:420px; }
 
-  /* A partir de 900px de viewport o formulário vai para baixo da lista: em
-     desktop a ação frequente é ler/responder, não submeter. Em telemóvel fica
-     em cima, que é onde o staff submete. Para reverter, apaga este @media. */
-  @media (min-width:900px){
-    .pedidos-split > .form-card{ order:2; }
-  }
-
   /* Grelha de cartões: colunas reagem à largura do CONTENTOR (auto-fill), não
      do ecrã. max-width limita a 4 colunas em ecrãs largos. align-items:start
      para que abrir comentários/sub-itens de um cartão não estique os vizinhos. */
+  /* Todos os cartões com a MESMA altura (--pedido-card-h). O corpo faz scroll
+     interno quando o conteúdo é maior; o bloco de edição fica colado ao fundo,
+     alinhado entre cartões. Sem isto as alturas eram irregulares e a grelha
+     ficava cheia de buracos. Para afinar a altura, mexe só na variável. */
   .pedidos-grid{
+    --pedido-card-h:440px;
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
     gap:10px;
-    align-items:start;
+    align-items:stretch;
     max-width:1250px;
     margin-top:10px;
   }
@@ -746,7 +744,29 @@
     margin-top:10px;
   }
 
-  .pedidos-grid > .pedido-card{ margin-top:0; }
+  .pedidos-grid > .pedido-card{
+    margin-top:0;
+    height:var(--pedido-card-h);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .pedidos-grid .pedido-corpo{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+  }
+
+  .pedidos-grid .pedido-edit{
+    flex:0 0 auto;
+  }
+
+  /* Em telemóvel não há grelha para alinhar: altura natural, sem scroll interno. */
+  @media (max-width:700px){
+    .pedidos-grid > .pedido-card{ height:auto; overflow:visible; }
+    .pedidos-grid .pedido-corpo{ overflow:visible; }
+  }
 
   .pedido-top{
     display:flex;
@@ -3868,6 +3888,7 @@
     var comentariosAbertos = !!pedidosComentariosAbertos[id];
 
     var html = '<div class="pedido-card">';
+    html += '  <div class="pedido-corpo">';
     html += '  <div class="pedido-top">';
     html += '    <div class="pedido-badges">';
     html += '      <span class="pedido-badge ' + (ESTADO_BADGE_CLASS[estado] || 'pedido-badge-novo') + '">' + (ESTADO_LABELS[estado] || estado) + '</span>';
@@ -3940,6 +3961,7 @@
     }
     html += '  </div>';
 
+    html += '  </div>';
     html += '  <div class="pedido-edit">';
     html += '    <select id="pedido-estado-' + id + '">';
     Object.keys(ESTADO_LABELS).forEach(function(key){
