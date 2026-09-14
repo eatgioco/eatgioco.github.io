@@ -1334,9 +1334,9 @@
     }
     var c = paleta(ev);
     var hora = ev.diaInteiro || !ev.horaInicio ? '' : '<span class="num">' + ev.horaInicio + '</span>';
-    var dica = ev.titulo + (temReuniao(ev) ? ' · ' + ev.extra.reuniao.servico : '');
+    var dica = ev.titulo + (temReuniao(ev) ? ' · ' + ev.extra.reuniao.servico : '') + (temComunicado(ev) ? ' · Comunicado à loja' : '');
     return '<button type="button" class="ev-chip' + c.classe + classeCancelado(ev) + '" data-id="' + escapeHtml(ev.id) + '" style="background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(dica) + '">' +
-      hora + iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo) + '</button>';
+      hora + iconeLigacao(ev) + iconeReuniao(ev) + iconeComunicado(ev) + escapeHtml(ev.titulo) + '</button>';
   }
   var chipHtml = chipDe;
   /* Item anulado/cancelado, de QUALQUER fonte que o traga marcado (anulado
@@ -1358,6 +1358,15 @@
   function iconeReuniao(ev) {
     if (!temReuniao(ev)) return '';
     return '<svg class="icon" width="14" height="14"><use href="#i-video"/></svg>';
+  }
+  /* Evento comunicado à loja (sub-objeto `comunicado`, ver gioco-eventos.js):
+     ícone i-message-square pela mesma porta do i-store / i-video — indicador
+     discreto para o Manel ver de relance o que já está partilhado com a equipa.
+     A categoria (incluindo 'loja') não conta: só a presença do sub-objeto. */
+  function temComunicado(ev) { return !!(ev && ev.comunicado); }
+  function iconeComunicado(ev) {
+    if (!temComunicado(ev)) return '';
+    return '<svg class="icon" width="14" height="14"><use href="#i-message-square"/></svg>';
   }
 
   /* Ao telemóvel a célula é mais pequena: 2 chips de texto truncado e, com
@@ -1780,7 +1789,7 @@
     var largura = 100 / it.ncols, left = largura * it.col;
     var horas = it.ev.horaInicio + (it.ev.horaFim ? '–' + it.ev.horaFim : '');
     return '<button type="button" class="ev-bloco' + c.classe + '" data-id="' + escapeHtml(it.ev.id) + '" style="top:' + top + 'px;height:' + altura + 'px;left:calc(' + left + '% + 2px);width:calc(' + largura + '% - 4px);background:' + c.cor + ';color:' + c.texto + '" title="' + escapeHtml(it.ev.titulo) + '">' +
-      '<b>' + iconeLigacao(it.ev) + iconeReuniao(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
+      '<b>' + iconeLigacao(it.ev) + iconeReuniao(it.ev) + iconeComunicado(it.ev) + escapeHtml(it.ev.titulo) + '</b><span class="num">' + horas + '</span></button>';
   }
 
   function horaColHtml() {
@@ -1872,7 +1881,7 @@
   function itemDiaHtml(ev, opts) {
     if (ehPagamento(ev)) return pagDiaHtml(ev, opts);
     var c = paleta(ev);
-    var titulo = iconeLigacao(ev) + iconeReuniao(ev) + escapeHtml(ev.titulo);
+    var titulo = iconeLigacao(ev) + iconeReuniao(ev) + iconeComunicado(ev) + escapeHtml(ev.titulo);
     if (opts && opts.agenda) {
       var hora = ev.diaInteiro || !ev.horaInicio
         ? '<b>Dia</b><small>inteiro</small>'

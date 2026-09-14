@@ -14,7 +14,15 @@
      origem ('manual' | 'lojaPedido'; no futuro 'outlook', 'tesouraria'…),
      ligacao? ({ tipo:'lojaPedido', id:<chave de lojaPedidos> } — só quando
        o evento nasce de outro registo; nunca é editado depois),
-     criadoEm, atualizadoEm (ms), anulado (bool), anuladoEm? (ms)
+     criadoEm, atualizadoEm (ms), anulado (bool), anuladoEm? (ms),
+     comunicado? (Set/2026 — "Comunicar à loja": sub-objeto OPCIONAL cuja
+       PRESENÇA é o único critério para o evento aparecer no cartão "Esta
+       semana na loja" da loja-sao-bento.html; a categoria — incluindo
+       'loja' — NUNCA é critério. { tipo ∈ visita | entrega | manutencao |
+       obra | formacao | outro, titulo (obrigatório, máx 120), detalhe?,
+       quem?, pessoas? (inteiro), acao?; só com tipo 'visita': subtipo ∈
+       influencer | jornalista | marca | outro, handle?, combinado?,
+       contrapartida?, anfitriao? }. Campos vazios ficam AUSENTES.)
    }
 
    REGRAS DE ESCRITA (as mesmas de sempre):
@@ -25,6 +33,13 @@
      notas quando deixam de existir;
    - anular = dois set() (anulado:true, anuladoEm). NUNCA remove() do evento,
      NUNCA set()/update() no nó pai depois de criado. Sem restauro.
+   - comunicado: na criação vai dentro do objeto do push().set(); ao editar,
+     se o evento ainda não tinha, um set() em eventos/{id}/comunicado (nó
+     novo); se já tinha, um set() por folha alterada em
+     eventos/{id}/comunicado/{campo} e remove() nas folhas que deixam de
+     existir; desligar o bloco = remove() de eventos/{id}/comunicado (a
+     mesma regra das folhas horaInicio/horaFim/notas). Sempre com
+     eventos/{id}/atualizadoEm.
    A flag aGravar (dois cliques rápidos) vive aqui dentro.
 
    USO:
@@ -52,6 +67,50 @@ function giocoEventosEngine(deps){
   function categoria(id) {
     for (var i = 0; i < CATEGORIAS.length; i++) if (CATEGORIAS[i].id === id) return CATEGORIAS[i];
     return CATEGORIAS[CATEGORIAS.length - 1];
+  }
+
+  /* ---------- Comunicar à loja (sub-objeto opcional `comunicado`) ---------- */
+  var COMUNICADO_TIPOS = [
+    { id: 'visita',     label: 'Visita' },
+    { id: 'entrega',    label: 'Entrega' },
+    { id: 'manutencao', label: 'Manutenção' },
+    { id: 'obra',       label: 'Obra' },
+    { id: 'formacao',   label: 'Formação' },
+    { id: 'outro',      label: 'Outro' }
+  ];
+  var COMUNICADO_SUBTIPOS = [
+    { id: 'influencer', label: 'Influencer' },
+    { id: 'jornalista', label: 'Jornalista' },
+    { id: 'marca',      label: 'Marca' },
+    { id: 'outro',      label: 'Outro' }
+  ];
+  function comunicadoTipo(id) {
+    for (var i = 0; i < COMUNICADO_TIPOS.length; i++) if (COMUNICADO_TIPOS[i].id === id) return COMUNICADO_TIPOS[i];
+    return COMUNICADO_TIPOS[COMUNICADO_TIPOS.length - 1];
+  }
+  function comunicadoSubtipo(id) {
+    for (var i = 0; i < COMUNICADO_SUBTIPOS.length; i++) if (COMUNICADO_SUBTIPOS[i].id === id) return COMUNICADO_SUBTIPOS[i];
+    return COMUNICADO_SUBTIPOS[COMUNICADO_SUBTIPOS.length - 1];
+  }
+  // Campos do sub-objeto, por ordem. Os de visita só existem com tipo 'visita'.
+  var COMUNICADO_CAMPOS = ['tipo', 'titulo', 'detalhe', 'quem', 'pessoas', 'acao'];
+  var COMUNICADO_CAMPOS_VISITA = ['subtipo', 'handle', 'combinado', 'contrapartida', 'anfitriao'];
+  // normalizarComunicado(bruto) → objeto limpo (só folhas preenchidas) ou null.
+  // É a leitura defensiva partilhada: a loja-sao-bento.html e a calendario.html
+  // passam por aqui, nunca leem o sub-objeto à mão.
+  function normalizarComunicado(c) {
+    if (!c || typeof c !== 'object') return null;
+    var titulo = c.titulo != null ? String(c.titulo).trim().slice(0, 120) : '';
+    if (!titulo) return null;
+    var out = { tipo: comunicadoTipo(c.tipo).id, titulo: titulo };
+    ['detalhe', 'quem', 'acao'].forEach(function (k) { var v = c[k] != null ? String(c[k]).trim() : ''; if (v) out[k] = v.slice(0, 2000); });
+    var p = parseInt(c.pessoas, 10);
+    if (!isNaN(p) && p > 0) out.pessoas = p;
+    if (out.tipo === 'visita') {
+      out.subtipo = comunicadoSubtipo(c.subtipo).id;
+      ['handle', 'combinado', 'contrapartida', 'anfitriao'].forEach(function (k) { var v = c[k] != null ? String(c[k]).trim() : ''; if (v) out[k] = v.slice(0, 500); });
+    }
+    return out;
   }
 
   /* ---------- Helpers de data/hora (puros) ---------- */
@@ -97,6 +156,7 @@ function giocoEventosEngine(deps){
       notas: v.notas ? String(v.notas) : '',
       origem: v.origem || 'manual',
       ligacao: v.ligacao && v.ligacao.tipo ? { tipo: String(v.ligacao.tipo), id: v.ligacao.id != null ? String(v.ligacao.id) : null } : null,
+      comunicado: normalizarComunicado(v.comunicado),
       editavel: true
     };
   }
@@ -182,6 +242,67 @@ function giocoEventosEngine(deps){
     inNotas.addEventListener('input', crescer);
     form.appendChild(el('div', { 'class': 'ev-field' }, [el('label', { 'class': 'ev-field-label', 'for': 'evNotas', text: 'Notas' }), inNotas]));
 
+    /* ---- Comunicar à loja (recolhido por omissão; o controlo é o checkbox
+       .ev-check-linha que o formulário já usa em "Dia inteiro") ---- */
+    var comIni = inicial.comunicado || null;
+    var inComunicar = el('input', { type: 'checkbox', id: 'evComunicar' });
+    inComunicar.checked = !!comIni;
+    var bloco = el('div', { 'class': 'ev-comunicado' });
+    var com = {};
+    function campoTexto(nome, label, placeholder) {
+      var i = el('input', { type: 'text', id: 'evCom_' + nome, maxlength: '500', placeholder: placeholder || '', autocomplete: 'off' });
+      i.value = comIni && comIni[nome] != null ? String(comIni[nome]) : '';
+      com[nome] = i;
+      return el('div', { 'class': 'ev-field' }, [el('label', { 'class': 'ev-field-label', 'for': 'evCom_' + nome, text: label }), i]);
+    }
+    function campoSelect(nome, label, opcoes, atual) {
+      var s = el('select', { id: 'evCom_' + nome });
+      opcoes.forEach(function (o) { var op = el('option', { value: o.id, text: o.label }); if (o.id === atual) op.selected = true; s.appendChild(op); });
+      com[nome] = s;
+      return el('div', { 'class': 'ev-field' }, [el('label', { 'class': 'ev-field-label', 'for': 'evCom_' + nome, text: label }), s]);
+    }
+    var erroComTitulo = el('div', { 'class': 'ev-erro' });
+    var linhaTipoTitulo = el('div', { 'class': 'ev-campo-linha' }, [
+      campoSelect('tipo', 'Tipo', COMUNICADO_TIPOS, comIni ? comIni.tipo : 'visita'),
+      campoTexto('titulo', 'Título para a loja', 'O que a equipa lê primeiro')
+    ]);
+    bloco.appendChild(linhaTipoTitulo);
+    bloco.appendChild(erroComTitulo);
+    var inDetalhe = el('textarea', { id: 'evCom_detalhe', rows: '2', maxlength: '2000', placeholder: 'O que é preciso saber (opcional)' });
+    inDetalhe.value = comIni && comIni.detalhe ? String(comIni.detalhe) : '';
+    com.detalhe = inDetalhe;
+    bloco.appendChild(el('div', { 'class': 'ev-field' }, [el('label', { 'class': 'ev-field-label', 'for': 'evCom_detalhe', text: 'Detalhe' }), inDetalhe]));
+    var inPessoas = el('input', { type: 'number', id: 'evCom_pessoas', min: '1', step: '1', placeholder: '—' });
+    inPessoas.value = comIni && comIni.pessoas ? String(comIni.pessoas) : '';
+    com.pessoas = inPessoas;
+    bloco.appendChild(el('div', { 'class': 'ev-campo-linha' }, [
+      campoTexto('quem', 'Quem', 'Pessoa ou empresa'),
+      el('div', { 'class': 'ev-field ev-field-curto' }, [el('label', { 'class': 'ev-field-label', 'for': 'evCom_pessoas', text: 'Pessoas' }), inPessoas])
+    ]));
+    bloco.appendChild(campoTexto('acao', 'O que a loja tem de fazer', 'ex.: libertar o corredor antes das 9h'));
+    var blocoVisita = el('div', { 'class': 'ev-comunicado-visita' }, [
+      el('div', { 'class': 'ev-campo-linha' }, [
+        campoSelect('subtipo', 'Quem visita', COMUNICADO_SUBTIPOS, comIni ? comIni.subtipo : 'influencer'),
+        campoTexto('handle', 'Handle / publicação', '@instagram ou nome do meio')
+      ]),
+      campoTexto('combinado', 'Oferta (o que se oferece)', 'ex.: 2 focaccias + bebidas'),
+      campoTexto('contrapartida', 'Pede-se (em troca)', 'ex.: 1 reel + 1 story'),
+      campoTexto('anfitriao', 'Recebe', 'Quem recebe a visita')
+    ]);
+    bloco.appendChild(blocoVisita);
+    function sincronizarComunicado() {
+      bloco.style.display = inComunicar.checked ? '' : 'none';
+      blocoVisita.style.display = com.tipo.value === 'visita' ? '' : 'none';
+    }
+    inComunicar.addEventListener('change', function () { sincronizarComunicado(); if (inComunicar.checked) com.titulo.focus(); });
+    com.tipo.addEventListener('change', sincronizarComunicado);
+    sincronizarComunicado();
+    form.appendChild(el('div', { 'class': 'ev-comunicado-wrap' }, [
+      el('label', { 'class': 'ev-check-linha', 'for': 'evComunicar' }, [inComunicar, el('span', { text: 'Comunicar à loja' })]),
+      el('div', { 'class': 'ev-comunicado-ajuda', text: 'Aparece no cartão "Esta semana na loja" do computador da loja.' }),
+      bloco
+    ]));
+
     var btnGuardar = el('button', { type: 'submit', 'class': 'btn-add', text: 'Guardar' });
     var btnCancelar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Cancelar' });
     var direita = el('div', { 'class': 'ev-actions-right' }, [btnCancelar, btnGuardar]);
@@ -201,8 +322,16 @@ function giocoEventosEngine(deps){
       if (input) input.classList.add('ev-invalido');
     }
     function limparErros() {
-      [erroTitulo, erroData, erroHoras].forEach(function (x) { x.textContent = ''; x.classList.remove('on'); });
-      [inTitulo, inData, inInicio, inFim].forEach(function (x) { x.classList.remove('ev-invalido'); });
+      [erroTitulo, erroData, erroHoras, erroComTitulo].forEach(function (x) { x.textContent = ''; x.classList.remove('on'); });
+      [inTitulo, inData, inInicio, inFim, com.titulo].forEach(function (x) { x.classList.remove('ev-invalido'); });
+    }
+    // lerComunicado() → sub-objeto limpo, null (bloco desligado) ou false (inválido).
+    function lerComunicado() {
+      if (!inComunicar.checked) return null;
+      var bruto = {};
+      COMUNICADO_CAMPOS.concat(COMUNICADO_CAMPOS_VISITA).forEach(function (k) { bruto[k] = com[k].value; });
+      if (!String(com.titulo.value).trim()) { mostrarErro(erroComTitulo, com.titulo, 'O título para a loja é obrigatório.'); return false; }
+      return normalizarComunicado(bruto);
     }
 
     function lerFormulario() {
@@ -220,8 +349,10 @@ function giocoEventosEngine(deps){
         if (horaFim && !horaInicio) { mostrarErro(erroHoras, inInicio, 'Indica a hora de início.'); ok = false; }
         else if (horaInicio && horaFim && minutos(horaFim) <= minutos(horaInicio)) { mostrarErro(erroHoras, inFim, 'O fim tem de ser depois do início.'); ok = false; }
       }
+      var comunicado = lerComunicado();
+      if (comunicado === false) ok = false;
       if (!ok) return null;
-      return { titulo: titulo, data: data, diaInteiro: diaInteiro, horaInicio: horaInicio, horaFim: horaFim, categoria: catAtual, notas: inNotas.value.trim().slice(0, 2000) };
+      return { titulo: titulo, data: data, diaInteiro: diaInteiro, horaInicio: horaInicio, horaFim: horaFim, categoria: catAtual, notas: inNotas.value.trim().slice(0, 2000), comunicado: comunicado };
     }
 
     return { form: form, inTitulo: inTitulo, inNotas: inNotas, crescer: crescer, btnGuardar: btnGuardar, btnAnular: btnAnular, acoes: acoes, lerFormulario: lerFormulario };
@@ -249,6 +380,7 @@ function giocoEventosEngine(deps){
     if (!v.diaInteiro && v.horaInicio) obj.horaInicio = v.horaInicio;
     if (!v.diaInteiro && v.horaFim) obj.horaFim = v.horaFim;
     if (v.notas) obj.notas = v.notas;
+    if (v.comunicado) obj.comunicado = v.comunicado;
     if (extra) Object.keys(extra).forEach(function (k) { if (extra[k] != null) obj[k] = extra[k]; });
     var novo = eventosRef.push();
     return novo.set(obj).then(function () { return novo.key; });
@@ -273,8 +405,32 @@ function giocoEventosEngine(deps){
     campo('notas', v.notas);
     campo('horaInicio', v.diaInteiro ? null : v.horaInicio);
     campo('horaFim', v.diaInteiro ? null : v.horaFim);
+    escritas = escritas.concat(escritasComunicado(ref, bruto.comunicado, v.comunicado));
     if (escritas.length) escritas.push(ref.child('atualizadoEm').set(Date.now()));
     return Promise.all(escritas);
+  }
+
+  // escritasComunicado(ref, antigoBruto, novo): as escritas do sub-objeto.
+  // - desligado e existia → remove() de eventos/{id}/comunicado (regra das folhas);
+  // - ligado e não existia → set() do sub-objeto em eventos/{id}/comunicado (nó novo);
+  // - ligado e existia → set() por folha alterada / remove() por folha que saiu.
+  // Nunca toca no nó pai do evento.
+  function escritasComunicado(ref, antigoBruto, novo) {
+    var temAntigo = antigoBruto != null && typeof antigoBruto === 'object';
+    var sub = ref.child('comunicado');
+    if (!novo) return temAntigo ? [sub.remove()] : [];
+    if (!temAntigo) return [sub.set(novo)];
+    var escritas = [];
+    var chaves = {};
+    Object.keys(antigoBruto).forEach(function (k) { chaves[k] = true; });
+    Object.keys(novo).forEach(function (k) { chaves[k] = true; });
+    Object.keys(chaves).forEach(function (k) {
+      var a = antigoBruto[k] == null ? null : antigoBruto[k];
+      var n = novo[k] == null ? null : novo[k];
+      if (n == null) { if (a != null) escritas.push(sub.child(k).remove()); }
+      else if (a !== n) escritas.push(sub.child(k).set(n));
+    });
+    return escritas;
   }
 
   // anular(id): flag. NUNCA remove() do evento.
@@ -374,6 +530,8 @@ function giocoEventosEngine(deps){
 
   return {
     CATEGORIAS: CATEGORIAS, categoria: categoria,
+    COMUNICADO_TIPOS: COMUNICADO_TIPOS, COMUNICADO_SUBTIPOS: COMUNICADO_SUBTIPOS,
+    comunicadoTipo: comunicadoTipo, comunicadoSubtipo: comunicadoSubtipo, normalizarComunicado: normalizarComunicado,
     normalizar: normalizar,
     construirFormulario: construirFormulario,
     abrirNovo: abrirNovo, abrirEditar: abrirEditar,
