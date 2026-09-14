@@ -530,6 +530,72 @@
 
   .vendas-oculto{ display:none; }
 
+  /* ---------- Cartão Instagram (Vista Rápida) ----------
+     Só leitura de social/instagram/. Camadas: sparkline de seguidores (30
+     dias) em SVG ancorado ao fundo, atrás do conteúdo — textura, não gráfico
+     (sem eixos nem rótulos, e nada quando há < 3 pontos); seguidores em
+     grande com chip de variação a 7 dias (só quando o histórico cobre 14
+     dias, a MESMA regra da social.html); miniatura do post com mais alcance
+     (o URL do CDN da Meta expira: com onerror some por completo); rodapé com
+     alcance e visualizações dos últimos 7 dias. Tudo por tokens do shell. */
+  .card-instagram .card-icon .icon{ width:22px;height:22px;color:var(--red); }
+  /* O .card > * empurra tudo para z-index:1; o sparkline volta para 0, por
+     baixo do conteúdo e do brilho do vidro. */
+  .card-instagram .ig-spark{
+    position:absolute;left:0;right:0;bottom:0;height:58%;
+    z-index:0;pointer-events:none;
+  }
+  .ig-spark svg{ display:block;width:100%;height:100%; }
+  /* A cor entra por CSS (um atributo SVG não aceita var()): a linha e as
+     paragens do gradiente lêem o --red do tema ativo. */
+  .ig-spark path{ stroke:var(--red); }
+  .ig-spark stop{ stop-color:var(--red); }
+  .ig-spark .ig-spark-area{ fill:url(#igSparkGrad); stroke:none; }
+  .ig-corpo{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+    margin-top:14px;
+  }
+  .ig-corpo[hidden]{ display:none; }
+  .ig-principal{ min-width:0; }
+  .ig-num-row{ display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
+  /* Inter 700: o Antonio do shell é só para o h1/hero (ver gioco-shell.css),
+     e os outros cartões (.contas-total) fazem o número grande em Inter. */
+  .ig-num{
+    font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:32px;font-weight:700;line-height:1;letter-spacing:-.01em;
+    color:var(--ink);
+  }
+  .ig-num-label{
+    display:block;margin-top:4px;
+    font-size:11px;letter-spacing:.04em;text-transform:lowercase;color:var(--muted);
+  }
+  .ig-chip{
+    display:inline-block;padding:2px 8px;border-radius:100px;
+    font-size:11.5px;font-weight:700;line-height:1.4;
+    background:var(--green-bg);color:var(--green);
+  }
+  /* A descer: --red-ink (= --red no claro; clareia no escuro, onde o --red só
+     dá 3,35:1) sobre um véu do próprio vermelho, no molde do --green-bg. O
+     --blush como fundo dava 3,5:1 com texto vermelho — abaixo de AA. */
+  .ig-chip.desceu{ background:rgba(217,17,36,0.10);color:var(--red-ink); }
+  [data-theme="dark"] .ig-chip.desceu{ background:rgba(255,125,136,0.14); }
+  .ig-chip[hidden]{ display:none; }
+  .ig-thumb{
+    position:relative;flex:0 0 auto;width:52px;height:52px;
+    border-radius:10px;overflow:hidden;background:var(--line);
+  }
+  .ig-thumb[hidden]{ display:none; }
+  .ig-thumb img{ display:block;width:100%;height:100%;object-fit:cover; }
+  /* Alcance por cima da imagem: branco fixo sobre véu escuro, legível sobre
+     qualquer foto — não é --on-red nem --white (que é superfície). */
+  .ig-thumb-alcance{
+    position:absolute;left:0;right:0;bottom:0;padding:8px 5px 3px;
+    font-size:10px;font-weight:700;line-height:1;color:#FFFFFF;text-align:right;
+    background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.62));
+  }
+  .ig-rodape{ margin:12px 0 0;font-size:11.5px;color:var(--muted); }
+  .ig-rodape[hidden]{ display:none; }
+
   .card-header-row{
     display:flex;
     justify-content:space-between;
@@ -2270,11 +2336,30 @@
       <ul class="cc-linhas" id="obrLinhas" hidden></ul>
     </a>
 
-    <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="https://www.instagram.com/eatgioco/" target="_blank" rel="noopener">
-      <div class="card-icon">📸</div>
+    <!-- Instagram (social.html). Só leitura de social/instagram/{perfil,
+         diario, posts, meta}, escritos pelo job ig_sync.py. Os cálculos
+         (variação a 7 dias, "histórico insuficiente") são os MESMOS da
+         social.html — se os dois mostrarem números diferentes, é bug. -->
+    <a class="card glass-light card-compact card-instagram" id="cardInstagram" href="social.html">
+      <div class="ig-spark" id="igSpark" aria-hidden="true"></div>
+      <div class="card-icon"><svg class="icon" width="22" height="22"><use href="#i-trending-up"/></svg></div>
       <h3 class="card-title">Instagram</h3>
-      <p class="card-subtitle">Crescimento e métricas — em breve</p>
-      <span class="status-badge status-badge-warning">Em configuração</span>
+      <p class="card-subtitle" id="igSub">A carregar…</p>
+      <div class="ig-corpo" id="igCorpo" hidden>
+        <div class="ig-principal">
+          <div class="ig-num-row">
+            <span class="ig-num num" id="igSeguidores">—</span>
+            <span class="ig-chip num" id="igChip" hidden></span>
+          </div>
+          <span class="ig-num-label">seguidores</span>
+        </div>
+        <!-- div, não <a>: o cartão inteiro já é um link (âncoras aninhadas são inválidas). -->
+        <div class="ig-thumb" id="igThumb" hidden title="Post com mais alcance nos últimos 30 dias">
+          <img id="igThumbImg" alt="" loading="lazy" referrerpolicy="no-referrer">
+          <span class="ig-thumb-alcance num" id="igThumbAlcance"></span>
+        </div>
+      </div>
+      <p class="ig-rodape num" id="igRodape" hidden></p>
     </a>
 
     <a class="card glass-light card-compact card-reviews" id="cardReviews" href="https://www.google.com/maps/search/?api=1&query=GIOCO+Rua+de+S%C3%A3o+Bento+154+Lisboa" target="_blank" rel="noopener">
@@ -2739,6 +2824,169 @@ window.addEventListener('load', function () {
   }
   obrigacoesRef.on('value', function (snapshot) { obrigacoesDash = snapshot.val() || {}; renderObrigacoesDash(); });
   projetosRef.on('value', function (snapshot) { projetosDash = snapshot.val() || {}; renderObrigacoesDash(); });
+
+  // social/instagram/ (cartão Instagram): SÓ LEITURA — o nó é escrito pelo job
+  // ig_sync.py e esta página nunca lhe toca. Os cálculos são os da social.html:
+  // janela atual = hoje-6..hoje, anterior = hoje-13..hoje-7; a variação de
+  // seguidores compara perfil.seguidores com diario[hoje-7].seguidores e só
+  // existe quando o primeiro dia do histórico é <= hoje-13. Sem isso o chip
+  // não aparece — nunca um "0" nem um "—". Sparkline = seguidores dos últimos
+  // 30 dias, só com >= 3 pontos.
+  var igPerfil = null, igDiario = {}, igPosts = {}, igMeta = null;
+  var igPerfilOk = false, igDiarioOk = false, igPostsOk = false, igMetaOk = false;
+  var IG_SPARK_DIAS = 30, IG_SPARK_MIN_PONTOS = 3, IG_POST_DIAS = 30;
+
+  function igIsoLocal(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function igSomarDias(iso, n) { var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + n); return igIsoLocal(d); }
+  function igNum(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  // 8465 → "8,5k"; 1 234 567 → "1,2M"; abaixo de 1000 tal como está.
+  function igCompacto(n) {
+    if (igNum(n) === null) return '—';
+    var abs = Math.abs(n);
+    if (abs >= 1e6) return (n / 1e6).toLocaleString('pt-PT', { maximumFractionDigits: 1 }) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toLocaleString('pt-PT', { maximumFractionDigits: 1 }) + 'k';
+    return n.toLocaleString('pt-PT');
+  }
+  function igDiasOrdenados() {
+    return Object.keys(igDiario).filter(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort();
+  }
+  function igSomaJanela(chave, inicio, fim) {
+    var total = 0, n = 0;
+    Object.keys(igDiario).forEach(function (dia) {
+      if (dia < inicio || dia > fim) return;
+      var v = igDiario[dia] && igDiario[dia][chave];
+      if (igNum(v) !== null) { total += v; n++; }
+    });
+    return { total: total, n: n };
+  }
+  function igLinkSeguro(url) {
+    try { var u = new URL(String(url || '')); return u.protocol === 'https:' ? u.href : null; } catch (e) { return null; }
+  }
+
+  function igSparklineHtml(dias, hoje) {
+    var inicio = igSomarDias(hoje, -(IG_SPARK_DIAS - 1));
+    var pontos = dias.filter(function (d) { return d >= inicio && igNum(igDiario[d].seguidores) !== null; })
+      .map(function (d) { return igDiario[d].seguidores; });
+    if (pontos.length < IG_SPARK_MIN_PONTOS) return '';
+    var W = 100, H = 40, n = pontos.length;
+    var vMin = Math.min.apply(null, pontos), vMax = Math.max.apply(null, pontos);
+    var folga = Math.max(1, (vMax - vMin) * 0.15);
+    var lo = vMin - folga, hi = vMax + folga;
+    function px(i) { return (i * W / (n - 1)).toFixed(2); }
+    function py(v) { return (H - 2 - (v - lo) / (hi - lo) * (H - 6)).toFixed(2); }
+    var linha = pontos.map(function (v, i) { return (i ? 'L' : 'M') + px(i) + ' ' + py(v); }).join(' ');
+    var area = linha + ' L' + W + ' ' + H + ' L0 ' + H + ' Z';
+    // vector-effect: o preserveAspectRatio="none" estica o viewBox e, sem isto,
+    // o traço ficava mais grosso na horizontal do que na vertical.
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" focusable="false">' +
+      '<defs><linearGradient id="igSparkGrad" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-opacity="0.12"/>' +
+      '<stop offset="1" stop-opacity="0"/></linearGradient></defs>' +
+      '<path class="ig-spark-area" d="' + area + '"/>' +
+      '<path d="' + linha + '" fill="none" stroke-width="1.5" stroke-opacity="0.18" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '</svg>';
+  }
+
+  function igMelhorPost(hoje) {
+    var inicio = igSomarDias(hoje, -(IG_POST_DIAS - 1));
+    var melhor = null;
+    Object.keys(igPosts).forEach(function (id) {
+      var p = igPosts[id];
+      if (!p || typeof p.dataHora !== 'string') return;
+      var d = new Date(p.dataHora);
+      if (isNaN(d.getTime()) || igIsoLocal(d) < inicio) return;
+      var alcance = igNum(p.alcance);
+      if (alcance === null) return;
+      if (!melhor || alcance > melhor.alcance) melhor = { alcance: alcance, thumb: igLinkSeguro(p.thumbnail) };
+    });
+    return melhor && melhor.thumb ? melhor : null;
+  }
+
+  function igThumbFalhou() {
+    // URL do CDN da Meta expirado: a miniatura some por completo e o número
+    // fica com o cartão todo — nunca um ícone de imagem partida.
+    var t = document.getElementById('igThumb');
+    if (t) t.hidden = true;
+  }
+
+  function renderInstagramDash() {
+    if (!igPerfilOk || !igDiarioOk || !igPostsOk || !igMetaOk) return;
+    var sub = document.getElementById('igSub');
+    var corpo = document.getElementById('igCorpo');
+    var spark = document.getElementById('igSpark');
+    var segEl = document.getElementById('igSeguidores');
+    var chip = document.getElementById('igChip');
+    var thumb = document.getElementById('igThumb');
+    var thumbImg = document.getElementById('igThumbImg');
+    var thumbAlc = document.getElementById('igThumbAlcance');
+    var rodape = document.getElementById('igRodape');
+    if (!sub || !corpo || !spark) return;
+
+    var segAtual = igPerfil ? igNum(igPerfil.seguidores) : null;
+    var erro = igMeta && igMeta.estado === 'erro';
+    if (segAtual === null || erro) {
+      sub.textContent = erro ? 'Sem dados — sincronização em erro' : 'Sem dados';
+      corpo.hidden = true; rodape.hidden = true; spark.innerHTML = '';
+      return;
+    }
+
+    var hoje = igIsoLocal(new Date());
+    var dias = igDiasOrdenados();
+    var primeiro = dias.length ? dias[0] : null;
+    var atualIni = igSomarDias(hoje, -6), antIni = igSomarDias(hoje, -13), antFim = igSomarDias(hoje, -7);
+    var suficiente = !!primeiro && primeiro <= antIni;
+
+    segEl.textContent = segAtual.toLocaleString('pt-PT');
+    var segAntes = igDiario[antFim] ? igNum(igDiario[antFim].seguidores) : null;
+    if (suficiente && segAntes !== null) {
+      var delta = segAtual - segAntes;
+      chip.textContent = (delta > 0 ? '+' : '') + delta.toLocaleString('pt-PT');
+      chip.classList.toggle('desceu', delta < 0);
+      chip.title = 'vs. há 7 dias';
+      chip.hidden = false;
+    } else {
+      chip.hidden = true;
+    }
+
+    var melhor = igMelhorPost(hoje);
+    if (melhor) {
+      thumbImg.onerror = igThumbFalhou;
+      thumbAlc.textContent = igCompacto(melhor.alcance);
+      thumb.hidden = false;
+      if (thumbImg.getAttribute('src') !== melhor.thumb) thumbImg.setAttribute('src', melhor.thumb);
+    } else {
+      thumb.hidden = true;
+      thumbImg.removeAttribute('src');
+    }
+
+    var alc = igSomaJanela('alcance', atualIni, hoje);
+    var vis = igSomaJanela('visualizacoes', atualIni, hoje);
+    var partes = [];
+    if (alc.n) partes.push(igCompacto(alc.total) + ' alcance');
+    if (vis.n) partes.push(igCompacto(vis.total) + ' visualizações');
+    rodape.textContent = partes.join(' · ') + (partes.length ? ' · 7 dias' : '');
+    rodape.hidden = partes.length === 0;
+
+    sub.textContent = '@' + (igPerfil.username || 'eatgioco') + (igMeta && igMeta.ultimaSync ? ' · sync ' + tempoRelativoIg(igMeta.ultimaSync) : '');
+    spark.innerHTML = igSparklineHtml(dias, hoje);
+    corpo.hidden = false;
+  }
+  function tempoRelativoIg(iso) {
+    var t = new Date(iso).getTime();
+    if (!isFinite(t)) return '';
+    var min = Math.round(Math.max(0, Date.now() - t) / 60000);
+    if (min < 60) return 'há ' + min + ' min';
+    var h = Math.round(min / 60);
+    if (h < 24) return 'há ' + h + 'h';
+    var d = Math.round(h / 24);
+    return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+  }
+  db.ref('social/instagram/perfil').on('value', function (s) { igPerfil = s.val() || null; igPerfilOk = true; renderInstagramDash(); });
+  db.ref('social/instagram/diario').on('value', function (s) { igDiario = s.val() || {}; igDiarioOk = true; renderInstagramDash(); });
+  db.ref('social/instagram/posts').on('value', function (s) { igPosts = s.val() || {}; igPostsOk = true; renderInstagramDash(); });
+  db.ref('social/instagram/meta').on('value', function (s) { igMeta = s.val() || null; igMetaOk = true; renderInstagramDash(); });
+  // Exposto só para testes no browser (injetar histórico falso em memória).
+  window.__igDash = { render: renderInstagramDash, set: function (o) { if (o.perfil !== undefined) igPerfil = o.perfil; if (o.diario !== undefined) igDiario = o.diario; if (o.posts !== undefined) igPosts = o.posts; if (o.meta !== undefined) igMeta = o.meta; renderInstagramDash(); } };
 
   var todayPicksRef = db.ref('todayPicks');
   var snoozedRef = db.ref('tarefasUi/snoozed');
