@@ -1571,10 +1571,12 @@
      sem grelha de 7 colunas em ecrã estreito, sem scroll horizontal.
      7 colunas segunda a domingo, sempre visíveis (mesmo vazias) para se ler
      como uma semana; altura mínima igual e scroll INTERNO por coluna, para o
-     card não crescer sem limite. Expandir um chip é só UI (classe .aberto). */
+     card não crescer sem limite. O chip é SEMPRE compacto (nunca expande —
+     numa coluna de ~200px o texto ficava ilegível): clicar abre o detalhe no
+     giocoModal do shell, só de leitura. */
   .semana-grelha{ display:none; }
   .semana-col{
-    min-width:0; min-height:220px; max-height:420px; overflow-y:auto; overflow-x:hidden;
+    min-width:0; min-height:160px; max-height:420px; overflow-y:auto; overflow-x:hidden;
     border-left:1px solid var(--line); padding:0 6px 6px;
   }
   .semana-col:first-child{ border-left:none; padding-left:0; }
@@ -1594,16 +1596,34 @@
     font-family:'Inter',sans-serif; cursor:pointer;
   }
   .semana-chip:hover{ border-color:var(--ink); }
-  .semana-chip.aberto{ border-color:var(--ink); background:var(--white); }
   .semana-chip-cab{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .semana-chip-hora{ font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
-  .semana-chip .semana-titulo{ font-size:13px; display:block; margin-top:3px; }
+  /* Título a 2 linhas no máximo, com reticências. */
+  .semana-chip .semana-titulo{
+    font-size:13px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden; margin-top:3px; overflow-wrap:anywhere;
+  }
   .semana-chip .semana-badge{ font-size:9px; padding:2px 6px; }
-  .semana-chip-det{ display:none; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
-  .semana-chip.aberto .semana-chip-det{ display:block; }
-  .semana-chip-det .semana-visita{ margin-top:6px; padding:6px 8px; }
-  .semana-chip-det .semana-oferta{ font-size:14px; }
+  /* Marcador discreto "há algo a fazer" (comunicado com `acao`), sem texto. */
+  .semana-chip-acao{ width:7px; height:7px; border-radius:50%; background:var(--red); flex-shrink:0; margin-left:auto; }
   .semana-grelha-vazio{ display:none; margin:8px 0 0; font-size:14px; color:var(--muted); }
+
+  /* Modal de detalhe do comunicado (giocoModal do shell, SÓ leitura; só a
+     partir da grelha — a vista empilhada mostra tudo inline). Texto a tamanho
+     de leitura por cima dos 12.5px do .gioco-modal-body. */
+  .semana-modal{ font-size:15px; line-height:1.5; color:var(--ink); }
+  .semana-modal-t{ font-size:20px; font-weight:700; line-height:1.25; margin:0 0 6px; overflow-wrap:anywhere; }
+  .semana-modal-quando{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .semana-modal-quando b{ color:var(--ink); font-weight:600; }
+  .semana-modal .semana-quem{ font-size:14px; margin-top:10px; }
+  .semana-modal-acao{
+    margin-top:14px; padding:12px 14px; border-radius:10px;
+    border:2px solid var(--red); background:var(--white); font-size:16px; font-weight:700; line-height:1.4;
+  }
+  .semana-modal-acao b{ color:var(--red-ink); }
+  .semana-modal .semana-detalhe{ font-size:15px; margin-top:14px; }
+  .semana-modal .semana-visita{ margin-top:14px; padding:12px 14px; font-size:15px; line-height:1.6; }
+  .semana-modal .semana-oferta{ font-size:17px; }
 
 </style>
 </head>
@@ -4689,9 +4709,9 @@
     var eventosBrutos = {};
     // Semana visível, em semanas a contar da corrente (0 = esta). Só UI.
     var deslocamento = 0;
-    // Chips abertos na grelha (ids de eventos), para sobreviverem ao re-render
-    // do on('value') e do refresh de minuto a minuto. Só UI, nunca escrita.
-    var abertos = {};
+    // Última lista normalizada desenhada, por id — é daqui que o modal de
+    // detalhe lê o evento ao clicar num chip (nunca do nó bruto à mão).
+    var porId = {};
     var DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
     var DIAS_LONGO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -4777,17 +4797,49 @@
         '</div></div>';
     }
 
-    // Chip da grelha (>= 900px): hora | badge | título; clicar abre os
-    // detalhes completos (só UI — classe .aberto, nada é escrito).
+    // Chip da grelha (>= 900px): SEMPRE compacto — hora (ou "dia inteiro") |
+    // badge | título a 2 linhas, e um ponto discreto quando há `acao`.
+    // Nunca expande: clicar abre o modal de detalhe (só leitura).
     function chipHtml(ev){
       var c = ev.comunicado;
       var hora = horaTexto(ev);
-      var det = detalhesHtml(c);
-      return '<button type="button" class="semana-chip' + (abertos[ev.id] ? ' aberto' : '') + '" data-id="' + escapeHtml(ev.id) + '" aria-expanded="' + (abertos[ev.id] ? 'true' : 'false') + '">' +
-        '<span class="semana-chip-cab">' + (hora ? '<span class="semana-chip-hora">' + escapeHtml(hora) + '</span>' : '') + badgeHtml(c) + '</span>' +
+      return '<button type="button" class="semana-chip" data-id="' + escapeHtml(ev.id) + '" title="Ver detalhe">' +
+        '<span class="semana-chip-cab">' +
+          '<span class="semana-chip-hora">' + (hora ? escapeHtml(hora) : 'dia inteiro') + '</span>' + badgeHtml(c) +
+          (c.acao ? '<i class="semana-chip-acao" title="Há algo a fazer"></i>' : '') +
+        '</span>' +
         '<span class="semana-titulo">' + escapeHtml(c.titulo) + '</span>' +
-        (det ? '<span class="semana-chip-det">' + det + '</span>' : '') +
         '</button>';
+    }
+
+    // Modal de detalhe (giocoModal do shell): o comunicado completo, por ordem
+    // de peso — título · data e hora · badge · quem/pessoas · "Fazer:" ·
+    // detalhe · bloco de visita. ZERO botões de escrita.
+    function modalHtml(ev){
+      var c = ev.comunicado;
+      var d = deIso(ev.data);
+      var hora = horaTexto(ev);
+      var quando = DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + ' ' + MESES[d.getMonth()];
+      var h = '<div class="semana-modal">' +
+        '<p class="semana-modal-t">' + escapeHtml(c.titulo) + '</p>' +
+        '<div class="semana-modal-quando"><b>' + escapeHtml(quando) + '</b><span>' + (hora ? escapeHtml(hora) : 'dia inteiro') + '</span>' + badgeHtml(c) + '</div>';
+      var quem = [];
+      var quemDistinto = c.quem && c.quem.trim().toLowerCase() !== c.titulo.trim().toLowerCase();
+      if (quemDistinto) quem.push('<b>' + escapeHtml(c.quem) + '</b>');
+      if (c.tipo === 'visita' && c.subtipo) quem.push(escapeHtml(EV.comunicadoSubtipo(c.subtipo).label.toLowerCase()));
+      if (c.pessoas) quem.push(escapeHtml(c.pessoas + (c.pessoas === 1 ? ' pessoa' : ' pessoas')));
+      if (quem.length) h += '<div class="semana-quem">' + quem.join(' · ') + '</div>';
+      if (c.acao) h += '<div class="semana-modal-acao"><b>Fazer:</b> ' + escapeHtml(c.acao) + '</div>';
+      if (c.detalhe) h += '<div class="semana-detalhe">' + escapeHtml(c.detalhe) + '</div>';
+      if (c.tipo === 'visita' && (c.handle || c.combinado || c.contrapartida || c.anfitriao)) {
+        h += '<div class="semana-visita">';
+        if (c.handle) h += '<div>' + escapeHtml(c.handle) + '</div>';
+        if (c.combinado) h += '<div class="semana-oferta"><b>Oferta:</b> ' + escapeHtml(c.combinado) + '</div>';
+        if (c.contrapartida) h += '<div><b>Pede-se:</b> ' + escapeHtml(c.contrapartida) + '</div>';
+        if (c.anfitriao) h += '<div><b>Recebe:</b> ' + escapeHtml(c.anfitriao) + '</div>';
+        h += '</div>';
+      }
+      return h + '</div>';
     }
 
     function classeDia(dia, s){ return dia === s.hoje ? ' hoje' : (dia < s.hoje ? ' passado' : ''); }
@@ -4799,6 +4851,8 @@
       btnHoje.disabled = deslocamento === 0;
       var porDia = itensDaSemana(s);
       var dias = Object.keys(porDia).sort();
+      porId = {};
+      dias.forEach(function(dia){ porDia[dia].forEach(function(ev){ porId[ev.id] = ev; }); });
 
       // Grelha semanal: os 7 dias sempre presentes, vazios ou não.
       var g = '';
@@ -4823,18 +4877,18 @@
       lista.innerHTML = html;
     }
 
-    // Expandir/recolher um chip da grelha: só UI.
+    // Clicar num chip da grelha abre o detalhe no giocoModal (só leitura;
+    // fecha por ×, clique fora e Escape — tudo do shell).
     grelha.addEventListener('click', function(e){
       var chip = e.target.closest('.semana-chip');
       if (!chip) return;
-      var id = chip.getAttribute('data-id');
-      if (abertos[id]) delete abertos[id]; else abertos[id] = true;
-      chip.classList.toggle('aberto', !!abertos[id]);
-      chip.setAttribute('aria-expanded', abertos[id] ? 'true' : 'false');
+      var ev = porId[chip.getAttribute('data-id')];
+      if (!ev || !window.giocoModal) return;
+      giocoModal.open({ titulo: 'Comunicado à loja', conteudo: modalHtml(ev) });
     });
 
     // Navegação de semana: setas e Hoje, nas duas vistas.
-    function mudarSemana(n){ deslocamento = n; abertos = {}; render(); }
+    function mudarSemana(n){ deslocamento = n; render(); }
     btnAnterior.addEventListener('click', function(){ mudarSemana(deslocamento - 1); });
     btnSeguinte.addEventListener('click', function(){ mudarSemana(deslocamento + 1); });
     btnHoje.addEventListener('click', function(){ mudarSemana(0); });
