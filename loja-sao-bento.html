@@ -25,6 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-consumo.js"></script>
+<script src="gioco-eventos.js"></script>
 
 <style>
 
@@ -1487,6 +1488,64 @@
     color:var(--muted);
     line-height:1.55;
   }
+  /* ---------- Esta semana na loja (Set/2026) ----------
+     SÓ LEITURA de eventos/ — mostra apenas os que têm o sub-objeto
+     `comunicado` (ver gioco-eventos.js) e não estão anulados, na semana
+     corrente (segunda a domingo). A categoria do evento nunca é critério.
+     Padrão visual do card "O que falta": .faltas-card / .falta-row. */
+  .semana-card{
+    background:var(--white); border:2px solid var(--line); border-radius:12px;
+    padding:14px; color:var(--ink);
+  }
+  .semana-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+  .semana-top h2{ margin:0; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+  .semana-intervalo{ font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; margin-right:auto; }
+  .semana-copiar{
+    min-height:36px; padding:0 14px; display:inline-flex; align-items:center; gap:6px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    border-radius:100px; border:2px solid var(--ink); background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .semana-copiar .icon{ width:14px; height:14px; }
+  .semana-copiar:hover{ background:var(--ink); color:var(--white); }
+  .semana-copiar.copiado{ background:var(--green-bg); border-color:var(--green); color:var(--green); }
+  .semana-vazio{ margin:6px 0 4px; font-size:14px; color:var(--muted); }
+  .semana-dia{ padding:10px 0 4px; border-top:2px solid var(--line); }
+  .semana-dia:first-child{ border-top:none; padding-top:2px; }
+  .semana-dia-t{
+    display:flex; align-items:center; gap:8px; margin:0 0 4px;
+    font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  }
+  .semana-dia.hoje .semana-dia-t{ color:var(--red-ink); }
+  .semana-dia.hoje .semana-dia-t::after{ content:'Hoje'; font-size:10px; padding:1px 7px; border-radius:100px; background:var(--red); color:var(--on-red); letter-spacing:.5px; }
+  .semana-dia.passado{ opacity:.45; }
+  .semana-item{ display:grid; grid-template-columns:52px minmax(0,1fr); gap:6px 10px; padding:8px 0; border-top:1px solid var(--line); }
+  .semana-dia .semana-item:first-of-type{ border-top:none; }
+  .semana-hora{ font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink); padding-top:2px; }
+  .semana-hora small{ display:block; font-size:10px; font-weight:500; color:var(--muted); }
+  .semana-main{ min-width:0; }
+  .semana-linha1{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .semana-badge{
+    font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    padding:3px 8px; border-radius:100px; white-space:nowrap; color:#141414;
+  }
+  .semana-badge-visita{ background:var(--mustard); }
+  .semana-badge-entrega{ background:var(--sky); }
+  .semana-badge-manutencao{ background:var(--blush); }
+  .semana-badge-obra{ background:var(--lime); }
+  .semana-badge-formacao{ background:var(--navy); color:#FFFFFF; }
+  .semana-badge-outro{ background:transparent; border:1.5px solid var(--line); color:var(--muted); }
+  .semana-titulo{ font-size:16px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+  .semana-quem{ font-size:13px; color:var(--muted); }
+  .semana-quem b{ color:var(--ink); font-weight:600; }
+  .semana-detalhe{ font-size:13px; margin-top:4px; white-space:pre-line; }
+  .semana-acao{ font-size:13px; margin-top:4px; }
+  .semana-acao b, .semana-visita b{ font-weight:700; }
+  .semana-visita{ margin-top:6px; padding:8px 10px; border-radius:8px; background:var(--dough); font-size:13px; line-height:1.5; }
+  .semana-visita div{ overflow-wrap:anywhere; }
+  /* A oferta é o campo que evita dúvidas ao balcão: tem de saltar à vista. */
+  .semana-oferta{ font-size:15px; font-weight:700; color:var(--red-ink); }
+  .semana-oferta b{ color:var(--ink); }
+
 </style>
 </head>
 <body class="shell-mobile">
@@ -1627,6 +1686,18 @@
     </div>
   </div>
   </div><!-- /.topo-grid -->
+
+  <div class="section" id="semana-section">
+    <p class="section-title">Esta semana na loja</p>
+    <div class="semana-card" id="semanaCard">
+      <div class="semana-top">
+        <h2>Esta semana</h2>
+        <span class="semana-intervalo" id="semanaIntervalo"></span>
+        <button type="button" class="semana-copiar" id="semanaCopiar" title="Copiar a semana em texto para colar no WhatsApp"><svg class="icon"><use href="#i-copy"/></svg><span>Copiar semana</span></button>
+      </div>
+      <div id="semanaLista"><p class="semana-vazio">Nada marcado para esta semana.</p></div>
+    </div>
+  </div>
 
   <div class="section">
     <p class="section-title">Planta</p>
@@ -4527,6 +4598,173 @@
 
     // "há 9h" envelhece: refrescar de minuto a minuto.
     setInterval(renderFaltas, 60000);
+  })();
+
+  /* ---------- Esta semana na loja (Set/2026) ----------
+     SÓ LEITURA. Lê eventos/ com on('value') e mostra apenas os eventos com o
+     sub-objeto `comunicado` (normalizado pelo gioco-eventos.js) e não anulados,
+     na semana corrente (segunda a domingo), agrupados por dia e ordenados por
+     hora. Não escreve uma única vez em nó nenhum; não há botões de editar,
+     anular ou concluir. A categoria do evento (incluindo 'loja') NUNCA é
+     critério — só a presença do sub-objeto. */
+  (function semanaModulo(){
+    var EV = giocoEventosEngine({ eventosRef: db.ref('eventos') });
+    var lista = document.getElementById('semanaLista');
+    var intervaloEl = document.getElementById('semanaIntervalo');
+    var btnCopiar = document.getElementById('semanaCopiar');
+    var eventosBrutos = {};
+    var DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+    var DIAS_LONGO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+    function pad2(n){ return (n < 10 ? '0' : '') + n; }
+    function isoLocal(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+    function deIso(iso){ var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    function rotuloTipo(c){ return EV.comunicadoTipo(c.tipo).label; }
+    // Semana corrente: segunda a domingo, em datas LOCAIS.
+    function semanaAtual(){
+      var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+      var seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7));
+      var dom = new Date(seg); dom.setDate(seg.getDate() + 6);
+      return { hoje: isoLocal(hoje), inicio: isoLocal(seg), fim: isoLocal(dom), seg: seg, dom: dom };
+    }
+    function rotuloIntervalo(s){
+      if (s.seg.getMonth() === s.dom.getMonth()) return s.seg.getDate() + ' a ' + s.dom.getDate() + ' ' + MESES[s.dom.getMonth()];
+      return s.seg.getDate() + ' ' + MESES[s.seg.getMonth()] + ' a ' + s.dom.getDate() + ' ' + MESES[s.dom.getMonth()];
+    }
+    function horaTexto(ev){ return ev.diaInteiro || !ev.horaInicio ? null : ev.horaInicio.replace(':', 'h'); }
+
+    // Só os que interessam: comunicado presente, não anulado (EV.normalizar
+    // devolve null aos anulados), dentro da semana. Agrupados por dia.
+    function itensDaSemana(s){
+      var porDia = {};
+      Object.keys(eventosBrutos).forEach(function(id){
+        var ev = EV.normalizar(id, eventosBrutos[id]);
+        if (!ev || !ev.comunicado) return;
+        if (ev.data < s.inicio || ev.data > s.fim) return;
+        (porDia[ev.data] = porDia[ev.data] || []).push(ev);
+      });
+      Object.keys(porDia).forEach(function(dia){
+        porDia[dia].sort(function(a, b){
+          var ha = a.horaInicio || '', hb = b.horaInicio || '';
+          if (!!a.diaInteiro !== !!b.diaInteiro) return a.diaInteiro ? -1 : 1;
+          if (ha !== hb) return ha < hb ? -1 : 1;
+          return a.comunicado.titulo.localeCompare(b.comunicado.titulo, 'pt');
+        });
+      });
+      return porDia;
+    }
+
+    function linhaHtml(ev){
+      var c = ev.comunicado;
+      var hora = horaTexto(ev);
+      var h = '<div class="semana-item">' +
+        '<div class="semana-hora">' + (hora ? escapeHtml(hora) : '<small>dia inteiro</small>') + '</div>' +
+        '<div class="semana-main">' +
+          '<div class="semana-linha1">' +
+            '<span class="semana-badge semana-badge-' + escapeHtml(c.tipo) + '">' + escapeHtml(rotuloTipo(c)) + '</span>' +
+            '<span class="semana-titulo">' + escapeHtml(c.titulo) + '</span>' +
+          '</div>';
+      var quem = [];
+      // "quem" igual ao título não se repete (ex.: visita cujo título é o nome da pessoa).
+      var quemDistinto = c.quem && c.quem.trim().toLowerCase() !== c.titulo.trim().toLowerCase();
+      if (quemDistinto) quem.push('<b>' + escapeHtml(c.quem) + '</b>');
+      if (c.tipo === 'visita' && c.handle) quem.push(escapeHtml(c.handle));
+      if (c.tipo === 'visita' && c.subtipo) quem.push(escapeHtml(EV.comunicadoSubtipo(c.subtipo).label.toLowerCase()));
+      if (c.pessoas) quem.push(escapeHtml(c.pessoas + (c.pessoas === 1 ? ' pessoa' : ' pessoas')));
+      if (quem.length) h += '<div class="semana-quem">' + quem.join(' · ') + '</div>';
+      if (c.detalhe) h += '<div class="semana-detalhe">' + escapeHtml(c.detalhe) + '</div>';
+      if (c.acao) h += '<div class="semana-acao"><b>Fazer:</b> ' + escapeHtml(c.acao) + '</div>';
+      if (c.tipo === 'visita' && (c.combinado || c.contrapartida || c.anfitriao)) {
+        h += '<div class="semana-visita">';
+        if (c.combinado) h += '<div class="semana-oferta"><b>Oferta:</b> ' + escapeHtml(c.combinado) + '</div>';
+        if (c.contrapartida) h += '<div><b>Pede-se:</b> ' + escapeHtml(c.contrapartida) + '</div>';
+        if (c.anfitriao) h += '<div><b>Recebe:</b> ' + escapeHtml(c.anfitriao) + '</div>';
+        h += '</div>';
+      }
+      h += '</div></div>';
+      return h;
+    }
+
+    function render(){
+      var s = semanaAtual();
+      intervaloEl.textContent = rotuloIntervalo(s);
+      var porDia = itensDaSemana(s);
+      var dias = Object.keys(porDia).sort();
+      if (!dias.length) { lista.innerHTML = '<p class="semana-vazio">Nada marcado para esta semana.</p>'; return; }
+      var html = '';
+      dias.forEach(function(dia){
+        var d = deIso(dia);
+        var cls = dia === s.hoje ? ' hoje' : (dia < s.hoje ? ' passado' : '');
+        html += '<div class="semana-dia' + cls + '"><p class="semana-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>';
+        porDia[dia].forEach(function(ev){ html += linhaHtml(ev); });
+        html += '</div>';
+      });
+      lista.innerHTML = html;
+    }
+
+    // Texto simples pronto a colar no WhatsApp.
+    function textoSemana(){
+      var s = semanaAtual();
+      var porDia = itensDaSemana(s);
+      var dias = Object.keys(porDia).sort();
+      var out = ['GIOCO · SB154 · semana de ' + rotuloIntervalo(s), ''];
+      if (!dias.length) { out.push('Nada marcado para esta semana.'); return out.join('\n'); }
+      dias.forEach(function(dia){
+        var d = deIso(dia);
+        porDia[dia].forEach(function(ev){
+          var c = ev.comunicado;
+          var hora = horaTexto(ev) || 'dia inteiro';
+          var quemDistinto = c.quem && c.quem.trim().toLowerCase() !== c.titulo.trim().toLowerCase();
+          var handle = c.tipo === 'visita' && c.handle ? ' (' + c.handle + ')' : '';
+          // O handle cola-se a quem visita: ao "quem" se for distinto do título, senão ao próprio título.
+          var cab = DIAS[d.getDay()] + ' ' + d.getDate() + ', ' + hora + ' — ' + rotuloTipo(c).toUpperCase() + ' · ' + c.titulo + (quemDistinto ? '' : handle);
+          var extra = [];
+          if (quemDistinto) extra.push(c.quem + handle);
+          if (c.tipo === 'visita' && c.subtipo) extra.push(EV.comunicadoSubtipo(c.subtipo).label.toLowerCase());
+          if (c.pessoas) extra.push(c.pessoas + ' pax');
+          if (extra.length) cab += ' · ' + extra.join(' · ');
+          out.push(cab);
+          if (c.detalhe) out.push('  ' + c.detalhe.replace(/\s*\n\s*/g, ' '));
+          if (c.tipo === 'visita' && c.combinado) out.push('  Oferta: ' + c.combinado);
+          if (c.tipo === 'visita' && c.contrapartida) out.push('  Pede-se: ' + c.contrapartida);
+          if (c.tipo === 'visita' && c.anfitriao) out.push('  Recebe: ' + c.anfitriao);
+          if (c.acao) out.push('  Fazer: ' + c.acao);
+          out.push('');
+        });
+      });
+      while (out.length && out[out.length - 1] === '') out.pop();
+      return out.join('\n');
+    }
+    function copiarTexto(texto){
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(texto);
+      return new Promise(function(res, rej){
+        var ta = document.createElement('textarea');
+        ta.value = texto; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        if (ok) res(); else rej(new Error('clipboard indisponível'));
+      });
+    }
+    var feedbackTimer = null;
+    btnCopiar.addEventListener('click', function(){
+      var span = btnCopiar.querySelector('span');
+      copiarTexto(textoSemana()).then(function(){
+        btnCopiar.classList.add('copiado'); span.textContent = 'Copiado ✓';
+      }).catch(function(){
+        span.textContent = 'Não foi possível copiar';
+      }).then(function(){
+        clearTimeout(feedbackTimer);
+        feedbackTimer = setTimeout(function(){ btnCopiar.classList.remove('copiado'); span.textContent = 'Copiar semana'; }, 2000);
+      });
+    });
+    // Exposto só para os testes (leitura pura, sem efeitos).
+    window.__semanaTexto = textoSemana;
+
+    db.ref('eventos').on('value', function(s){ eventosBrutos = s.val() || {}; render(); });
+    // "Hoje" e "passado" mudam à meia-noite: refrescar de minuto a minuto.
+    setInterval(render, 60000);
   })();
 
   }); // fim de autenticarEContinuar
