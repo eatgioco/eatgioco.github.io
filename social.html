@@ -397,7 +397,7 @@
   .post-link .icon{ width:12px; height:12px; }
 
   /* ======================================================================
-     SECÇÃO 3 — Calendário de publicações
+     SECÇÃO 3 — Calendário de conteúdo
      ====================================================================== */
   .cal-card{
     background:var(--white);
@@ -431,10 +431,47 @@
   .cal-novo .icon{ width:14px; height:14px; }
   .cal-novo:hover{ background:var(--red); border-color:var(--red); color:var(--on-red); }
 
-  .cal-legenda{ display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin:0 0 10px; }
+  /* ---------- Cores de pilar ----------
+     Paleta tirada das superfícies de selo do shell (as mesmas famílias das
+     categorias do gioco-eventos.js). O texto por cima é um literal fixo, com
+     par [data-theme="dark"] onde o fundo clareia no escuro — é o padrão de
+     .status.* do shell. A MESMA regra serve o bloco do calendário, o chip da
+     configuração e o selector de cor: uma só definição por cor. */
+  .gcor[data-cor="lime"]    { background:var(--lime);    color:#141414; }
+  .gcor[data-cor="mustard"] { background:var(--mustard); color:#141414; }
+  .gcor[data-cor="blush"]   { background:var(--blush);   color:#141414; }
+  .gcor[data-cor="sky"]     { background:var(--sky);     color:#141414; }
+  .gcor[data-cor="navy"]    { background:var(--navy);    color:#FFFFFF; }
+  .gcor[data-cor="red"]     { background:var(--red);     color:var(--on-red); }
+  .gcor[data-cor="nenhum"]  { background:var(--line);    color:var(--ink); }
+  [data-theme="dark"] .gcor[data-cor="navy"]{ color:#141414; }
+
+  /* ---------- Marca de estado ----------
+     Estado e pilar são dimensões diferentes e não podem competir pela mesma
+     pista visual: o PILAR pinta o bloco, o ESTADO é esta marca monocromática
+     em currentColor (logo, sempre legível sobre qualquer pilar). Distingue-se
+     por FORMA e por enchimento, nunca por cor. O texto do estado continua no
+     title, no modal e na lista — a marca nunca é a única pista. */
+  .est-marca{
+    flex:none; width:9px; height:9px; border-radius:100px;
+    border:1.5px solid currentColor; background:transparent; box-sizing:border-box;
+  }
+  .est-marca.e-ideia{ border-style:dashed; }
+  .est-marca.e-revisao{ background:linear-gradient(90deg, currentColor 0 50%, transparent 50% 100%); }
+  .est-marca.e-aprovado{ background:currentColor; }
+  .est-marca.e-agendado{ background:currentColor; outline:1.5px solid currentColor; outline-offset:1.5px; }
+  .est-marca.e-publicado{ background:currentColor; border-radius:2px; }
+
+  .cal-legenda{ display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin:0 0 10px; align-items:center; }
   .cal-legenda span{ display:inline-flex; align-items:center; gap:5px; }
   .cal-legenda i{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .cal-legenda .sep{ width:1px; height:12px; background:var(--line); display:inline-block; }
+  /* A regra `.cal-legenda i` acima é mais específica do que `.est-marca`:
+     sem isto as marcas de estado da legenda saíam todas quadradas. */
+  .cal-legenda .est-marca{ color:var(--ink); width:9px; height:9px; border-radius:100px; }
+  .cal-legenda .est-marca.e-publicado{ border-radius:2px; }
 
+  /* ---------- Vista MÊS ---------- */
   .cal-semana{
     display:grid; grid-template-columns:repeat(7, minmax(0,1fr));
     font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
@@ -461,29 +498,23 @@
   .cal-dia.hoje .cal-dia-n{ background:var(--red); color:var(--on-red); }
   .cal-ents{ display:flex; flex-direction:column; gap:3px; margin-top:4px; }
 
-  /* Bloco de entrada: cor por ESTADO (superfícies de selo do shell, texto
-     fixo #141414 — o padrão de .status.* do shell). */
+  /* Bloco de entrada: o fundo é a COR DO PILAR (.gcor), a marca de estado
+     fica à esquerda em currentColor. */
   .cal-ent{
-    display:block; width:100%; text-align:left; min-width:0;
+    display:flex; align-items:center; gap:5px; width:100%; text-align:left; min-width:0;
     padding:3px 6px; border:none; border-radius:6px; cursor:pointer;
-    font-family:'Inter',sans-serif; font-size:11px; line-height:1.3; color:#141414;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-family:'Inter',sans-serif; font-size:11px; line-height:1.3;
   }
-  .cal-ent b{ font-weight:700; margin-right:3px; }
+  .cal-ent .t{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-ent b{ font-weight:700; margin-right:3px; font-variant-numeric:tabular-nums; }
   .cal-ent:hover{ outline:2px solid var(--ink); outline-offset:-1px; }
-  .cal-ent-ideia{ background:var(--line); color:var(--ink); }
-  .cal-ent-pronto{ background:var(--mustard); }
-  .cal-ent-aprovado{ background:var(--sky); }
-  .cal-ent-publicado{ background:var(--lime); }
-  [data-theme="dark"] .cal-ent-ideia{ color:var(--ink); }
 
-  .cal-legenda .l-ideia{ background:var(--line); }
-  .cal-legenda .l-pronto{ background:var(--mustard); }
-  .cal-legenda .l-aprovado{ background:var(--sky); }
-  .cal-legenda .l-publicado{ background:var(--lime); }
+  .pil-chip{
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 8px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap;
+  }
 
-  /* Lista do mês (telemóvel): nasce escondida; troca com a grelha abaixo
-     de 700px, tal como a grelha de Pedidos da loja perde a altura fixa. */
+  /* ---------- Lista do mês (telemóvel) ---------- */
   .cal-lista{ display:none; }
   .cal-lista-dia{ padding:10px 0 6px; border-top:1px solid var(--line); }
   .cal-lista-dia:first-child{ border-top:none; padding-top:2px; }
@@ -492,7 +523,8 @@
     font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
   }
   .cal-lista-dia.hoje .cal-lista-dia-t{ color:var(--red-ink); }
-  .cal-lista .cal-ent{ font-size:13px; padding:8px 10px; margin-top:4px; white-space:normal; min-height:44px; }
+  .cal-lista .cal-ent{ font-size:13px; padding:8px 10px; margin-top:4px; min-height:44px; }
+  .cal-lista .cal-ent .t{ white-space:normal; }
   .cal-lista-add{
     display:inline-block; margin-top:4px; background:none; border:none; padding:6px 0;
     font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;
@@ -504,11 +536,112 @@
     .cal-lista{ display:block; }
   }
 
-  /* Modal (giocoModal do shell) — conteúdo do formulário. */
+  /* ---------- Configuração (pilares + grelha recorrente) ---------- */
+  .cal-config{
+    margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);
+  }
+  .cal-config > summary{
+    cursor:pointer; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+    color:var(--muted); list-style:none; display:flex; align-items:center; gap:6px;
+  }
+  .cal-config > summary::-webkit-details-marker{ display:none; }
+  .cal-config > summary .icon{ width:13px; height:13px; transition:transform .15s ease; }
+  .cal-config[open] > summary .icon{ transform:rotate(90deg); }
+  .cal-config > summary:hover{ color:var(--ink); }
+  .cal-config-corpo{ padding-top:12px; }
+  .cal-config-bloco{ margin-bottom:22px; }
+  .cal-config-bloco:last-child{ margin-bottom:0; }
+  .cal-config-bloco h3{
+    margin:0 0 4px; font-size:13px; font-weight:700; color:var(--ink);
+  }
+  .cal-config-bloco .ajuda{ margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.5; max-width:62ch; }
+
+  .pil-linha{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:8px 0; border-bottom:1px solid var(--line);
+  }
+  .pil-linha.inativo{ opacity:.55; }
+  .pil-linha .nome-in{
+    flex:1 1 180px; min-width:120px; max-width:320px; padding:7px 10px; border:1px solid var(--line); border-radius:8px;
+    background:var(--dough); color:var(--ink); font-family:'Inter',sans-serif; font-size:13px;
+  }
+  .pil-linha .nome-in:focus{ outline:none; border-color:var(--ink); }
+  .cor-sel{
+    width:26px; height:26px; border-radius:100px; border:2px solid transparent; cursor:pointer; padding:0;
+  }
+  .cor-sel.sel{ border-color:var(--ink); }
+  .cor-row{ display:inline-flex; gap:4px; }
+  .pil-btns{ display:inline-flex; gap:4px; margin-left:auto; }
+  .btn-mini{
+    min-width:30px; min-height:30px; padding:0 8px; display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); border-radius:100px; background:var(--white); color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .btn-mini:hover{ background:var(--ink); color:var(--white); }
+  .btn-mini:disabled{ opacity:.35; cursor:default; }
+  .btn-mini:disabled:hover{ background:var(--white); color:var(--ink); }
+  .btn-mini .icon{ width:13px; height:13px; }
+
+  .pil-novo, .slot-novo{
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px;
+  }
+  .pil-novo input, .slot-novo input, .slot-novo select{
+    padding:8px 11px; border:1px solid var(--line); border-radius:8px;
+    background:var(--dough); color:var(--ink); font-family:'Inter',sans-serif; font-size:13px;
+  }
+  .pil-novo input{ flex:1 1 200px; min-width:140px; }
+  .pil-novo input:focus, .slot-novo input:focus, .slot-novo select:focus{ outline:none; border-color:var(--ink); }
+
+  .cfg-vazio{
+    padding:14px 16px; border:1px dashed var(--line); border-radius:12px;
+    font-size:12.5px; color:var(--muted); line-height:1.55; max-width:62ch;
+  }
+
+  .grelha-dia{ padding:8px 0; border-bottom:1px solid var(--line); }
+  .grelha-dia-t{
+    margin:0 0 6px; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  }
+  .grelha-slots{ display:flex; flex-wrap:wrap; gap:6px; }
+  .grelha-slot{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 6px 5px 10px; border:1px solid var(--line); border-radius:100px;
+    font-size:11.5px; color:var(--ink); font-variant-numeric:tabular-nums;
+  }
+  .grelha-slot.inativo{ opacity:.5; }
+  .grelha-slot .ponto{ width:8px; height:8px; border-radius:100px; flex:none; }
+  .grelha-slot .x{
+    border:none; background:none; cursor:pointer; color:var(--muted); font-size:13px; line-height:1;
+    padding:2px 4px;
+  }
+  .grelha-slot .x:hover{ color:var(--red-ink); }
+  .grelha-vazio{ font-size:11.5px; color:var(--muted); }
+
+  .cfg-erro{ color:var(--red-ink); font-size:12px; margin:8px 0 0; }
+  .cfg-nota{ color:var(--muted); font-size:11.5px; margin:8px 0 0; }
+
+  /* ---------- Modal (giocoModal do shell) ---------- */
   .cal-modal{ font-size:13px; color:var(--ink); }
   .cal-modal .field{ margin-bottom:12px; }
   .cal-modal-2col{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(180px,100%),1fr)); gap:0 12px; }
+  .cal-modal-3col{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(150px,100%),1fr)); gap:0 12px; }
   .cal-modal-meta{ font-size:11px; color:var(--muted); margin:0 0 12px; }
+  .cal-zona{ margin:0 0 18px; }
+  .cal-zona-t{
+    margin:0 0 10px; padding-bottom:5px; border-bottom:1px solid var(--line);
+    font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  }
+  .cal-conta{ font-size:11px; color:var(--muted); margin-top:4px; text-align:right; font-variant-numeric:tabular-nums; }
+  .cal-conta.longa{ color:var(--amber); }
+  .cal-dup{
+    display:none; gap:8px; align-items:center; flex-wrap:wrap;
+    margin:12px 0 0; padding:10px 12px; border:1px dashed var(--line); border-radius:12px;
+  }
+  .cal-dup.on{ display:flex; }
+  .cal-dup input[type="date"]{
+    padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+    background:var(--dough); color:var(--ink); font-family:'Inter',sans-serif; font-size:13px;
+  }
+  .cal-dup .nota{ font-size:11px; color:var(--muted); flex-basis:100%; }
 
   /* Arredondamento (Fase 3 da loja). */
   .btn, .btn-registar, .pedidos-filter-chip{ border-radius:100px; }
@@ -604,7 +737,10 @@
 
   <!-- ===================== SECÇÃO 3: Calendário ===================== -->
   <div class="section" id="calendario-section">
-    <p class="section-title">Calendário de publicações</p>
+    <div class="section-head">
+      <p class="section-title">Calendário de conteúdo</p>
+      <span class="section-nota" id="calNota"></span>
+    </div>
     <div class="cal-card">
       <div class="cal-top">
         <h2 id="calTitulo">—</h2>
@@ -615,15 +751,46 @@
         </div>
         <button type="button" class="cal-novo" id="calNovo"><svg class="icon"><use href="#i-plus"/></svg><span>Nova entrada</span></button>
       </div>
-      <div class="cal-legenda">
-        <span><i class="l-ideia"></i>ideia</span>
-        <span><i class="l-pronto"></i>pronto</span>
-        <span><i class="l-aprovado"></i>aprovado</span>
-        <span><i class="l-publicado"></i>publicado</span>
-      </div>
+      <div class="cal-legenda" id="calLegenda"></div>
       <div class="cal-semana"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
       <div class="cal-grelha" id="calGrelha"></div>
       <div class="cal-lista" id="calLista"></div>
+
+      <!-- Configuração: pilares de conteúdo e grelha semanal recorrente.
+           Recolhida por omissão — mexe-se uma vez, não todos os dias. -->
+      <details class="cal-config" id="calConfig">
+        <summary><svg class="icon"><use href="#i-chevron-right"/></svg><span>Configuração — pilares e grelha semanal</span></summary>
+        <div class="cal-config-corpo">
+
+          <div class="cal-config-bloco">
+            <h3>Pilares de conteúdo</h3>
+            <p class="ajuda">Um pilar é um tema recorrente do que se publica — a coluna a que cada post pertence. É a cor do pilar que pinta o calendário, e é a distribuição por pilar que diz se o mês está equilibrado ou se está tudo a cair no mesmo sítio.</p>
+            <div id="pilLista"></div>
+            <div class="pil-novo">
+              <input type="text" id="pilNovoNome" maxlength="40" placeholder="Nome do pilar novo" autocomplete="off">
+              <div class="cor-row" id="pilNovaCor"></div>
+              <button type="button" class="btn-mini" id="pilCriar">Criar pilar</button>
+            </div>
+            <p class="cfg-erro hidden" id="pilErro"></p>
+          </div>
+
+          <div class="cal-config-bloco">
+            <h3>Grelha semanal</h3>
+            <p class="ajuda">O ritmo fixo da semana: por exemplo, segunda às 12h00 um Reel do pilar X. Cada slot é um espaço planeado que o calendário mostra por preencher enquanto não tiver entrada.</p>
+            <div id="grelhaLista"></div>
+            <div class="slot-novo">
+              <select id="slotDia"></select>
+              <input type="time" id="slotHora" value="12:00">
+              <select id="slotCanal"></select>
+              <select id="slotFormato"></select>
+              <select id="slotPilar"></select>
+              <button type="button" class="btn-mini" id="slotCriar">Adicionar slot</button>
+            </div>
+            <p class="cfg-erro hidden" id="slotErro"></p>
+          </div>
+
+        </div>
+      </details>
     </div>
   </div>
 
@@ -1132,53 +1299,284 @@
   perfilRef.on('value', function(){ if (postsCarregados) renderPosts(); });
 
   /* =====================================================================
-     SECÇÃO 3 — Calendário de publicações (social/calendario/{id})
-     { data 'AAAA-MM-DD', canal, tema, notas, link, estado, responsavel,
-       responsavelId, criadoEm, atualizadoEm }
-     Escritas: criar = push().set() do objecto completo; editar = update()
-     em social/calendario/{id} com os campos do formulário + atualizadoEm;
-     apagar = remove() com confirmação (decisão desta página: é planeamento,
-     não registo de negócio).
+     SECÇÃO 3 — Calendário de conteúdo
+     ---------------------------------------------------------------------
+     TRÊS nós, todos sob social/ — os ÚNICOS onde esta página escreve:
+
+     social/calendario/{id} = { data 'AAAA-MM-DD', hora 'HH:MM', canal,
+       formato, pilarId, hook, legenda, hashtags, linkMaterial, cta, estado,
+       responsavel, responsavelId, notas, postId, criadoEm, atualizadoEm }
+     social/config/pilares/{id} = { nome, cor, ordem, ativo }
+     social/config/grelha/{diaSemana}/{slotId} = { hora, canal, formato,
+       pilarId, ativo }   — diaSemana 1 = segunda … 7 = domingo
+
+     ESCRITAS: criar entrada = push().set() do objecto completo; editar =
+     update() em social/calendario/{id} com os campos do formulário +
+     atualizadoEm; apagar = remove() com confirmação (decisão desta página:
+     é planeamento, não registo de negócio — ver CLAUDE.md).
+     Pilar = push().set() na criação e um set() POR FOLHA a seguir (nome,
+     cor, ordem, ativo). Desativar é ativo:false, NUNCA remove(): as entradas
+     antigas continuam a apontar para o pilar e continuam a resolver.
+     Slot da grelha = push().set() e remove() na remoção — é configuração de
+     ritmo, não dado de negócio, e nenhuma entrada lhe aponta (as entradas
+     guardam pilarId, nunca slotId).
+
+     ESTADO E PILAR SÃO DIMENSÕES DIFERENTES e não podem partilhar pista
+     visual: a cor do PILAR pinta o bloco, o ESTADO é uma marca monocromática
+     (ver .est-marca no <style>). Ao acrescentar um estado, acrescentar uma
+     FORMA, nunca uma cor.
      ===================================================================== */
-  var CANAIS = ['Feed', 'Reel', 'Story', 'Carrossel'];
+  var CANAIS = ['Instagram', 'Facebook', 'Google Business', 'Outro'];
+  var FORMATOS = ['Reel', 'Carrossel', 'Imagem', 'Story', 'Texto'];
+
   var ESTADOS = [
     { v: 'ideia',     label: 'Ideia' },
-    { v: 'pronto',    label: 'Pronto' },
+    { v: 'rascunho',  label: 'Rascunho' },
+    { v: 'revisao',   label: 'Em revisão' },
     { v: 'aprovado',  label: 'Aprovado' },
+    { v: 'agendado',  label: 'Agendado' },
     { v: 'publicado', label: 'Publicado' }
   ];
+  // Estados do modelo anterior → estados de hoje. 'pronto' era o passo a
+  // seguir à ideia, que agora se chama rascunho; os outros três mantêm o nome.
+  var ESTADO_LEGADO = { pronto: 'rascunho' };
 
-  var entradas = {};
+  // Paleta dos pilares: só superfícies de selo do shell, para o texto por
+  // cima poder ser um literal fixo (ver .gcor no <style>).
+  var PALETA = [
+    { id: 'lime',    label: 'Lima' },
+    { id: 'mustard', label: 'Mostarda' },
+    { id: 'blush',   label: 'Rosa' },
+    { id: 'sky',     label: 'Céu' },
+    { id: 'navy',    label: 'Azul' },
+    { id: 'red',     label: 'Vermelho' }
+  ];
+
+  // 1 = segunda … 7 = domingo (ISO). getDay() do JS é 0 = domingo.
+  var DIAS_GRELHA = [
+    { n: 1, label: 'Segunda' }, { n: 2, label: 'Terça' }, { n: 3, label: 'Quarta' },
+    { n: 4, label: 'Quinta' },  { n: 5, label: 'Sexta' }, { n: 6, label: 'Sábado' },
+    { n: 7, label: 'Domingo' }
+  ];
+  function diaSemanaIso(d){ return d.getDay() === 0 ? 7 : d.getDay(); }
+
+  var LEGENDA_MAX_CHARS = 2200; // limite do Instagram
+
+  /* ---------- Nós ---------- */
+  var pilaresRef = db.ref('social/config/pilares');
+  var grelhaRef = db.ref('social/config/grelha');
+  var migracoesRef = db.ref('social/config/migracoes');
+
+  var entradas = {};        // bruto do Firebase
   var calCarregado = false;
+  var pilares = {};
+  var pilaresCarregados = false;
+  var grelha = {};
+  var grelhaCarregada = false;
+
   var hojeD = new Date();
   var mesRef = { ano: hojeD.getFullYear(), mes: hojeD.getMonth() }; // mes 0-11
 
   var calGrelha = document.getElementById('calGrelha');
   var calLista = document.getElementById('calLista');
   var calTitulo = document.getElementById('calTitulo');
+  var calNota = document.getElementById('calNota');
 
-  function estadoValido(e){ return ESTADOS.some(function(x){ return x.v === e; }) ? e : 'ideia'; }
+  /* ---------- Vocabulário: validação defensiva ---------- */
+  function txt(v){ return v === null || v === undefined ? '' : String(v); }
+  function horaValida(h){ return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(h || '')); }
+  function estadoValido(e){
+    var v = ESTADO_LEGADO[e] || e;
+    return ESTADOS.some(function(x){ return x.v === v; }) ? v : 'ideia';
+  }
+  function estadoLabel(v){
+    var e = ESTADOS.filter(function(x){ return x.v === estadoValido(v); })[0];
+    return e ? e.label : 'Ideia';
+  }
+  function corValida(c){ return PALETA.some(function(p){ return p.id === c; }) ? c : PALETA[0].id; }
 
+  /* Normalização de uma entrada. É aqui que o ecrã fica imune ao estado da
+     migração: uma entrada por migrar continua a ler o `tema` e o `link`
+     antigos, e nenhum campo novo chega ao DOM como undefined. */
+  function normalizarEntrada(id, v){
+    if (!v || typeof v !== 'object') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.data || ''))) return null;
+    var legado = CANAL_LEGADO[v.canal];
+    return {
+      id: id,
+      data: v.data,
+      hora: horaValida(v.hora) ? v.hora : '',
+      canal: CANAIS.indexOf(v.canal) !== -1 ? v.canal : (legado ? legado.canal : ''),
+      formato: FORMATOS.indexOf(v.formato) !== -1 ? v.formato : (legado ? legado.formato : ''),
+      pilarId: txt(v.pilarId),
+      hook: txt(v.hook) || txt(v.tema),
+      legenda: txt(v.legenda),
+      hashtags: txt(v.hashtags),
+      linkMaterial: txt(v.linkMaterial) || txt(v.link),
+      cta: txt(v.cta),
+      estado: estadoValido(v.estado),
+      responsavel: txt(v.responsavel),
+      responsavelId: txt(v.responsavelId),
+      notas: txt(v.notas),
+      postId: txt(v.postId),
+      criadoEm: txt(v.criadoEm),
+      atualizadoEm: txt(v.atualizadoEm)
+    };
+  }
+
+  function listaEntradas(){
+    return Object.keys(entradas)
+      .map(function(id){ return normalizarEntrada(id, entradas[id]); })
+      .filter(Boolean);
+  }
+
+  /* ---------- Pilares ---------- */
+  function pilaresOrdenados(incluirInativos){
+    return Object.keys(pilares)
+      .map(function(id){ return Object.assign({ id: id }, pilares[id]); })
+      .filter(function(p){ return p && typeof p === 'object' && (incluirInativos || p.ativo !== false); })
+      .sort(function(a, b){
+        var oa = typeof a.ordem === 'number' ? a.ordem : 9999;
+        var ob = typeof b.ordem === 'number' ? b.ordem : 9999;
+        if (oa !== ob) return oa - ob;
+        return txt(a.nome).localeCompare(txt(b.nome), 'pt');
+      });
+  }
+  // Um pilar desativado continua a resolver: as entradas antigas mantêm-no.
+  function pilarDe(id){
+    if (!id || !pilares[id] || typeof pilares[id] !== 'object') return null;
+    return Object.assign({ id: id }, pilares[id]);
+  }
+  function corDoPilar(id){
+    var p = pilarDe(id);
+    return p && PALETA.some(function(x){ return x.id === p.cor; }) ? p.cor : 'nenhum';
+  }
+  function nomeDoPilar(id){
+    var p = pilarDe(id);
+    return p ? txt(p.nome) : '';
+  }
+
+  /* =====================================================================
+     MIGRAÇÃO calendarioV2 — corre UMA vez, é idempotente
+     ---------------------------------------------------------------------
+     As entradas do modelo anterior tinham { canal, tema, link, estado } com
+     canal a valer Feed/Reel/Story/Carrossel — que é o FORMATO de hoje, não o
+     canal. A migração move tema→hook e link→linkMaterial (o valor não se
+     perde, muda de folha), deduz canal+formato do canal antigo, mapeia o
+     estado e preenche as folhas novas em falta com '' para nada ficar
+     undefined. Guarda-se um marcador em social/config/migracoes/calendarioV2
+     para não voltar a correr; mesmo sem ele nada se estragava, porque cada
+     entrada só é tocada enquanto tiver forma antiga.
+     ===================================================================== */
+  var CANAL_LEGADO = {
+    'Feed':      { canal: 'Instagram', formato: 'Imagem' },
+    'Reel':      { canal: 'Instagram', formato: 'Reel' },
+    'Story':     { canal: 'Instagram', formato: 'Story' },
+    'Carrossel': { canal: 'Instagram', formato: 'Carrossel' }
+  };
+  var MIGRACAO_ID = 'calendarioV2';
+  var CAMPOS_NOVOS = ['hora', 'canal', 'formato', 'pilarId', 'hook', 'legenda', 'hashtags', 'linkMaterial', 'cta', 'postId'];
+
+  // Devolve o update a aplicar a esta entrada, ou null se já está migrada.
+  function planoMigracao(v){
+    if (!v || typeof v !== 'object') return null;
+    var up = {};
+    var legado = CANAL_LEGADO[v.canal];
+
+    if (!txt(v.hook) && txt(v.tema)){ up.hook = txt(v.tema); }
+    if (v.tema !== undefined && v.tema !== null){ up.tema = null; }
+    if (!txt(v.linkMaterial) && txt(v.link)){ up.linkMaterial = txt(v.link); }
+    if (v.link !== undefined && v.link !== null){ up.link = null; }
+    if (legado){ up.canal = legado.canal; up.formato = legado.formato; }
+    var estNovo = estadoValido(v.estado);
+    if (estNovo !== v.estado){ up.estado = estNovo; }
+    CAMPOS_NOVOS.forEach(function(c){
+      if (up[c] === undefined && (v[c] === undefined || v[c] === null)) up[c] = '';
+    });
+
+    return Object.keys(up).length ? up : null;
+  }
+
+  function migrarCalendario(){
+    migracoesRef.child(MIGRACAO_ID).once('value').then(function(s){
+      if (s.val() && s.val().feitoEm) return null;       // já correu
+      return calRef.once('value').then(function(snap){
+        var val = snap.val() || {};
+        var ids = Object.keys(val);
+        var planos = [];
+        ids.forEach(function(id){
+          var up = planoMigracao(val[id]);
+          if (up) planos.push({ id: id, up: up });
+        });
+        return Promise.all(planos.map(function(p){ return calRef.child(p.id).update(p.up); }))
+          .then(function(){
+            return migracoesRef.child(MIGRACAO_ID).set({
+              feitoEm: nowIso(), versao: 2, entradas: planos.length, total: ids.length
+            }).then(function(){ return { entradas: planos.length, total: ids.length }; });
+          });
+      });
+    }).then(function(r){
+      if (!r) return;
+      console.info('[social] migração calendarioV2: ' + r.entradas + ' de ' + r.total + ' entradas actualizadas.');
+      if (calNota) calNota.textContent = 'Migração: ' + r.entradas + ' de ' + r.total + ' entradas actualizadas';
+    }).catch(function(err){
+      console.error('[social] migração calendarioV2 falhou:', err);
+      if (calNota) calNota.textContent = 'Migração por concluir — ver consola';
+    });
+  }
+
+  /* =====================================================================
+     Render do calendário (vista Mês + lista de telemóvel)
+     ===================================================================== */
   function entradasPorDia(){
     var porDia = {};
-    Object.keys(entradas).forEach(function(id){
-      var e = entradas[id];
-      if (!e || typeof e !== 'object' || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.data || ''))) return;
-      (porDia[e.data] = porDia[e.data] || []).push(Object.assign({ id: id }, e));
-    });
+    listaEntradas().forEach(function(e){ (porDia[e.data] = porDia[e.data] || []).push(e); });
     Object.keys(porDia).forEach(function(d){
       porDia[d].sort(function(a, b){
-        var c = String(a.canal || '').localeCompare(String(b.canal || ''), 'pt');
-        if (c !== 0) return c;
-        return String(a.criadoEm || '').localeCompare(String(b.criadoEm || ''));
+        // Sem hora vai para o fim do dia: é planeamento por marcar, não 00:00.
+        var ha = a.hora || '99:99', hb = b.hora || '99:99';
+        if (ha !== hb) return ha < hb ? -1 : 1;
+        return txt(a.criadoEm).localeCompare(txt(b.criadoEm));
       });
     });
     return porDia;
   }
 
+  function tituloEntrada(e){
+    var partes = [];
+    if (e.hora) partes.push(e.hora);
+    if (e.canal) partes.push(e.canal);
+    if (e.formato) partes.push(e.formato);
+    var np = nomeDoPilar(e.pilarId);
+    if (np) partes.push(np);
+    partes.push(estadoLabel(e.estado));
+    return partes.join(' · ');
+  }
+
   function entHtml(e){
-    return '<button type="button" class="cal-ent cal-ent-' + estadoValido(e.estado) + '" data-id="' + escapeHtml(e.id) + '" title="' + escapeHtml((e.canal || '') + ' · ' + (e.tema || '') + ' · ' + estadoValido(e.estado)) + '">' +
-      '<b>' + escapeHtml(e.canal || '—') + '</b>' + escapeHtml(e.tema || '(sem tema)') + '</button>';
+    return '<button type="button" class="cal-ent gcor" data-cor="' + corDoPilar(e.pilarId) + '"' +
+      ' data-id="' + escapeHtml(e.id) + '" title="' + escapeHtml(tituloEntrada(e) + (e.hook ? ' — ' + e.hook : '')) + '">' +
+      '<span class="est-marca e-' + e.estado + '" aria-hidden="true"></span>' +
+      '<span class="t">' + (e.hora ? '<b>' + escapeHtml(e.hora) + '</b>' : '') +
+      escapeHtml(e.hook || '(sem hook)') + '</span></button>';
+  }
+
+  function renderLegenda(){
+    var el = document.getElementById('calLegenda');
+    if (!el) return;
+    var html = '';
+    var ativos = pilaresOrdenados(false);
+    if (ativos.length){
+      html += ativos.map(function(p){
+        return '<span><i class="gcor" data-cor="' + escapeHtml(corValida(p.cor)) + '"></i>' + escapeHtml(p.nome) + '</span>';
+      }).join('');
+      html += '<span class="sep"></span>';
+    }
+    // A marca de estado é sempre a mesma forma, seja qual for a cor do pilar.
+    html += ESTADOS.map(function(s){
+      return '<span><i class="est-marca e-' + s.v + '"></i>' + escapeHtml(s.label) + '</span>';
+    }).join('');
+    el.innerHTML = html;
   }
 
   function renderCalendario(){
@@ -1189,6 +1587,7 @@
     calTitulo.textContent = MESES_LONGO[mesRef.mes] + ' ' + mesRef.ano;
     document.getElementById('calHoje').disabled = (mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth());
 
+    renderLegenda();
     var porDia = entradasPorDia();
 
     // Grelha: começa na segunda-feira; células "fora" do mês a cinzento.
@@ -1225,11 +1624,11 @@
   // Clique numa entrada → editar; clique num dia → criar nesse dia.
   function calClick(e){
     var ent = e.target.closest('.cal-ent');
-    if (ent){ abrirModal(ent.getAttribute('data-id'), null); return; }
+    if (ent){ abrirModal(ent.getAttribute('data-id'), null, null); return; }
     var add = e.target.closest('.cal-lista-add');
-    if (add){ abrirModal(null, add.getAttribute('data-dia')); return; }
+    if (add){ abrirModal(null, { data: add.getAttribute('data-dia') }, null); return; }
     var dia = e.target.closest('.cal-dia');
-    if (dia){ abrirModal(null, dia.getAttribute('data-dia')); }
+    if (dia){ abrirModal(null, { data: dia.getAttribute('data-dia') }, null); }
   }
   calGrelha.addEventListener('click', calClick);
   calLista.addEventListener('click', calClick);
@@ -1247,15 +1646,229 @@
   document.getElementById('calNovo').addEventListener('click', function(){
     // No mês corrente abre em hoje; noutro mês, no dia 1 desse mês.
     var noCorrente = mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth();
-    abrirModal(null, noCorrente ? todayStr() : mesRef.ano + '-' + pad2(mesRef.mes + 1) + '-01');
+    abrirModal(null, { data: noCorrente ? todayStr() : mesRef.ano + '-' + pad2(mesRef.mes + 1) + '-01' }, null);
   });
 
-  /* ---------- Modal de criar/editar (giocoModal do shell) ---------- */
+  /* =====================================================================
+     Configuração — pilares
+     ===================================================================== */
+  var pilNovaCor = PALETA[0].id;
+
+  function corRowHtml(atual, attr){
+    return PALETA.map(function(c){
+      return '<button type="button" class="cor-sel gcor' + (c.id === atual ? ' sel' : '') + '" data-cor="' + c.id + '"' +
+        (attr || '') + ' title="' + escapeHtml(c.label) + '" aria-label="' + escapeHtml(c.label) + '"></button>';
+    }).join('');
+  }
+
+  function renderPilares(){
+    var lista = document.getElementById('pilLista');
+    var novaCor = document.getElementById('pilNovaCor');
+    if (!lista) return;
+    novaCor.innerHTML = corRowHtml(pilNovaCor, ' data-alvo="novo"');
+
+    if (!pilaresCarregados){ lista.innerHTML = '<p class="cfg-vazio">A carregar…</p>'; return; }
+    var todos = pilaresOrdenados(true);
+    if (!todos.length){
+      lista.innerHTML = '<div class="cfg-vazio"><b>Ainda não há pilares.</b><br>' +
+        'Um pilar de conteúdo é um tema recorrente do que se publica — por exemplo aquilo sobre que a marca fala sempre, o que mostra dos bastidores, ou o que vende directamente. ' +
+        'Cada entrada do calendário pertence a um pilar, e é a cor do pilar que pinta o calendário. Cria o primeiro aqui em baixo.</div>';
+      return;
+    }
+    lista.innerHTML = todos.map(function(p, i){
+      var inativo = p.ativo === false;
+      return '<div class="pil-linha' + (inativo ? ' inativo' : '') + '" data-id="' + escapeHtml(p.id) + '">' +
+        '<input class="nome-in" type="text" maxlength="40" value="' + escapeHtml(txt(p.nome)) + '" data-acao="nome" aria-label="Nome do pilar">' +
+        '<div class="cor-row">' + corRowHtml(corValida(p.cor), ' data-acao="cor"') + '</div>' +
+        '<div class="pil-btns">' +
+          '<button type="button" class="btn-mini" data-acao="subir"' + (i === 0 ? ' disabled' : '') + ' title="Subir" aria-label="Subir">↑</button>' +
+          '<button type="button" class="btn-mini" data-acao="descer"' + (i === todos.length - 1 ? ' disabled' : '') + ' title="Descer" aria-label="Descer">↓</button>' +
+          '<button type="button" class="btn-mini" data-acao="ativo" title="' + (inativo ? 'Reactivar' : 'Desativar (nunca apaga: as entradas antigas mantêm o pilar)') + '">' +
+            (inativo ? 'Reactivar' : 'Desativar') + '</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function pilErro(msg){
+    var el = document.getElementById('pilErro');
+    el.textContent = msg || '';
+    el.classList.toggle('hidden', !msg);
+  }
+
+  document.getElementById('pilNovaCor').addEventListener('click', function(ev){
+    var b = ev.target.closest('.cor-sel');
+    if (!b) return;
+    pilNovaCor = corValida(b.getAttribute('data-cor'));
+    renderPilares();
+  });
+
+  document.getElementById('pilCriar').addEventListener('click', function(){
+    var input = document.getElementById('pilNovoNome');
+    var nome = input.value.trim();
+    pilErro('');
+    if (!nome){ pilErro('Dá um nome ao pilar.'); input.focus(); return; }
+    var maxOrdem = pilaresOrdenados(true).reduce(function(m, p){
+      return Math.max(m, typeof p.ordem === 'number' ? p.ordem : 0);
+    }, 0);
+    var btn = this; btn.disabled = true;
+    pilaresRef.push().set({ nome: nome, cor: pilNovaCor, ordem: maxOrdem + 1, ativo: true })
+      .then(function(){ input.value = ''; })
+      .catch(function(err){ pilErro('Erro ao criar: ' + err.message); })
+      .then(function(){ btn.disabled = false; });
+  });
+
+  document.getElementById('pilLista').addEventListener('click', function(ev){
+    var linha = ev.target.closest('.pil-linha');
+    if (!linha) return;
+    var id = linha.getAttribute('data-id');
+    var cor = ev.target.closest('.cor-sel');
+    if (cor){
+      pilErro('');
+      pilaresRef.child(id).child('cor').set(corValida(cor.getAttribute('data-cor')))
+        .catch(function(err){ pilErro('Erro ao gravar a cor: ' + err.message); });
+      return;
+    }
+    var btn = ev.target.closest('.btn-mini');
+    if (!btn) return;
+    var acao = btn.getAttribute('data-acao');
+    pilErro('');
+    if (acao === 'ativo'){
+      var atual = pilares[id] && pilares[id].ativo !== false;
+      pilaresRef.child(id).child('ativo').set(!atual)
+        .catch(function(err){ pilErro('Erro ao gravar: ' + err.message); });
+      return;
+    }
+    if (acao === 'subir' || acao === 'descer'){
+      // Troca a folha `ordem` com o vizinho: dois set(), nunca um set no nó.
+      var todos = pilaresOrdenados(true);
+      var i = todos.map(function(p){ return p.id; }).indexOf(id);
+      var j = acao === 'subir' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= todos.length) return;
+      var oi = typeof todos[i].ordem === 'number' ? todos[i].ordem : i + 1;
+      var oj = typeof todos[j].ordem === 'number' ? todos[j].ordem : j + 1;
+      if (oi === oj){ oi = i + 1; oj = j + 1; }
+      Promise.all([
+        pilaresRef.child(todos[i].id).child('ordem').set(oj),
+        pilaresRef.child(todos[j].id).child('ordem').set(oi)
+      ]).catch(function(err){ pilErro('Erro ao reordenar: ' + err.message); });
+    }
+  });
+
+  document.getElementById('pilLista').addEventListener('change', function(ev){
+    var input = ev.target.closest('input[data-acao="nome"]');
+    if (!input) return;
+    var linha = input.closest('.pil-linha');
+    var nome = input.value.trim();
+    if (!nome){ pilErro('O nome do pilar não pode ficar vazio.'); renderPilares(); return; }
+    pilErro('');
+    pilaresRef.child(linha.getAttribute('data-id')).child('nome').set(nome)
+      .catch(function(err){ pilErro('Erro ao renomear: ' + err.message); });
+  });
+
+  /* =====================================================================
+     Configuração — grelha semanal recorrente
+     ===================================================================== */
+  function slotsDoDia(n){
+    var val = grelha[String(n)] || {};
+    return Object.keys(val)
+      .map(function(id){ return Object.assign({ id: id }, val[id]); })
+      .filter(function(s){ return s && typeof s === 'object'; })
+      .sort(function(a, b){ return txt(a.hora).localeCompare(txt(b.hora)); });
+  }
+
+  function slotErro(msg){
+    var el = document.getElementById('slotErro');
+    el.textContent = msg || '';
+    el.classList.toggle('hidden', !msg);
+  }
+
+  function renderGrelha(){
+    var lista = document.getElementById('grelhaLista');
+    if (!lista) return;
+
+    // Selects do formulário de slot novo (o pilar muda com os pilares).
+    var selDia = document.getElementById('slotDia');
+    if (!selDia.options.length){
+      selDia.innerHTML = DIAS_GRELHA.map(function(d){ return '<option value="' + d.n + '">' + d.label + '</option>'; }).join('');
+      document.getElementById('slotCanal').innerHTML = optionsHtml(CANAIS, CANAIS[0]);
+      document.getElementById('slotFormato').innerHTML = optionsHtml(FORMATOS, FORMATOS[0]);
+    }
+    var selPilar = document.getElementById('slotPilar');
+    var pilarAtual = selPilar.value;
+    selPilar.innerHTML = '<option value="">— sem pilar —</option>' + pilaresOrdenados(false).map(function(p){
+      return '<option value="' + escapeHtml(p.id) + '"' + (p.id === pilarAtual ? ' selected' : '') + '>' + escapeHtml(txt(p.nome)) + '</option>';
+    }).join('');
+
+    if (!grelhaCarregada){ lista.innerHTML = '<p class="cfg-vazio">A carregar…</p>'; return; }
+    var algum = DIAS_GRELHA.some(function(d){ return slotsDoDia(d.n).length; });
+    if (!algum){
+      lista.innerHTML = '<div class="cfg-vazio"><b>Sem grelha definida.</b><br>' +
+        'A grelha é o ritmo que se quer ter — os espaços fixos da semana. Enquanto não tiver entrada, cada slot aparece no calendário por preencher.</div>';
+      return;
+    }
+    lista.innerHTML = DIAS_GRELHA.map(function(d){
+      var slots = slotsDoDia(d.n);
+      return '<div class="grelha-dia"><p class="grelha-dia-t">' + d.label + '</p><div class="grelha-slots">' +
+        (slots.length ? slots.map(function(s){
+          var np = nomeDoPilar(s.pilarId);
+          return '<span class="grelha-slot' + (s.ativo === false ? ' inativo' : '') + '">' +
+            '<i class="ponto gcor" data-cor="' + corDoPilar(s.pilarId) + '"></i>' +
+            '<b>' + escapeHtml(txt(s.hora) || '—') + '</b> ' + escapeHtml(txt(s.formato) || '—') +
+            (s.canal ? ' · ' + escapeHtml(s.canal) : '') + (np ? ' · ' + escapeHtml(np) : '') +
+            '<button type="button" class="x" data-dia="' + d.n + '" data-id="' + escapeHtml(s.id) + '" title="Remover slot" aria-label="Remover slot">✕</button></span>';
+        }).join('') : '<span class="grelha-vazio">sem slots</span>') +
+        '</div></div>';
+    }).join('');
+  }
+
+  document.getElementById('slotCriar').addEventListener('click', function(){
+    var dia = document.getElementById('slotDia').value;
+    var hora = document.getElementById('slotHora').value;
+    slotErro('');
+    if (!horaValida(hora)){ slotErro('Indica a hora do slot.'); return; }
+    var btn = this; btn.disabled = true;
+    grelhaRef.child(String(dia)).push().set({
+      hora: hora,
+      canal: document.getElementById('slotCanal').value,
+      formato: document.getElementById('slotFormato').value,
+      pilarId: document.getElementById('slotPilar').value || '',
+      ativo: true
+    }).catch(function(err){ slotErro('Erro ao criar o slot: ' + err.message); })
+      .then(function(){ btn.disabled = false; });
+  });
+
+  document.getElementById('grelhaLista').addEventListener('click', function(ev){
+    var x = ev.target.closest('.x');
+    if (!x) return;
+    if (!confirm('Remover este slot da grelha? As entradas já criadas não são afetadas.')) return;
+    slotErro('');
+    grelhaRef.child(x.getAttribute('data-dia')).child(x.getAttribute('data-id')).remove()
+      .catch(function(err){ slotErro('Erro ao remover: ' + err.message); });
+  });
+
+  /* =====================================================================
+     Modal de criar/editar (giocoModal do shell), em três zonas:
+     Agendamento · Conteúdo · Workflow
+     ===================================================================== */
   function optionsHtml(lista, atual){
     return lista.map(function(o){
       var v = typeof o === 'string' ? o : o.v, l = typeof o === 'string' ? o : o.label;
       return '<option value="' + escapeHtml(v) + '"' + (v === atual ? ' selected' : '') + '>' + escapeHtml(l) + '</option>';
     }).join('');
+  }
+
+  function pilarOptionsHtml(atual){
+    var html = '<option value="">— sem pilar —</option>';
+    var visto = false;
+    pilaresOrdenados(false).forEach(function(p){
+      if (p.id === atual) visto = true;
+      html += '<option value="' + escapeHtml(p.id) + '"' + (p.id === atual ? ' selected' : '') + '>' + escapeHtml(txt(p.nome)) + '</option>';
+    });
+    // Pilar desativado que a entrada ainda usa: continua visível na edição.
+    if (atual && !visto && pilares[atual]){
+      html += '<option value="' + escapeHtml(atual) + '" selected>' + escapeHtml(nomeDoPilar(atual)) + ' (desativado)</option>';
+    }
+    return html;
   }
 
   function respOptionsHtml(atualId, atualNome){
@@ -1270,46 +1883,119 @@
     return html;
   }
 
-  function abrirModal(id, dia){
+  function entradaVazia(pre){
+    pre = pre || {};
+    return {
+      data: pre.data || todayStr(), hora: pre.hora || '',
+      canal: pre.canal || CANAIS[0], formato: pre.formato || FORMATOS[0],
+      pilarId: pre.pilarId || '', hook: '', legenda: '', hashtags: '',
+      linkMaterial: '', cta: '', estado: 'ideia',
+      responsavel: '', responsavelId: '', notas: '', postId: ''
+    };
+  }
+
+  /* abrirModal(id, pre, copiaDe)
+       id      — entrada a editar, ou null
+       pre     — valores pré-preenchidos de uma criação (dia clicado, slot…)
+       copiaDe — entrada de origem quando isto é uma duplicação */
+  function abrirModal(id, pre, copiaDe){
     if (!window.giocoModal) return;
-    var e = id ? entradas[id] : null;
+    var e = id ? normalizarEntrada(id, entradas[id]) : null;
     if (id && !e) return;
     var editar = !!e;
-    var d = editar ? e : { data: dia || todayStr(), canal: 'Feed', tema: '', notas: '', link: '', estado: 'ideia', responsavel: '', responsavelId: '' };
-    var linkOk = linkSeguro(d.link);
+    var d = editar ? e : (copiaDe ? Object.assign(entradaVazia(pre), copiaDe, pre || {}) : entradaVazia(pre));
+    var linkOk = linkSeguro(d.linkMaterial);
 
     var html = '<div class="cal-modal">';
     if (editar){
-      html += '<p class="cal-modal-meta">Criada ' + escapeHtml(fmtDataCurta(e.criadoEm)) + (e.atualizadoEm && e.atualizadoEm !== e.criadoEm ? ' · atualizada ' + escapeHtml(fmtDataCurta(e.atualizadoEm)) : '') + '</p>';
+      html += '<p class="cal-modal-meta">Criada ' + escapeHtml(fmtDataCurta(e.criadoEm)) +
+        (e.atualizadoEm && e.atualizadoEm !== e.criadoEm ? ' · atualizada ' + escapeHtml(fmtDataCurta(e.atualizadoEm)) : '') + '</p>';
     }
+
+    /* Zona 1 — Agendamento */
+    html += '<div class="cal-zona"><p class="cal-zona-t">Agendamento</p>';
     html += '<div class="cal-modal-2col">';
     html += '<div class="field"><label class="field-label" for="calData">Data</label><input type="date" id="calData" value="' + escapeHtml(d.data || '') + '"></div>';
-    html += '<div class="field"><label class="field-label" for="calCanal">Canal</label><select id="calCanal">' + optionsHtml(CANAIS, CANAIS.indexOf(d.canal) !== -1 ? d.canal : 'Feed') + '</select></div>';
-    html += '</div>';
-    html += '<div class="field"><label class="field-label" for="calTema">Tema</label><input type="text" id="calTema" maxlength="120" value="' + escapeHtml(d.tema || '') + '" placeholder="ex: focaccia de figo, bastidores da cozinha"></div>';
+    html += '<div class="field"><label class="field-label" for="calHora">Hora</label><input type="time" id="calHora" value="' + escapeHtml(d.hora || '') + '"></div>';
+    html += '</div><div class="cal-modal-3col">';
+    html += '<div class="field"><label class="field-label" for="calCanal">Canal</label><select id="calCanal">' + optionsHtml(CANAIS, CANAIS.indexOf(d.canal) !== -1 ? d.canal : CANAIS[0]) + '</select></div>';
+    html += '<div class="field"><label class="field-label" for="calFormato">Formato</label><select id="calFormato">' + optionsHtml(FORMATOS, FORMATOS.indexOf(d.formato) !== -1 ? d.formato : FORMATOS[0]) + '</select></div>';
+    html += '<div class="field"><label class="field-label" for="calPilar">Pilar</label><select id="calPilar">' + pilarOptionsHtml(d.pilarId) + '</select>' +
+      (pilaresOrdenados(false).length ? '' : '<p class="field-nota">Ainda não há pilares — cria-os na Configuração, no fundo do calendário.</p>') + '</div>';
+    html += '</div></div>';
+
+    /* Zona 2 — Conteúdo */
+    html += '<div class="cal-zona"><p class="cal-zona-t">Conteúdo</p>';
+    html += '<div class="field"><label class="field-label" for="calHook">Hook (a primeira linha, o que prende)</label>' +
+      '<input type="text" id="calHook" maxlength="120" value="' + escapeHtml(d.hook || '') + '" placeholder="ex: a focaccia que só existe às sextas"></div>';
+    html += '<div class="field"><label class="field-label" for="calLegendaTxt">Legenda</label>' +
+      '<textarea id="calLegendaTxt" rows="5" maxlength="' + LEGENDA_MAX_CHARS + '" placeholder="a copy final, tal como vai sair">' + escapeHtml(d.legenda || '') + '</textarea>' +
+      '<p class="cal-conta" id="calConta"></p></div>';
+    html += '<div class="field"><label class="field-label" for="calHashtags">Hashtags</label>' +
+      '<input type="text" id="calHashtags" maxlength="500" value="' + escapeHtml(d.hashtags || '') + '" placeholder="#focaccia #lisboa"></div>';
+    html += '<div class="cal-modal-2col">';
+    html += '<div class="field"><label class="field-label" for="calLink">Link do material (Drive, Canva…)</label>' +
+      '<input type="url" id="calLink" value="' + escapeHtml(d.linkMaterial || '') + '" placeholder="https://…" inputmode="url">' +
+      (linkOk ? '<p class="field-nota"><a href="' + escapeHtml(linkOk) + '" target="_blank" rel="noopener noreferrer">abrir material ↗</a></p>' : '') + '</div>';
+    html += '<div class="field"><label class="field-label" for="calCta">CTA (o que se pede ao leitor)</label>' +
+      '<input type="text" id="calCta" maxlength="120" value="' + escapeHtml(d.cta || '') + '" placeholder="ex: guardar para sexta"></div>';
+    html += '</div></div>';
+
+    /* Zona 3 — Workflow */
+    html += '<div class="cal-zona"><p class="cal-zona-t">Workflow</p>';
     html += '<div class="cal-modal-2col">';
     html += '<div class="field"><label class="field-label" for="calEstado">Estado</label><select id="calEstado">' + optionsHtml(ESTADOS, estadoValido(d.estado)) + '</select></div>';
-    html += '<div class="field"><label class="field-label" for="calResp">Responsável</label><select id="calResp"' + (pessoasCarregadas ? '' : ' disabled') + '>' + (pessoasCarregadas ? respOptionsHtml(d.responsavelId, d.responsavel) : '<option>A carregar...</option>') + '</select></div>';
+    html += '<div class="field"><label class="field-label" for="calResp">Responsável</label><select id="calResp"' + (pessoasCarregadas ? '' : ' disabled') + '>' +
+      (pessoasCarregadas ? respOptionsHtml(d.responsavelId, d.responsavel) : '<option>A carregar...</option>') + '</select></div>';
     html += '</div>';
-    html += '<div class="field"><label class="field-label" for="calLink">Link (Drive, Canva…)</label><input type="url" id="calLink" value="' + escapeHtml(d.link || '') + '" placeholder="https://…" inputmode="url">' +
-      (linkOk ? '<p class="field-nota"><a href="' + escapeHtml(linkOk) + '" target="_blank" rel="noopener noreferrer">abrir material ↗</a></p>' : '') + '</div>';
-    html += '<div class="field"><label class="field-label" for="calNotas">Notas (o porquê do post)</label><textarea id="calNotas" rows="3" maxlength="2000" placeholder="objetivo, referências, o que se quer comunicar">' + escapeHtml(d.notas || '') + '</textarea></div>';
+    html += '<div class="field"><label class="field-label" for="calNotas">Notas (o porquê do post)</label>' +
+      '<textarea id="calNotas" rows="3" maxlength="2000" placeholder="objetivo, referências, o que se quer comunicar">' + escapeHtml(d.notas || '') + '</textarea></div>';
+    html += '</div>';
+
     html += '<p class="form-erro hidden" id="calErro"></p>';
+
+    // Duplicar: linha inline, nunca um prompt() — planeia-se em lote daqui.
+    if (editar){
+      html += '<div class="cal-dup" id="calDup">' +
+        '<label class="field-label" for="calDupData" style="margin:0">Duplicar em</label>' +
+        '<input type="date" id="calDupData" value="' + escapeHtml(somarDias(d.data, 7)) + '">' +
+        '<button type="button" class="btn" id="calDupCriar">Criar cópia</button>' +
+        '<span class="nota">A cópia leva tudo menos o estado, que volta a Ideia — uma cópia ainda não foi aprovada nem publicada.</span>' +
+        '</div>';
+    }
+
     html += '<div class="modal-actions">';
     if (editar) html += '<button type="button" class="btn btn-perigo esq" id="calApagar">Apagar</button>';
+    if (editar) html += '<button type="button" class="btn" id="calDuplicar">Duplicar…</button>';
     html += '<button type="button" class="btn" id="calCancelar">Cancelar</button>';
     html += '<button type="button" class="btn btn-primary" id="calGuardar">' + (editar ? 'Guardar' : 'Criar entrada') + '</button>';
     html += '</div></div>';
 
-    var body = giocoModal.open({ titulo: editar ? 'Editar publicação' : 'Nova publicação', conteudo: html });
+    var body = giocoModal.open({
+      titulo: editar ? 'Editar publicação' : (copiaDe ? 'Duplicar publicação' : 'Nova publicação'),
+      conteudo: html
+    });
     var erroEl = body.querySelector('#calErro');
-    function erro(msg){ erroEl.textContent = msg; erroEl.classList.toggle('hidden', !msg); }
+    function erro(msg){ erroEl.textContent = msg || ''; erroEl.classList.toggle('hidden', !msg); }
+
+    // Contador de caracteres da legenda.
+    var legendaEl = body.querySelector('#calLegendaTxt');
+    var contaEl = body.querySelector('#calConta');
+    function atualizarConta(){
+      var n = legendaEl.value.length;
+      contaEl.textContent = n + ' / ' + LEGENDA_MAX_CHARS + ' caracteres';
+      contaEl.classList.toggle('longa', n > LEGENDA_MAX_CHARS - 200);
+    }
+    legendaEl.addEventListener('input', atualizarConta);
+    atualizarConta();
 
     body.querySelector('#calCancelar').addEventListener('click', function(){ giocoModal.close(); });
 
-    body.querySelector('#calGuardar').addEventListener('click', function(){
+    // Lê o formulário. Devolve null (e mostra o erro) se algo não serve.
+    function lerFormulario(){
       var data = body.querySelector('#calData').value;
-      var tema = body.querySelector('#calTema').value.trim();
+      var hora = body.querySelector('#calHora').value;
+      var hook = body.querySelector('#calHook').value.trim();
       var link = body.querySelector('#calLink').value.trim();
       var respSel = body.querySelector('#calResp');
       var respId = respSel.disabled ? (d.responsavelId || '') : respSel.value;
@@ -1319,20 +2005,33 @@
         respNome = p ? p.nome : (d.responsavel || '');
       }
       erro('');
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)){ erro('Indica a data.'); return; }
-      if (!tema){ erro('Escreve o tema.'); body.querySelector('#calTema').focus(); return; }
-      if (link && !linkSeguro(link)){ erro('O link tem de ser um URL https:// válido.'); return; }
-      var campos = {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)){ erro('Indica a data.'); return null; }
+      if (hora && !horaValida(hora)){ erro('A hora não é válida.'); return null; }
+      if (!hook){ erro('Escreve o hook — é a primeira linha, o que prende.'); body.querySelector('#calHook').focus(); return null; }
+      if (link && !linkSeguro(link)){ erro('O link do material tem de ser um URL https:// válido.'); return null; }
+      return {
         data: data,
+        hora: hora || '',
         canal: body.querySelector('#calCanal').value,
-        tema: tema,
-        notas: body.querySelector('#calNotas').value.trim(),
-        link: link ? linkSeguro(link) : '',
+        formato: body.querySelector('#calFormato').value,
+        pilarId: body.querySelector('#calPilar').value || '',
+        hook: hook,
+        legenda: legendaEl.value.trim(),
+        hashtags: body.querySelector('#calHashtags').value.trim(),
+        linkMaterial: link ? linkSeguro(link) : '',
+        cta: body.querySelector('#calCta').value.trim(),
         estado: estadoValido(body.querySelector('#calEstado').value),
         responsavel: respNome,
         responsavelId: respId || '',
+        notas: body.querySelector('#calNotas').value.trim(),
+        postId: d.postId || '',
         atualizadoEm: nowIso()
       };
+    }
+
+    body.querySelector('#calGuardar').addEventListener('click', function(){
+      var campos = lerFormulario();
+      if (!campos) return;
       var btn = this; btn.disabled = true;
       var escrita = editar
         ? calRef.child(id).update(campos)
@@ -1341,24 +2040,59 @@
         .catch(function(err){ btn.disabled = false; erro('Erro ao guardar: ' + err.message); });
     });
 
+    var dupBtn = body.querySelector('#calDuplicar');
+    if (dupBtn){
+      var dupBox = body.querySelector('#calDup');
+      dupBtn.addEventListener('click', function(){
+        dupBox.classList.toggle('on');
+        if (dupBox.classList.contains('on')) body.querySelector('#calDupData').focus();
+      });
+      body.querySelector('#calDupCriar').addEventListener('click', function(){
+        var campos = lerFormulario();
+        if (!campos) return;
+        var novaData = body.querySelector('#calDupData').value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(novaData)){ erro('Indica a data da cópia.'); return; }
+        // A cópia é uma entrada nova por planear: estado volta a Ideia e o
+        // postId não se herda (o post real pertence ao original).
+        campos.data = novaData;
+        campos.estado = 'ideia';
+        campos.postId = '';
+        var btn = this; btn.disabled = true;
+        calRef.push().set(Object.assign({ criadoEm: campos.atualizadoEm }, campos))
+          .then(function(){ giocoModal.close(); })
+          .catch(function(err){ btn.disabled = false; erro('Erro ao duplicar: ' + err.message); });
+      });
+    }
+
     var apagarBtn = body.querySelector('#calApagar');
     if (apagarBtn){
       apagarBtn.addEventListener('click', function(){
-        if (!confirm('Apagar "' + (e.tema || 'esta entrada') + '" de ' + fmtDataCurta(e.data + 'T12:00:00') + '? Esta ação não pode ser desfeita.')) return;
+        if (!confirm('Apagar "' + (e.hook || 'esta entrada') + '" de ' + fmtDataCurta(e.data + 'T12:00:00') + '? Esta ação não pode ser desfeita.')) return;
         apagarBtn.disabled = true;
         calRef.child(id).remove().then(function(){ giocoModal.close(); })
           .catch(function(err){ apagarBtn.disabled = false; erro('Erro ao apagar: ' + err.message); });
       });
     }
 
-    setTimeout(function(){ var t = body.querySelector('#calTema'); if (t && !editar) t.focus(); }, 50);
+    setTimeout(function(){ var t = body.querySelector('#calHook'); if (t && !editar) t.focus(); }, 50);
   }
 
+  /* ---------- Ligação aos nós ---------- */
   calRef.on('value', function(s){ entradas = s.val() || {}; calCarregado = true; renderCalendario(); });
+  pilaresRef.on('value', function(s){
+    pilares = s.val() || {}; pilaresCarregados = true;
+    renderPilares(); renderGrelha(); renderCalendario();
+  });
+  grelhaRef.on('value', function(s){
+    grelha = s.val() || {}; grelhaCarregada = true; renderGrelha();
+  });
   carregarPessoas(function(){
     // O select do modal é construído na abertura; nada a repovoar aqui.
   });
   renderCalendario();
+  renderPilares();
+  renderGrelha();
+  migrarCalendario();
 
   }); // fim de autenticarEContinuar
 </script>

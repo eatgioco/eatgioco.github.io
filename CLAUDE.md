@@ -687,15 +687,61 @@ social                — Instagram + calendário de publicações (social.html,
                          { ultimaSync (ISO), estado ('ok'|'erro'), erro, versao, … }.
                          A Meta devolve mais posts (37) do que o perfil conta (28) —
                          conta de forma diferente; a página mostra todos.
-                         social/calendario/{pushId} — o ÚNICO nó onde a social.html
-                         escreve: { data 'AAAA-MM-DD', canal (Feed|Reel|Story|Carrossel),
-                         tema, notas, link ('' ou URL https:, validado antes de gravar),
-                         estado (ideia|pronto|aprovado|publicado), responsavel (nome),
-                         responsavelId (chave de pessoas/ ou ''), criadoEm, atualizadoEm
-                         (ISO) }. Criar = push().set() completo; editar = update() no
-                         registo; apagar = remove() com confirmação (é planeamento, não
-                         registo de negócio — a única excepção à regra "nunca remove()"
-                         ao lado do lojaPedidos)
+                         social/calendario/ e social/config/ são os ÚNICOS nós onde a
+                         social.html escreve.
+                         social/calendario/{pushId} (content calendar, Set/2026) =
+                         { data 'AAAA-MM-DD', hora ('HH:MM' ou '' — sem hora é planeamento
+                         por marcar, NUNCA 00:00, e ordena-se no fim do dia), canal
+                         (Instagram|Facebook|Google Business|Outro), formato
+                         (Reel|Carrossel|Imagem|Story|Texto), pilarId (chave de
+                         social/config/pilares ou ''), hook (a primeira linha, o que
+                         prende — campo curto, obrigatório, separado da legenda), legenda
+                         (a copy final, máx. 2200 = limite do Instagram), hashtags,
+                         linkMaterial ('' ou URL https:, validado antes de gravar), cta,
+                         estado (ideia|rascunho|revisao|aprovado|agendado|publicado),
+                         responsavel (nome), responsavelId (chave de pessoas/ ou ''),
+                         notas, postId (chave de social/instagram/posts quando a entrada
+                         foi ligada ao post real, senão ''), criadoEm, atualizadoEm (ISO) }.
+                         Criar = push().set() completo; editar = update() no registo;
+                         apagar = remove() com confirmação (é planeamento, não registo de
+                         negócio — a única excepção à regra "nunca remove()" ao lado do
+                         lojaPedidos). Duplicar cria uma entrada NOVA com tudo menos o
+                         estado (volta a 'ideia') e o postId (que pertence ao original).
+                         MIGRAÇÃO calendarioV2 (Set/2026, corre no browser uma vez e é
+                         idempotente, marcador em social/config/migracoes/calendarioV2 =
+                         { feitoEm, versao, entradas, total }): o modelo anterior tinha
+                         { canal, tema, link, estado } com canal a valer Feed|Reel|Story|
+                         Carrossel — que é o FORMATO de hoje, não o canal. tema→hook,
+                         link→linkMaterial (o valor muda de folha, não se perde), canal
+                         antigo → canal 'Instagram' + formato (Feed→Imagem), estado
+                         'pronto'→'rascunho', e as folhas novas em falta ficam ''. Mesmo
+                         sem o marcador nada se estraga: cada entrada só é tocada enquanto
+                         tiver forma antiga. A leitura da página é defensiva e continua a
+                         resolver `tema`/`link` de uma entrada por migrar — o ecrã nunca
+                         depende da migração ter corrido.
+                         social/config/pilares/{pushId} = { nome, cor (lime|mustard|blush|
+                         sky|navy|red — superfícies de selo do shell, para o texto por cima
+                         poder ser um literal fixo), ordem (inteiro), ativo (bool) }. NÃO
+                         há pilares por omissão: o ecrã arranca vazio e explica o que é um
+                         pilar. Criar = push().set() completo; renomear/cor/ordem/ativo =
+                         um set() POR FOLHA (reordenar troca a folha `ordem` com o vizinho,
+                         dois set()). Desativar é ativo:false e NUNCA remove(): as entradas
+                         antigas continuam a apontar para o pilar, continuam a resolver e
+                         continuam pintadas com a cor dele.
+                         social/config/grelha/{diaSemana}/{slotId} = { hora 'HH:MM', canal,
+                         formato, pilarId, ativo } — diaSemana 1 = segunda … 7 = domingo
+                         (ISO; o getDay() do JS é 0 = domingo). É o ritmo recorrente da
+                         semana, e cada slot sem entrada aparece no calendário por
+                         preencher. Criar = push().set(); remover = remove() com
+                         confirmação — é configuração de ritmo, não dado de negócio, e
+                         nenhuma entrada lhe aponta (as entradas guardam pilarId, nunca
+                         slotId).
+                         ESTADO E PILAR SÃO DIMENSÕES DIFERENTES e não partilham pista
+                         visual: a cor do PILAR pinta o bloco, o ESTADO é uma marca
+                         monocromática em currentColor que se distingue por FORMA e
+                         enchimento (.est-marca no <style> da página), nunca por cor. Ao
+                         acrescentar um estado, acrescenta-se uma FORMA. O texto do estado
+                         continua no title e no modal — a marca nunca é a única pista
 mapaProdutosReceitas  — ligação {codigoZoneSoft} -> uma de QUATRO formas,
                          escrita SÓ pela foodcost.html. O código é o das chaves de
                          vendasDiario/{AAAA-MM}/{dia}/produtos.
