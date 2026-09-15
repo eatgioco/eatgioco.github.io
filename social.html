@@ -658,6 +658,26 @@
   }
   .cal-aviso.on{ display:block; }
 
+  /* ---------- Página isolada: o .main sem sidebar ao lado ----------
+     O shell dá `.main{ padding:20px 28px 40px 0 }` a contar com a barra
+     lateral à esquerda. Sem ela o conteúdo colava à margem: o padding-left
+     volta aqui, e só aqui. */
+  .shell > .main{ padding-left:28px; }
+  /* Sem barra no fundo, a folga que o shell reserva para ela não faz falta. */
+  body.shell-mobile .page{ padding-bottom:24px; }
+
+  /* ---------- Botão "Filtros" (só telemóvel) ----------
+     Nasce escondido: acima de 700px a barra de filtros está sempre aberta e
+     este botão não existe. */
+  .cal-filtros-btn{ display:none; }
+  .cal-legenda-det > summary{ display:none; }
+  /* Os pontos da célula compacta são SÓ do telemóvel e nascem escondidos: sem
+     isto, um dia com mais itens do que os pontos que cabem imprimia o "+N"
+     solto na célula do desktop. */
+  .cal-pontos{ display:none; }
+
+  /* ---------- Resumo: uma linha compacta no telemóvel ---------- */
+
   /* ---------- Camadas (só leitura) ---------- */
   /* Evento da loja: linha fina no topo do dia, não clicável, não arrastável. */
   .cal-evento{
@@ -749,14 +769,108 @@
   /* Vistas: só uma de cada vez. Nascem escondidas e o JS liga a activa. */
   .cal-vista{ display:none; }
   .cal-vista.on{ display:block; }
+  /* =====================================================================
+     TELEMÓVEL (< 700px) — o MESMO limite que o JS lê em MQ_MOBILE.
+     Os dois têm de mudar juntos; o número não se repete em mais lado nenhum.
+     ---------------------------------------------------------------------
+     A vista MÊS é uma grelha de 7 colunas também aqui — um calendário que
+     degrada para lista deixa de ser um calendário. As células ficam
+     compactas (número + um ponto por item, na cor do pilar) e o dia tocado
+     abre em painel POR BAIXO da grelha, que é de onde se cria e se edita.
+     A vista SEMANA continua a degradar para lista (7 colunas com faixas
+     horárias não cabem), e a LISTA é a tabela de sempre.
+     ===================================================================== */
   @media (max-width:700px){
-    /* Abaixo de 700px as grelhas (mês e semana) não cabem: as duas degradam
-       para a MESMA lista por dia, onde tudo abre no modal — é o caminho sem
-       arrasto, o único que existe ao toque. A vista Lista é uma tabela e
-       continua a ser a própria, com scroll horizontal. */
-    .cal-vista-mes .cal-semana, .cal-vista-mes .cal-grelha, .cal-sem-grelha{ display:none; }
-    .cal-vista-mes .cal-lista, .cal-vista-semana .cal-lista{ display:block; }
+    .shell > .main{ padding-left:16px; padding-right:16px; }
+    .cal-card{ padding:10px; }
+
+    .cal-sem-grelha{ display:none; }
+    .cal-vista-semana .cal-lista{ display:block; }
+    /* A vista Mês mantém a grelha e usa a lista como PAINEL DO DIA. */
+    .cal-vista-mes .cal-semana, .cal-vista-mes .cal-grelha{ display:grid; }
+    .cal-vista-mes .cal-lista{ display:block; }
     .cal-tabela .c-legenda, .cal-tabela .c-resp{ display:none; }
+
+    /* --- Filtros atrás de um botão, fechados por omissão --- */
+    .cal-filtros-btn{
+      display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 14px;
+      margin:10px 0 0; border-radius:100px; border:1px solid var(--line);
+      background:var(--white); color:var(--ink); cursor:pointer;
+      font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700;
+    }
+    .cal-filtros-btn .icon{ width:13px; height:13px; }
+    .cal-filtros-btn .n{
+      background:var(--red); color:var(--on-red); border-radius:100px;
+      padding:1px 7px; font-size:11px; font-variant-numeric:tabular-nums;
+    }
+    .cal-filtros-btn[aria-expanded="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+    .cal-barra{ border-top:none; padding-top:8px; }
+    /* Fechada, a barra NÃO desaparece: fica só com o grupo do PILAR. As
+       células do mês são pontos coloridos e sem os nomes dos pilares os
+       pontos não querem dizer nada — esse é o grupo que tem de ficar à vista.
+       (Um `display:none` na barra inteira escondia-o também: o pai ganha.) */
+    .cal-barra.fechada > .cal-fgrupo:not(.pilar){ display:none; }
+    .cal-barra.fechada:empty{ padding:0; }
+
+    /* --- Legenda recolhida --- */
+    .cal-legenda-det{ margin:0 0 8px; }
+    .cal-legenda-det > summary{
+      display:flex; align-items:center; gap:6px; cursor:pointer; list-style:none;
+      font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+      min-height:32px;
+    }
+    .cal-legenda-det > summary::-webkit-details-marker{ display:none; }
+    .cal-legenda-det > summary .icon{ width:12px; height:12px; }
+    .cal-legenda-det[open] > summary .icon{ transform:rotate(90deg); }
+    .cal-legenda{ margin:0 0 6px; }
+
+    /* --- Resumo numa linha só --- */
+    .cal-resumo{
+      flex-wrap:nowrap; overflow-x:auto; gap:4px 10px; margin:0 0 8px; padding-bottom:2px;
+      white-space:nowrap; -webkit-overflow-scrolling:touch;
+      /* A linha corre para lá da margem: esbatida na ponta em vez de cortada
+         a seco, que se lia como texto truncado por defeito. */
+      -webkit-mask-image:linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+      mask-image:linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+    }
+    .cal-resumo::-webkit-scrollbar{ display:none; }
+    .cal-resumo .r-grupo{ flex-wrap:nowrap; }
+
+    /* --- Grelha do mês compacta: número + pontos, zero texto --- */
+    .cal-semana span{ padding:0 2px; font-size:9px; letter-spacing:0; text-align:center; }
+    .cal-dia{ min-height:46px; padding:3px 2px; }
+    .cal-dia-n{ font-size:11px; min-width:18px; height:18px; line-height:18px; }
+    .cal-dia.sel{ background:var(--dough); box-shadow:inset 0 0 0 2px var(--ink); }
+    .cal-ents{ display:none; }                 /* o texto vive no painel do dia */
+    .cal-pontos{
+      display:flex; flex-wrap:wrap; gap:2px; margin-top:2px; min-height:8px; justify-content:center;
+    }
+    .cal-pontos .pt{ width:7px; height:7px; border-radius:100px; display:block; }
+    .cal-pontos .pt.evento{ background:var(--muted); opacity:.6; }
+    .cal-pontos .pt.slot{ background:transparent; box-shadow:inset 0 0 0 1.5px var(--muted); opacity:.75; }
+    .cal-pontos .pt.post{ background:var(--muted); opacity:.3; box-shadow:inset 0 0 0 1px var(--muted); }
+    .cal-pontos .mais{ font-size:8.5px; font-weight:700; color:var(--muted); line-height:7px; font-variant-numeric:tabular-nums; }
+
+    /* --- Painel do dia, por baixo da grelha --- */
+    .cal-vista-mes .cal-lista{
+      margin-top:10px; padding-top:10px; border-top:2px solid var(--line);
+    }
+    .cal-dia-painel-t{
+      display:flex; align-items:baseline; gap:8px; margin:0 0 8px;
+      font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink);
+    }
+    .cal-dia-painel-t .hoje-selo{
+      font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--on-red);
+      background:var(--red); border-radius:100px; padding:2px 8px; text-transform:uppercase;
+    }
+  }
+
+  /* A 320px o mês continua a caber: a única coisa que muda é a folga. */
+  @media (max-width:360px){
+    .shell > .main{ padding-left:10px; padding-right:10px; }
+    .cal-card{ padding:8px 6px; }
+    .cal-dia{ padding:2px 1px; }
+    .cal-semana span{ font-size:8px; padding:0 1px; }
   }
 
   /* ---------- Post ligado (fecha o ciclo plano → publicado) ---------- */
@@ -809,38 +923,25 @@
 </style>
 </head>
 <body class="shell-mobile">
-<div class="nav-overlay" id="navOverlay"></div>
 <script src="gioco-shell.js"></script>
 <!-- Só pela normalização de eventos/ (EV.normalizar) na camada de eventos do
      calendário: esta página NUNCA cria, edita nem anula um evento. -->
 <script src="gioco-eventos.js"></script>
 
+<!-- PÁGINA ISOLADA (Set/2026, decisão do Manel): a social.html NÃO tem barra de
+     navegação nem link para outra página do OS — quem a abre não sai dela. É a
+     ÚNICA página assim, e a excepção vive toda aqui: o markup da `.sidebar`, o
+     `#navOverlay`, o `#sidebarPinBtn` e a chamada a `giocoNav()` foram
+     removidos deste ficheiro. O gioco-shell.js e o gioco-shell.css NÃO foram
+     tocados (o shell já é defensivo: `if (!sidebarEl) return`), por isso todas
+     as outras páginas continuam com a barra intacta. O `.main` recupera aqui o
+     padding-left que a sidebar lhe dava. -->
 <div class="shell">
-
-  <div class="sidebar glass collapsed" id="sidebarEl">
-    <div class="glass-bend"></div>
-    <div class="brand">
-      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
-      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
-      <div class="word">GIOCO OS<span>painel interno</span></div>
-    </div>
-    <nav id="giocoNav"></nav>
-    <script>giocoNav('social.html');</script>
-    <div class="sidebar-foot">
-      <div class="foot-user">
-        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
-        <span>Administrador</span><div class="dot"></div>
-      </div>
-    </div>
-  </div>
 
   <div class="main">
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
-          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
-        </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-message-square"/></svg>GIOCO · <b>Social</b></h1>
         <div class="spacer"></div>
         <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
@@ -920,10 +1021,18 @@
         <button type="button" class="cal-novo" id="calNovo"><svg class="icon"><use href="#i-plus"/></svg><span>Nova entrada</span></button>
       </div>
       <!-- Filtros: todos ligados por omissão; o estado não persiste entre
-           sessões (decisão da Fase 2 — um filtro esquecido esconde trabalho). -->
+           sessões (decisão da Fase 2 — um filtro esquecido esconde trabalho).
+           Abaixo de 700px vivem atrás do botão, fechados; acima, o botão não
+           existe e a barra está sempre aberta. -->
+      <button type="button" class="cal-filtros-btn" id="calFiltrosBtn" aria-expanded="false" aria-controls="calFiltros">
+        <svg class="icon"><use href="#i-filter"/></svg><span>Filtros</span><span class="n" id="calFiltrosN" hidden>0</span>
+      </button>
       <div class="cal-barra" id="calFiltros"></div>
       <div class="cal-resumo" id="calResumo"></div>
-      <div class="cal-legenda" id="calLegenda"></div>
+      <details class="cal-legenda-det" id="calLegendaDet">
+        <summary><svg class="icon"><use href="#i-chevron-right"/></svg><span>Legenda</span></summary>
+        <div class="cal-legenda" id="calLegenda"></div>
+      </details>
       <div class="cal-aviso" id="calAviso"></div>
 
       <!-- Vista MÊS -->
@@ -1762,6 +1871,16 @@
     return FAIXAS.filter(function(f){ return f.id === id; })[0] || FAIXAS[0];
   }
 
+  /* ---------- Telemóvel ----------
+     O limite é de LARGURA e vive em DOIS sítios que têm de mudar juntos: o
+     `@media (max-width:700px)` do <style> e este matchMedia. O número não se
+     repete em mais lado nenhum (mesmo padrão da calendario.html). */
+  var MQ_MOBILE = window.matchMedia ? window.matchMedia('(max-width:700px)') : null;
+  function ehMobile(){ return !!(MQ_MOBILE && MQ_MOBILE.matches); }
+
+  /* Dia aberto no painel da vista Mês ao telemóvel. Começa em hoje. */
+  var diaSel = todayStr();
+
   /* ---------- Estado da vista ---------- */
   var VISTA_STORAGE = 'social.calendario.vista';
   var vista = 'mes';
@@ -1807,7 +1926,9 @@
     if (!el) return;
     function grupo(rotulo, dim, itens){
       if (!itens.length) return '';
-      return '<div class="cal-fgrupo"><span class="cal-flabel">' + escapeHtml(rotulo) + '</span>' +
+      // O grupo do pilar leva classe própria: ao telemóvel fica de fora do
+      // botão "Filtros", porque é ele que dá nome às cores dos pontos do mês.
+      return '<div class="cal-fgrupo ' + dim + '"><span class="cal-flabel">' + escapeHtml(rotulo) + '</span>' +
         itens.map(function(it){
           var off = !!filtroOff[dim][it.v];
           return '<button type="button" class="cal-chip' + (off ? ' off' : '') + '" data-dim="' + dim + '" data-v="' + escapeHtml(it.v) + '"' +
@@ -1831,7 +1952,45 @@
           escapeHtml(par[1]) + '</button>';
       }).join('') + '</div>';
     el.innerHTML = html;
+    renderFiltrosBtn();
   }
+
+  /* Contador do botão: TUDO o que está desligado, esteja o chip dentro ou
+     fora do painel (o pilar fica fora) — a regra é nunca esconder sem contar. */
+  function nDesligados(){
+    var n = 0;
+    Object.keys(filtroOff).forEach(function(dim){ n += Object.keys(filtroOff[dim]).length; });
+    Object.keys(camadas).forEach(function(c){ if (!camadas[c]) n++; });
+    return n;
+  }
+
+  function renderFiltrosBtn(){
+    var badge = document.getElementById('calFiltrosN');
+    if (!badge) return;
+    var n = nDesligados();
+    badge.textContent = n;
+    badge.hidden = n === 0;
+  }
+
+  /* Abaixo de 700px a barra nasce fechada; acima está sempre aberta e o botão
+     não se vê (`display:none` fora da media query). */
+  function aplicarModoMobile(){
+    var barra = document.getElementById('calFiltros');
+    var btn = document.getElementById('calFiltrosBtn');
+    var leg = document.getElementById('calLegendaDet');
+    var mob = ehMobile();
+    if (barra) barra.classList.toggle('fechada', mob && btn.getAttribute('aria-expanded') !== 'true');
+    if (mob && btn) btn.setAttribute('aria-expanded', btn.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
+    // A legenda é um <details>: fechada ao telemóvel, sempre aberta acima de
+    // 700px (o <summary> está escondido lá, por isso nunca se vê o triângulo).
+    if (leg) leg.open = !mob;
+  }
+
+  document.getElementById('calFiltrosBtn').addEventListener('click', function(){
+    var aberto = this.getAttribute('aria-expanded') === 'true';
+    this.setAttribute('aria-expanded', aberto ? 'false' : 'true');
+    document.getElementById('calFiltros').classList.toggle('fechada', aberto);
+  });
 
   document.getElementById('calFiltros').addEventListener('click', function(ev){
     var b = ev.target.closest('.cal-chip');
@@ -1992,6 +2151,35 @@
     return out;
   }
 
+  /* Pontos da célula compacta (telemóvel): UM por item do dia, pela MESMA
+     ordem das camadas, com a cor do pilar nas entradas. O texto não cabe numa
+     célula de ~40px — vive no painel do dia, por baixo da grelha. */
+  var MAX_PONTOS = 5;
+  function pontosHtml(iso, dados){
+    var ents = dados.entradas[iso] || [];
+    var pts = [];
+    (dados.eventos[iso] || []).forEach(function(){ pts.push('<i class="pt evento"></i>'); });
+    slotsPorPreencher(iso, ents).forEach(function(){ pts.push('<i class="pt slot"></i>'); });
+    ents.forEach(function(e){ pts.push('<i class="pt gcor" data-cor="' + corDoPilar(e.pilarId) + '"></i>'); });
+    (dados.posts[iso] || []).forEach(function(){ pts.push('<i class="pt post"></i>'); });
+    if (!pts.length) return '<div class="cal-pontos"></div>';
+    if (pts.length <= MAX_PONTOS) return '<div class="cal-pontos">' + pts.join('') + '</div>';
+    // Nunca esconder sem contar, nem quando o que cabe são pontos de 6px.
+    return '<div class="cal-pontos">' + pts.slice(0, MAX_PONTOS - 1).join('') +
+      '<span class="mais">+' + (pts.length - (MAX_PONTOS - 1)) + '</span></div>';
+  }
+
+  /* Painel do dia (telemóvel, vista Mês): o dia tocado por inteiro, e é daqui
+     que se cria e se edita — os mesmos botões da lista de sempre. */
+  function painelDiaHtml(iso, dados){
+    var d = deIso(iso);
+    var itens = itensDoDia(iso, dados);
+    return '<p class="cal-dia-painel-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + ' ' + MESES[d.getMonth()] +
+      (iso === todayStr() ? '<span class="hoje-selo">hoje</span>' : '') + '</p>' +
+      (itens.length ? itens.join('') : '<p class="cal-vazio">Nada planeado neste dia.</p>') +
+      '<button type="button" class="cal-lista-add" data-dia="' + iso + '">+ adicionar neste dia</button>';
+  }
+
   // Dias com "+N" aberto. A grelha não pode crescer sem controlo nem ganhar
   // scroll por célula: mostra-se um tecto e conta-se o resto.
   var MAX_DIA = 4;
@@ -2098,11 +2286,28 @@
       var d = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i);
       var iso = isoLocal(d);
       var fora = d.getMonth() !== m.mes;
-      g += '<div class="cal-dia' + (fora ? ' fora' : '') + (iso === hoje ? ' hoje' : '') + '" data-dia="' + iso + '" title="Nova entrada em ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '">' +
+      g += '<div class="cal-dia' + (fora ? ' fora' : '') + (iso === hoje ? ' hoje' : '') + (iso === diaSel ? ' sel' : '') +
+        '" data-dia="' + iso + '" title="' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '">' +
         '<span class="cal-dia-n">' + d.getDate() + '</span><div class="cal-ents">' +
-        itensHtmlComTecto(iso, itensDoDia(iso, dados), MAX_DIA) + '</div></div>';
+        itensHtmlComTecto(iso, itensDoDia(iso, dados), MAX_DIA) + '</div>' +
+        pontosHtml(iso, dados) + '</div>';
     }
     calGrelha.innerHTML = g;
+
+    /* TELEMÓVEL: a lista deixa de ser o mês inteiro e passa a ser o PAINEL do
+       dia seleccionado, por baixo da grelha. O dia tem de ser deste mês. */
+    if (ehMobile()){
+      if (diaSel.indexOf(mesIso) !== 0){
+        diaSel = hoje.indexOf(mesIso) === 0 ? hoje : mesIso + '-01';
+        // Sem re-render: a célula certa marca-se na próxima passagem, e esta
+        // já vai desenhar o painel do dia novo.
+        Array.prototype.forEach.call(calGrelha.querySelectorAll('.cal-dia'), function(c){
+          c.classList.toggle('sel', c.getAttribute('data-dia') === diaSel);
+        });
+      }
+      calLista.innerHTML = calCarregado ? painelDiaHtml(diaSel, dados) : '<p class="cal-vazio">A carregar…</p>';
+      return;
+    }
 
     // Lista do mês (telemóvel): só os dias com alguma coisa.
     var comCoisas = {};
@@ -2326,7 +2531,21 @@
     var faixa = e.target.closest('.cal-sem-faixa');
     if (faixa){ abrirModal(null, { data: faixa.getAttribute('data-dia'), hora: faixaPorId(faixa.getAttribute('data-faixa')).hora }, null); return; }
     var dia = e.target.closest('.cal-dia');
-    if (dia){ abrirModal(null, { data: dia.getAttribute('data-dia') }, null); }
+    if (dia){
+      var iso = dia.getAttribute('data-dia');
+      // Ao telemóvel a célula é só número + pontos: tocar ABRE o dia no painel
+      // de baixo, não o formulário. Criar é o "+ adicionar neste dia" de lá.
+      if (ehMobile()){
+        diaSel = iso;
+        var m = mesDaAncora();
+        if (iso.indexOf(m.ano + '-' + pad2(m.mes + 1)) !== 0){
+          ancora = deIso(iso);   // tocou num dia de fora do mês: segue-o
+        }
+        render();
+        return;
+      }
+      abrirModal(null, { data: iso }, null);
+    }
   }
   calGrelha.addEventListener('click', calClick);
   calLista.addEventListener('click', calClick);
@@ -2966,6 +3185,15 @@
     // O select do modal é construído na abertura; nada a repovoar aqui.
   });
   renderFiltros();
+  aplicarModoMobile();
+  // Rodar o ecrã atravessa o limite: a vista Mês troca entre grelha+painel e
+  // lista do mês, e a legenda abre/fecha. Sem isto ficava o desenho do outro
+  // lado do limite até ao próximo clique.
+  if (MQ_MOBILE){
+    var aoMudarMQ = function(){ aplicarModoMobile(); render(); };
+    if (MQ_MOBILE.addEventListener) MQ_MOBILE.addEventListener('change', aoMudarMQ);
+    else if (MQ_MOBILE.addListener) MQ_MOBILE.addListener(aoMudarMQ);
+  }
   render();
   renderPilares();
   renderGrelha();

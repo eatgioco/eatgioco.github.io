@@ -43,8 +43,15 @@ for f in *.html; do
   if ! grep -q 'gioco-shell.js' "$f"; then
     erro "$f: sem gioco-shell.js"
   fi
-  if ! grep -q 'giocoNav(' "$f"; then
+  # A social.html é a ÚNICA página deliberadamente ISOLADA (Set/2026, decisão do
+  # Manel): não tem sidebar nem link para mais nenhuma página do OS, por isso
+  # não chama giocoNav(). A excepção é só a esta regra — todas as outras
+  # (fontes, tokens, shell, ícones, mobile) continuam a valer para ela.
+  if [ "$f" != "social.html" ] && ! grep -q 'giocoNav(' "$f"; then
     erro "$f: sem giocoNav() — sidebar fora da nav partilhada"
+  fi
+  if [ "$f" = "social.html" ] && grep -q '<nav id="giocoNav"' "$f"; then
+    erro "social.html: voltou a ter a nav partilhada — é a página isolada"
   fi
 
   # 5. Zero CDN de ícones / frameworks de UI.
