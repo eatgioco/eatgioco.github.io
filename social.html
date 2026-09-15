@@ -470,6 +470,10 @@
      sem isto as marcas de estado da legenda saíam todas quadradas. */
   .cal-legenda .est-marca{ color:var(--ink); width:9px; height:9px; border-radius:100px; }
   .cal-legenda .est-marca.e-publicado{ border-radius:2px; }
+  /* Camadas só de leitura: cada uma com o desenho que tem no calendário. */
+  .cal-legenda .l-evento{ height:3px; border-radius:2px; background:var(--muted); opacity:.55; }
+  .cal-legenda .l-slot{ border:1px dashed var(--muted); background:transparent; border-radius:3px; }
+  .cal-legenda .l-post{ background:var(--dough); border:1px solid var(--line); border-radius:3px; }
 
   /* ---------- Vista MÊS ---------- */
   .cal-semana{
@@ -531,10 +535,6 @@
   }
   .cal-vazio{ margin:6px 0 4px; font-size:14px; color:var(--muted); }
 
-  @media (max-width:700px){
-    .cal-semana, .cal-grelha{ display:none; }
-    .cal-lista{ display:block; }
-  }
 
   /* ---------- Configuração (pilares + grelha recorrente) ---------- */
   .cal-config{
@@ -619,6 +619,166 @@
   .cfg-erro{ color:var(--red-ink); font-size:12px; margin:8px 0 0; }
   .cfg-nota{ color:var(--muted); font-size:11.5px; margin:8px 0 0; }
 
+  /* ---------- Vistas, filtros e resumo (Fase 2) ---------- */
+  .cal-vistas{ display:inline-flex; gap:6px; flex-wrap:wrap; }
+  .cal-barra{
+    display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center;
+    margin:0 0 10px; padding:10px 0 0; border-top:1px dashed var(--line);
+  }
+  .cal-fgrupo{ display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .cal-flabel{
+    font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-right:2px;
+  }
+  .cal-chip{
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:700;
+    padding:6px 11px; border-radius:100px; border:1px solid var(--line);
+    background:var(--white); color:var(--ink); cursor:pointer;
+    display:inline-flex; align-items:center; gap:5px; min-height:32px;
+  }
+  .cal-chip:hover{ border-color:var(--ink); }
+  .cal-chip.sel{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  /* Filtro desligado: esbatido e riscado — nunca só a cor. */
+  .cal-chip.off{ opacity:.5; text-decoration:line-through; }
+  .cal-chip .ponto{ width:9px; height:9px; border-radius:100px; flex:none; }
+
+  .cal-resumo{
+    display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center;
+    margin:0 0 10px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;
+  }
+  .cal-resumo b{ color:var(--ink); font-weight:700; }
+  .cal-resumo .r-grupo{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .cal-resumo .r-pil{ display:inline-flex; align-items:center; gap:4px; }
+  .cal-resumo .r-pil i{ width:8px; height:8px; border-radius:100px; display:inline-block; }
+
+  /* Aviso de gravação falhada num arrasto (a entrada volta ao sítio). */
+  .cal-aviso{
+    display:none; margin:0 0 10px; padding:10px 12px;
+    border-left:4px solid var(--red); border-radius:8px; background:var(--white);
+    font-size:12.5px; color:var(--ink);
+  }
+  .cal-aviso.on{ display:block; }
+
+  /* ---------- Camadas (só leitura) ---------- */
+  /* Evento da loja: linha fina no topo do dia, não clicável, não arrastável. */
+  .cal-evento{
+    display:flex; align-items:center; gap:4px; min-width:0;
+    font-size:10px; line-height:1.35; color:var(--muted);
+    padding:1px 5px; border-left:3px solid var(--muted); border-radius:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    cursor:default;
+  }
+
+  /* Slot da grelha recorrente ainda por preencher. */
+  .cal-slot{
+    display:flex; align-items:center; gap:5px; width:100%; text-align:left; min-width:0;
+    padding:3px 6px; border:1px dashed var(--muted); border-radius:6px; cursor:pointer;
+    background:transparent; color:var(--muted);
+    font-family:'Inter',sans-serif; font-size:11px; line-height:1.3;
+  }
+  .cal-slot .t{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-slot:hover{ border-color:var(--ink); color:var(--ink); }
+  .cal-slot .ponto{ width:8px; height:8px; border-radius:100px; flex:none; }
+
+  /* Post publicado: abre o permalink, nunca se arrasta. */
+  .cal-post{
+    display:flex; align-items:center; gap:5px; min-width:0;
+    padding:2px 5px; border:1px solid var(--line); border-radius:6px;
+    background:var(--dough); color:var(--ink); text-decoration:none;
+    font-size:10.5px; line-height:1.3; font-variant-numeric:tabular-nums;
+  }
+  .cal-post:hover{ border-color:var(--ink); }
+  .cal-post img{ width:16px; height:16px; object-fit:cover; border-radius:3px; flex:none; background:var(--line); }
+  .cal-post .ph{ width:12px; height:12px; flex:none; color:var(--muted); opacity:.75; }
+  .cal-post .t{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .cal-mais{
+    display:block; width:100%; text-align:left;
+    background:none; border:none; padding:2px 6px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:10.5px; color:var(--muted); text-decoration:underline;
+  }
+
+  /* ---------- Arrastar ---------- */
+  .cal-ent[draggable="true"]{ cursor:grab; }
+  .cal-ent.a-arrastar{ opacity:.35; }
+  .cal-dia.alvo, .cal-sem-faixa.alvo{ background:var(--dough); box-shadow:inset 0 0 0 2px var(--red); }
+
+  /* ---------- Vista SEMANA ---------- */
+  /* Uma grelha por LINHAS, com goteira de rótulos à esquerda: a faixa
+     horária escreve-se uma vez, não sete (uma por coluna). */
+  .cal-sem-grelha{
+    display:grid; grid-template-columns:62px repeat(7, minmax(0,1fr));
+    border-top:1px solid var(--line); border-left:1px solid var(--line);
+  }
+  .cal-sem-grelha > *{ border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0; }
+  .cal-sem-gut{
+    padding:6px 8px; background:var(--dough);
+    font-size:9px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
+  }
+  .cal-sem-cab{
+    padding:6px; background:var(--dough);
+    font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted);
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .cal-sem-cab b{ font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .cal-sem-cab.hoje, .cal-sem-cab.hoje b{ color:var(--red-ink); }
+  .cal-sem-cel{ padding:4px; display:flex; flex-direction:column; gap:3px; }
+  .cal-sem-faixa{ min-height:50px; cursor:pointer; }
+  .cal-sem-cel.hoje-col{ background:color-mix(in srgb, var(--red) 4%, transparent); }
+
+  /* ---------- Vista LISTA ---------- */
+  .cal-tabela-wrap{ overflow-x:auto; }
+  .cal-tabela{ width:100%; border-collapse:collapse; font-size:12.5px; color:var(--ink); }
+  .cal-tabela th{
+    text-align:left; padding:8px 10px; border-bottom:2px solid var(--line);
+    font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+    white-space:nowrap; cursor:pointer; user-select:none;
+  }
+  .cal-tabela th:hover{ color:var(--ink); }
+  .cal-tabela th .ord{ font-size:9px; margin-left:3px; }
+  .cal-tabela td{
+    padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink);
+  }
+  .cal-tabela tbody tr{ cursor:pointer; }
+  .cal-tabela tbody tr:hover td{ background:var(--dough); }
+  .cal-tabela .c-data, .cal-tabela .c-hora{ white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .cal-tabela .c-hook{ min-width:170px; }
+  .cal-tabela .c-legenda{ color:var(--muted); font-size:11.5px; min-width:180px; }
+  .cal-tabela .est-cel{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .cal-tabela .vazio{ color:var(--muted); }
+
+  /* Vistas: só uma de cada vez. Nascem escondidas e o JS liga a activa. */
+  .cal-vista{ display:none; }
+  .cal-vista.on{ display:block; }
+  @media (max-width:700px){
+    /* Abaixo de 700px as grelhas (mês e semana) não cabem: as duas degradam
+       para a MESMA lista por dia, onde tudo abre no modal — é o caminho sem
+       arrasto, o único que existe ao toque. A vista Lista é uma tabela e
+       continua a ser a própria, com scroll horizontal. */
+    .cal-vista-mes .cal-semana, .cal-vista-mes .cal-grelha, .cal-sem-grelha{ display:none; }
+    .cal-vista-mes .cal-lista, .cal-vista-semana .cal-lista{ display:block; }
+    .cal-tabela .c-legenda, .cal-tabela .c-resp{ display:none; }
+  }
+
+  /* ---------- Post ligado (fecha o ciclo plano → publicado) ---------- */
+  .cal-post-nums{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(min(78px,100%),1fr)); gap:8px;
+    margin:8px 0 0; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--dough);
+  }
+  .cal-post-nums b{ display:block; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .cal-post-nums span{ display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; }
+  .cal-ligar-lista{ display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:260px; overflow-y:auto; }
+  .cal-ligar-item{
+    display:flex; align-items:center; gap:8px; text-align:left; width:100%;
+    padding:7px 9px; border:1px solid var(--line); border-radius:10px;
+    background:var(--white); color:var(--ink); cursor:pointer; font-family:'Inter',sans-serif; font-size:12px;
+  }
+  .cal-ligar-item:hover{ border-color:var(--ink); }
+  .cal-ligar-item img{ width:34px; height:34px; object-fit:cover; border-radius:6px; flex:none; background:var(--line); }
+  .cal-ligar-item .t{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+  .cal-ligar-item .n{ color:var(--muted); font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .cal-ligado{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+  .cal-ligado a{ color:var(--red-ink); }
+
   /* ---------- Modal (giocoModal do shell) ---------- */
   .cal-modal{ font-size:13px; color:var(--ink); }
   .cal-modal .field{ margin-bottom:12px; }
@@ -651,6 +811,9 @@
 <body class="shell-mobile">
 <div class="nav-overlay" id="navOverlay"></div>
 <script src="gioco-shell.js"></script>
+<!-- Só pela normalização de eventos/ (EV.normalizar) na camada de eventos do
+     calendário: esta página NUNCA cria, edita nem anula um evento. -->
+<script src="gioco-eventos.js"></script>
 
 <div class="shell">
 
@@ -749,12 +912,37 @@
           <button type="button" class="cal-nav-btn" id="calHoje" title="Voltar ao mês corrente">Hoje</button>
           <button type="button" class="cal-nav-btn" id="calSeguinte" title="Mês seguinte" aria-label="Mês seguinte"><svg class="icon"><use href="#i-chevron-right"/></svg></button>
         </div>
+        <div class="cal-vistas" id="calVistas">
+          <button type="button" class="cal-chip sel" data-vista="mes">Mês</button>
+          <button type="button" class="cal-chip" data-vista="semana">Semana</button>
+          <button type="button" class="cal-chip" data-vista="lista">Lista</button>
+        </div>
         <button type="button" class="cal-novo" id="calNovo"><svg class="icon"><use href="#i-plus"/></svg><span>Nova entrada</span></button>
       </div>
+      <!-- Filtros: todos ligados por omissão; o estado não persiste entre
+           sessões (decisão da Fase 2 — um filtro esquecido esconde trabalho). -->
+      <div class="cal-barra" id="calFiltros"></div>
+      <div class="cal-resumo" id="calResumo"></div>
       <div class="cal-legenda" id="calLegenda"></div>
-      <div class="cal-semana"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
-      <div class="cal-grelha" id="calGrelha"></div>
-      <div class="cal-lista" id="calLista"></div>
+      <div class="cal-aviso" id="calAviso"></div>
+
+      <!-- Vista MÊS -->
+      <div class="cal-vista cal-vista-mes on" id="vistaMes">
+        <div class="cal-semana"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+        <div class="cal-grelha" id="calGrelha"></div>
+        <div class="cal-lista" id="calLista"></div>
+      </div>
+
+      <!-- Vista SEMANA (a de trabalho: slots por preencher + faixas horárias) -->
+      <div class="cal-vista cal-vista-semana" id="vistaSemana">
+        <div class="cal-sem-grelha" id="calSemGrelha"></div>
+        <div class="cal-lista" id="calSemLista"></div>
+      </div>
+
+      <!-- Vista LISTA (substitui a folha de cálculo: um mês de uma vez) -->
+      <div class="cal-vista cal-vista-lista" id="vistaLista">
+        <div class="cal-tabela-wrap"><table class="cal-tabela" id="calTabela"></table></div>
+      </div>
 
       <!-- Configuração: pilares de conteúdo e grelha semanal recorrente.
            Recolhida por omissão — mexe-se uma vez, não todos os dias. -->
@@ -1295,7 +1483,12 @@
     renderPosts();
   });
 
-  postsRef.on('value', function(s){ posts = s.val() || {}; postsCarregados = true; renderPosts(); });
+  postsRef.on('value', function(s){
+    posts = s.val() || {}; postsCarregados = true;
+    renderPosts();
+    // Os mesmos posts alimentam a camada "publicados" do calendário.
+    if (typeof render === 'function') render();
+  });
   perfilRef.on('value', function(){ if (postsCarregados) renderPosts(); });
 
   /* =====================================================================
@@ -1375,7 +1568,6 @@
   var grelhaCarregada = false;
 
   var hojeD = new Date();
-  var mesRef = { ano: hojeD.getFullYear(), mes: hojeD.getMonth() }; // mes 0-11
 
   var calGrelha = document.getElementById('calGrelha');
   var calLista = document.getElementById('calLista');
@@ -1526,11 +1718,138 @@
   }
 
   /* =====================================================================
-     Render do calendário (vista Mês + lista de telemóvel)
+     Camadas, vistas e filtros (Fase 2)
+     ---------------------------------------------------------------------
+     O calendário mostra quatro coisas por dia, SEMPRE nesta ordem:
+       1. eventos da loja   (só leitura, de eventos/ — não clicável)
+       2. slots por preencher (da grelha recorrente, clicáveis: criam a entrada
+          já com canal, formato, pilar e hora do slot)
+       3. entradas planeadas (as únicas que se arrastam e se editam)
+       4. posts publicados  (só leitura, de social/instagram/posts/ — abrem o
+          permalink)
+     Nada disto escreve: as ÚNICAS escritas continuam a ser em
+     social/calendario/ e social/config/.
+
+     EVENTOS DA LOJA — critério: só os que têm o sub-objeto `comunicado`,
+     exactamente como o cartão "Esta semana na loja" da loja-sao-bento.html.
+     eventos/ é a agenda PESSOAL do Manel e esta página é da equipa: o
+     `comunicado` é o mecanismo deliberado de partilhar um evento com a
+     equipa, e é por isso o único critério defensável aqui. A categoria
+     (incluindo 'loja') NUNCA conta — a mesma regra do resto do OS.
+     ===================================================================== */
+  var eventosBrutos = {};
+  var EV = window.giocoEventosEngine ? giocoEventosEngine({ eventosRef: db.ref('eventos') }) : null;
+
+  /* Faixas horárias da vista Semana. São os alvos de largada que definem a
+     hora: largar numa faixa grava a hora REPRESENTATIVA da faixa (a hora
+     exacta continua a editar-se no modal). Poucas faixas de propósito — uma
+     grelha de 24 linhas × 7 colunas não cabe no ecrã nem se lê. */
+  var FAIXAS = [
+    { id: 'sem',    label: 'sem hora', hora: '',      de: null,    ate: null },
+    { id: 'manha',  label: 'manhã',    hora: '09:00', de: '00:00', ate: '11:59' },
+    { id: 'almoco', label: 'almoço',   hora: '12:00', de: '12:00', ate: '14:59' },
+    { id: 'tarde',  label: 'tarde',    hora: '17:00', de: '15:00', ate: '18:59' },
+    { id: 'noite',  label: 'noite',    hora: '20:00', de: '19:00', ate: '23:59' }
+  ];
+  function faixaDe(hora){
+    if (!horaValida(hora)) return 'sem';
+    for (var i = 1; i < FAIXAS.length; i++){
+      if (hora >= FAIXAS[i].de && hora <= FAIXAS[i].ate) return FAIXAS[i].id;
+    }
+    return 'sem';
+  }
+  function faixaPorId(id){
+    return FAIXAS.filter(function(f){ return f.id === id; })[0] || FAIXAS[0];
+  }
+
+  /* ---------- Estado da vista ---------- */
+  var VISTA_STORAGE = 'social.calendario.vista';
+  var vista = 'mes';
+  try {
+    var guardada = localStorage.getItem(VISTA_STORAGE);
+    if (guardada === 'mes' || guardada === 'semana' || guardada === 'lista') vista = guardada;
+  } catch (e) {}
+
+  // Âncora única das três vistas: Mês e Lista mostram o mês dela, Semana
+  // mostra a semana dela. Mudar de vista mantém-se no mesmo sítio do tempo.
+  var ancora = new Date();
+  function mesDaAncora(){ return { ano: ancora.getFullYear(), mes: ancora.getMonth() }; }
+  function inicioSemana(d){
+    var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));   // recua até segunda
+    return x;
+  }
+  function diasDaSemana(){
+    var ini = inicioSemana(ancora), out = [];
+    for (var i = 0; i < 7; i++){
+      out.push(isoLocal(new Date(ini.getFullYear(), ini.getMonth(), ini.getDate() + i)));
+    }
+    return out;
+  }
+
+  /* ---------- Filtros (todos ligados por omissão) ----------
+     Guardam-se os DESLIGADOS: um valor que ninguém desligou nunca esconde
+     nada, e um valor desconhecido (pilar apagado da lista, canal antigo)
+     também não — é a regra de "nenhuma vista esconde sem contar". */
+  var filtroOff = { pilar: {}, canal: {}, formato: {}, estado: {} };
+  var camadas = { eventos: true, slots: true, publicados: true };
+
+  function passaFiltro(e){
+    if (e.pilarId && filtroOff.pilar[e.pilarId]) return false;
+    if (e.canal && filtroOff.canal[e.canal]) return false;
+    if (e.formato && filtroOff.formato[e.formato]) return false;
+    if (filtroOff.estado[e.estado]) return false;
+    return true;
+  }
+
+  function renderFiltros(){
+    var el = document.getElementById('calFiltros');
+    if (!el) return;
+    function grupo(rotulo, dim, itens){
+      if (!itens.length) return '';
+      return '<div class="cal-fgrupo"><span class="cal-flabel">' + escapeHtml(rotulo) + '</span>' +
+        itens.map(function(it){
+          var off = !!filtroOff[dim][it.v];
+          return '<button type="button" class="cal-chip' + (off ? ' off' : '') + '" data-dim="' + dim + '" data-v="' + escapeHtml(it.v) + '"' +
+            ' aria-pressed="' + (off ? 'false' : 'true') + '">' +
+            (it.cor ? '<i class="ponto gcor" data-cor="' + escapeHtml(it.cor) + '"></i>' : '') +
+            (it.marca ? '<i class="est-marca e-' + escapeHtml(it.v) + '"></i>' : '') +
+            escapeHtml(it.label) + '</button>';
+        }).join('') + '</div>';
+    }
+    var html = '';
+    html += grupo('Pilar', 'pilar', pilaresOrdenados(false).map(function(p){
+      return { v: p.id, label: txt(p.nome), cor: corValida(p.cor) };
+    }));
+    html += grupo('Canal', 'canal', CANAIS.map(function(c){ return { v: c, label: c }; }));
+    html += grupo('Formato', 'formato', FORMATOS.map(function(f){ return { v: f, label: f }; }));
+    html += grupo('Estado', 'estado', ESTADOS.map(function(s){ return { v: s.v, label: s.label, marca: true }; }));
+    html += '<div class="cal-fgrupo"><span class="cal-flabel">Camadas</span>' +
+      [['eventos', 'Eventos'], ['slots', 'Slots vazios'], ['publicados', 'Publicados']].map(function(par){
+        var on = camadas[par[0]];
+        return '<button type="button" class="cal-chip' + (on ? '' : ' off') + '" data-camada="' + par[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+          escapeHtml(par[1]) + '</button>';
+      }).join('') + '</div>';
+    el.innerHTML = html;
+  }
+
+  document.getElementById('calFiltros').addEventListener('click', function(ev){
+    var b = ev.target.closest('.cal-chip');
+    if (!b) return;
+    var cam = b.getAttribute('data-camada');
+    if (cam){ camadas[cam] = !camadas[cam]; renderFiltros(); render(); return; }
+    var dim = b.getAttribute('data-dim'), v = b.getAttribute('data-v');
+    if (!dim) return;
+    if (filtroOff[dim][v]) delete filtroOff[dim][v]; else filtroOff[dim][v] = true;
+    renderFiltros(); render();
+  });
+
+  /* =====================================================================
+     Dados por dia — as quatro camadas
      ===================================================================== */
   function entradasPorDia(){
     var porDia = {};
-    listaEntradas().forEach(function(e){ (porDia[e.data] = porDia[e.data] || []).push(e); });
+    listaEntradas().filter(passaFiltro).forEach(function(e){ (porDia[e.data] = porDia[e.data] || []).push(e); });
     Object.keys(porDia).forEach(function(d){
       porDia[d].sort(function(a, b){
         // Sem hora vai para o fim do dia: é planeamento por marcar, não 00:00.
@@ -1542,6 +1861,60 @@
     return porDia;
   }
 
+  // Eventos da loja, por dia (só leitura; ver o comentário do topo).
+  function eventosPorDia(){
+    var porDia = {};
+    if (!camadas.eventos || !EV) return porDia;
+    Object.keys(eventosBrutos).forEach(function(id){
+      var ev = EV.normalizar(id, eventosBrutos[id]);
+      if (!ev || !ev.comunicado) return;
+      (porDia[ev.data] = porDia[ev.data] || []).push(ev);
+    });
+    Object.keys(porDia).forEach(function(d){
+      porDia[d].sort(function(a, b){
+        if (!!a.diaInteiro !== !!b.diaInteiro) return a.diaInteiro ? -1 : 1;
+        return txt(a.horaInicio).localeCompare(txt(b.horaInicio));
+      });
+    });
+    return porDia;
+  }
+
+  // Posts publicados, por dia local (só leitura de social/instagram/posts).
+  function postsPorDia(){
+    var porDia = {};
+    if (!camadas.publicados) return porDia;
+    Object.keys(posts).forEach(function(id){
+      var p = posts[id];
+      if (!p || typeof p !== 'object' || !p.dataHora) return;
+      var d = new Date(p.dataHora);
+      if (isNaN(d.getTime())) return;
+      (porDia[isoLocal(d)] = porDia[isoLocal(d)] || []).push(Object.assign({ _id: id }, p));
+    });
+    Object.keys(porDia).forEach(function(d){
+      porDia[d].sort(function(a, b){ return txt(a.dataHora).localeCompare(txt(b.dataHora)); });
+    });
+    return porDia;
+  }
+
+  /* Slots por preencher de um dia: os da grelha desse dia da semana que
+     ainda não têm entrada. "Já tem entrada" = existe nesse dia uma entrada
+     com a MESMA hora e o mesmo formato — é o par que identifica o slot; o
+     pilar pode ter mudado na entrada sem deixar de ser aquele espaço. */
+  function slotsPorPreencher(iso, entradasDoDia){
+    if (!camadas.slots) return [];
+    var slots = slotsDoDia(diaSemanaIso(deIso(iso)));
+    return slots.filter(function(s){
+      if (s.ativo === false) return false;
+      var ocupado = (entradasDoDia || []).some(function(e){
+        return e.hora === txt(s.hora) && e.formato === txt(s.formato);
+      });
+      return !ocupado;
+    });
+  }
+
+  /* =====================================================================
+     HTML de cada tipo de item
+     ===================================================================== */
   function tituloEntrada(e){
     var partes = [];
     if (e.hora) partes.push(e.hora);
@@ -1550,15 +1923,135 @@
     var np = nomeDoPilar(e.pilarId);
     if (np) partes.push(np);
     partes.push(estadoLabel(e.estado));
+    if (e.postId) partes.push('ligada a um post publicado');
     return partes.join(' · ');
   }
 
+  // Uma entrada publicada NÃO se arrasta: a data dela é um facto, não um plano.
+  function arrastavel(e){ return e.estado !== 'publicado'; }
+
   function entHtml(e){
+    var dr = arrastavel(e);
     return '<button type="button" class="cal-ent gcor" data-cor="' + corDoPilar(e.pilarId) + '"' +
-      ' data-id="' + escapeHtml(e.id) + '" title="' + escapeHtml(tituloEntrada(e) + (e.hook ? ' — ' + e.hook : '')) + '">' +
+      ' data-id="' + escapeHtml(e.id) + '"' + (dr ? ' draggable="true"' : '') +
+      ' title="' + escapeHtml(tituloEntrada(e) + (e.hook ? ' — ' + e.hook : '')) + '">' +
       '<span class="est-marca e-' + e.estado + '" aria-hidden="true"></span>' +
       '<span class="t">' + (e.hora ? '<b>' + escapeHtml(e.hora) + '</b>' : '') +
       escapeHtml(e.hook || '(sem hook)') + '</span></button>';
+  }
+
+  function eventoHtml(ev){
+    var hora = ev.diaInteiro || !ev.horaInicio ? 'dia inteiro' : ev.horaInicio;
+    var c = ev.comunicado;
+    return '<div class="cal-evento" title="' + escapeHtml(hora + ' · ' + c.titulo + ' (evento da loja)') + '">' +
+      escapeHtml(hora) + ' ' + escapeHtml(c.titulo) + '</div>';
+  }
+
+  function slotHtml(iso, s){
+    var rot = [txt(s.hora), txt(s.formato)].filter(Boolean).join(' ');
+    var np = nomeDoPilar(s.pilarId);
+    return '<button type="button" class="cal-slot" data-slot-dia="' + escapeHtml(iso) + '" data-slot-id="' + escapeHtml(s.id) + '"' +
+      ' data-slot-dow="' + diaSemanaIso(deIso(iso)) + '"' +
+      ' title="' + escapeHtml('Slot por preencher · ' + rot + (np ? ' · ' + np : '') + ' — clicar cria a entrada') + '">' +
+      '<i class="ponto gcor" data-cor="' + corDoPilar(s.pilarId) + '"></i>' +
+      '<span class="t">' + escapeHtml(rot || 'slot') + ' · por preencher</span></button>';
+  }
+
+  // Miniatura do CDN da Meta expira: o onerror esconde a imagem, nunca deixa
+  // o ícone partido do browser.
+  var THUMB_PH = '<svg class="ph" aria-hidden="true"><use href="#i-scan"/></svg>';
+  window.socialCalThumbFalhou = function(img){
+    if (!img || !img.parentNode) return;
+    img.onerror = null;
+    // Sem miniatura o chip ficava um número solto e ilegível: entra o mesmo
+    // símbolo que a grelha de Posts usa quando o URL do CDN da Meta expira.
+    var ph = document.createElement('span');
+    ph.innerHTML = THUMB_PH;
+    img.parentNode.replaceChild(ph.firstChild, img);
+  };
+
+  function postHtml(p){
+    var permalink = linkSeguro(p.permalink);
+    var thumb = linkSeguro(p.thumbnail);
+    var alcance = typeof p.alcance === 'number' ? fmtNum(p.alcance) : '—';
+    var titulo = 'Publicado · ' + tipoPost(p) + ' · alcance ' + alcance;
+    var dentro = (thumb ? '<img src="' + escapeHtml(thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="socialCalThumbFalhou(this)">' : THUMB_PH) +
+      '<span class="t">' + escapeHtml(alcance) + '</span>';
+    if (!permalink) return '<span class="cal-post" title="' + escapeHtml(titulo) + '">' + dentro + '</span>';
+    return '<a class="cal-post" href="' + escapeHtml(permalink) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(titulo + ' — abrir no Instagram') + '">' + dentro + '</a>';
+  }
+
+  /* Itens de um dia pela ordem fixa das camadas. */
+  function itensDoDia(iso, dados){
+    var ents = dados.entradas[iso] || [];
+    var out = [];
+    (dados.eventos[iso] || []).forEach(function(ev){ out.push(eventoHtml(ev)); });
+    slotsPorPreencher(iso, ents).forEach(function(s){ out.push(slotHtml(iso, s)); });
+    ents.forEach(function(e){ out.push(entHtml(e)); });
+    (dados.posts[iso] || []).forEach(function(p){ out.push(postHtml(p)); });
+    return out;
+  }
+
+  // Dias com "+N" aberto. A grelha não pode crescer sem controlo nem ganhar
+  // scroll por célula: mostra-se um tecto e conta-se o resto.
+  var MAX_DIA = 4;
+  var diasExpandidos = {};
+
+  function itensHtmlComTecto(iso, itens, tecto){
+    if (itens.length <= tecto || diasExpandidos[iso]) return itens.join('');
+    return itens.slice(0, tecto).join('') +
+      '<button type="button" class="cal-mais" data-mais="' + escapeHtml(iso) + '">+' + (itens.length - tecto) + ' mais</button>';
+  }
+
+  /* =====================================================================
+     Resumo do mês e legenda
+     ===================================================================== */
+  function renderResumo(){
+    var el = document.getElementById('calResumo');
+    if (!el) return;
+    var m = mesDaAncora();
+    var mesIso = m.ano + '-' + pad2(m.mes + 1);
+    var doMes = listaEntradas().filter(function(e){ return e.data.indexOf(mesIso) === 0; });
+
+    // Slots por preencher no mês inteiro (conta-se a grelha dia a dia).
+    var nDias = new Date(m.ano, m.mes + 1, 0).getDate();
+    var porDia = {};
+    doMes.forEach(function(e){ (porDia[e.data] = porDia[e.data] || []).push(e); });
+    var vazios = 0;
+    for (var d = 1; d <= nDias; d++){
+      var iso = mesIso + '-' + pad2(d);
+      var slots = slotsDoDia(diaSemanaIso(deIso(iso))).filter(function(s){ return s.ativo !== false; });
+      slots.forEach(function(s){
+        var ocupado = (porDia[iso] || []).some(function(e){ return e.hora === txt(s.hora) && e.formato === txt(s.formato); });
+        if (!ocupado) vazios++;
+      });
+    }
+
+    var porEstado = {};
+    doMes.forEach(function(e){ porEstado[e.estado] = (porEstado[e.estado] || 0) + 1; });
+    var porPilar = {};
+    doMes.forEach(function(e){ var k = e.pilarId || ''; porPilar[k] = (porPilar[k] || 0) + 1; });
+
+    var html = '<span><b>' + doMes.length + '</b> ' + (doMes.length === 1 ? 'entrada' : 'entradas') + ' no mês</span>';
+    var estados = ESTADOS.filter(function(s){ return porEstado[s.v]; });
+    if (estados.length){
+      html += '<span class="r-grupo">' + estados.map(function(s){
+        return '<span class="r-pil"><i class="est-marca e-' + s.v + '" style="color:var(--ink)"></i><b>' + porEstado[s.v] + '</b> ' + escapeHtml(s.label.toLowerCase()) + '</span>';
+      }).join('') + '</span>';
+    }
+    html += '<span><b>' + vazios + '</b> ' + (vazios === 1 ? 'slot por preencher' : 'slots por preencher') + '</span>';
+
+    // Distribuição por pilar em % — é o que diz num relance se o mês está
+    // equilibrado ou se está tudo a cair no mesmo pilar.
+    if (doMes.length){
+      var chaves = Object.keys(porPilar).sort(function(a, b){ return porPilar[b] - porPilar[a]; });
+      html += '<span class="r-grupo">' + chaves.map(function(k){
+        var pct = Math.round(porPilar[k] / doMes.length * 100);
+        return '<span class="r-pil"><i class="gcor" data-cor="' + (k ? corDoPilar(k) : 'nenhum') + '"></i>' +
+          escapeHtml(k ? (nomeDoPilar(k) || 'pilar apagado') : 'sem pilar') + ' <b>' + pct + '%</b></span>';
+      }).join('') + '</span>';
+    }
+    el.innerHTML = html;
   }
 
   function renderLegenda(){
@@ -1567,86 +2060,382 @@
     var html = '';
     var ativos = pilaresOrdenados(false);
     if (ativos.length){
+      html += '<span class="cal-flabel">Pilar (cor do bloco)</span>';
       html += ativos.map(function(p){
         return '<span><i class="gcor" data-cor="' + escapeHtml(corValida(p.cor)) + '"></i>' + escapeHtml(p.nome) + '</span>';
       }).join('');
       html += '<span class="sep"></span>';
     }
-    // A marca de estado é sempre a mesma forma, seja qual for a cor do pilar.
+    // A marca de estado é a mesma forma seja qual for a cor do pilar: são
+    // duas dimensões diferentes e a legenda tem de o dizer.
+    html += '<span class="cal-flabel">Estado (marca)</span>';
     html += ESTADOS.map(function(s){
       return '<span><i class="est-marca e-' + s.v + '"></i>' + escapeHtml(s.label) + '</span>';
     }).join('');
+    html += '<span class="sep"></span>';
+    html += '<span class="cal-flabel">Só leitura</span>';
+    html += '<span><i class="l-evento"></i>evento da loja</span>' +
+      '<span><i class="l-slot"></i>slot por preencher</span>' +
+      '<span><i class="l-post"></i>post publicado</span>';
     el.innerHTML = html;
   }
 
-  function renderCalendario(){
+  /* =====================================================================
+     Vista MÊS
+     ===================================================================== */
+  function renderMes(dados){
     var hoje = todayStr();
-    var primeiro = new Date(mesRef.ano, mesRef.mes, 1);
-    var nDias = new Date(mesRef.ano, mesRef.mes + 1, 0).getDate();
-    var mesIso = mesRef.ano + '-' + pad2(mesRef.mes + 1);
-    calTitulo.textContent = MESES_LONGO[mesRef.mes] + ' ' + mesRef.ano;
-    document.getElementById('calHoje').disabled = (mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth());
+    var m = mesDaAncora();
+    var primeiro = new Date(m.ano, m.mes, 1);
+    var nDias = new Date(m.ano, m.mes + 1, 0).getDate();
+    var mesIso = m.ano + '-' + pad2(m.mes + 1);
 
-    renderLegenda();
-    var porDia = entradasPorDia();
-
-    // Grelha: começa na segunda-feira; células "fora" do mês a cinzento.
     var offset = (primeiro.getDay() + 6) % 7;
-    var inicio = new Date(mesRef.ano, mesRef.mes, 1 - offset);
+    var inicio = new Date(m.ano, m.mes, 1 - offset);
     var total = Math.ceil((offset + nDias) / 7) * 7;
     var g = '';
     for (var i = 0; i < total; i++){
       var d = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i);
       var iso = isoLocal(d);
-      var fora = d.getMonth() !== mesRef.mes;
+      var fora = d.getMonth() !== m.mes;
       g += '<div class="cal-dia' + (fora ? ' fora' : '') + (iso === hoje ? ' hoje' : '') + '" data-dia="' + iso + '" title="Nova entrada em ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '">' +
         '<span class="cal-dia-n">' + d.getDate() + '</span><div class="cal-ents">' +
-        (porDia[iso] || []).map(entHtml).join('') + '</div></div>';
+        itensHtmlComTecto(iso, itensDoDia(iso, dados), MAX_DIA) + '</div></div>';
     }
     calGrelha.innerHTML = g;
 
-    // Lista do mês (telemóvel): só os dias com entradas.
-    var diasComEntradas = Object.keys(porDia).filter(function(d){ return d.indexOf(mesIso) === 0; }).sort();
+    // Lista do mês (telemóvel): só os dias com alguma coisa.
+    var comCoisas = {};
+    [dados.entradas, dados.eventos, dados.posts].forEach(function(mapa){
+      Object.keys(mapa).forEach(function(d){ if (d.indexOf(mesIso) === 0) comCoisas[d] = true; });
+    });
+    for (var dd = 1; dd <= nDias; dd++){
+      var isoD = mesIso + '-' + pad2(dd);
+      if (slotsPorPreencher(isoD, dados.entradas[isoD]).length) comCoisas[isoD] = true;
+    }
+    var dias = Object.keys(comCoisas).sort();
     if (!calCarregado){
       calLista.innerHTML = '<p class="cal-vazio">A carregar…</p>';
-    } else if (!diasComEntradas.length){
+    } else if (!dias.length){
       calLista.innerHTML = '<p class="cal-vazio">Nada planeado para este mês.</p>';
     } else {
-      calLista.innerHTML = diasComEntradas.map(function(iso){
+      calLista.innerHTML = dias.map(function(iso){
         var d = deIso(iso);
         return '<div class="cal-lista-dia' + (iso === hoje ? ' hoje' : '') + '"><p class="cal-lista-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>' +
-          porDia[iso].map(entHtml).join('') +
+          itensDoDia(iso, dados).join('') +
           '<button type="button" class="cal-lista-add" data-dia="' + iso + '">+ adicionar neste dia</button></div>';
       }).join('');
     }
   }
 
-  // Clique numa entrada → editar; clique num dia → criar nesse dia.
+  /* =====================================================================
+     Vista SEMANA — a vista de trabalho
+     ===================================================================== */
+  function renderSemana(dados){
+    var hoje = todayStr();
+    var dias = diasDaSemana();
+    var host = document.getElementById('calSemGrelha');
+    var lista = document.getElementById('calSemLista');
+
+    var porDia = dias.map(function(iso){
+      var ents = (dados.entradas[iso] || []);
+      return { iso: iso, ents: ents, slots: slotsPorPreencher(iso, ents), posts: dados.posts[iso] || [], evs: dados.eventos[iso] || [] };
+    });
+
+    // Cabeçalho: goteira vazia + os sete dias.
+    var html = '<div class="cal-sem-gut"></div>' + porDia.map(function(c){
+      var d = deIso(c.iso);
+      return '<div class="cal-sem-cab' + (c.iso === hoje ? ' hoje' : '') + '">' + DIAS[d.getDay()] + ' <b>' + d.getDate() + '</b></div>';
+    }).join('');
+
+    // Linha dos eventos da loja — só existe se a semana tiver algum.
+    if (porDia.some(function(c){ return c.evs.length; })){
+      html += '<div class="cal-sem-gut">loja</div>' + porDia.map(function(c){
+        return '<div class="cal-sem-cel' + (c.iso === hoje ? ' hoje-col' : '') + '">' + c.evs.map(eventoHtml).join('') + '</div>';
+      }).join('');
+    }
+
+    // Uma linha por faixa horária. A célula é o alvo de largada: é ela que
+    // define a hora ao largar.
+    html += FAIXAS.map(function(f){
+      return '<div class="cal-sem-gut">' + escapeHtml(f.label) + '</div>' + porDia.map(function(c){
+        var itens = [];
+        c.slots.filter(function(s){ return faixaDe(txt(s.hora)) === f.id; }).forEach(function(s){ itens.push(slotHtml(c.iso, s)); });
+        c.ents.filter(function(e){ return faixaDe(e.hora) === f.id; }).forEach(function(e){ itens.push(entHtml(e)); });
+        c.posts.filter(function(p){
+          var dt = new Date(p.dataHora);
+          return faixaDe(isNaN(dt.getTime()) ? '' : pad2(dt.getHours()) + ':' + pad2(dt.getMinutes())) === f.id;
+        }).forEach(function(p){ itens.push(postHtml(p)); });
+        return '<div class="cal-sem-cel cal-sem-faixa' + (c.iso === hoje ? ' hoje-col' : '') + '" data-dia="' + c.iso + '" data-faixa="' + f.id + '"' +
+          ' title="Nova entrada — ' + escapeHtml(f.label) + '">' + itens.join('') + '</div>';
+      }).join('');
+    }).join('');
+
+    host.innerHTML = html;
+
+    // Ao telemóvel a grelha da semana desaparece e fica esta lista por dia.
+    lista.innerHTML = porDia.map(function(c){
+      var d = deIso(c.iso);
+      var itens = itensDoDia(c.iso, dados);
+      return '<div class="cal-lista-dia' + (c.iso === hoje ? ' hoje' : '') + '"><p class="cal-lista-dia-t">' + DIAS_LONGO[d.getDay()] + ' ' + d.getDate() + '</p>' +
+        (itens.length ? itens.join('') : '<p class="cal-vazio">nada marcado</p>') +
+        '<button type="button" class="cal-lista-add" data-dia="' + c.iso + '">+ adicionar neste dia</button></div>';
+    }).join('');
+  }
+
+  /* =====================================================================
+     Vista LISTA — a que substitui a folha de cálculo
+     ===================================================================== */
+  var COLUNAS = [
+    { k: 'data',        label: 'Data',        cls: 'c-data' },
+    { k: 'hora',        label: 'Hora',        cls: 'c-hora' },
+    { k: 'canal',       label: 'Canal',       cls: '' },
+    { k: 'formato',     label: 'Formato',     cls: '' },
+    { k: 'pilar',       label: 'Pilar',       cls: '' },
+    { k: 'hook',        label: 'Hook',        cls: 'c-hook' },
+    { k: 'estado',      label: 'Estado',      cls: '' },
+    { k: 'responsavel', label: 'Responsável', cls: 'c-resp' },
+    { k: 'legenda',     label: 'Legenda',     cls: 'c-legenda' }
+  ];
+  var ordem = { k: 'data', asc: true };
+
+  function valorColuna(e, k){
+    if (k === 'pilar') return nomeDoPilar(e.pilarId);
+    if (k === 'estado') return String(ESTADOS.map(function(s){ return s.v; }).indexOf(e.estado));
+    if (k === 'hora') return e.hora || '99:99';   // sem hora ordena no fim do dia
+    return txt(e[k]);
+  }
+
+  function renderLista(){
+    var m = mesDaAncora();
+    var mesIso = m.ano + '-' + pad2(m.mes + 1);
+    var linhas = listaEntradas().filter(passaFiltro).filter(function(e){ return e.data.indexOf(mesIso) === 0; });
+    linhas.sort(function(a, b){
+      var va = valorColuna(a, ordem.k), vb = valorColuna(b, ordem.k);
+      var c = va.localeCompare(vb, 'pt', { numeric: true });
+      if (c === 0) c = (a.data + (a.hora || '99:99')).localeCompare(b.data + (b.hora || '99:99'));
+      return ordem.asc ? c : -c;
+    });
+
+    var html = '<thead><tr>' + COLUNAS.map(function(c){
+      var act = ordem.k === c.k;
+      return '<th data-col="' + c.k + '" class="' + c.cls + '" title="Ordenar por ' + escapeHtml(c.label) + '">' +
+        escapeHtml(c.label) + (act ? '<span class="ord">' + (ordem.asc ? '▲' : '▼') + '</span>' : '') + '</th>';
+    }).join('') + '</tr></thead><tbody>';
+
+    if (!linhas.length){
+      html += '<tr><td colspan="' + COLUNAS.length + '" class="vazio">Nada neste mês com estes filtros.</td></tr>';
+    } else {
+      linhas.forEach(function(e){
+        var d = deIso(e.data);
+        html += '<tr data-id="' + escapeHtml(e.id) + '">' +
+          '<td class="c-data">' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' <span class="vazio">' + DIAS[d.getDay()].toLowerCase() + '</span></td>' +
+          '<td class="c-hora">' + (e.hora ? escapeHtml(e.hora) : '<span class="vazio">—</span>') + '</td>' +
+          '<td>' + (e.canal ? escapeHtml(e.canal) : '<span class="vazio">—</span>') + '</td>' +
+          '<td>' + (e.formato ? escapeHtml(e.formato) : '<span class="vazio">—</span>') + '</td>' +
+          '<td>' + (e.pilarId && nomeDoPilar(e.pilarId)
+              ? '<span class="pil-chip gcor" data-cor="' + corDoPilar(e.pilarId) + '">' + escapeHtml(nomeDoPilar(e.pilarId)) + '</span>'
+              : '<span class="vazio">—</span>') + '</td>' +
+          '<td class="c-hook">' + escapeHtml(e.hook || '(sem hook)') + (e.postId ? ' <span class="vazio">· ligada</span>' : '') + '</td>' +
+          '<td><span class="est-cel"><i class="est-marca e-' + e.estado + '"></i>' + escapeHtml(estadoLabel(e.estado)) + '</span></td>' +
+          '<td class="c-resp">' + (e.responsavel ? escapeHtml(e.responsavel) : '<span class="vazio">—</span>') + '</td>' +
+          '<td class="c-legenda">' + (e.legenda ? escapeHtml(legendaCurta(e.legenda)) : '<span class="vazio">—</span>') + '</td>' +
+          '</tr>';
+      });
+    }
+    document.getElementById('calTabela').innerHTML = html + '</tbody>';
+  }
+
+  document.getElementById('calTabela').addEventListener('click', function(ev){
+    var th = ev.target.closest('th[data-col]');
+    if (th){
+      var k = th.getAttribute('data-col');
+      if (ordem.k === k) ordem.asc = !ordem.asc; else ordem = { k: k, asc: true };
+      renderLista();
+      return;
+    }
+    var tr = ev.target.closest('tr[data-id]');
+    if (tr) abrirModal(tr.getAttribute('data-id'), null, null);
+  });
+
+  /* =====================================================================
+     Render central
+     ===================================================================== */
+  function render(){
+    var hoje = todayStr();
+    var m = mesDaAncora();
+
+    // Título e navegação mudam de unidade conforme a vista.
+    if (vista === 'semana'){
+      var dias = diasDaSemana();
+      var a = deIso(dias[0]), b = deIso(dias[6]);
+      calTitulo.textContent = a.getDate() + ' ' + MESES[a.getMonth()] + ' – ' + b.getDate() + ' ' + MESES[b.getMonth()] + ' ' + b.getFullYear();
+      document.getElementById('calHoje').disabled = dias.indexOf(hoje) !== -1;
+    } else {
+      calTitulo.textContent = MESES_LONGO[m.mes] + ' ' + m.ano;
+      document.getElementById('calHoje').disabled = (m.ano === hojeD.getFullYear() && m.mes === hojeD.getMonth());
+    }
+
+    ['mes', 'semana', 'lista'].forEach(function(v){
+      document.getElementById('vista' + v.charAt(0).toUpperCase() + v.slice(1)).classList.toggle('on', v === vista);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#calVistas .cal-chip'), function(b){
+      b.classList.toggle('sel', b.getAttribute('data-vista') === vista);
+    });
+
+    renderLegenda();
+    renderResumo();
+
+    var dados = { entradas: entradasPorDia(), eventos: eventosPorDia(), posts: postsPorDia() };
+    if (vista === 'mes') renderMes(dados);
+    else if (vista === 'semana') renderSemana(dados);
+    else renderLista();
+  }
+  // As três vistas partilham o mesmo render: os mesmos dados, os mesmos
+  // filtros, as mesmas camadas — nunca uma vista com números próprios.
+  var renderCalendario = render;
+
+  document.getElementById('calVistas').addEventListener('click', function(ev){
+    var b = ev.target.closest('.cal-chip');
+    if (!b) return;
+    vista = b.getAttribute('data-vista');
+    try { localStorage.setItem(VISTA_STORAGE, vista); } catch (e) {}
+    render();
+  });
+
+  /* ---------- Cliques comuns às vistas de calendário ---------- */
   function calClick(e){
+    var mais = e.target.closest('.cal-mais');
+    if (mais){ diasExpandidos[mais.getAttribute('data-mais')] = true; render(); return; }
     var ent = e.target.closest('.cal-ent');
     if (ent){ abrirModal(ent.getAttribute('data-id'), null, null); return; }
+    var slot = e.target.closest('.cal-slot');
+    if (slot){
+      // Clicar num slot cria a entrada já com canal, formato, pilar e hora.
+      var s = (slotsDoDia(slot.getAttribute('data-slot-dow')) || []).filter(function(x){ return x.id === slot.getAttribute('data-slot-id'); })[0];
+      if (!s) return;
+      abrirModal(null, {
+        data: slot.getAttribute('data-slot-dia'), hora: txt(s.hora),
+        canal: txt(s.canal) || CANAIS[0], formato: txt(s.formato) || FORMATOS[0], pilarId: txt(s.pilarId)
+      }, null);
+      return;
+    }
+    if (e.target.closest('.cal-post') || e.target.closest('.cal-evento')) return;  // só leitura
     var add = e.target.closest('.cal-lista-add');
     if (add){ abrirModal(null, { data: add.getAttribute('data-dia') }, null); return; }
+    var faixa = e.target.closest('.cal-sem-faixa');
+    if (faixa){ abrirModal(null, { data: faixa.getAttribute('data-dia'), hora: faixaPorId(faixa.getAttribute('data-faixa')).hora }, null); return; }
     var dia = e.target.closest('.cal-dia');
     if (dia){ abrirModal(null, { data: dia.getAttribute('data-dia') }, null); }
   }
   calGrelha.addEventListener('click', calClick);
   calLista.addEventListener('click', calClick);
+  document.getElementById('calSemGrelha').addEventListener('click', calClick);
+  document.getElementById('calSemLista').addEventListener('click', calClick);
 
-  function mudarMes(delta){
-    var d = new Date(mesRef.ano, mesRef.mes + delta, 1);
-    mesRef = { ano: d.getFullYear(), mes: d.getMonth() };
-    renderCalendario();
+  /* =====================================================================
+     Arrastar para mover (HTML5 nativo — o OS não carrega bibliotecas)
+     ---------------------------------------------------------------------
+     Só entradas planeadas se arrastam: posts publicados, eventos da loja e
+     slots por preencher não têm draggable, e uma entrada em estado
+     'publicado' também não (a data dela é um facto, não um plano).
+     A gravação é UMA, no fim do movimento. Se falhar, o RTDB desfaz a
+     escrita local (latency compensation) e o listener volta a desenhar a
+     entrada no sítio de origem — e aparece o aviso. Ao toque não há drag
+     nativo: abaixo de 700px as grelhas dão lugar à lista e o caminho é
+     abrir a entrada e mudar a data no modal.
+     ===================================================================== */
+  var arrastando = null;
+
+  function avisoArrasto(msg){
+    var el = document.getElementById('calAviso');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('on', !!msg);
+    if (msg) clearTimeout(avisoArrasto._t), avisoArrasto._t = setTimeout(function(){ el.classList.remove('on'); }, 8000);
   }
-  document.getElementById('calAnterior').addEventListener('click', function(){ mudarMes(-1); });
-  document.getElementById('calSeguinte').addEventListener('click', function(){ mudarMes(1); });
-  document.getElementById('calHoje').addEventListener('click', function(){
-    mesRef = { ano: hojeD.getFullYear(), mes: hojeD.getMonth() }; renderCalendario();
-  });
+
+  function limparAlvos(){
+    Array.prototype.forEach.call(document.querySelectorAll('.alvo'), function(el){ el.classList.remove('alvo'); });
+  }
+
+  function ligarArrasto(host){
+    host.addEventListener('dragstart', function(ev){
+      var ent = ev.target.closest('.cal-ent[draggable="true"]');
+      if (!ent){ ev.preventDefault(); return; }
+      var e = normalizarEntrada(ent.getAttribute('data-id'), entradas[ent.getAttribute('data-id')]);
+      if (!e || !arrastavel(e)){ ev.preventDefault(); return; }
+      arrastando = { id: e.id, data: e.data, hora: e.hora };
+      ent.classList.add('a-arrastar');
+      try {
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', e.id);
+      } catch (err) {}
+    });
+
+    host.addEventListener('dragend', function(){
+      arrastando = null;
+      Array.prototype.forEach.call(document.querySelectorAll('.a-arrastar'), function(el){ el.classList.remove('a-arrastar'); });
+      limparAlvos();
+    });
+
+    host.addEventListener('dragover', function(ev){
+      if (!arrastando) return;
+      var alvo = ev.target.closest('.cal-sem-faixa, .cal-dia');
+      if (!alvo) return;
+      ev.preventDefault();
+      try { ev.dataTransfer.dropEffect = 'move'; } catch (err) {}
+      if (!alvo.classList.contains('alvo')){ limparAlvos(); alvo.classList.add('alvo'); }
+    });
+
+    host.addEventListener('dragleave', function(ev){
+      var alvo = ev.target.closest('.cal-sem-faixa, .cal-dia');
+      if (alvo && !alvo.contains(ev.relatedTarget)) alvo.classList.remove('alvo');
+    });
+
+    host.addEventListener('drop', function(ev){
+      var alvo = ev.target.closest('.cal-sem-faixa, .cal-dia');
+      if (!alvo || !arrastando) return;
+      ev.preventDefault();
+      limparAlvos();
+      var mov = arrastando;
+      arrastando = null;
+
+      var novaData = alvo.getAttribute('data-dia');
+      var campos = {};
+      if (novaData && novaData !== mov.data) campos.data = novaData;
+      // Na vista de semana a faixa em que se larga define também a hora.
+      var faixa = alvo.getAttribute('data-faixa');
+      if (faixa){
+        var novaHora = faixaPorId(faixa).hora;
+        if (novaHora !== mov.hora) campos.hora = novaHora;
+      }
+      if (!Object.keys(campos).length) return;   // largou onde já estava
+
+      campos.atualizadoEm = nowIso();
+      avisoArrasto('');
+      calRef.child(mov.id).update(campos).catch(function(err){
+        avisoArrasto('Não foi possível mover a entrada (' + err.message + '). Ficou onde estava.');
+      });
+    });
+  }
+  ligarArrasto(calGrelha);
+  ligarArrasto(document.getElementById('calSemGrelha'));
+
+  /* ---------- Navegação ---------- */
+  function mudarPeriodo(delta){
+    if (vista === 'semana') ancora = new Date(ancora.getFullYear(), ancora.getMonth(), ancora.getDate() + delta * 7);
+    else ancora = new Date(ancora.getFullYear(), ancora.getMonth() + delta, 1);
+    render();
+  }
+  document.getElementById('calAnterior').addEventListener('click', function(){ mudarPeriodo(-1); });
+  document.getElementById('calSeguinte').addEventListener('click', function(){ mudarPeriodo(1); });
+  document.getElementById('calHoje').addEventListener('click', function(){ ancora = new Date(); render(); });
   document.getElementById('calNovo').addEventListener('click', function(){
-    // No mês corrente abre em hoje; noutro mês, no dia 1 desse mês.
-    var noCorrente = mesRef.ano === hojeD.getFullYear() && mesRef.mes === hojeD.getMonth();
-    abrirModal(null, { data: noCorrente ? todayStr() : mesRef.ano + '-' + pad2(mesRef.mes + 1) + '-01' }, null);
+    var m = mesDaAncora();
+    var noCorrente = m.ano === hojeD.getFullYear() && m.mes === hojeD.getMonth();
+    abrirModal(null, { data: vista === 'semana' ? (diasDaSemana().indexOf(todayStr()) !== -1 ? todayStr() : diasDaSemana()[0])
+      : (noCorrente ? todayStr() : m.ano + '-' + pad2(m.mes + 1) + '-01') }, null);
   });
 
   /* =====================================================================
@@ -1950,6 +2739,9 @@
     html += '</div>';
     html += '<div class="field"><label class="field-label" for="calNotas">Notas (o porquê do post)</label>' +
       '<textarea id="calNotas" rows="3" maxlength="2000" placeholder="objetivo, referências, o que se quer comunicar">' + escapeHtml(d.notas || '') + '</textarea></div>';
+    // Ligar ao post real: fecha o ciclo entre o que se planeou e o que saiu.
+    // Só faz sentido numa entrada já gravada e já agendada ou publicada.
+    if (editar) html += '<div class="field" id="calPostBloco"></div>';
     html += '</div>';
 
     html += '<p class="form-erro hidden" id="calErro"></p>';
@@ -1989,6 +2781,86 @@
     legendaEl.addEventListener('input', atualizarConta);
     atualizarConta();
 
+    /* ---------- Ligar a um post realmente publicado (2D) ----------
+       Escreve só a folha postId (+ atualizadoEm) em social/calendario/{id};
+       social/instagram/ continua a ser leitura pura. O bloco só aparece com
+       a entrada em 'agendado' ou 'publicado' — antes disso não há post. */
+    var postBloco = body.querySelector('#calPostBloco');
+    if (postBloco){
+      var postIdAtual = d.postId || '';
+
+      function postsAoRedor(){
+        var ini = somarDias(body.querySelector('#calData').value || d.data, -7);
+        var fim = somarDias(body.querySelector('#calData').value || d.data, 7);
+        return Object.keys(posts).map(function(id){
+          var p = posts[id];
+          if (!p || typeof p !== 'object' || !p.dataHora) return null;
+          var dt = new Date(p.dataHora);
+          if (isNaN(dt.getTime())) return null;
+          var iso = isoLocal(dt);
+          if (iso < ini || iso > fim) return null;
+          return Object.assign({ _id: id, _dia: iso }, p);
+        }).filter(Boolean).sort(function(a, b){ return txt(b.dataHora).localeCompare(txt(a.dataHora)); });
+      }
+
+      function numsHtml(p){
+        return '<div class="cal-post-nums">' + [['alcance', 'alcance'], ['likes', 'likes'], ['guardados', 'guardados'], ['partilhas', 'partilhas'], ['comentarios', 'comentários']]
+          .map(function(par){ return '<div><b>' + fmtNum(p[par[0]]) + '</b><span>' + par[1] + '</span></div>'; }).join('') + '</div>';
+      }
+
+      function renderPostBloco(){
+        var estadoSel = body.querySelector('#calEstado').value;
+        if (estadoSel !== 'agendado' && estadoSel !== 'publicado' && !postIdAtual){
+          postBloco.innerHTML = '';
+          return;
+        }
+        var h = '<label class="field-label">Post real</label>';
+        var p = postIdAtual ? posts[postIdAtual] : null;
+        if (postIdAtual && p){
+          var permalink = linkSeguro(p.permalink);
+          h += '<div class="cal-ligado"><span>Ligada ao post de ' + escapeHtml(fmtDataCurta(p.dataHora)) + '</span>' +
+            (permalink ? '<a href="' + escapeHtml(permalink) + '" target="_blank" rel="noopener noreferrer">ver no Instagram ↗</a>' : '') +
+            '<button type="button" class="btn-mini" id="calDesligarPost">Desligar</button></div>' + numsHtml(p);
+        } else if (postIdAtual){
+          // postId gravado que já não está no Firebase (sync ainda não o trouxe
+          // ou o post foi apagado): diz-se, nunca se apaga a ligação sozinho.
+          h += '<div class="cal-ligado"><span>Ligada a um post que não está sincronizado.</span>' +
+            '<button type="button" class="btn-mini" id="calDesligarPost">Desligar</button></div>';
+        } else {
+          var cands = postsAoRedor();
+          h += '<p class="field-nota">Escolhe o post que saiu, nos 7 dias à volta desta data.</p>';
+          if (!cands.length){
+            h += '<p class="field-nota">Nenhum post publicado nessa janela.</p>';
+          } else {
+            h += '<div class="cal-ligar-lista">' + cands.map(function(p){
+              var thumb = linkSeguro(p.thumbnail);
+              return '<button type="button" class="cal-ligar-item" data-post="' + escapeHtml(p._id) + '">' +
+                (thumb ? '<img src="' + escapeHtml(thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="socialCalThumbFalhou(this)">' : '') +
+                '<span class="t">' + escapeHtml(fmtDataCurta(p.dataHora)) + ' · ' + escapeHtml(tipoPost(p)) + ' · ' + escapeHtml(legendaCurta(p.legenda) || 'sem legenda') + '</span>' +
+                '<span class="n">' + fmtNum(p.alcance) + '</span></button>';
+            }).join('') + '</div>';
+          }
+        }
+        postBloco.innerHTML = h;
+      }
+
+      function gravarPostId(valor){
+        erro('');
+        calRef.child(id).update({ postId: valor, atualizadoEm: nowIso() })
+          .then(function(){ postIdAtual = valor; d.postId = valor; renderPostBloco(); })
+          .catch(function(err){ erro('Erro ao ligar ao post: ' + err.message); });
+      }
+
+      postBloco.addEventListener('click', function(ev){
+        var it = ev.target.closest('.cal-ligar-item');
+        if (it){ gravarPostId(it.getAttribute('data-post')); return; }
+        if (ev.target.closest('#calDesligarPost')) gravarPostId('');
+      });
+      body.querySelector('#calEstado').addEventListener('change', renderPostBloco);
+      body.querySelector('#calData').addEventListener('change', renderPostBloco);
+      renderPostBloco();
+    }
+
     body.querySelector('#calCancelar').addEventListener('click', function(){ giocoModal.close(); });
 
     // Lê o formulário. Devolve null (e mostra o erro) se algo não serve.
@@ -2024,7 +2896,7 @@
         responsavel: respNome,
         responsavelId: respId || '',
         notas: body.querySelector('#calNotas').value.trim(),
-        postId: d.postId || '',
+        postId: d.postId || '',   // mantido tal como está (a ligação grava-se sozinha)
         atualizadoEm: nowIso()
       };
     }
@@ -2081,15 +2953,20 @@
   calRef.on('value', function(s){ entradas = s.val() || {}; calCarregado = true; renderCalendario(); });
   pilaresRef.on('value', function(s){
     pilares = s.val() || {}; pilaresCarregados = true;
-    renderPilares(); renderGrelha(); renderCalendario();
+    renderPilares(); renderGrelha(); renderFiltros(); render();
   });
   grelhaRef.on('value', function(s){
-    grelha = s.val() || {}; grelhaCarregada = true; renderGrelha();
+    grelha = s.val() || {}; grelhaCarregada = true; renderGrelha(); render();
   });
+  /* Camadas SÓ LEITURA. eventos/ é a agenda pessoal do Manel: só entram os
+     eventos com `comunicado`, o mecanismo deliberado de partilha com a
+     equipa (ver o comentário da secção das camadas). Nada é escrito aqui. */
+  if (EV) db.ref('eventos').on('value', function(s){ eventosBrutos = s.val() || {}; render(); });
   carregarPessoas(function(){
     // O select do modal é construído na abertura; nada a repovoar aqui.
   });
-  renderCalendario();
+  renderFiltros();
+  render();
   renderPilares();
   renderGrelha();
   migrarCalendario();
