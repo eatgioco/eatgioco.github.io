@@ -319,13 +319,16 @@
     color:var(--muted);
   }
 
-  /* Repartição por turnos, logo a seguir ao bloco "Agora": uma faixa compacta
-     — barra 100% empilhada com a legenda por baixo. Substituiu dois .kpi, que
-     gastavam a altura de um cartão para mostrar um número cada. Sem @media: a
-     legenda é flex com wrap e cada metade tem min-width, por isso empilha
-     sozinha quando a coluna estreita. Altura medida: 31px em desktop (barra +
-     legenda numa linha), 77px a 375px, onde empilha. */
-  .turnos-faixa{ margin:10px 0 6px; }
+  /* Repartição por turnos, a FECHAR a secção, logo por baixo do gráfico: uma
+     faixa compacta — barra 100% empilhada com a legenda por baixo. Substituiu
+     dois .kpi, que gastavam a altura de um cartão para mostrar um número cada.
+     Sem @media: a legenda é flex com wrap e cada metade tem min-width, por
+     isso empilha sozinha quando a coluna estreita. Altura medida: 31px em
+     desktop (barra + legenda numa linha), 77px a 375px, onde empilha.
+     A margem é a de antes invertida: os 6px que a separavam do gráfico
+     passaram para cima, agora que o gráfico é que está por cima. Nem .bars
+     nem .chart-host têm margem inferior, por isso não há margens a somar. */
+  .turnos-faixa{ margin:6px 0 10px; }
 
   .turnos-barra{
     display:flex;
@@ -3072,7 +3075,8 @@
       '</div>';
   }
 
-  /* Faixa "Turnos" logo a seguir ao "Agora": barra 100% empilhada + legenda.
+  /* Faixa "Turnos" a fechar a secção, por baixo do gráfico: barra 100%
+     empilhada + legenda.
      `divisor` é o mesmo das barras — em "Média por dia" mostra a média por dia
      de cada turno, em "Total" a soma do período, e em dia individual os valores
      reais desse dia. Aparece SEMPRE, mesmo com um turno a zero: um turno vazio
@@ -3111,10 +3115,11 @@
   /* O bloco "Agora" actualiza-se a cada 60 s a partir dos dados em memória
      (sem nova leitura). vistaHoras guarda aqui os argumentos; renderVistas
      limpa o intervalo antes de redesenhar e volta a armá-lo no fim.
-     O bloco de turnos vive DENTRO do mesmo #horasAgora e é reescrito aqui com
-     ele: escolheu-se isto em vez de um #horasTurnos à parte porque o relógio
-     já reescrevia este div inteiro — basta-lhe concatenar o blocoTurnos, sem
-     procurar nem tratar um segundo elemento, e sem setInterval novo. */
+     Os dois blocos vivem em divs separados (#horasAgora por cima do gráfico,
+     #horasTurnos por baixo) e são reescritos pelo MESMO intervalo — nunca um
+     segundo setInterval. Cada div é tratado por si: um que falte não impede o
+     outro de ser actualizado, e o relógio só pára quando nenhum dos dois
+     existe (a secção deixou de estar no DOM). */
   var agoraRelogio = { timer: null, args: null };
   function pararRelogioAgora(){
     if (agoraRelogio.timer) clearInterval(agoraRelogio.timer);
@@ -3124,10 +3129,12 @@
   function armarRelogioAgora(){
     if (!agoraRelogio.args) return;
     agoraRelogio.timer = setInterval(function(){
-      var alvo = document.getElementById('horasAgora');
       var a = agoraRelogio.args;
-      if (!alvo || !a){ pararRelogioAgora(); return; }
-      alvo.innerHTML = blocoAgora(a.p, a.dias, a.conjunto) + blocoTurnos(a.p, a.divisor);
+      var divAgora = document.getElementById('horasAgora');
+      var divTurnos = document.getElementById('horasTurnos');
+      if (!a || (!divAgora && !divTurnos)){ pararRelogioAgora(); return; }
+      if (divAgora) divAgora.innerHTML = blocoAgora(a.p, a.dias, a.conjunto);
+      if (divTurnos) divTurnos.innerHTML = blocoTurnos(a.p, a.divisor);
     }, 60000);
   }
 
@@ -3233,14 +3240,17 @@
         '</span>' + ctrl;
     }
 
-    /* Bloco "Agora" e repartição por turnos antes do gráfico, os dois dentro do
-       MESMO #horasAgora — ver armarRelogioAgora(). Sem média (temMedia falso) o
-       relógio nem chega a ser armado e o bloco fica estático, que é o correcto:
-       os turnos não dependem da hora a que se olha para eles. */
+    /* Bloco "Agora" antes do gráfico, repartição por turnos DEPOIS dele: a
+       faixa é a leitura de fecho da secção, não a de abertura. Cada um no seu
+       div, os dois reescritos pelo mesmo relógio — ver armarRelogioAgora().
+       Sem média (temMedia falso) o relógio nem chega a ser armado e a faixa
+       fica estática, que é o correcto: os turnos não dependem da hora a que se
+       olha para eles. */
     agoraRelogio.args = temMedia ? { p:p, dias:dias, conjunto:conjunto, divisor:divisor } : null;
-    var agora = '<div id="horasAgora">' + blocoAgora(p, dias, conjunto) + blocoTurnos(p, divisor) + '</div>';
+    var agora = '<div id="horasAgora">' + blocoAgora(p, dias, conjunto) + '</div>';
+    var turnos = '<div id="horasTurnos">' + blocoTurnos(p, divisor) + '</div>';
 
-    return seccao('Vendas por hora', sub, agora + corpo, ctrl);
+    return seccao('Vendas por hora', sub, agora + corpo + turnos, ctrl);
   }
 
   function vistaDiaSemana(p){
