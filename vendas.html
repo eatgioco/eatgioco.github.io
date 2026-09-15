@@ -319,9 +319,61 @@
     color:var(--muted);
   }
 
-  /* Repartição por turnos, logo a seguir ao bloco "Agora": os mesmos .kpi,
-     com menos folga em cima para os dois blocos lerem como um só. */
-  .turnos-row{ margin-top:8px; margin-bottom:4px; }
+  /* Repartição por turnos, logo a seguir ao bloco "Agora": uma faixa compacta
+     — barra 100% empilhada com a legenda por baixo. Substituiu dois .kpi, que
+     gastavam a altura de um cartão para mostrar um número cada. Sem @media: a
+     legenda é flex com wrap e cada metade tem min-width, por isso empilha
+     sozinha quando a coluna estreita. Altura medida: 31px em desktop (barra +
+     legenda numa linha), 77px a 375px, onde empilha. */
+  .turnos-faixa{ margin:10px 0 6px; }
+
+  .turnos-barra{
+    display:flex;
+    height:8px;
+    border-radius:999px;
+    /* o overflow é o que arredonda as pontas e deixa o meio a direito — as
+       duas partes ficam coladas, sem gap nem rebordo entre elas */
+    overflow:hidden;
+    background:var(--chart-neutro);
+  }
+  .turnos-barra > span{ display:block; height:100%; }
+  /* t1 no neutro das barras não destacadas do gráfico, t2 no vermelho da
+     marca: os dois tokens já existem e já têm par [data-theme="dark"]. */
+  .tb-t1{ background:var(--chart-neutro); }
+  .tb-t2{ background:var(--red); }
+
+  .turnos-legenda{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:4px 16px;
+    margin-top:9px;
+    font-size:12px;
+    color:var(--ink);
+  }
+  .turnos-legenda > span{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:2px 6px;
+    flex:0 1 auto;
+    min-width:min(290px, 100%);
+  }
+  .tl-dot{
+    flex:0 0 auto;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+  }
+  .tl-1{ background:var(--chart-neutro); }
+  .tl-2{ background:var(--red); }
+  .turnos-legenda em{ font-style:normal; font-size:11px; color:var(--muted); }
+
+  /* Sem dados no período: nada a repartir, por isso a barra não finge uma
+     divisão — fica 50/50 na cor neutra de texto e os valores em "—". */
+  .turnos-faixa.vazia .tb-t1,
+  .turnos-faixa.vazia .tb-t2,
+  .turnos-faixa.vazia .tl-dot{ background:var(--muted); }
 
   /* Separador do 2.º turno nas barras horizontais de Vendas por hora: rótulo
      curto e uma linha fina a preencher o resto, no corte de HORA_CORTE_TURNO.
@@ -3020,27 +3072,40 @@
       '</div>';
   }
 
-  /* Bloco "Turnos" (dois .kpi) logo a seguir ao "Agora". `divisor` é o mesmo
-     das barras: em "Média por dia" mostra a média por dia de cada turno, em
-     "Total" a soma do período, e em dia individual os valores reais desse dia.
-     Aparece SEMPRE, mesmo com um turno a zero — um turno vazio é informação
-     (a loja não vendeu nada depois das 17h), não motivo para esconder a
-     repartição. Os docs vão arredondados, como no "por dia aberto" do Resumo:
-     numa média por dia o número é fraccionário e "163,077 docs" num KPI só
-     confunde. */
+  /* Faixa "Turnos" logo a seguir ao "Agora": barra 100% empilhada + legenda.
+     `divisor` é o mesmo das barras — em "Média por dia" mostra a média por dia
+     de cada turno, em "Total" a soma do período, e em dia individual os valores
+     reais desse dia. Aparece SEMPRE, mesmo com um turno a zero: um turno vazio
+     é informação (a loja não vendeu nada depois das 17h), não motivo para
+     esconder a repartição. Os docs vão arredondados, como no "por dia aberto"
+     do Resumo — numa média por dia o número é fraccionário e "163,077 docs"
+     numa legenda só confunde. */
   function blocoTurnos(p, divisor){
     var t = giocoTurnos(p.porHora, divisor);
-    function cartao(rotulo, parte){
-      var partes = [];
-      partes.push(t.total.bruto > 0 ? dec(parte.bruto / t.total.bruto * 100, 0) + '% do dia' : '—');
-      partes.push(intFmt(Math.round(parte.docs)) + ' docs');
-      if (parte.ticket !== null) partes.push('ticket ' + eur(parte.ticket));
-      return kpi(rotulo, eur(parte.bruto), partes.join(' · '));
+    var vazio = !(t.total.bruto > 0);
+    /* A barra leva a percentagem exacta (as duas larguras somam 100,00 %); a
+       legenda leva a arredondada, com a segunda a valer 100 − a primeira. Sem
+       isto, um 32,5 / 67,5 aparecia como 33 % + 68 % = 101 %. */
+    var fatia1 = vazio ? 50 : t.t1.bruto / t.total.bruto * 100;
+    var pct1 = Math.round(fatia1);
+    function metade(rotulo, classe, parte, pct){
+      var extras = [];
+      if (!vazio) extras.push(pct + '%');
+      extras.push(intFmt(Math.round(parte.docs)) + ' docs');
+      if (parte.ticket !== null) extras.push('ticket ' + eur(parte.ticket));
+      return '<span><i class="tl-dot ' + classe + '"></i>' + esc(rotulo) +
+        ' <b class="num">' + (vazio ? '—' : eur(parte.bruto)) + '</b>' +
+        ' <em>' + extras.join(' · ') + '</em></span>';
     }
-    return '<div class="kpi-row turnos-row">' +
-      cartao('1.º turno · até ' + HORA_CORTE_TURNO + 'h', t.t1) +
-      cartao('2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho', t.t2) +
-      '</div>';
+    return '<div class="turnos-faixa' + (vazio ? ' vazia' : '') + '">' +
+      '<div class="turnos-barra">' +
+        '<span class="tb-t1" style="width:' + fatia1.toFixed(2) + '%"></span>' +
+        '<span class="tb-t2" style="width:' + (100 - fatia1).toFixed(2) + '%"></span>' +
+      '</div>' +
+      '<div class="turnos-legenda">' +
+        metade('1.º turno · até ' + HORA_CORTE_TURNO + 'h', 'tl-1', t.t1, pct1) +
+        metade('2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho', 'tl-2', t.t2, 100 - pct1) +
+      '</div></div>';
   }
 
   /* O bloco "Agora" actualiza-se a cada 60 s a partir dos dados em memória
