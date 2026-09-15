@@ -91,3 +91,80 @@ assert.strictEqual(G.localMaisProximo(1, 1, null), null);
 var dois = { A: { nome: 'A', lat: 0, lng: 0, local: 'loja' }, B: { nome: 'B', lat: 0.0005, lng: 0, raio: 300, local: 'rua' } };
 assert.strictEqual(G.localMaisProximo(0.0001, 0, dois).id, 'A');
 console.log('testa-obrigacoes (local/geo): OK');
+
+/* ---------- Bloco 1 da UX Notion: projeto = página, ação = sub-item ----------
+   Cálculos derivados na leitura (nunca gravados) e a precedência do estado. */
+assert.strictEqual(G.fmtDuracaoMin(30), '30 min');
+assert.strictEqual(G.fmtDuracaoMin(59), '59 min');
+assert.strictEqual(G.fmtDuracaoMin(60), '1h');
+assert.strictEqual(G.fmtDuracaoMin(90), '1h30');
+assert.strictEqual(G.fmtDuracaoMin(125), '2h05', 'minutos < 10 com zero à esquerda');
+assert.strictEqual(G.fmtDuracaoMin(0), '0 min');
+assert.strictEqual(G.fmtDuracaoMin(null), '0 min');
+assert.strictEqual(G.fmtDuracaoMin('x'), '0 min');
+assert.strictEqual(G.prazoValido('2026-09-11'), true);
+assert.strictEqual(G.prazoValido('2026-9-11'), false);
+assert.strictEqual(G.prazoValido(null), false);
+
+var pj = { id: 'PX', nome: 'X', estado: 'ativo', criadoEm: '2026-09-01T10:00:00.000Z', ultimoAvancoEm: '2026-09-09T10:00:00.000Z' };
+function calc(obrs, projeto) { return G.calculosProjeto(projeto || pj, obrs, HOJE); }
+
+// (3) Por decompor: sem ações abertas NEM concluídas
+assert.strictEqual(calc({}).estado, 'porDecompor');
+assert.deepStrictEqual(calc({}).progresso, { feitas: 0, total: 0 });
+// Um projeto só com ações ANULADAS continua «por decompor»: as anuladas não contam.
+assert.strictEqual(calc({ a: { titulo: 'a', projetoId: 'PX', ordem: 1, estado: 'anulada', anulado: true } }).estado, 'porDecompor');
+
+// (5) Em curso + cálculos
+var vivo = {
+  a1: { titulo: 'a1', projetoId: 'PX', ordem: 1, estado: 'aberta', duracaoPrevista: 30 },
+  a2: { titulo: 'a2', projetoId: 'PX', ordem: 2, estado: 'aberta', duracaoPrevista: 90, dependeDe: ['a1'] },
+  a3: { titulo: 'a3', projetoId: 'PX', ordem: 3, estado: 'concluida', duracaoPrevista: 15 },
+  a4: { titulo: 'a4', projetoId: 'PX', ordem: 4, estado: 'anulada', anulado: true, duracaoPrevista: 999 }
+};
+var c = calc(vivo);
+assert.strictEqual(c.estado, 'emCurso');
+assert.deepStrictEqual(c.progresso, { feitas: 1, total: 3 }, 'a anulada fica fora do progresso');
+assert.strictEqual(c.minutosRestantes, 120, 'só as abertas; a anulada não soma');
+assert.strictEqual(c.bloqueadas, 1);
+assert.strictEqual(c.proxima.id, 'a1');
+assert.strictEqual(c.proximoPrazo, null);
+
+// (2) Vencido ganha a Em curso — prazo passado numa AÇÃO aberta
+var venc = JSON.parse(JSON.stringify(vivo)); venc.a2.prazo = '2026-09-10';
+assert.strictEqual(calc(venc).estado, 'vencido');
+assert.strictEqual(calc(venc).proximoPrazo, '2026-09-10');
+// ... ou no próprio PROJETO
+assert.strictEqual(G.calculosProjeto(Object.assign({ prazo: '2026-09-01' }, pj), vivo, HOJE).estado, 'vencido');
+// Prazo de HOJE não é vencido (só passado)
+assert.strictEqual(G.calculosProjeto(Object.assign({ prazo: HOJE }, pj), vivo, HOJE).estado, 'emCurso');
+// O próximo prazo é o MAIS CEDO entre o do projeto e os das ações abertas
+assert.strictEqual(G.calculosProjeto(Object.assign({ prazo: '2026-09-20' }, pj), venc, HOJE).proximoPrazo, '2026-09-10');
+
+// (4) Bloqueado: há abertas mas nenhuma desbloqueada
+var bloq = {
+  b1: { titulo: 'b1', projetoId: 'PX', ordem: 1, estado: 'aberta', duracaoPrevista: 30, dependeDe: ['b2'] },
+  b2: { titulo: 'b2', projetoId: 'PX', ordem: 2, estado: 'aberta', duracaoPrevista: 30, dependeDe: ['b1'] }
+};
+assert.strictEqual(calc(bloq).estado, 'bloqueado');
+assert.strictEqual(calc(bloq).bloqueadas, 2);
+assert.strictEqual(calc(bloq).proxima, null);
+// Bloqueado NÃO ganha a vencido
+bloq.b1.prazo = '2026-09-01';
+assert.strictEqual(calc(bloq).estado, 'vencido', 'vencido tem precedência sobre bloqueado');
+
+// (1) Concluído ganha a tudo, mesmo com um prazo por cumprir
+var pcon = Object.assign({}, pj, { estado: 'concluido', prazo: '2026-01-01' });
+assert.strictEqual(G.calculosProjeto(pcon, vivo, HOJE).estado, 'concluido');
+
+// Soltas: o mesmo formato, nunca porDecompor nem bloqueado
+var s = G.calculosSolta({ id: 'S', titulo: 's', estado: 'aberta', duracaoPrevista: 45 }, HOJE);
+assert.strictEqual(s.estado, 'emCurso');
+assert.strictEqual(s.minutosRestantes, 45);
+assert.deepStrictEqual(s.progresso, { feitas: 0, total: 1 });
+assert.strictEqual(G.calculosSolta({ id: 'S', titulo: 's', estado: 'aberta', prazo: '2026-09-01' }, HOJE).estado, 'vencido');
+assert.strictEqual(G.calculosSolta({ id: 'S', titulo: 's', estado: 'concluida' }, HOJE).estado, 'concluido');
+assert.strictEqual(G.calculosSolta({ id: 'S', titulo: 's', estado: 'anulada', anulado: true }, HOJE).progresso.total, 0);
+// Rótulos completos para os cinco estados
+G.ESTADOS_PROJETO.forEach(function (e) { assert.ok(G.ROTULO_ESTADO_PROJETO[e], 'rótulo de ' + e); });
+console.log('testa-obrigacoes (projeto como página): OK');

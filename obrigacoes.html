@@ -359,6 +359,233 @@
   body.shell-touch .sug-linha input[type="text"]{ flex-basis:100%; }
   body.shell-touch .sug-linha select{ max-width:100%; flex:1 1 140px; }
   body.shell-touch .topo-fino{ padding:10px 16px; }
+
+  /* ==========================================================================
+     Bloco 1 da UX Notion (Set/2026): um PROJETO é uma página (a unidade das
+     vistas) e uma AÇÃO é um sub-item dentro dele. Tudo o que se segue desenha
+     essas duas coisas — cartão/linha, pills de propriedades e página do projeto.
+     O critério de toque é SEMPRE o hover (body.shell-touch, posto pelo shell),
+     nunca a largura: esta página não tem um único @media próprio.
+     ========================================================================== */
+
+  /* ---------- Separadores de vista ---------- */
+  .vista-tabs{ display:inline-flex; gap:2px; padding:3px; border-radius:100px; background:var(--white); border:1.5px solid var(--line); flex-shrink:0; }
+  .vista-tab{
+    padding:6px 13px; border:none; border-radius:100px; background:transparent; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; color:var(--muted); white-space:nowrap;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .vista-tab:hover{ color:var(--ink); }
+  .vista-tab.ativo{ background:var(--ink); color:var(--white); }
+  .vista-tab .n{ font-variant-numeric:tabular-nums; opacity:.75; }
+
+  /* ---------- Faixa de confiança: nunca se esconde nada em silêncio ---------- */
+  .faixa-esconde{
+    display:none; align-items:center; gap:10px; flex-wrap:wrap; position:sticky; top:0; z-index:35;
+    margin-top:10px; padding:9px 14px; border-radius:12px; background:var(--white);
+    border:1px solid var(--line); border-left:4px solid var(--amber); font-size:13px; color:var(--ink);
+  }
+  .faixa-esconde.on{ display:flex; }
+  .faixa-esconde .num{ font-variant-numeric:tabular-nums; font-weight:700; }
+  .faixa-esconde button{ background:none; border:none; padding:0; font:inherit; font-weight:600; color:var(--red-ink); cursor:pointer; text-decoration:underline; }
+
+  /* ---------- Painel de filtros ---------- */
+  .filtros-box{ display:none; margin-top:10px; padding:12px 14px; border-radius:12px; background:var(--white); border:1px solid var(--line); }
+  .filtros-box.on{ display:block; }
+  .f-grupo{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px; font-size:12px; color:var(--muted); }
+  .f-grupo:last-child{ margin-bottom:0; }
+  .f-grupo > b{ min-width:64px; font-weight:700; color:var(--ink); font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; }
+  .f-chip{
+    display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border:1.5px solid var(--line); border-radius:100px;
+    background:var(--dough); font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer; white-space:nowrap;
+  }
+  .f-chip:hover{ border-color:var(--ink); }
+  .f-chip.ativo{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  body.shell-touch .f-chip{ padding:9px 13px; font-size:13px; }
+
+  /* ---------- Pills de propriedades (ação e projeto) ---------- */
+  .pills{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .pill{
+    display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border:1px solid var(--line); border-radius:100px;
+    background:var(--dough); font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; color:var(--ink);
+    cursor:pointer; white-space:nowrap; max-width:190px; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pill:hover{ border-color:var(--ink); }
+  .pill .icon{ flex-shrink:0; opacity:.7; }
+  .pill.num{ font-variant-numeric:tabular-nums; }
+  .pill.alerta{ border-color:var(--red); color:var(--red-ink); background:var(--white); }
+  .pill.aviso{ border-color:var(--amber); color:var(--amber); background:var(--white); }
+  .pill.estatica{ cursor:default; }
+  .pill.estatica:hover{ border-color:var(--line); }
+  /* Pill vazia (prazo/local por definir): só em hover no desktop; ao toque fica
+     como ícone discreto, sempre presente — sem hover não há como a descobrir. */
+  .pill.vazia{ border-style:dashed; color:var(--muted); background:transparent; opacity:0; transition:opacity .12s ease; }
+  .u-card:hover .pill.vazia, .acao-linha:hover .pill.vazia, .pill.vazia:focus, .pill.vazia.on{ opacity:1; }
+  body.shell-touch .pill.vazia{ opacity:.7; padding:5px 7px; }
+  body.shell-touch .pill.vazia .rot{ display:none; }
+  body.shell-touch .pill{ padding:5px 10px; font-size:12px; }
+
+  /* Selo de estado calculado — o texto nunca é a única pista: cada estado tem
+     também a sua superfície. Todas as superfícies de selo do shell invertem mal
+     no escuro, por isso o texto por cima é literal fixo com par [data-theme]. */
+  .pill-estado{ border:none; cursor:default; font-weight:700; letter-spacing:.2px; }
+  .est-emCurso{ background:var(--lime); color:#141414; }
+  .est-vencido{ background:var(--red); color:var(--on-red); }
+  .est-porDecompor{ background:var(--mustard); color:#141414; }
+  .est-bloqueado{ background:var(--blush); color:#141414; }
+  .est-concluido{ background:var(--line); color:var(--muted); }
+  [data-theme="dark"] .est-emCurso, [data-theme="dark"] .est-porDecompor, [data-theme="dark"] .est-bloqueado{ color:#141414; }
+
+  /* ---------- Barra de progresso fina ---------- */
+  .prog{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .prog-barra{ width:54px; height:4px; border-radius:100px; background:var(--line); overflow:hidden; flex-shrink:0; }
+  .prog-barra i{ display:block; height:100%; background:var(--red); border-radius:100px; }
+  .prog b{ color:var(--ink); font-weight:700; }
+
+  /* ---------- Cartão de unidade (projeto ou solta) ---------- */
+  .u-lista{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+  .u-card{
+    position:relative; padding:12px 14px; border-radius:14px; background:var(--white); border:1px solid var(--line);
+    color:var(--ink); transition:box-shadow .14s ease, transform .14s ease;
+  }
+  .u-card.vencido{ border-left:4px solid var(--red); }
+  .u-card.porDecompor{ border-left:4px solid var(--mustard); background:color-mix(in srgb, var(--mustard) 8%, var(--white)); }
+  .u-card.fechada{ opacity:.62; }
+  .u-card.fechada .u-nome{ text-decoration:line-through; color:var(--muted); }
+  .u-card.realce{ box-shadow:0 0 0 2px var(--ink); }
+  .u-card.arrastando{ opacity:.35; }
+  .u-card.temp{ border-style:dashed; }
+  .u-card.largar-antes{ box-shadow:0 -3px 0 0 var(--red); }
+  .u-card.largar-depois{ box-shadow:0 3px 0 0 var(--red); }
+  .q-col.alvo{ box-shadow:inset 0 0 0 2px var(--red); }
+  .q-col:not([data-aceita]).alvo{ box-shadow:none; }
+  .u-topo{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .u-toggle{
+    width:22px; height:22px; flex-shrink:0; border:none; border-radius:6px; background:transparent; color:var(--muted); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; padding:0; transition:transform .15s ease;
+  }
+  .u-toggle:hover{ background:var(--dough); color:var(--ink); }
+  .u-toggle.aberto{ transform:rotate(90deg); }
+  .u-toggle.vazio{ visibility:hidden; }
+  .u-nome{ flex:1 1 200px; min-width:0; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; word-break:break-word; }
+  .u-card.solta .u-nome{ font-size:14px; font-weight:600; }
+  .u-meta{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:7px; }
+  .u-prox{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:9px 10px;
+    border-radius:10px; background:var(--dough); border:1px solid var(--line);
+  }
+  .u-prox .rotulo{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); flex-basis:100%; }
+  .u-prox .t{ flex:1 1 160px; min-width:0; font-size:13.5px; font-weight:600; }
+  .u-nota{ margin-top:9px; font-size:12.5px; color:var(--muted); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .u-sub{ margin-top:10px; padding-top:8px; border-top:1px dashed var(--line); }
+  .u-contador{
+    margin-top:8px; background:none; border:none; padding:0; font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    color:var(--muted); cursor:pointer; text-decoration:underline dotted var(--line); font-variant-numeric:tabular-nums;
+  }
+  .u-contador:hover{ color:var(--ink); }
+
+  /* ---------- Linha de ação (dentro do toggle e da página do projeto) ---------- */
+  .acao-linha{
+    position:relative; display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 4px 7px 2px; color:var(--ink); font-size:13.5px;
+  }
+  .acao-linha + .acao-linha{ border-top:1px solid var(--line); }
+  .acao-linha.fechada .t{ text-decoration:line-through; color:var(--muted); }
+  .acao-linha.fechada{ opacity:.62; }
+  .acao-linha.arrastando{ opacity:.35; }
+  .acao-linha.largar-antes{ box-shadow:0 -3px 0 0 var(--red); }
+  .acao-linha.largar-depois{ box-shadow:0 3px 0 0 var(--red); }
+  .acao-linha.temp{ opacity:.9; }
+  .acao-linha .t{ flex:1 1 180px; min-width:0; font-weight:600; word-break:break-word; }
+  .acao-linha .pills{ flex-shrink:0; }
+  .acao-corpo{ flex:1 1 200px; min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+  /* Check de concluir: é uma AÇÃO (abre a pergunta do tempo), não um interruptor. */
+  .chk{
+    width:20px; height:20px; flex-shrink:0; border:1.5px solid var(--line); border-radius:50%; background:var(--white); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; padding:0; color:transparent;
+  }
+  .chk:hover{ border-color:var(--red); color:var(--red); }
+  .chk.feito{ background:var(--ink); border-color:var(--ink); color:var(--white); cursor:default; }
+  .chk:disabled{ cursor:default; }
+
+  /* Cadeado das bloqueadas: o title diz de que ação depende (hover e toque longo). */
+  .cadeado{ display:inline-flex; align-items:center; gap:4px; color:var(--amber); font-size:11px; font-weight:700; flex-shrink:0; cursor:help; }
+
+  /* ---------- Grelha de propriedades da página do projeto ---------- */
+  .props{ display:grid; grid-template-columns:max-content 1fr; gap:7px 14px; align-items:center; margin-top:14px; }
+  .props dt{ font-size:11.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .props dd{ margin:0; font-size:13px; color:var(--ink); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .painel-nome-grande{ font-family:'Inter',sans-serif; font-size:24px; font-weight:700; line-height:1.2; }
+  .painel.pagina{ width:100vw; left:0; right:0; border-left:none; }
+  .painel.pagina .painel-conteudo{ max-width:900px; margin:0 auto; }
+  .concluidas-fold{ margin-top:14px; }
+
+  /* ---------- Bottom sheet (seletores ao toque) ---------- */
+  .sheet-fundo{ display:none; position:fixed; inset:0; z-index:70; background:rgba(20,20,20,.32); }
+  .sheet-fundo.on{ display:block; }
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:71; max-height:80vh; overflow-y:auto;
+    background:var(--white); border-top-left-radius:18px; border-top-right-radius:18px; border-top:1px solid var(--line);
+    padding:8px 14px calc(18px + env(safe-area-inset-bottom)); transform:translateY(100%); transition:transform .2s ease; visibility:hidden;
+  }
+  .sheet.on{ transform:none; visibility:visible; }
+  .sheet-puxador{ width:38px; height:4px; border-radius:100px; background:var(--line); margin:4px auto 10px; }
+  .sheet-t{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .sheet-corpo button, .sheet-corpo label{
+    display:flex; align-items:center; gap:10px; width:100%; padding:13px 10px; border:none; border-radius:10px; background:transparent;
+    font-family:'Inter',sans-serif; font-size:15px; font-weight:500; color:var(--ink); cursor:pointer; text-align:left;
+  }
+  .sheet-corpo button:hover{ background:var(--dough); }
+  .sheet-corpo button.perigo{ color:var(--red-ink); }
+  .sheet-corpo button.ativo::after{ content:'✓'; margin-left:auto; color:var(--muted); }
+  .sheet-corpo .sep{ height:1px; background:var(--line); margin:5px 2px; }
+  .sheet-corpo .hint{ padding:4px 10px 8px; font-size:12.5px; color:var(--muted); }
+  .sheet-corpo label input, .sheet-corpo input[type="date"], .sheet-corpo input[type="number"]{
+    width:90px; padding:9px 10px; border:1.5px solid var(--line); border-radius:10px; background:var(--dough); font:inherit; font-size:15px; color:var(--ink);
+  }
+  .sheet-corpo input[type="date"]{ width:auto; flex:1 1 140px; }
+
+  /* ---------- Toast de desfazer ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom)); transform:translate(-50%, 140%); z-index:90;
+    display:flex; align-items:center; gap:14px; max-width:min(520px, calc(100vw - 28px));
+    padding:11px 14px; border-radius:12px; background:var(--ink); color:var(--white);
+    font-family:'Inter',sans-serif; font-size:13.5px; box-shadow:0 14px 34px rgba(0,0,0,.24);
+    transition:transform .2s ease, opacity .2s ease; opacity:0; pointer-events:none;
+  }
+  .toast.on{ transform:translate(-50%, 0); opacity:1; pointer-events:auto; }
+  .toast span{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .toast button{
+    flex-shrink:0; padding:6px 13px; border:1.5px solid var(--white); border-radius:100px; background:transparent;
+    font:inherit; font-weight:700; color:var(--white); cursor:pointer;
+  }
+  .toast button:hover{ background:var(--white); color:var(--ink); }
+  .toast .atalho{ flex:0 0 auto; font-size:11px; opacity:.6; }
+  body.shell-touch .toast .atalho{ display:none; }
+  /* Com a barra de navegação do shell no fundo, o toast sobe para não ficar por baixo. */
+  body.shell-touch .toast{ bottom:calc(76px + env(safe-area-inset-bottom)); }
+
+  /* ---------- Anulados ---------- */
+  .anul-linha{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:11px 13px; background:var(--white);
+    border:1px solid var(--line); border-radius:12px; color:var(--ink); font-size:13.5px;
+  }
+  .anul-linha .t{ flex:1 1 200px; min-width:0; font-weight:600; text-decoration:line-through; color:var(--muted); word-break:break-word; }
+  .anul-linha .tipo{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .anul-linha .quando{ font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+  /* ---------- Grupos (Lista agrupada) ---------- */
+  .g-sec{ margin-top:22px; }
+  .g-head{ display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .g-head .u-toggle{ color:var(--muted); }
+  .g-titulo{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .g-head .n{ font-size:12px; color:var(--ink); font-variant-numeric:tabular-nums; font-weight:700; }
+  .g-head .ponto{ width:8px; height:8px; border-radius:50%; background:var(--g-cor); flex-shrink:0; }
+
+  /* A pega das unidades (ordenação manual de projetos) segue o mesmo padrão da pega
+     dos passos; ao toque o long-press precisa de não disparar a lupa nem a selecção. */
+  .l-grip{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .u-grip{ align-self:center; }
 </style>
 </head>
 <body class="shell-mobile">
@@ -398,7 +625,7 @@
         </div>
       </div>
 
-      <p class="page-subtitle">Próxima ação de cada projeto — nada sai daqui sem ser concluído ou anulado</p>
+      <p class="page-subtitle">Cada projeto é uma página, cada ação um sub-item — nada sai daqui sem ser concluído ou anulado</p>
 
       <div id="authErro">
         <div class="auth-box card glass-light">
@@ -416,11 +643,11 @@
   <div class="card glass-light">
     <p class="cap-titulo"><b>Novo projeto</b></p>
     <div class="cap-row">
-      <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo os passos" autocomplete="off">
+      <input type="text" id="projInput" placeholder="Nome do projeto — Enter cria e sugere logo as ações" autocomplete="off">
       <button type="button" class="btn-add" id="projCriarBtn">Criar projeto</button>
     </div>
     <textarea class="ctx-area" id="projContexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Opcional."></textarea>
-    <p class="cap-hint">Abre logo o painel do projeto com uma sugestão de passos a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
+    <p class="cap-hint">Abre logo a página do projeto com uma sugestão de ações a correr; editas, apagas, acrescentas e só gravas o que confirmares.</p>
 
     <div class="cap-solta">
       <p class="cap-titulo">Obrigação solta</p>
@@ -445,18 +672,37 @@
 
   <div id="conteudo" style="display:none;">
 
-    <!-- Toolbar de vista: Lista/Quadro · Agrupado por · procurar/filtrar/ordenar · + -->
+    <!-- Barra da vista: separadores · pesquisa · Filtro · Ordenar · Agrupar · + -->
     <div class="toolbar" id="toolbar">
-      <button type="button" class="tb-chip" id="tbVista" aria-haspopup="menu"><svg class="icon" width="14" height="14" id="tbVistaIcone"><use href="#i-list"/></svg><span id="tbVistaTxt">Lista</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
-      <button type="button" class="tb-chip" id="tbGrupo" aria-haspopup="menu"><span class="k">Agrupado por:</span><span id="tbGrupoTxt">projeto</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <div class="vista-tabs" role="tablist">
+        <button type="button" class="vista-tab ativo" data-vista="lista" role="tab"><svg class="icon" width="14" height="14"><use href="#i-list"/></svg>Lista</button>
+        <button type="button" class="vista-tab" data-vista="quadro" role="tab"><svg class="icon" width="14" height="14"><use href="#i-columns"/></svg>Quadro</button>
+        <button type="button" class="vista-tab" data-vista="anulados" role="tab"><svg class="icon" width="14" height="14"><use href="#i-trash-2"/></svg>Anulados <span class="n num" id="tabAnuladosN"></span></button>
+      </div>
       <button type="button" class="tb-ghost" id="tbProcurar" title="Procurar" aria-label="Procurar"><svg class="icon" width="16" height="16"><use href="#i-search"/></svg></button>
-      <button type="button" class="tb-ghost" id="tbFiltrar" title="Filtrar por local" aria-label="Filtrar por local"><svg class="icon" width="16" height="16"><use href="#i-filter"/></svg></button>
-      <button type="button" class="tb-ghost" id="tbOrdenar" title="Ordenar" aria-label="Ordenar" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-arrow-up-down"/></svg></button>
-      <button type="button" class="tb-mais" id="tbMais" title="Novo projeto / novo passo" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-plus"/></svg><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <button type="button" class="tb-chip" id="tbFiltrar" aria-haspopup="true"><svg class="icon" width="14" height="14"><use href="#i-filter"/></svg><span id="tbFiltrarTxt">Filtro</span></button>
+      <button type="button" class="tb-chip" id="tbOrdenar" aria-haspopup="menu"><svg class="icon" width="14" height="14"><use href="#i-arrow-up-down"/></svg><span class="k">Ordenar:</span><span id="tbOrdenarTxt">próximo prazo</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <button type="button" class="tb-chip" id="tbGrupo" aria-haspopup="menu"><span class="k">Agrupar:</span><span id="tbGrupoTxt">nenhum</span><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
+      <button type="button" class="tb-mais" id="tbMais" title="Novo projeto / nova obrigação" aria-haspopup="menu"><svg class="icon" width="16" height="16"><use href="#i-plus"/></svg><svg class="icon" width="12" height="12"><use href="#i-chevron-down"/></svg></button>
     </div>
     <div class="tb-procura" id="tbProcura">
-      <input type="search" id="procuraInput" placeholder="Procurar por título…" autocomplete="off">
+      <input type="search" id="procuraInput" placeholder="Procurar em títulos e contexto…" autocomplete="off">
       <span id="procuraNota"></span>
+    </div>
+
+    <!-- Filtros: Estado · Prazo · Local · Tipo. Nenhum chip ligado = tudo visível. -->
+    <div class="filtros-box" id="filtrosBox">
+      <div class="f-grupo" data-f="estado"><b>Estado</b></div>
+      <div class="f-grupo" data-f="prazo"><b>Prazo</b></div>
+      <div class="f-grupo" data-f="local"><b>Local</b></div>
+      <div class="f-grupo" data-f="tipo"><b>Tipo</b></div>
+      <div class="f-grupo"><b></b><button type="button" class="b" id="filtrosLimpar">Limpar filtros</button><span id="filtrosNota"></span></div>
+    </div>
+
+    <!-- REGRA DE CONFIANÇA: com filtro ou pesquisa ativos, o que fica de fora é SEMPRE contado. -->
+    <div class="faixa-esconde" id="faixaEsconde">
+      <span id="faixaEscondeTxt"></span>
+      <button type="button" id="faixaEscondeLimpar">Limpar</button>
     </div>
 
     <!-- Só aparece se a posição casar com um local de referência; aplicar o filtro é SEMPRE um clique. -->
@@ -464,71 +710,21 @@
       <span id="geoAvisoTexto"></span>
       <button type="button" class="b ok" id="geoAvisoBtn">Ver só estas</button>
     </div>
-    <div class="filtro-local" id="filtroLocal">
-      <span>Local:</span>
-      <button type="button" class="chip ativo" data-filtro-local="">Todos</button>
-      <button type="button" class="chip" data-filtro-local="loja">Loja</button>
-      <button type="button" class="chip" data-filtro-local="computador">Computador</button>
-      <button type="button" class="chip" data-filtro-local="rua">Rua</button>
-      <button type="button" class="chip" data-filtro-local="telefone">Telefone</button>
-      <span id="filtroLocalNota"></span>
-    </div>
 
     <!-- ===== Vista Lista (por omissão) ===== -->
-    <div id="vistaLista">
-      <div id="listaPorProjeto">
-        <div class="sec" id="secParados" style="display:none;">
-          <p class="sec-title">Parados há mais de 14 dias <span class="n" id="nParados"></span></p>
-          <p class="sec-sub">Projetos sem nenhum avanço registado há mais de duas semanas. Abre-os e conclui ou anula um passo.</p>
-          <div class="lista" id="listaParados"></div>
-        </div>
-
-        <div class="sec">
-          <p class="sec-title">Próxima ação por projeto <span class="n" id="nProjetos"></span></p>
-          <p class="sec-sub">Só o passo desbloqueado de menor ordem de cada projeto ativo. Clica no título para editar, no projeto para abrir o painel.</p>
-          <div class="lista" id="listaProjetos"></div>
-        </div>
-
-        <div class="sec" id="secBloqueados" style="display:none;">
-          <p class="sec-title">Projetos com todos os passos bloqueados <span class="n" id="nBloqueados"></span></p>
-          <p class="sec-sub">Todos os passos abertos dependem de outros ainda por concluir. Abre o projeto para desbloquear.</p>
-          <div class="lista" id="listaBloqueados"></div>
-        </div>
-
-        <div class="sec" id="secSemPassos" style="display:none;">
-          <p class="sec-title">Projetos sem passos abertos <span class="n" id="nSemPassos"></span></p>
-          <p class="sec-sub">Ou está concluído e falta marcá-lo, ou falta decompor. Nunca desaparece sozinho.</p>
-          <div class="lista" id="listaSemPassos"></div>
-        </div>
-
-        <div class="sec">
-          <p class="sec-title">Obrigações soltas <span class="n" id="nSoltas"></span></p>
-          <p class="sec-sub">Coisas avulsas, sem projeto. Passa o rato para ver a pega, o ⋯ e o + entre linhas.</p>
-          <div class="lista viva" id="listaSoltas"></div>
-        </div>
-      </div>
-
-      <!-- Agrupado por local / semana: uma secção por grupo, todas as abertas, nunca menos -->
-      <div id="listaAgrupada" style="display:none;"></div>
-    </div>
+    <div id="vistaLista"><div id="listaUnidades"></div></div>
 
     <!-- ===== Vista Quadro ===== -->
     <div id="vistaQuadro" style="display:none;">
-      <p class="sec-sub" id="quadroSub">Uma coluna por grupo. Arrasta a coluna para os lados para ver a seguinte; «+ Novo» cria no grupo.</p>
+      <p class="sec-sub" id="quadroSub"></p>
       <div class="quadro" id="quadro"></div>
     </div>
 
-    <details class="sec fold" id="secFechadas">
-      <summary id="sumFechadas">Obrigações e passos concluídos e anulados (0)</summary>
-      <p class="sec-sub">Histórico completo, sem limite. Nada aqui é apagado.</p>
-      <div class="lista" id="listaFechadas"></div>
-    </details>
-
-    <details class="sec fold" id="secProjFechados">
-      <summary id="sumProjFechados">Projetos concluídos e anulados (0)</summary>
-      <p class="sec-sub">Clica num projeto para ver os passos que teve.</p>
-      <div class="lista" id="listaProjFechados"></div>
-    </details>
+    <!-- ===== Vista Anulados ===== -->
+    <div id="vistaAnulados" style="display:none;">
+      <p class="sec-sub">Projetos, ações e obrigações soltas com <code>anulado</code>. Mais recentes primeiro. Restaurar repõe o estado aberto e guarda <code>restauradoEm</code> — o <code>anuladoEm</code> fica como histórico.</p>
+      <div class="lista" id="anuladosLista"></div>
+    </div>
 
     <!-- Locais de referência (mrnLocais/): coordenadas gravadas pelo Manel. Só distância
          entre coordenadas — sem mapas nem serviços externos. Apagar = anulado:true. -->
@@ -547,18 +743,22 @@
     </details>
   </div>
 
-  <!-- ===== Painel lateral de projeto (full-screen ao toque) ===== -->
+  <!-- ===== Página do projeto: painel à direita no desktop, ecrã inteiro sem hover ===== -->
   <div class="painel-fundo" id="painelFundo"></div>
   <aside class="painel" id="painel" aria-hidden="true" role="dialog" aria-label="Projeto">
+   <div class="painel-conteudo">
     <div class="painel-head">
-      <h2 class="painel-nome" id="projNome" data-edit="projNome" tabindex="0" title="Clica para editar o nome"></h2>
-      <span class="status" id="projEstado"></span>
+      <h2 class="painel-nome painel-nome-grande" id="projNome" data-edit="projNome" tabindex="0" title="Clica para editar o nome"></h2>
+      <button type="button" class="b icone" id="painelExpandir" title="Página inteira" aria-label="Página inteira"><svg class="icon" width="14" height="14"><use href="#i-maximize-2"/></svg></button>
       <button type="button" class="b icone" id="painelFechar" title="Fechar (Esc)" aria-label="Fechar"><svg class="icon" width="14" height="14"><use href="#i-x"/></svg></button>
     </div>
-    <p class="proj-sub" id="projSub"></p>
+
+    <!-- Grelha de propriedades ao estilo Notion: as editáveis são pills clicáveis. -->
+    <dl class="props" id="projProps"></dl>
+
     <div class="painel-acoes">
-      <button type="button" class="b ok" id="projSugerirBtn"><svg class="icon" width="14" height="14"><use href="#i-sparkles"/></svg> Sugerir passos</button>
-      <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="14" height="14"><use href="#i-plus"/></svg> Decompor</button>
+      <button type="button" class="b ok" id="projSugerirBtn"><svg class="icon" width="14" height="14"><use href="#i-sparkles"/></svg> Sugerir ações</button>
+      <button type="button" class="b" id="projDecomporBtn"><svg class="icon" width="16" height="16"><use href="#i-plus"/></svg> Decompor</button>
       <button type="button" class="b" id="projConcluirBtn">Concluir projeto</button>
       <button type="button" class="b perigo" id="projAnularBtn">Anular projeto</button>
     </div>
@@ -567,15 +767,15 @@
       <textarea class="ctx-area" id="ctxTexto" placeholder="Escreve tudo o que sabes sobre isto — o que já fizeste, o que te preocupa, o que falta decidir. Guarda sozinho."></textarea>
     </div>
     <div class="decompor-box" id="decomporBox">
-      <textarea id="decomporTexto" placeholder="Um passo por linha. Ficam com ordem sequencial a seguir aos passos existentes e a duração por omissão."></textarea>
+      <textarea id="decomporTexto" placeholder="Uma ação por linha. Ficam com ordem sequencial a seguir às existentes e a duração por omissão."></textarea>
       <div class="decompor-acoes">
-        <button type="button" class="btn-add" id="decomporCriar">Criar passos</button>
+        <button type="button" class="btn-add" id="decomporCriar">Criar ações</button>
         <button type="button" class="b" id="decomporCancelar">Cancelar</button>
         <span id="decomporInfo"></span>
       </div>
     </div>
     <!-- Sugestão automática: a resposta do modelo NUNCA é gravada directamente.
-         Vive aqui, editável, até «Criar N passos». -->
+         Vive aqui, editável, até «Criar N ações». -->
     <div class="sug-box" id="sugBox">
       <div class="sug-head" id="sugHead"></div>
       <div class="sug-erro" id="sugErro" style="display:none;"></div>
@@ -588,14 +788,14 @@
       </div>
       <div class="sug-lista" id="sugLista"></div>
       <div class="sug-acoes" id="sugAcoes">
-        <button type="button" class="btn-add" id="sugCriar">Criar passos</button>
+        <button type="button" class="btn-add" id="sugCriar">Criar ações</button>
         <button type="button" class="b" id="sugAdd"><svg class="icon" width="13" height="13"><use href="#i-plus"/></svg> Acrescentar linha</button>
         <button type="button" class="b" id="sugRepetir">Pedir outra sugestão</button>
         <button type="button" class="b" id="sugCancelar">Cancelar</button>
         <span id="sugInfo"></span>
       </div>
     </div>
-    <!-- Atualização incremental: o modelo propõe ALTERAÇÕES aos passos que faltam.
+    <!-- Atualização incremental: o modelo propõe ALTERAÇÕES às ações que faltam.
          Nada é gravado até «Aplicar»; cada alteração tem checkbox (ativa por omissão). -->
     <div class="sug-box" id="atzBox">
       <div class="sug-head" id="atzHead"></div>
@@ -610,10 +810,16 @@
     </div>
 
     <div class="sec">
-      <p class="sec-title">Passos <span class="n" id="nPassos"></span></p>
+      <p class="sec-title">Ações <span class="n" id="nPassos"></span></p>
       <p class="sec-sub">Arrasta pela pega ⋮⋮ para reordenar. Clica no título para editar; o + entre linhas insere a seguir.</p>
       <div class="lista viva" id="listaPassos"></div>
     </div>
+
+    <details class="fold concluidas-fold" id="foldConcluidas">
+      <summary id="sumConcluidas">Concluídas (0)</summary>
+      <div class="lista" id="listaConcluidas"></div>
+    </details>
+   </div>
   </aside>
 
   <div class="menu-pop" id="menuPop" role="menu"></div>
@@ -625,6 +831,21 @@
 </div>
 <div class="nav-overlay" id="navOverlay"></div>
 
+<!-- Seletor em bottom sheet: o MESMO conteúdo do menu flutuante, encaminhado para
+     aqui quando não há hover (body.shell-touch). Ver escolherDestino() no JS. -->
+<div class="sheet-fundo" id="sheetFundo"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="sheet-puxador"></div>
+  <div class="sheet-t" id="sheetT"></div>
+  <div class="sheet-corpo" id="sheetCorpo"></div>
+</div>
+
+<!-- Rede de segurança: 6 s para desfazer a última escrita, e Cmd/Ctrl+Z enquanto lá estiver. -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastTxt"></span>
+  <button type="button" id="toastBtn">Desfazer</button>
+  <span class="atalho">⌘Z</span>
+</div>
 <script>
   var firebaseConfig = {
     apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
@@ -704,43 +925,81 @@
   var db = firebase.database();
   var G = window.GiocoObrigacoes;
 
-  /* ESCRITAS (ver CLAUDE.md, nós obrigacoes/ e projetos/):
+  /* ESCRITAS (ver CLAUDE.md, nós obrigacoes/, projetos/ e obrigacoesVistas/):
      criar = push().set() do objeto completo — o ÚNICO set() no nó do registo;
      tudo o resto = update() por caminho no nó do registo ou set() numa folha.
-     NUNCA remove(): concluir e anular são estados/flags, e uma obrigação aberta
-     só sai da vista por ação explícita. */
+     remove() SÓ em folhas de campos opcionais (prazo, local, dependeDe) quando se
+     limpam — NUNCA num registo: concluir, anular e restaurar são estados/flags.
+
+     MODELO (Bloco 1 da UX Notion, Set/2026):
+       projetos/{id}        = uma PÁGINA (a unidade das vistas)
+       obrigacoes/{id} com projetoId = uma AÇÃO (sub-item dessa página)
+       obrigacoes/{id} sem projetoId = uma obrigação SOLTA, que nas vistas aparece
+                              ao nível dos projetos (um projeto de uma só ação).
+     Não houve migração de dados: as soltas continuam exactamente como estavam. */
   var obrigacoesRef = db.ref('obrigacoes');
   var projetosRef = db.ref('projetos');
+  var vistasRef = db.ref('obrigacoesVistas');
 
   var obrs = {};
   var projs = {};
   var obrsCarregadas = false, projsCarregados = false;
-  var projetoAberto = null;      // id do projeto no painel lateral
+  var projetoAberto = null;      // id do projeto na página lateral
   var concluirEmCurso = null;    // id da obrigação com a pergunta do tempo aberta
-  var prazoEmEdicao = null;      // id com o date input aberto
-  var duracaoEmEdicao = null;
-
-  /* ---------- Estado da UX (Set/2026, vista Lista/Quadro ao estilo Notion) ----------
-     vista: 'lista' (por omissão) | 'quadro'; grupo: 'projeto' | 'local' | 'semana';
-     ordenacao: 'prazo' (a regra do motor) | 'titulo' | 'recente'; procura: texto.
-     Nenhum destes esconde uma aberta sem contar: procura e filtro de local mostram
-     "N fora"; um agrupamento sem grupo cria a coluna/secção "Sem projeto"/"Sem local"/
-     "Sem prazo". edicaoAtiva suspende o re-render enquanto um título está a ser
-     escrito (o snapshot chega a cada escrita e destruiria o elemento com foco);
-     novoTemp é a linha nova ainda NÃO gravada — só existe no DOM até Enter/blur. */
-  var LS_VISTA = 'obrigacoes.vista', LS_GRUPO = 'obrigacoes.grupo';
-  var vista = lerLS(LS_VISTA, 'lista'); if (vista !== 'quadro') vista = 'lista';
-  var grupo = lerLS(LS_GRUPO, 'projeto'); if (['projeto', 'local', 'semana'].indexOf(grupo) < 0) grupo = 'projeto';
-  var ordenacao = 'prazo';
-  var procura = '';
-  var filtroLocal = '';
-  var edicaoAtiva = null;   // { tipo:'titulo'|'novo'|'projNome', id }
+  var edicaoAtiva = null;        // { tipo:'titulo'|'novo'|'projNome', id }
   var renderPendente = false;
-  var novoTemp = null;      // { projetoId, aposId, local, prazo, coluna }
-  function lerLS(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
-  function gravarLS(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var novoTemp = null;           // linha nova ainda NÃO gravada (só existe no DOM)
+  var procura = '';              // NUNCA persistida: um filtro esquecido esconde trabalho
+  var filtroLocalGeo = '';       // atalho do aviso de posição (escreve em filtros.local)
 
   var $ = function (id) { return document.getElementById(id); };
+  var VISTAS = ['lista', 'quadro', 'anulados'];
+  var vista = 'lista';
+
+  /* ---------- Configuração por vista (obrigacoesVistas/{vista}) ----------
+     filtro, ordenação, agrupamento e colapsos vivem no Firebase para ficarem
+     iguais no iPhone e no computador. A pesquisa NÃO se guarda. Escrita sempre
+     com update() no nó da vista; um grupo de filtro vazio some do nó (ausente =
+     sem filtro), que é exactamente o que queremos. */
+  function cfgDefault(v) {
+    return { filtros: { estado: {}, prazo: {}, local: {}, tipo: {} },
+             ordenacao: 'prazo', grupo: v === 'quadro' ? 'estado' : 'nenhum',
+             abertos: {}, gruposFechados: {} };
+  }
+  var cfgs = { lista: cfgDefault('lista'), quadro: cfgDefault('quadro'), anulados: cfgDefault('anulados') };
+  function cfg() { return cfgs[vista] || cfgs.lista; }
+  // Agrupar no Quadro é sempre por Estado ou por Prazo — «nenhum» não faz colunas.
+  function grupoEfetivo() {
+    var g = cfg().grupo;
+    if (vista === 'quadro' && g !== 'prazo') return 'estado';
+    return (['nenhum', 'estado', 'prazo'].indexOf(g) >= 0) ? g : 'nenhum';
+  }
+  var vistaSujaAte = 0;   // ignora o snapshot do nosso próprio update() enquanto assenta
+  var vistaTimer = null;
+  function guardarVista() {
+    var v = vista, c = cfg();
+    vistaSujaAte = Date.now() + 2500;
+    clearTimeout(vistaTimer);
+    vistaTimer = setTimeout(function () {
+      vistasRef.child(v).update({
+        filtros: c.filtros, ordenacao: c.ordenacao, grupo: c.grupo,
+        abertos: c.abertos, gruposFechados: c.gruposFechados
+      }).catch(function (e) { console.warn('Vista não guardada:', e); });
+    }, 350);
+  }
+  function objeto(v) { var o = {}; if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { if (v[k] === true) o[k] = true; }); return o; }
+  function aplicarVistasDoFirebase(val) {
+    VISTAS.forEach(function (v) {
+      var d = cfgDefault(v), g = (val && val[v]) || {};
+      var f = g.filtros || {};
+      cfgs[v] = {
+        filtros: { estado: objeto(f.estado), prazo: objeto(f.prazo), local: objeto(f.local), tipo: objeto(f.tipo) },
+        ordenacao: ['prazo', 'estado', 'horas', 'criado', 'manual'].indexOf(g.ordenacao) >= 0 ? g.ordenacao : d.ordenacao,
+        grupo: ['nenhum', 'estado', 'prazo'].indexOf(g.grupo) >= 0 ? g.grupo : d.grupo,
+        abertos: objeto(g.abertos), gruposFechados: objeto(g.gruposFechados)
+      };
+    });
+  }
 
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
@@ -758,25 +1017,76 @@
     var p = function (n) { return (n < 10 ? '0' : '') + n; };
     return p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
+  var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  // «Hoje», «Amanhã», o dia da semana se for nos próximos 7 dias, senão «12 out».
+  function rotuloPrazo(iso, hoje) {
+    if (!G.prazoValido(iso)) return '—';
+    var n = G.diasEntre(iso, hoje);           // > 0 = vencido, 0 = hoje, < 0 = futuro
+    if (n === null) return '—';
+    if (n === 0) return 'Hoje';
+    if (n === -1) return 'Amanhã';
+    var d = new Date(iso + 'T00:00:00');
+    if (n < -1 && n >= -7) return DIAS[d.getDay()];
+    return d.getDate() + ' ' + MESES[d.getMonth()];
+  }
+  function prazoAlerta(iso, hoje) {
+    var n = G.prazoValido(iso) ? G.diasEntre(iso, hoje) : null;
+    return n !== null && n >= 0;              // hoje ou vencido → cor de alerta
+  }
+  function somaDias(hoje, n) { var d = new Date(hoje + 'T00:00:00'); d.setDate(d.getDate() + n); return G.hojeISO(d); }
+  function proximaSegunda(hoje) { var d = new Date(hoje + 'T00:00:00'); var dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() + (7 - dow)); return G.hojeISO(d); }
+  function proximaSexta(hoje) { var d = new Date(hoje + 'T00:00:00'); var dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() + (4 - dow >= 0 ? 4 - dow : 11 - dow)); return G.hojeISO(d); }
+  function fimDaSemana(hoje) { var d = new Date(hoje + 'T00:00:00'); var dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() + (6 - dow)); return G.hojeISO(d); }
+
   function duracaoDefault() {
     var n = parseInt($('capDuracao').value, 10);
     return n > 0 ? n : G.DURACAO_DEFAULT;
   }
   function numOuNull(v) { var n = parseInt(v, 10); return n > 0 ? n : null; }
-  function projetoDe(obr) { return obr && obr.projetoId ? projs[obr.projetoId] : null; }
   function projetoAtivo(p) { return !!p && p.estado === 'ativo' && p.anulado !== true; }
+  function projetoVivo(p) { return !!p && p.anulado !== true; }
   function depsDe(obr) {
     var d = obr && obr.dependeDe;
     if (!d) return [];
     return Array.isArray(d) ? d.slice() : Object.keys(d).map(function (k) { return d[k]; });
   }
   function normTexto(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
-  function casaProcura(obr) { return !procura || normTexto(obr.titulo).indexOf(normTexto(procura)) >= 0; }
-  function comIds(mapa) { return Object.keys(mapa).map(function (id) { var o = Object.assign({}, mapa[id]); o.id = id; return o; }); }
+  function comIds(mapa) { return Object.keys(mapa).filter(function (id) { return !!mapa[id]; }).map(function (id) { var o = Object.assign({}, mapa[id]); o.id = id; return o; }); }
+  function erroEscrita(e) {
+    console.error('Falha ao gravar:', e);
+    alert('Falha ao gravar no Firebase: ' + (e && e.message ? e.message : e));
+  }
+
+  /* ==========================================================================
+     REDE DE SEGURANÇA — toast «Desfazer» (6 s) + Cmd/Ctrl+Z
+     Cada operação reversível regista aqui o que era ANTES; desfazer repõe
+     exactamente esse valor com update()/set() nas folhas, nunca com remove()
+     num registo. O toast é a única confirmação: não há alert nenhum.
+     ========================================================================== */
+  var desfazer = null, desfazerTimer = null;
+  function registarDesfazer(texto, reverter) {
+    desfazer = { reverter: reverter };
+    $('toastTxt').textContent = texto;
+    $('toast').classList.add('on');
+    clearTimeout(desfazerTimer);
+    desfazerTimer = setTimeout(esconderToast, 6000);
+  }
+  function esconderToast() { clearTimeout(desfazerTimer); $('toast').classList.remove('on'); desfazer = null; }
+  $('toastBtn').addEventListener('click', function () {
+    var d = desfazer; esconderToast();
+    if (d) Promise.resolve(d.reverter()).catch(erroEscrita);
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (String(ev.key).toLowerCase() !== 'z' || !(ev.metaKey || ev.ctrlKey) || ev.shiftKey) return;
+    if (!desfazer) return;
+    var t = ev.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    ev.preventDefault();
+    $('toastBtn').click();
+  });
 
   /* ---------- Escritas ---------- */
-  // extra (opcional): { dependeDe:[ids], sugerida:true, local, prazo } — só a confirmação de
-  // uma sugestão e o Duplicar os usam; a origem continua 'manual' porque foi o Manel a confirmar.
   function criarObrigacao(titulo, projetoId, ordem, duracao, extra) {
     var ref = obrigacoesRef.push();
     var reg = {
@@ -791,6 +1101,7 @@
       origem: 'manual',
       sugerida: (extra && extra.sugerida) ? true : null,
       local: (extra && extra.local) ? extra.local : null,
+      localManual: (extra && extra.localManual) ? true : null,
       criadoEm: agoraISO(),
       adiada: 0
     };
@@ -808,42 +1119,59 @@
   }
   function concluir(id, duracaoReal) {
     var o = obrs[id]; if (!o || !G.estaAberta(o)) return Promise.resolve();
+    var antes = { duracaoReal: o.duracaoReal === undefined ? null : o.duracaoReal };
     return obrigacoesRef.child(id).update({ estado: 'concluida', concluidaEm: agoraISO(), duracaoReal: duracaoReal })
-      .then(function () { return marcarAvanco(o.projetoId); });
-  }
-  function adiar(id) {
-    var o = obrs[id]; if (!o) return;
-    obrigacoesRef.child(id).child('adiada').set((o.adiada || 0) + 1).catch(erroEscrita);
+      .then(function () { return marcarAvanco(o.projetoId); })
+      .then(function () {
+        registarDesfazer('Concluída «' + o.titulo + '»', function () {
+          return obrigacoesRef.child(id).update({ estado: 'aberta', concluidaEm: null, duracaoReal: antes.duracaoReal });
+        });
+      });
   }
   function anular(id) {
     var o = obrs[id]; if (!o) return;
-    var oque = o.projetoId ? 'o passo' : 'a obrigação';
-    if (!confirm('Anular ' + oque + ' «' + o.titulo + '»? Fica ' + (o.projetoId ? 'registado como anulado' : 'registada como anulada') + ' (nunca se apaga).')) return;
-    obrigacoesRef.child(id).update({ estado: 'anulada', anulado: true, anuladoEm: agoraISO() }).catch(erroEscrita);
+    var oque = o.projetoId ? 'a ação' : 'a obrigação';
+    if (!confirm('Anular ' + oque + ' «' + o.titulo + '»? Fica registada como anulada (nunca se apaga) e aparece no separador Anulados.')) return;
+    var antes = { estado: o.estado, anulado: o.anulado === true, anuladoEm: o.anuladoEm || null };
+    obrigacoesRef.child(id).update({ estado: 'anulada', anulado: true, anuladoEm: agoraISO() })
+      .then(function () {
+        registarDesfazer('Anulada «' + o.titulo + '»', function () {
+          return obrigacoesRef.child(id).update({ estado: antes.estado, anulado: antes.anulado, anuladoEm: antes.anuladoEm });
+        });
+      }).catch(erroEscrita);
   }
-  function setFolha(id, campo, valor) {
-    obrigacoesRef.child(id).child(campo).set(valor).catch(erroEscrita);
+  function adiar(id) {
+    var o = obrs[id]; if (!o) return;
+    var antes = o.adiada || 0;
+    obrigacoesRef.child(id).child('adiada').set(antes + 1)
+      .then(function () {
+        registarDesfazer('Adiada «' + o.titulo + '»', function () { return obrigacoesRef.child(id).child('adiada').set(antes); });
+      }).catch(erroEscrita);
   }
-  function erroEscrita(e) {
-    console.error('Falha ao gravar:', e);
-    alert('Falha ao gravar no Firebase: ' + (e && e.message ? e.message : e));
+  /* Folha de campo opcional: gravar = set(), limpar = remove() SÓ nessa folha.
+     O desfazer repõe o valor exacto que lá estava (ou volta a limpar). */
+  function gravarFolha(ref, campo, valor, texto) {
+    var folha = ref.child(campo);
+    return folha.once('value').then(function (s) {
+      var antes = s.exists() ? s.val() : null;
+      var p = (valor === null || valor === undefined || valor === '') ? folha.remove() : folha.set(valor);
+      return p.then(function () {
+        if (texto) registarDesfazer(texto, function () {
+          return (antes === null) ? folha.remove() : folha.set(antes);
+        });
+      });
+    }).catch(erroEscrita);
   }
-  // Título / nome editados no sítio: um update() só com esse campo no registo.
-  function gravarTitulo(id, titulo) {
-    return obrigacoesRef.child(id).update({ titulo: titulo });
-  }
-  function gravarNomeProjeto(pid, nome) {
-    return projetosRef.child(pid).update({ nome: nome });
-  }
+  function gravarTitulo(id, titulo) { return obrigacoesRef.child(id).update({ titulo: titulo }); }
+  function gravarNomeProjeto(pid, nome) { return projetosRef.child(pid).update({ nome: nome }); }
 
   function maxOrdem(pid) {
     var m = 0;
     G.passosDoProjeto(pid, obrs).forEach(function (o) { if (typeof o.ordem === 'number' && o.ordem > m) m = o.ordem; });
     return m;
   }
-  // Ordem 1..n para a lista de ids dada (todos os passos do projeto, abertos e fechados),
-  // um set() na folha `ordem` só onde muda. É também o backfill: um passo sem ordem
-  // numérica ganha aqui a posição em que estava a ser lido.
+  // Ordem 1..n para a lista de ids dada, um set() na folha `ordem` só onde muda.
+  // É também o backfill: uma ação sem ordem numérica ganha aqui a posição em que estava.
   function renumerar(pid, ids) {
     var escritas = [];
     ids.forEach(function (id, i) {
@@ -852,7 +1180,6 @@
     });
     return Promise.all(escritas);
   }
-  // Insere um passo novo a seguir a `aposId` (ou no fim) e renumera os seguintes.
   function criarPassoApos(pid, aposId, titulo, duracao, extra) {
     var ids = G.passosDoProjeto(pid, obrs).map(function (o) { return o.id; });
     var k = aposId ? ids.indexOf(aposId) + 1 : ids.length;
@@ -869,11 +1196,54 @@
   }
   function duplicar(id) {
     var o = obrs[id]; if (!o) return;
-    var extra = { local: o.local || null, prazo: o.prazo || null };
+    var extra = { local: o.local || null, prazo: o.prazo || null, localManual: o.localManual === true };
     var p = o.projetoId && projetoAtivo(projs[o.projetoId])
       ? criarPassoApos(o.projetoId, id, o.titulo, o.duracaoPrevista, extra)
       : criarObrigacao(o.titulo, null, null, o.duracaoPrevista, extra);
-    p.catch(erroEscrita);
+    p.then(function (novo) {
+      registarDesfazer('Duplicada «' + o.titulo + '»', function () {
+        return obrigacoesRef.child(novo).update({ estado: 'anulada', anulado: true, anuladoEm: agoraISO() });
+      });
+    }).catch(erroEscrita);
+  }
+
+  /* CONVERTER UMA SOLTA EM PROJETO: cria projetos/{novoId} com o título e grava
+     projetoId + ordem na obrigação com update() no caminho dela. A obrigação
+     passa a ser a primeira AÇÃO da página nova; nada é apagado. */
+  function converterEmProjeto(id) {
+    var o = obrs[id]; if (!o || o.projetoId) return;
+    criarProjeto(o.titulo, null).then(function (pid) {
+      return obrigacoesRef.child(id).update({ projetoId: pid, ordem: 1 }).then(function () {
+        registarDesfazer('«' + o.titulo + '» convertida em projeto', function () {
+          return obrigacoesRef.child(id).update({ projetoId: null, ordem: null })
+            .then(function () { return projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agoraISO() }); });
+        });
+        abrirProjeto(pid);
+      });
+    }).catch(erroEscrita);
+  }
+
+  /* RESTAURAR (separador Anulados): anulado:false + restauradoEm, mantendo o
+     anuladoEm como histórico. Nunca remove() e nunca apaga o rasto. */
+  function restaurarObrigacao(id) {
+    var o = obrs[id]; if (!o) return Promise.resolve();
+    return obrigacoesRef.child(id).update({ estado: 'aberta', anulado: false, restauradoEm: agoraISO() });
+  }
+  function restaurarProjeto(pid) {
+    var p = projs[pid]; if (!p) return Promise.resolve();
+    return projetosRef.child(pid).update({ estado: 'ativo', anulado: false, restauradoEm: agoraISO() });
+  }
+  // Ações anuladas NA MESMA cascata: anuladoPorProjeto e o mesmo anuladoEm ± 5 s.
+  function cascataDoProjeto(pid) {
+    var p = projs[pid]; if (!p || !p.anuladoEm) return [];
+    var t = new Date(p.anuladoEm).getTime();
+    if (!isFinite(t)) return [];
+    return comIds(obrs).filter(function (o) {
+      if (o.projetoId !== pid || o.anulado !== true) return false;
+      if (o.anuladoPorProjeto !== true) return false;
+      var to = new Date(o.anuladoEm || '').getTime();
+      return isFinite(to) && Math.abs(to - t) <= 5000;
+    });
   }
 
   /* ---------- Captura ---------- */
@@ -894,19 +1264,25 @@
     seq.then(function () { classificarLocalEmFundo(criadas); }).catch(erroEscrita);
     input.focus();
   }
+  /* O Gemini pré-preenche o `local` em segundo plano. NUNCA escreve por cima de
+     uma escolha do Manel: a escrita é uma TRANSACTION na folha obrigacoes/{id}/local
+     que aborta se a folha já tiver valor, e o localManual (folha irmã, lida do
+     snapshot vivo) aborta também. Sem chave, sem rede, quota ou JSON estranho
+     fica null e NÃO se mostra erro nenhum — só console.warn. */
   function classificarLocalEmFundo(criadas) {
     if (!S || !criadas.length || !S.temChave()) return;
     S.classificarLocal(criadas.map(function (c) { return c.titulo; })).then(function (r) {
       criadas.forEach(function (c, i) {
         var l = r.locais[i];
-        var o = obrs[c.id];
-        if (!l || !o || o.localManual === true || o.local) return;
-        obrigacoesRef.child(c.id).update({ local: l }).catch(function (e) { console.warn('local não gravado:', e); });
+        if (!l) return;
+        obrigacoesRef.child(c.id).child('local').transaction(function (atual) {
+          if (atual) return;                                        // já tem local → aborta
+          var o = obrs[c.id];
+          if (!o || o.localManual === true) return;                 // escolha do Manel → aborta
+          return l;
+        }).catch(function (e) { console.warn('local não gravado:', e); });
       });
     }).catch(function (e) { console.warn('Classificação de local falhou (fica null):', e && e.motivo ? e.motivo : e); });
-  }
-  function gravarLocalManual(id, local) {
-    obrigacoesRef.child(id).update({ local: local || null, localManual: true }).catch(erroEscrita);
   }
   function novoProjeto() {
     var input = $('projInput');
@@ -925,408 +1301,774 @@
       .then(function () { $('projCriarBtn').disabled = false; });
   }
   $('projCriarBtn').addEventListener('click', novoProjeto);
-  $('projInput').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') { ev.preventDefault(); novoProjeto(); }
-  });
+  $('projInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); novoProjeto(); } });
   $('capBtn').addEventListener('click', function () { capturar(); });
-  $('capInput').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') { ev.preventDefault(); capturar(); }
-  });
+  $('capInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); capturar(); } });
   $('capInput').addEventListener('paste', function (ev) {
     var txt = ev.clipboardData && ev.clipboardData.getData('text');
     if (!txt || txt.indexOf('\n') < 0) return;
     ev.preventDefault();
     capturar(linhasDe(txt));
   });
-  $('capDuracao').addEventListener('change', function () {
-    if (!(parseInt(this.value, 10) > 0)) this.value = G.DURACAO_DEFAULT;
-  });
+  $('capDuracao').addEventListener('change', function () { if (!(parseInt(this.value, 10) > 0)) this.value = G.DURACAO_DEFAULT; });
 
-  /* ---------- Render: peças de linha ---------- */
-  function metaPrazo(obr, hoje) {
-    if (!obr.prazo) return '';
-    var n = G.diasEntre(obr.prazo, hoje);
-    var cls = n === null ? '' : n > 0 ? 'prazo-late' : n === 0 ? 'prazo-hoje' : '';
-    var txt = 'Prazo ' + fmtData(obr.prazo);
-    if (n !== null && n > 0) txt += ' · vencido há ' + n + (n === 1 ? ' dia' : ' dias');
-    else if (n === 0) txt += ' · hoje';
-    return '<span class="' + cls + '">' + txt + '</span>';
+  /* ==========================================================================
+     MENU / BOTTOM SHEET — o MESMO conteúdo, dois destinos.
+     O critério é o HOVER (body.shell-touch, posto pelo gioco-shell.js), nunca a
+     largura: com rato é um popover ancorado, ao toque é uma folha do fundo.
+     ========================================================================== */
+  var menuAncora = null;
+  function aoToque() { return document.body.classList.contains('shell-touch'); }
+  function htmlItens(itens, cls) {
+    return itens.map(function (it, i) {
+      if (it.sep) return '<div class="sep"></div>';
+      if (it.html) return it.html;
+      return '<button type="button" class="' + (it.perigo ? 'perigo' : '') + (it.ativo ? ' ativo' : '') + (cls || '') + '" data-menu-i="' + i + '">' +
+        (it.icone ? icone(it.icone, 14) : '') + escapeHtml(it.txt) + '</button>';
+    }).join('');
   }
-  function metaParado(dias) {
-    if (dias === null || dias === undefined) return '';
-    var muito = dias > G.LIMITE_PARADO_DIAS;
-    var txt = dias === 0 ? 'com avanço hoje' : 'parado há ' + dias + (dias === 1 ? ' dia' : ' dias');
-    return '<span class="parado' + (muito ? ' muito' : '') + '">' + txt + '</span>';
+  function abrirMenu(ancora, itens, titulo) {
+    fecharSheet();
+    if (aoToque()) { abrirSheet(itens, titulo); return; }
+    var m = $('menuPop');
+    m.innerHTML = htmlItens(itens);
+    m.classList.add('on');
+    if (menuAncora) menuAncora.classList.remove('on');
+    menuAncora = ancora; if (ancora) ancora.classList.add('on');
+    var r = ancora.getBoundingClientRect();
+    var w = m.offsetWidth, h = m.offsetHeight;
+    var left = r.left + window.scrollX, top = r.bottom + 6 + window.scrollY;
+    if (r.left + w > window.innerWidth - 8) left = Math.max(8, r.right - w) + window.scrollX;
+    if (r.bottom + 6 + h > window.innerHeight - 8) top = Math.max(8 + window.scrollY, r.top - h - 6 + window.scrollY);
+    // Dentro do painel (fixed) o menu tem de ser fixed também, senão fica preso ao scroll.
+    var noPainel = !!ancora.closest('#painel');
+    m.style.position = noPainel ? 'fixed' : 'absolute';
+    m.style.left = (noPainel ? left - window.scrollX : left) + 'px';
+    m.style.top = (noPainel ? top - window.scrollY : top) + 'px';
+    m._itens = itens;
+    var inp = m.querySelector('input'); if (inp) { inp.focus(); if (inp.select) inp.select(); }
   }
-  function classePrazo(obr, hoje) {
-    var g = G.grupoPrazo(obr, hoje);
-    if (g !== 0) return '';
-    return G.diasEntre(obr.prazo, hoje) > 0 ? 'vencida' : 'hoje-prazo';
+  function fecharMenu() {
+    var m = $('menuPop'); m.classList.remove('on'); m.innerHTML = ''; m._itens = null;
+    if (menuAncora) { menuAncora.classList.remove('on'); menuAncora = null; }
+    fecharSheet();
   }
-  function gripHtml() { return '<button type="button" class="l-grip" draggable="true" title="Arrastar para reordenar" aria-label="Arrastar"><svg class="icon" width="14" height="14"><use href="#i-grip-vertical"/></svg></button>'; }
-  function maisHtml() { return '<button type="button" class="l-mais" data-acao="menu" title="Mais opções" aria-label="Mais opções"><svg class="icon" width="16" height="16"><use href="#i-more-horizontal"/></svg></button>'; }
+  function abrirSheet(itens, titulo) {
+    var c = $('sheetCorpo');
+    c.innerHTML = htmlItens(itens);
+    c._itens = itens;
+    $('sheetT').textContent = titulo || '';
+    $('sheet').classList.add('on'); $('sheet').setAttribute('aria-hidden', 'false');
+    $('sheetFundo').classList.add('on');
+  }
+  function fecharSheet() {
+    $('sheet').classList.remove('on'); $('sheet').setAttribute('aria-hidden', 'true');
+    $('sheetFundo').classList.remove('on');
+    $('sheetCorpo').innerHTML = ''; $('sheetCorpo')._itens = null;
+  }
+  function menuAberto() { return $('menuPop').classList.contains('on') || $('sheet').classList.contains('on'); }
+  function cliqueEmMenu(ev, raiz) {
+    var b = ev.target.closest('[data-menu-i]');
+    if (b) { var it = raiz._itens[parseInt(b.dataset.menuI, 10)]; fecharMenu(); if (it && it.acao) it.acao(); return true; }
+    var ok = ev.target.closest('[data-menu-ok]');
+    if (ok) {
+      var inp = raiz.querySelector('[data-menu-campo]');
+      var v = inp ? inp.value : '';
+      var acao = raiz._acaoCampo;
+      fecharMenu();
+      if (acao) acao(v);
+      return true;
+    }
+    return false;
+  }
+  $('menuPop').addEventListener('click', function (ev) { cliqueEmMenu(ev, $('menuPop')); });
+  $('sheetCorpo').addEventListener('click', function (ev) { cliqueEmMenu(ev, $('sheetCorpo')); });
+  $('sheetFundo').addEventListener('click', fecharSheet);
+  function teclaMenu(ev, raiz) {
+    if (ev.key === 'Escape') { ev.stopPropagation(); fecharMenu(); return; }
+    if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.menuCampo !== undefined) {
+      ev.preventDefault();
+      var ok = raiz.querySelector('[data-menu-ok]'); if (ok) ok.click();
+    }
+  }
+  $('menuPop').addEventListener('keydown', function (ev) { teclaMenu(ev, $('menuPop')); });
+  $('sheetCorpo').addEventListener('keydown', function (ev) { teclaMenu(ev, $('sheetCorpo')); });
+  document.addEventListener('pointerdown', function (ev) {
+    if (!$('menuPop').classList.contains('on')) return;
+    if (ev.target.closest('#menuPop')) return;
+    if (menuAncora && ev.target.closest('.l-mais, .tb-chip, .tb-ghost, .tb-mais, .pill, .u-toggle') === menuAncora) return;
+    fecharMenu();
+  }, true);
+
+  /* ==========================================================================
+     PILLS DE PROPRIEDADES — duração, prazo e local, na ação e no projeto.
+     Gravam com set()/remove() na FOLHA do campo (ver gravarFolha) e cada
+     alteração deixa um «Desfazer» de 6 s.
+     ========================================================================== */
+  var ICONE_LOCAL = { loja: 'store', computador: 'monitor', rua: 'map-pin', telefone: 'phone' };
+
+  function pillDuracao(o) {
+    return '<button type="button" class="pill num" data-pill="duracao" data-alvo="' + escapeHtml(o.id) + '" title="Duração prevista">' +
+      icone('clock', 12) + G.fmtDuracaoMin(o.duracaoPrevista || G.DURACAO_DEFAULT) + '</button>';
+  }
+  function pillPrazo(alvoTipo, alvoId, prazo, hoje, editavel) {
+    var tem = G.prazoValido(prazo);
+    var cls = 'pill' + (tem ? (prazoAlerta(prazo, hoje) ? ' alerta' : '') : ' vazia');
+    var txt = tem ? rotuloPrazo(prazo, hoje) : '<span class="rot">+ Prazo</span>';
+    if (!editavel) return tem ? '<span class="pill estatica' + (prazoAlerta(prazo, hoje) ? ' alerta' : '') + '">' + icone('calendar', 12) + rotuloPrazo(prazo, hoje) + '</span>' : '';
+    return '<button type="button" class="' + cls + '" data-pill="prazo" data-tipo="' + alvoTipo + '" data-alvo="' + escapeHtml(alvoId) + '" title="' + (tem ? 'Prazo ' + fmtData(prazo) : 'Definir prazo') + '">' +
+      icone('calendar', 12) + txt + '</button>';
+  }
+  function pillLocal(o) {
+    var tem = o.local && G.LOCAIS.indexOf(o.local) >= 0;
+    var cls = 'pill' + (tem ? '' : ' vazia');
+    var txt = tem ? G.ROTULO_LOCAL[o.local] : '<span class="rot">+ Local</span>';
+    return '<button type="button" class="' + cls + '" data-pill="local" data-alvo="' + escapeHtml(o.id) + '" title="Onde se faz' + (o.localManual === true ? ' (escolhido à mão)' : '') + '">' +
+      icone(tem ? ICONE_LOCAL[o.local] : 'map-pin', 12) + txt + '</button>';
+  }
+  function pillsAcao(o, hoje, editavel) {
+    if (!editavel) {
+      var p = [];
+      p.push('<span class="pill estatica num">' + icone('clock', 12) + G.fmtDuracaoMin(o.duracaoPrevista || G.DURACAO_DEFAULT) + '</span>');
+      if (o.duracaoReal) p.push('<span class="pill estatica num" title="Duração real">' + o.duracaoReal + ' min reais</span>');
+      if (o.local && G.ROTULO_LOCAL[o.local]) p.push('<span class="pill estatica">' + icone(ICONE_LOCAL[o.local], 12) + G.ROTULO_LOCAL[o.local] + '</span>');
+      return '<span class="pills">' + p.join('') + '</span>';
+    }
+    return '<span class="pills">' + pillDuracao(o) + pillPrazo('obr', o.id, o.prazo, hoje, true) + pillLocal(o) +
+      (o.adiada > 0 ? '<span class="pill estatica aviso num" title="Vezes que foi adiada">adiada ' + o.adiada + '×</span>' : '') + '</span>';
+  }
+
+  function seletorDuracao(btn, id) {
+    var o = obrs[id]; if (!o) return;
+    var atual = o.duracaoPrevista || G.DURACAO_DEFAULT;
+    var itens = [15, 30, 45, 60, 90, 120].map(function (n) {
+      return { txt: G.fmtDuracaoMin(n), ativo: atual === n, acao: function () { porDuracao(id, n); } };
+    });
+    itens.push({ sep: true });
+    itens.push({ html: '<label>' + icone('clock', 14) + '<input type="number" min="1" step="5" value="' + escapeHtml(atual) + '" data-menu-campo aria-label="Duração prevista em minutos"> min <button type="button" class="b" data-menu-ok>OK</button></label>' });
+    abrirMenu(btn, itens, 'Duração prevista');
+    var raiz = aoToque() ? $('sheetCorpo') : $('menuPop');
+    raiz._acaoCampo = function (v) { var n = numOuNull(v); if (n) porDuracao(id, n); };
+  }
+  function porDuracao(id, n) {
+    var o = obrs[id]; if (!o) return;
+    gravarFolha(obrigacoesRef.child(id), 'duracaoPrevista', n, 'Duração de «' + o.titulo + '» → ' + G.fmtDuracaoMin(n));
+  }
+  function seletorPrazo(btn, tipo, alvoId) {
+    var hoje = G.hojeISO();
+    var ref = tipo === 'proj' ? projetosRef.child(alvoId) : obrigacoesRef.child(alvoId);
+    var reg = tipo === 'proj' ? projs[alvoId] : obrs[alvoId];
+    if (!reg) return;
+    var nome = tipo === 'proj' ? reg.nome : reg.titulo;
+    var por = function (iso) { gravarFolha(ref, 'prazo', iso, iso ? 'Prazo de «' + nome + '» → ' + rotuloPrazo(iso, hoje) : 'Prazo de «' + nome + '» removido'); };
+    var itens = [
+      { txt: 'Hoje', icone: 'calendar', ativo: reg.prazo === hoje, acao: function () { por(hoje); } },
+      { txt: 'Amanhã', icone: 'calendar', ativo: reg.prazo === somaDias(hoje, 1), acao: function () { por(somaDias(hoje, 1)); } },
+      { txt: 'Próxima segunda', icone: 'calendar', ativo: reg.prazo === proximaSegunda(hoje), acao: function () { por(proximaSegunda(hoje)); } },
+      { sep: true },
+      { html: '<label>' + icone('calendar', 14) + '<input type="date" value="' + escapeHtml(G.prazoValido(reg.prazo) ? reg.prazo : '') + '" data-menu-campo aria-label="Data do prazo"><button type="button" class="b" data-menu-ok>OK</button></label>' }
+    ];
+    if (G.prazoValido(reg.prazo)) { itens.push({ sep: true }); itens.push({ txt: 'Sem prazo', icone: 'x', perigo: true, acao: function () { por(null); } }); }
+    abrirMenu(btn, itens, tipo === 'proj' ? 'Prazo do projeto' : 'Prazo da ação');
+    var raiz = aoToque() ? $('sheetCorpo') : $('menuPop');
+    raiz._acaoCampo = function (v) { por(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null); };
+  }
+  /* Local escolhido à MÃO — definir ou limpar — grava sempre localManual:true:
+     a partir daí a classificação automática do Gemini nunca lhe toca. */
+  function seletorLocal(btn, id) {
+    var o = obrs[id]; if (!o) return;
+    var por = function (l) {
+      var folha = obrigacoesRef.child(id).child('local');
+      var antes = o.local || null;
+      var p = l ? folha.set(l) : folha.remove();
+      p.then(function () { return obrigacoesRef.child(id).child('localManual').set(true); })
+        .then(function () {
+          registarDesfazer('Local de «' + o.titulo + '» → ' + (l ? G.ROTULO_LOCAL[l] : 'sem local'), function () {
+            return (antes ? folha.set(antes) : folha.remove());
+          });
+        }).catch(erroEscrita);
+    };
+    var itens = G.LOCAIS.map(function (l) {
+      return { txt: G.ROTULO_LOCAL[l], icone: ICONE_LOCAL[l], ativo: o.local === l, acao: function () { por(l); } };
+    });
+    if (o.local) { itens.push({ sep: true }); itens.push({ txt: 'Sem local', icone: 'x', acao: function () { por(null); } }); }
+    abrirMenu(btn, itens, 'Onde se faz');
+  }
+
+  /* ==========================================================================
+     UNIDADES — o que as vistas mostram: projetos (páginas) e obrigações soltas.
+     Uma ação só aparece dentro da sua unidade; uma solta é uma unidade de uma
+     ação. Um passo de um projeto ANULADO ou apagado volta a contar como solta
+     (o motor nunca esconde uma aberta).
+     ========================================================================== */
+  function unidades(hoje) {
+    var out = [];
+    Object.keys(projs).forEach(function (pid) {
+      var p = projs[pid];
+      if (!projetoVivo(p)) return;
+      var proj = Object.assign({}, p); proj.id = pid;
+      out.push({ tipo: 'projeto', id: 'p:' + pid, projetoId: pid, projeto: proj, nome: p.nome || '',
+                 calc: G.calculosProjeto(proj, obrs, hoje), criadoEm: p.criadoEm || '',
+                 ordemManual: typeof p.ordem === 'number' ? p.ordem : null, contexto: p.contexto || '',
+                 diasParado: G.diasParado(proj, hoje) });
+    });
+    comIds(obrs).forEach(function (o) {
+      if (o.anulado === true) return;
+      if (o.projetoId && projetoVivo(projs[o.projetoId])) return;    // é uma AÇÃO de uma página
+      out.push({ tipo: 'solta', id: 'o:' + o.id, obrId: o.id, obr: o, nome: o.titulo || '',
+                 calc: G.calculosSolta(o, hoje), criadoEm: o.criadoEm || '', ordemManual: null,
+                 contexto: '', diasParado: G.diasEntre(o.criadoEm, hoje) });
+    });
+    return out;
+  }
+  function acoesDaUnidade(u) { return u.tipo === 'projeto' ? u.calc.passos : (u.obr ? [u.obr] : []); }
+
+  /* ---------- Filtros ---------- */
+  var F_PRAZO = [['vencido', 'Vencido'], ['hoje', 'Hoje'], ['semana', 'Esta semana'], ['sem', 'Sem prazo']];
+  var F_TIPO = [['projeto', 'Projetos'], ['solta', 'Soltas']];
+  function chavePrazo(iso, hoje) {
+    if (!G.prazoValido(iso)) return 'sem';
+    var n = G.diasEntre(iso, hoje);
+    if (n === null) return 'sem';
+    if (n > 0) return 'vencido';
+    if (n === 0) return 'hoje';
+    return iso <= fimDaSemana(hoje) ? 'semana' : 'tarde';
+  }
+  function algum(obj) { return Object.keys(obj || {}).length > 0; }
+  function casaFiltros(u, hoje) {
+    var f = cfg().filtros;
+    if (algum(f.tipo) && !f.tipo[u.tipo]) return false;
+    if (algum(f.estado) && !f.estado[u.calc.estado]) return false;
+    if (algum(f.prazo) && !f.prazo[chavePrazo(u.calc.proximoPrazo, hoje)]) return false;
+    if (algum(f.local)) {
+      var sel = Object.keys(f.local);
+      // Aplica-se às AÇÕES ABERTAS; uma obrigação sem local aparece SEMPRE
+      // (G.casaLocal), e uma unidade sem ações abertas nunca é escondida por local.
+      if (u.calc.abertas.length && !u.calc.abertas.some(function (o) {
+        return sel.some(function (l) { return G.casaLocal(o, l); });
+      })) return false;
+    }
+    return true;
+  }
+  function acaoCasaProcura(o) { return !procura || normTexto(o.titulo).indexOf(normTexto(procura)) >= 0; }
+  function casaProcura(u) {
+    if (!procura) return true;
+    var q = normTexto(procura);
+    if (normTexto(u.nome).indexOf(q) >= 0) return true;
+    if (normTexto(u.contexto).indexOf(q) >= 0) return true;
+    return acoesDaUnidade(u).some(acaoCasaProcura);
+  }
+  function filtrar(us, hoje) {
+    var vis = [], foraP = 0, foraS = 0;
+    us.forEach(function (u) {
+      if (casaFiltros(u, hoje) && casaProcura(u)) vis.push(u);
+      else if (u.tipo === 'projeto') foraP++; else foraS++;
+    });
+    return { vis: vis, foraProjetos: foraP, foraSoltas: foraS };
+  }
+
+  /* ---------- Ordenação (concluídas SEMPRE no fim) ---------- */
+  function ordenarUnidades(us, hoje) {
+    var ord = cfg().ordenacao;
+    var fechada = function (u) { return u.calc.estado === 'concluido' ? 1 : 0; };
+    var porPrazo = function (a, b) {
+      var pa = a.calc.proximoPrazo, pb = b.calc.proximoPrazo;
+      if (!pa && !pb) return (b.diasParado || 0) - (a.diasParado || 0);
+      if (!pa) return 1;
+      if (!pb) return -1;
+      return pa < pb ? -1 : pa > pb ? 1 : 0;
+    };
+    return us.slice().sort(function (a, b) {
+      var fa = fechada(a), fb = fechada(b);
+      if (fa !== fb) return fa - fb;
+      var r = 0;
+      if (ord === 'estado') r = G.ESTADOS_PROJETO.indexOf(a.calc.estado) - G.ESTADOS_PROJETO.indexOf(b.calc.estado) || porPrazo(a, b);
+      else if (ord === 'horas') r = b.calc.minutosRestantes - a.calc.minutosRestantes;
+      else if (ord === 'criado') r = (a.criadoEm < b.criadoEm) ? 1 : (a.criadoEm > b.criadoEm) ? -1 : 0;
+      else if (ord === 'manual') {
+        var oa = a.ordemManual === null ? Infinity : a.ordemManual;
+        var ob = b.ordemManual === null ? Infinity : b.ordemManual;
+        r = oa - ob;
+      } else r = porPrazo(a, b);
+      if (r) return r;
+      return String(a.nome).localeCompare(String(b.nome), 'pt') || (a.id < b.id ? -1 : 1);
+    });
+  }
+
+  /* ---------- Agrupamento ---------- */
+  var G_ESTADO = [['vencido', 3], ['emCurso', 1], ['bloqueado', 4], ['porDecompor', 2], ['concluido', 5]];
+  var G_PRAZO = [['vencido', 'Vencido', 3], ['hoje', 'Hoje', 2], ['semana', 'Esta semana', 1], ['tarde', 'Mais tarde', 4], ['sem', 'Sem prazo', 5]];
+  function gruposDe(us, hoje) {
+    var g = grupoEfetivo();
+    if (g === 'estado') {
+      return G_ESTADO.map(function (d) {
+        return { id: 'e:' + d[0], chave: d[0], nome: G.ROTULO_ESTADO_PROJETO[d[0]], cor: d[1],
+                 itens: us.filter(function (u) { return u.calc.estado === d[0]; }) };
+      });
+    }
+    if (g === 'prazo') {
+      return G_PRAZO.map(function (d) {
+        return { id: 'z:' + d[0], chave: d[0], nome: d[1], cor: d[2],
+                 itens: us.filter(function (u) { return chavePrazo(u.calc.proximoPrazo, hoje) === d[0]; }) };
+      });
+    }
+    return [{ id: 'todos', chave: 'todos', nome: 'Tudo', cor: 1, itens: us.slice() }];
+  }
+
+  /* ==========================================================================
+     RENDER — peças partilhadas pelo cartão, pelo toggle e pela página do projeto
+     ========================================================================== */
+  function gripHtml(cls) { return '<button type="button" class="l-grip' + (cls ? ' ' + cls : '') + '" draggable="true" title="Arrastar para reordenar" aria-label="Arrastar">' + icone('grip-vertical', 14) + '</button>'; }
+  function maisHtml(acao) { return '<button type="button" class="l-mais" data-acao="' + (acao || 'menu') + '" title="Mais opções" aria-label="Mais opções">' + icone('more-horizontal', 16) + '</button>'; }
   function inserirHtml(aposId, pid) {
     return '<button type="button" class="l-inserir" data-inserir-apos="' + escapeHtml(aposId) + '" data-inserir-projeto="' + escapeHtml(pid || '') + '" title="Inserir a seguir" aria-label="Inserir a seguir"></button>';
   }
-  function linhaTemp(pid, ordem) {
-    return '<div class="linha temp" data-temp="1">' + (ordem ? '<span class="passo-ordem num">' + ordem + '</span>' : '') +
-      '<div class="l-main"><div class="t placeholder" data-edit="novo" data-placeholder="' + (pid ? 'Novo passo — Enter grava, Esc cancela' : 'Nova obrigação — Enter grava, Esc cancela') + '"></div></div></div>';
+  function linhaTemp(pid) {
+    return '<div class="acao-linha temp" data-temp="1"><span class="chk" aria-hidden="true"></span>' +
+      '<div class="acao-corpo"><div class="t placeholder" data-edit="novo" data-placeholder="' +
+      (pid ? 'Nova ação — Enter grava, Esc cancela' : 'Nova obrigação — Enter grava, Esc cancela') + '"></div></div></div>';
   }
-
-  // opts: { semProjeto, ordem, extra, acoesExtra, diasParado, abertasNoProjeto, dnd, inserir }
-  function linhaObrigacao(obr, opts) {
+  function chkHtml(o) {
+    if (o.estado === 'concluida') return '<button type="button" class="chk feito" disabled title="Concluída ' + escapeHtml(fmtDataHora(o.concluidaEm)) + '">' + icone('check', 12) + '</button>';
+    if (!G.estaAberta(o)) return '<span class="chk" aria-hidden="true"></span>';
+    return '<button type="button" class="chk" data-acao="concluir" title="Concluir" aria-label="Concluir">' + icone('check', 12) + '</button>';
+  }
+  // Cadeado das bloqueadas: o title diz de QUE ação depende (hover e toque longo).
+  function cadeadoHtml(o) {
+    var pend = depsDe(o).map(function (d) { return obrs[d]; }).filter(function (d) { return d && G.estaAberta(d); });
+    if (!pend.length) return '';
+    return '<span class="cadeado" title="Depende de: ' + escapeHtml(pend.map(function (d) { return d.titulo; }).join(' · ')) + '">' +
+      icone('lock', 12) + pend.length + '</span>';
+  }
+  function concluirBoxHtml(o) {
+    if (concluirEmCurso !== o.id) return '';
+    return '<div class="concluir-box">Quanto tempo demorou de facto? ' +
+      '<input type="number" min="1" step="5" value="' + escapeHtml(o.duracaoPrevista || G.DURACAO_DEFAULT) + '" data-real="' + escapeHtml(o.id) + '" aria-label="Minutos reais"> min ' +
+      '<button type="button" class="b ok" data-acao="confirmar-concluir">✓ OK</button>' +
+      '<button type="button" class="b" data-acao="cancelar-concluir">Cancelar</button></div>';
+  }
+  // opts: { dnd, inserir, ordem, realce, semPills }
+  function linhaAcao(o, hoje, opts) {
     opts = opts || {};
-    var hoje = G.hojeISO();
-    var aberta = G.estaAberta(obr);
-    var p = projetoDe(obr);
-    var cls = 'linha' + (aberta ? ' ' + classePrazo(obr, hoje) : ' fechada');
-    var meta = [];
-    if (p && !opts.semProjeto) meta.push('<span class="proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(obr.projetoId) + '" title="Abrir o painel do projeto">' + escapeHtml(p.nome) + '</span>');
-    else if (obr.projetoId && !p) meta.push('<span>(projeto apagado)</span>');
-    if (aberta && duracaoEmEdicao === obr.id) {
-      meta.push('<span><input type="number" class="inline-date" style="width:64px" min="1" step="5" value="' + escapeHtml(obr.duracaoPrevista) + '" data-duracao="' + escapeHtml(obr.id) + '" autofocus> min</span>');
-    } else {
-      meta.push('<span class="num">' + (aberta ? '<button type="button" data-acao="editar-duracao" title="Alterar duração prevista">' : '') + (obr.duracaoPrevista || '—') + ' min previstos' + (aberta ? '</button>' : '') + '</span>');
-    }
-    if (obr.estado === 'concluida' && obr.duracaoReal) meta.push('<span class="num">' + obr.duracaoReal + ' min reais</span>');
-    if (aberta && prazoEmEdicao === obr.id) {
-      meta.push('<span><input type="date" class="inline-date" value="' + escapeHtml(obr.prazo || '') + '" data-prazo="' + escapeHtml(obr.id) + '"> <button type="button" data-acao="limpar-prazo">sem prazo</button></span>');
-    } else if (obr.prazo) {
-      meta.push(aberta ? '<button type="button" data-acao="editar-prazo" title="Alterar prazo">' + metaPrazo(obr, hoje) + '</button>' : metaPrazo(obr, hoje));
-    } else if (aberta) {
-      meta.push('<button type="button" data-acao="editar-prazo">+ prazo</button>');
-    }
-    if (aberta) meta.push(seletorLocal(obr));
-    else if (obr.local && G.ROTULO_LOCAL[obr.local]) meta.push('<span>' + G.ROTULO_LOCAL[obr.local] + '</span>');
-    if (opts.diasParado !== undefined && opts.diasParado !== null) meta.push(metaParado(opts.diasParado));
-    if (obr.adiada > 0) meta.push('<span class="adiada">adiada ' + obr.adiada + '×</span>');
-    if (obr.estado === 'concluida') meta.push('<span>' + (obr.projetoId ? 'concluído ' : 'concluída ') + fmtDataHora(obr.concluidaEm) + '</span>');
-    if (obr.estado === 'anulada') meta.push('<span>' + (obr.projetoId ? 'anulado ' : 'anulada ') + fmtDataHora(obr.anuladoEm) + (obr.anuladoPorProjeto === true ? ' · com o projeto' : obr.anuladoPorSugestao === true ? ' · por sugestão' : '') + '</span>');
-    if (opts.abertasNoProjeto > 1) meta.push('<span class="num">+' + (opts.abertasNoProjeto - 1) + ' passos abertos a seguir</span>');
-
-    var acoes = '';
-    if (aberta) acoes += '<button type="button" class="b ok" data-acao="concluir" title="Concluir">✓ Concluir</button>';
-    if (p && !opts.semProjeto) acoes += '<button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(obr.projetoId) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button>';
-
-    var concluirBox = '';
-    if (aberta && concluirEmCurso === obr.id) {
-      concluirBox = '<div class="concluir-box">Quanto tempo demorou de facto? ' +
-        '<input type="number" min="1" step="5" value="' + escapeHtml(obr.duracaoPrevista || G.DURACAO_DEFAULT) + '" data-real="' + escapeHtml(obr.id) + '" aria-label="Minutos reais"> min ' +
-        '<button type="button" class="b ok" data-acao="confirmar-concluir">✓ OK</button>' +
-        '<button type="button" class="b" data-acao="cancelar-concluir">Cancelar</button></div>';
-    }
+    var aberta = G.estaAberta(o);
+    var cls = 'acao-linha' + (aberta ? '' : ' fechada') + (opts.realce ? ' realce' : '');
     var titulo = aberta
-      ? '<div class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(obr.titulo) + '</div>'
-      : '<div class="t">' + escapeHtml(obr.titulo) + '</div>';
-
-    var html = '<div class="' + cls + '" data-id="' + escapeHtml(obr.id) + '">' +
+      ? '<div class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(o.titulo) + '</div>'
+      : '<div class="t">' + escapeHtml(o.titulo) + '</div>';
+    var html = '<div class="' + cls + '" data-id="' + escapeHtml(o.id) + '">' +
       (aberta && opts.dnd ? gripHtml() : '') +
       (opts.ordem !== undefined ? '<span class="passo-ordem num">' + escapeHtml(opts.ordem) + '</span>' : '') +
-      '<div class="l-main">' + titulo +
-      '<div class="l-meta">' + meta.join('') + '</div>' + (opts.extra || '') + '</div>' +
-      '<div class="l-acoes">' + (opts.acoesExtra || '') + acoes + '</div>' + (aberta ? maisHtml() : '') + concluirBox + '</div>';
+      chkHtml(o) +
+      '<div class="acao-corpo">' + titulo + (aberta ? cadeadoHtml(o) : '') + pillsAcao(o, hoje, aberta) + '</div>' +
+      (aberta ? maisHtml() : (o.estado === 'anulada' ? '<span class="quando">anulada ' + fmtDataHora(o.anuladoEm) + '</span>' : '')) +
+      concluirBoxHtml(o) + '</div>';
     if (opts.inserir && aberta) {
-      var pid = opts.semProjeto ? obr.projetoId : null;
-      if (novoTemp && novoTemp.aposId === obr.id && !novoTemp.coluna) html += linhaTemp(pid, opts.ordem !== undefined ? '+' : '');
-      html += inserirHtml(obr.id, pid);
+      if (novoTemp && novoTemp.aposId === o.id && !novoTemp.coluna) html += linhaTemp(o.projetoId || null);
+      html += inserirHtml(o.id, o.projetoId || '');
     }
     return html;
   }
 
-  function seletorLocal(obr) {
-    var atual = (obr.local && G.LOCAIS.indexOf(obr.local) >= 0) ? obr.local : '';
-    return '<span><select class="local-sel' + (atual ? '' : ' vazio') + '" data-local-sel="' + escapeHtml(obr.id) + '" title="Onde se faz' + (obr.localManual ? ' (corrigido à mão)' : '') + '">' +
-      '<option value=""' + (atual ? '' : ' selected') + '>' + (atual ? 'sem local' : 'local?') + '</option>' +
-      G.LOCAIS.map(function (l) { return '<option value="' + l + '"' + (atual === l ? ' selected' : '') + '>' + G.ROTULO_LOCAL[l] + '</option>'; }).join('') +
-      '</select></span>';
+  function progressoHtml(c) {
+    var t = c.progresso.total, f = c.progresso.feitas;
+    var pct = t ? Math.round(f / t * 100) : 0;
+    return '<span class="prog" title="' + f + ' de ' + t + ' ações concluídas"><b>' + f + '/' + t + '</b>' +
+      '<span class="prog-barra"><i style="width:' + pct + '%"></i></span></span>';
+  }
+  function calculosHtml(u, hoje) {
+    var c = u.calc, p = [];
+    if (u.tipo === 'projeto') p.push(progressoHtml(c));
+    if (c.minutosRestantes > 0) p.push('<span class="pill estatica num" title="Soma da duração prevista das ações abertas">' + icone('clock', 12) + G.fmtDuracaoMin(c.minutosRestantes) + ' por fazer</span>');
+    if (c.proximoPrazo) p.push('<span class="pill estatica' + (prazoAlerta(c.proximoPrazo, hoje) ? ' alerta' : '') + '" title="O mais cedo entre o prazo do projeto e os das ações abertas">' + icone('calendar', 12) + 'Próximo: ' + rotuloPrazo(c.proximoPrazo, hoje) + '</span>');
+    if (c.bloqueadas > 0) p.push('<span class="pill estatica aviso num" title="Ações que dependem de outras ainda abertas">' + icone('lock', 12) + c.bloqueadas + ' bloqueada' + (c.bloqueadas === 1 ? '' : 's') + '</span>');
+    return p.join('');
   }
 
-  function linhaProjetoSimples(p, dias, nota) {
-    return '<div class="linha" data-projeto-linha="' + escapeHtml(p.id) + '"><div class="l-main"><div class="t proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(p.id) + '" style="cursor:pointer" title="Abrir o painel do projeto">' + escapeHtml(p.nome) + '</div>' +
-      '<div class="l-meta">' + (nota ? '<span>' + nota + '</span>' : '') + metaParado(dias) + '</div></div>' +
-      '<div class="l-acoes"><button type="button" class="b" data-acao="abrir-projeto" data-projeto="' + escapeHtml(p.id) + '">Abrir projeto ' + icone('chevron-right', 12) + '</button></div></div>';
-  }
+  /* ---------- Cartão de unidade ---------- */
+  function cartaoUnidade(u, hoje, opts) {
+    opts = opts || {};
+    var c = u.calc;
+    var compacto = !!opts.compacto;                      // Quadro: sem toggle expandido
+    var fechada = c.estado === 'concluido';
+    var aberto = !compacto && !!cfg().abertos[u.id];
+    var acoes = acoesDaUnidade(u);
+    var abertasVivas = c.abertas;
+    // A pesquisa abre o toggle sozinha e realça a ação encontrada.
+    var achadas = procura ? acoes.filter(acaoCasaProcura).map(function (o) { return o.id; }) : [];
+    if (procura && achadas.length && normTexto(u.nome).indexOf(normTexto(procura)) < 0) aberto = !compacto;
 
-  /* ---------- Ordenação e agrupamento (sobre TODAS as abertas; nunca esconde) ---------- */
-  function ordenarItens(itens, hoje) {
-    if (ordenacao === 'titulo') return itens.slice().sort(function (a, b) { return String(a.obr.titulo).localeCompare(String(b.obr.titulo), 'pt'); });
-    if (ordenacao === 'recente') return itens.slice().sort(function (a, b) { return (b.obr.criadoEm || '') < (a.obr.criadoEm || '') ? -1 : 1; });
-    return G.ordenar(itens, hoje);
-  }
-  function semanaChave(obr, hoje) {
-    if (!obr.prazo) return 'semprazo';
-    var n = G.diasEntre(obr.prazo, hoje);   // >0 vencido
-    if (n === null) return 'semprazo';
-    if (n > 0) return 'vencidas';
-    var h = new Date(hoje + 'T00:00:00');
-    var dow = (h.getDay() + 6) % 7;         // 0 = segunda
-    var fimSemana = 6 - dow;                // dias até domingo
-    var d = -n;                             // dias até ao prazo
-    if (d <= fimSemana) return 'esta';
-    if (d <= fimSemana + 7) return 'proxima';
-    return 'tarde';
-  }
-  function segundaSeguinte(hoje) {
-    var h = new Date(hoje + 'T00:00:00');
-    var dow = (h.getDay() + 6) % 7;
-    h.setDate(h.getDate() + (7 - dow));
-    return G.hojeISO(h);
-  }
-  // Devolve [{ id, nome, cor (1..5), itens:[{obr, projeto}], novo:{projetoId, local, prazo} }]
-  function gruposDe(hoje) {
-    var abertas = G.listaAbertas(obrs);
-    var lista = abertas.map(function (o) { return { obr: o, projeto: projetoDe(o) }; });
-    var grupos = [];
-    if (grupo === 'projeto') {
-      var pids = Object.keys(projs).filter(function (id) { return projetoAtivo(projs[id]); })
-        .sort(function (a, b) { return String(projs[a].nome).localeCompare(String(projs[b].nome), 'pt'); });
-      pids.forEach(function (pid, i) {
-        var itens = lista.filter(function (x) { return x.obr.projetoId === pid; }).sort(function (a, b) { return cmpOrdemLocal(a.obr, b.obr); });
-        grupos.push({ id: 'p:' + pid, projetoId: pid, nome: projs[pid].nome, cor: (i % 5) + 1, itens: itens, novo: { projetoId: pid } });
-      });
-      var soltas = lista.filter(function (x) { return !x.obr.projetoId || !projetoAtivo(projs[x.obr.projetoId]); });
-      grupos.push({ id: 'semprojeto', nome: 'Sem projeto', cor: 5, itens: soltas, novo: {} });
-    } else if (grupo === 'local') {
-      G.LOCAIS.forEach(function (l, i) {
-        grupos.push({ id: 'l:' + l, nome: G.ROTULO_LOCAL[l], cor: (i % 5) + 1, itens: lista.filter(function (x) { return x.obr.local === l; }), novo: { local: l } });
-      });
-      grupos.push({ id: 'semlocal', nome: 'Sem local', cor: 5, itens: lista.filter(function (x) { return !x.obr.local || G.LOCAIS.indexOf(x.obr.local) < 0; }), novo: {} });
+    var h = '<article class="u-card' + (u.tipo === 'solta' ? ' solta' : '') + ' ' + c.estado + (fechada ? ' fechada' : '') +
+      '" data-unidade="' + escapeHtml(u.id) + '"' + (u.projetoId ? ' data-projeto="' + escapeHtml(u.projetoId) + '"' : '') +
+      (u.obrId ? ' data-id="' + escapeHtml(u.obrId) + '"' : '') +
+      (compacto ? ' data-arrasta="quadro" draggable="true"' : '') + '>';
+
+    h += '<div class="u-topo">';
+    if (cfg().ordenacao === 'manual' && !compacto) h += gripHtml('u-grip');
+    if (u.tipo === 'projeto') {
+      // No Quadro não há toggle: o cartão é compacto e a seta não teria o que abrir.
+      if (!compacto) h += '<button type="button" class="u-toggle' + (aberto ? ' aberto' : '') + (acoes.length ? '' : ' vazio') + '" data-acao="toggle-unidade" aria-expanded="' + (aberto ? 'true' : 'false') + '" title="Mostrar as ações">' + icone('chevron-right', 14) + '</button>';
+      h += '<div class="u-nome" data-acao="abrir-projeto" data-projeto="' + escapeHtml(u.projetoId) + '" title="Abrir a página do projeto">' + escapeHtml(u.nome) + '</div>';
     } else {
-      var defs = [['vencidas', 'Vencidas', 3, null], ['esta', 'Esta semana', 2, hoje], ['proxima', 'Próxima semana', 4, segundaSeguinte(hoje)], ['tarde', 'Mais tarde', 1, null], ['semprazo', 'Sem prazo', 5, null]];
-      defs.forEach(function (d) {
-        grupos.push({ id: 's:' + d[0], nome: d[1], cor: d[2], itens: lista.filter(function (x) { return semanaChave(x.obr, hoje) === d[0]; }), novo: { prazo: d[3] } });
-      });
+      h += chkHtml(u.obr);
+      h += (G.estaAberta(u.obr)
+        ? '<div class="u-nome t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(u.nome) + '</div>'
+        : '<div class="u-nome t">' + escapeHtml(u.nome) + '</div>');
     }
-    grupos.forEach(function (g) { if (!(grupo === 'projeto' && g.projetoId && ordenacao === 'prazo')) g.itens = ordenarItens(g.itens, hoje); });
-    return grupos;
-  }
-  function cmpOrdemLocal(a, b) {
-    var oa = typeof a.ordem === 'number' ? a.ordem : Infinity, ob = typeof b.ordem === 'number' ? b.ordem : Infinity;
-    if (oa !== ob) return oa - ob;
-    return (a.criadoEm || '') < (b.criadoEm || '') ? -1 : 1;
-  }
-  // Filtro de local + procura: devolve {vis, fora} sem nunca perder a contagem.
-  function filtrar(itens) {
-    var vis = itens.filter(function (x) { return G.casaLocal(x.obr, filtroLocal) && casaProcura(x.obr); });
-    return { vis: vis, fora: itens.length - vis.length };
-  }
-  function contagem(n, total) { return '(' + n + (n !== total ? ' de ' + total : '') + ')'; }
+    // Agrupado por estado no Quadro, a coluna JÁ diz o estado: o selo seria ruído.
+    if (!(compacto && grupoEfetivo() === 'estado')) h += '<span class="pill pill-estado est-' + c.estado + '">' + G.ROTULO_ESTADO_PROJETO[c.estado] + '</span>';
+    h += maisHtml('menu-unidade');
+    h += '</div>';
 
-  /* ---------- Render: vista principal ---------- */
+    // Pills de propriedades e cálculos
+    var meta = [];
+    if (u.tipo === 'projeto') {
+      meta.push(pillPrazo('proj', u.projetoId, u.projeto.prazo, hoje, !fechada));
+      meta.push(calculosHtml(u, hoje));
+    } else {
+      meta.push(pillsAcao(u.obr, hoje, G.estaAberta(u.obr)));
+      if (c.proximoPrazo && !G.prazoValido(u.obr.prazo)) meta.push(calculosHtml(u, hoje));
+    }
+    var metaHtml = meta.join('');
+    if (metaHtml) h += '<div class="u-meta">' + metaHtml + '</div>';
+
+    if (u.tipo === 'projeto') {
+      // A próxima ação aparece SEMPRE em destaque e é concluível daqui.
+      if (c.proxima && !aberto) {
+        h += '<div class="u-prox" data-id="' + escapeHtml(c.proxima.id) + '"><span class="rotulo">Próxima ação</span>' +
+          chkHtml(c.proxima) + '<span class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(c.proxima.titulo) + '</span>' +
+          pillsAcao(c.proxima, hoje, true) + maisHtml() + concluirBoxHtml(c.proxima) + '</div>';
+      }
+      if (c.estado === 'porDecompor') {
+        h += '<div class="u-nota">Este projeto ainda não tem ações. ' +
+          '<button type="button" class="b ok" data-acao="decompor-projeto" data-projeto="' + escapeHtml(u.projetoId) + '">' + icone('sparkles', 13) + ' Decompor</button></div>';
+      } else if (c.estado === 'bloqueado') {
+        h += '<div class="u-nota">' + icone('lock', 13) + ' Todas as ações abertas dependem de outras por concluir. Abre o projeto para desbloquear.</div>';
+      } else if (!fechada && !abertasVivas.length && c.concluidas.length) {
+        h += '<div class="u-nota">Todas as ações estão concluídas. ' +
+          '<button type="button" class="b ok" data-acao="concluir-projeto" data-projeto="' + escapeHtml(u.projetoId) + '">Concluir projeto?</button></div>';
+      }
+      if (u.diasParado !== null && u.diasParado > G.LIMITE_PARADO_DIAS && !fechada) {
+        h += '<div class="u-nota"><span class="parado muito">Parado há ' + u.diasParado + ' dias</span></div>';
+      }
+      // Toggle: todas as ações dentro do cartão, com as mesmas mecânicas da página.
+      if (!compacto && acoes.length) {
+        if (aberto) {
+          h += '<div class="u-sub" data-dnd-projeto="' + escapeHtml(u.projetoId) + '">' +
+            acoes.map(function (o, i) {
+              return linhaAcao(o, hoje, { dnd: !fechada, inserir: !fechada, ordem: i + 1, realce: achadas.indexOf(o.id) >= 0 });
+            }).join('') + '</div>';
+        } else {
+          var n = acoes.length;
+          h += '<button type="button" class="u-contador" data-acao="toggle-unidade">+' + n + (n === 1 ? ' ação' : ' ações') + (c.bloqueadas ? ' · ' + c.bloqueadas + ' bloqueada' + (c.bloqueadas === 1 ? '' : 's') : '') + '</button>';
+        }
+      }
+    }
+    h += '</article>';
+    return h;
+  }
+
+  // A obrigação solta nova existe só no DOM até Enter com texto: vazia ou Esc descarta.
+  function cartaoTemp() {
+    return '<article class="u-card solta temp" data-temp="1"><div class="u-topo"><span class="chk" aria-hidden="true"></span>' +
+      '<div class="u-nome t placeholder" data-edit="novo" data-placeholder="Nova obrigação — Enter grava, Esc cancela"></div></div></article>';
+  }
+
+  /* ---------- Vista Lista ---------- */
+  function renderLista(us, hoje) {
+    var g = grupoEfetivo();
+    var c = cfg();
+    var html = '';
+    if (g === 'nenhum') {
+      var abertos = us.filter(function (u) { return u.calc.estado !== 'concluido'; });
+      var concluidos = us.filter(function (u) { return u.calc.estado === 'concluido'; });
+      var temp = (novoTemp && !novoTemp.projetoId && !novoTemp.aposId && !novoTemp.coluna) ? cartaoTemp() : '';
+      html += '<div class="u-lista">' + (temp + abertos.map(function (u) { return cartaoUnidade(u, hoje); }).join('') ||
+        '<div class="vazio">Nada aberto por aqui. Cria um projeto ou uma obrigação solta no cartão de cima.</div>') + '</div>';
+      if (concluidos.length) {
+        html += '<details class="sec fold"' + (c.gruposFechados['concluidos'] === true ? '' : '') + '><summary>Concluídos (' + concluidos.length + ')</summary>' +
+          '<div class="u-lista">' + concluidos.map(function (u) { return cartaoUnidade(u, hoje); }).join('') + '</div></details>';
+      }
+    } else {
+      var grupos = gruposDe(us, hoje);
+      var temp = (novoTemp && !novoTemp.projetoId && !novoTemp.aposId && !novoTemp.coluna) ? cartaoTemp() : '';
+      var usados = 0;
+      html = grupos.map(function (gr) {
+        var fechado = c.gruposFechados[gr.id] === true;
+        var primeiro = (usados++ === 0);
+        return '<div class="g-sec" data-grupo="' + escapeHtml(gr.id) + '" style="--g-cor:var(--grupo-' + gr.cor + ')">' +
+          '<div class="g-head" data-acao="toggle-grupo"><button type="button" class="u-toggle' + (fechado ? '' : ' aberto') + '" aria-label="Abrir ou fechar grupo">' + icone('chevron-right', 14) + '</button>' +
+          '<span class="ponto"></span><span class="g-titulo">' + escapeHtml(gr.nome) + '</span><span class="n">' + gr.itens.length + '</span></div>' +
+          (fechado ? '' : '<div class="u-lista">' + ((primeiro ? temp : '') + gr.itens.map(function (u) { return cartaoUnidade(u, hoje); }).join('') || '<div class="vazio">Nada neste grupo.</div>') + '</div>') +
+          '</div>';
+      }).join('');
+    }
+    $('listaUnidades').innerHTML = html;
+  }
+
+  /* ---------- Vista Quadro ----------
+     Colunas por Estado ou por Prazo, conforme o Agrupar. Largar num grupo de
+     PRAZO muda o prazo (Hoje → hoje; Esta semana → próxima sexta; Sem prazo →
+     limpa a folha; Vencido e Mais tarde abrem o seletor de data em vez de
+     adivinhar). As colunas de ESTADO são calculadas e não aceitam drop — a
+     única excepção é «Concluído», que abre a confirmação de concluir. */
+  function renderQuadro(us, hoje) {
+    var g = grupoEfetivo();
+    $('quadroSub').textContent = g === 'prazo'
+      ? 'Colunas por prazo. Arrasta um cartão para mudar o prazo — «Vencido» e «Mais tarde» pedem a data, nunca a adivinham.'
+      : 'Colunas por estado. O estado é calculado, por isso as colunas não aceitam largar — só «Concluído», que pede confirmação.';
+    $('quadro').innerHTML = gruposDe(us, hoje).map(function (gr) {
+      var aceita = g === 'prazo' || gr.chave === 'concluido';
+      return '<div class="q-col" data-coluna="' + escapeHtml(gr.id) + '" data-chave="' + escapeHtml(gr.chave) + '"' + (aceita ? ' data-aceita="1"' : '') + ' style="--q-cor:var(--grupo-' + gr.cor + ')">' +
+        '<div class="q-head"><span class="q-pill"><i></i><span>' + escapeHtml(gr.nome) + '</span><span class="n num">' + gr.itens.length + '</span></span>' +
+        (g === 'prazo' ? '<button type="button" class="q-plus" data-acao="novo-coluna" title="Nova obrigação neste prazo" aria-label="Nova obrigação neste prazo">' + icone('plus', 16) + '</button>' : '') +
+        '</div>' +
+        '<div class="q-cards" data-coluna-cards="' + escapeHtml(gr.id) + '">' +
+        (gr.itens.map(function (u) { return cartaoUnidade(u, hoje, { compacto: true }); }).join('') || '<div class="vazio" style="padding:14px;font-size:12.5px">Nada aqui.</div>') +
+        '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- Vista Anulados ---------- */
+  function renderAnulados() {
+    var linhas = [];
+    comIds(projs).forEach(function (p) {
+      if (p.anulado !== true) return;
+      linhas.push({ tipo: 'projeto', id: p.id, titulo: p.nome || '(sem nome)', anuladoEm: p.anuladoEm || '', restauradoEm: p.restauradoEm });
+    });
+    comIds(obrs).forEach(function (o) {
+      if (o.anulado !== true) return;
+      var p = o.projetoId ? projs[o.projetoId] : null;
+      linhas.push({ tipo: o.projetoId ? 'acao' : 'solta', id: o.id, titulo: o.titulo || '(sem título)',
+                    anuladoEm: o.anuladoEm || '', sub: p ? p.nome : (o.projetoId ? '(projeto apagado)' : ''), porProjeto: o.anuladoPorProjeto === true });
+    });
+    linhas.sort(function (a, b) { return (a.anuladoEm < b.anuladoEm) ? 1 : (a.anuladoEm > b.anuladoEm) ? -1 : 0; });
+    $('tabAnuladosN').textContent = linhas.length ? linhas.length : '';
+    var rotulo = { projeto: 'Projeto', acao: 'Ação', solta: 'Solta' };
+    $('anuladosLista').innerHTML = linhas.length ? linhas.map(function (l) {
+      return '<div class="anul-linha" data-anul-tipo="' + l.tipo + '" data-anul-id="' + escapeHtml(l.id) + '">' +
+        '<span class="tipo">' + rotulo[l.tipo] + '</span>' +
+        '<span class="t">' + escapeHtml(l.titulo) + '</span>' +
+        (l.sub ? '<span class="quando">em ' + escapeHtml(l.sub) + '</span>' : '') +
+        (l.porProjeto ? '<span class="quando">· com o projeto</span>' : '') +
+        '<span class="quando">anulado ' + fmtDataHora(l.anuladoEm) + '</span>' +
+        '<button type="button" class="b ok" data-acao="restaurar">' + icone('rotate-ccw', 13) + ' Restaurar</button></div>';
+    }).join('') : '<div class="vazio">Nada anulado. Tudo o que anulares aparece aqui, para sempre.</div>';
+  }
+
+  /* ---------- Toolbar, filtros e a faixa de confiança ---------- */
+  var ROT_ORDEM = { prazo: 'próximo prazo', estado: 'estado', horas: 'horas restantes', criado: 'criado em', manual: 'manual' };
+  var ROT_GRUPO = { nenhum: 'nenhum', estado: 'estado', prazo: 'prazo' };
   function renderToolbar() {
-    $('tbVistaTxt').textContent = vista === 'quadro' ? 'Quadro' : 'Lista';
-    $('tbVistaIcone').innerHTML = '<use href="#i-' + (vista === 'quadro' ? 'columns' : 'list') + '"/>';
-    $('tbGrupoTxt').textContent = grupo;
-    $('tbProcurar').classList.toggle('ativo', !!procura || $('tbProcura').classList.contains('on'));
-    $('tbFiltrar').classList.toggle('ativo', !!filtroLocal || $('filtroLocal').classList.contains('on'));
-    $('tbOrdenar').classList.toggle('ativo', ordenacao !== 'prazo');
-    $('tbOrdenar').title = 'Ordenar: ' + (ordenacao === 'titulo' ? 'título A–Z' : ordenacao === 'recente' ? 'mais recentes primeiro' : 'prazo e antiguidade');
-    Array.prototype.forEach.call($('filtroLocal').querySelectorAll('[data-filtro-local]'), function (b) { b.classList.toggle('ativo', b.dataset.filtroLocal === filtroLocal); });
+    Array.prototype.forEach.call(document.querySelectorAll('.vista-tab'), function (b) { b.classList.toggle('ativo', b.dataset.vista === vista); });
+    var c = cfg();
+    $('tbOrdenarTxt').textContent = ROT_ORDEM[c.ordenacao] || 'próximo prazo';
+    $('tbGrupoTxt').textContent = ROT_GRUPO[grupoEfetivo()] || 'nenhum';
+    var nF = ['estado', 'prazo', 'local', 'tipo'].reduce(function (n, k) { return n + Object.keys(c.filtros[k] || {}).length; }, 0);
+    $('tbFiltrarTxt').textContent = nF ? 'Filtro · ' + nF : 'Filtro';
+    $('tbFiltrar').classList.toggle('ativo', nF > 0);
+    $('tbProcurar').classList.toggle('ativo', !!procura);
+    $('tbOrdenar').classList.toggle('ativo', c.ordenacao !== 'prazo');
+    var esconde = vista === 'anulados';
+    ['tbFiltrar', 'tbOrdenar', 'tbGrupo', 'tbProcurar'].forEach(function (id) { $(id).style.display = esconde ? 'none' : ''; });
+    renderFiltros();
+  }
+  function chipsFiltro(grupo, defs) {
+    var sel = cfg().filtros[grupo] || {};
+    return defs.map(function (d) {
+      return '<button type="button" class="f-chip' + (sel[d[0]] ? ' ativo' : '') + '" data-fgrupo="' + grupo + '" data-fvalor="' + d[0] + '">' + escapeHtml(d[1]) + '</button>';
+    }).join('');
+  }
+  function renderFiltros() {
+    var box = $('filtrosBox');
+    var defs = {
+      estado: G.ESTADOS_PROJETO.map(function (e) { return [e, G.ROTULO_ESTADO_PROJETO[e]]; }),
+      prazo: F_PRAZO,
+      local: G.LOCAIS.map(function (l) { return [l, G.ROTULO_LOCAL[l]]; }),
+      tipo: F_TIPO
+    };
+    Object.keys(defs).forEach(function (k) {
+      var el = box.querySelector('[data-f="' + k + '"]');
+      if (!el) return;
+      var b = el.querySelector('b');
+      el.innerHTML = '';
+      el.appendChild(b);
+      el.insertAdjacentHTML('beforeend', chipsFiltro(k, defs[k]));
+    });
+    $('filtrosNota').textContent = 'O filtro de local aplica-se às ações abertas — uma sem local aparece sempre.';
+  }
+  $('filtrosBox').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-fgrupo]');
+    if (b) {
+      var sel = cfg().filtros[b.dataset.fgrupo];
+      if (sel[b.dataset.fvalor]) delete sel[b.dataset.fvalor]; else sel[b.dataset.fvalor] = true;
+      guardarVista(); render();
+    }
+  });
+  $('filtrosLimpar').addEventListener('click', limparFiltros);
+  $('faixaEscondeLimpar').addEventListener('click', limparFiltros);
+  function limparFiltros() {
+    var c = cfg();
+    c.filtros = { estado: {}, prazo: {}, local: {}, tipo: {} };
+    procura = ''; $('procuraInput').value = ''; $('tbProcura').classList.remove('on');
+    guardarVista(); render();
   }
 
+  /* ---------- Render principal ---------- */
   function renderPrincipal() {
-    if (!obrsCarregadas || !projsCarregados) return;
     $('loadingState').style.display = 'none';
     $('indRow').style.display = '';
     $('conteudo').style.display = '';
     var hoje = G.hojeISO();
     var v = G.vistaProximaAcao(obrs, projs, hoje);
     var nAtivos = Object.keys(projs).filter(function (id) { return projetoAtivo(projs[id]); }).length;
-
     $('indAbertasN').textContent = v.totalAbertas;
     $('indParadosN').textContent = v.parados.length;
     $('indParados').classList.toggle('alerta', v.parados.length > 0);
     $('indProjetosN').textContent = nAtivos;
     $('topoFinoN').textContent = v.totalAbertas + ' abertas';
+
     renderToolbar();
+    renderAnulados();
 
-    var emQuadro = vista === 'quadro';
-    $('vistaLista').style.display = emQuadro ? 'none' : '';
-    $('vistaQuadro').style.display = emQuadro ? '' : 'none';
-    var totalFora = 0;
-    if (emQuadro) totalFora = renderQuadro(hoje);
-    else if (grupo === 'projeto') totalFora = renderListaPorProjeto(v, hoje);
-    else totalFora = renderListaAgrupada(hoje);
-    $('listaPorProjeto').style.display = (!emQuadro && grupo === 'projeto') ? '' : 'none';
-    $('listaAgrupada').style.display = (!emQuadro && grupo !== 'projeto') ? '' : 'none';
-    $('procuraNota').textContent = procura ? (totalFora ? totalFora + ' fora da procura' : 'todas as abertas casam') : '';
-    $('filtroLocalNota').textContent = filtroLocal && !procura ? (totalFora ? '· ' + totalFora + ' noutros locais' : '') : '';
+    $('vistaLista').style.display = vista === 'lista' ? '' : 'none';
+    $('vistaQuadro').style.display = vista === 'quadro' ? '' : 'none';
+    $('vistaAnulados').style.display = vista === 'anulados' ? '' : 'none';
+    $('secLocais').style.display = vista === 'anulados' ? 'none' : '';
+
+    if (vista === 'anulados') { $('faixaEsconde').classList.remove('on'); renderGeoAviso(); return; }
+
+    var us = unidades(hoje);
+    var f = filtrar(us, hoje);
+    var lista = ordenarUnidades(f.vis, hoje);
+    if (vista === 'quadro') renderQuadro(lista, hoje); else renderLista(lista, hoje);
+
+    // REGRA DE CONFIANÇA: nada aberto desaparece sem um número à vista.
+    var fora = f.foraProjetos + f.foraSoltas;
+    var faixa = $('faixaEsconde');
+    if (fora > 0) {
+      var partes = [];
+      if (f.foraProjetos) partes.push('<span class="num">' + f.foraProjetos + '</span> projeto' + (f.foraProjetos === 1 ? '' : 's'));
+      if (f.foraSoltas) partes.push('<span class="num">' + f.foraSoltas + '</span> solta' + (f.foraSoltas === 1 ? '' : 's'));
+      $('faixaEscondeTxt').innerHTML = partes.join(' e ') + (fora === 1 ? ' escondido' : ' escondidos') + ' pel' + (procura ? 'a pesquisa' : 'o filtro');
+      faixa.classList.add('on');
+    } else faixa.classList.remove('on');
+    $('procuraNota').textContent = procura ? (fora ? fora + ' fora da procura' : 'tudo casa') : '';
     renderGeoAviso();
-
-    // Fechadas: todas, sem limite (só a secção é colapsável). Mais recentes primeiro.
-    var fechadas = comIds(obrs).filter(function (o) { return !G.estaAberta(o); })
-      .sort(function (a, b) { return (b.concluidaEm || b.anuladoEm || '') < (a.concluidaEm || a.anuladoEm || '') ? -1 : 1; });
-    $('sumFechadas').textContent = 'Obrigações e passos concluídos e anulados (' + fechadas.length + ')';
-    $('listaFechadas').innerHTML = fechadas.map(function (o) { return linhaObrigacao(o, {}); }).join('') || '<div class="vazio">Ainda nada.</div>';
-
-    var projFechados = comIds(projs).filter(function (p) { return !projetoAtivo(p); });
-    $('sumProjFechados').textContent = 'Projetos concluídos e anulados (' + projFechados.length + ')';
-    $('listaProjFechados').innerHTML = projFechados.map(function (p) {
-      return linhaProjetoSimples(p, null, p.anulado === true ? 'anulado ' + fmtDataHora(p.anuladoEm) : 'concluído ' + fmtDataHora(p.ultimoAvancoEm));
-    }).join('') || '<div class="vazio">Ainda nada.</div>';
-    reporFoco();
   }
 
-  function renderListaPorProjeto(v, hoje) {
-    $('secParados').style.display = v.parados.length ? '' : 'none';
-    $('nParados').textContent = '(' + v.parados.length + ')';
-    $('listaParados').innerHTML = v.parados.map(function (x) {
-      var prox = G.proximaAcao(x.projeto.id, obrs);
-      return linhaProjetoSimples(x.projeto, x.diasParado, prox ? 'próxima: ' + escapeHtml(prox.titulo) : 'sem próxima ação desbloqueada');
-    }).join('');
-
-    var fp = filtrar(v.projetos), fs = filtrar(v.soltas);
-    var lp = ordenacao === 'prazo' ? fp.vis : ordenarItens(fp.vis, hoje);
-    var ls = ordenacao === 'prazo' ? fs.vis : ordenarItens(fs.vis, hoje);
-    $('nProjetos').textContent = contagem(lp.length, v.projetos.length);
-    $('listaProjetos').innerHTML = lp.length
-      ? lp.map(function (x) { return linhaObrigacao(x.obr, { diasParado: x.diasParado, abertasNoProjeto: x.abertasNoProjeto }); }).join('')
-      : '<div class="vazio">' + (v.projetos.length ? 'Nenhuma próxima ação casa com o filtro.' : 'Nenhum projeto ativo com passos abertos.') + '</div>';
-
-    $('secBloqueados').style.display = v.bloqueados.length ? '' : 'none';
-    $('nBloqueados').textContent = '(' + v.bloqueados.length + ')';
-    $('listaBloqueados').innerHTML = v.bloqueados.map(function (x) {
-      return linhaProjetoSimples(x.projeto, x.diasParado, x.abertas + (x.abertas === 1 ? ' passo aberto' : ' passos abertos') + ', todos à espera de dependências');
-    }).join('');
-
-    $('secSemPassos').style.display = v.semPassos.length ? '' : 'none';
-    $('nSemPassos').textContent = '(' + v.semPassos.length + ')';
-    $('listaSemPassos').innerHTML = v.semPassos.map(function (x) {
-      return linhaProjetoSimples(x.projeto, x.diasParado, 'sem passos abertos — decompor ou concluir');
-    }).join('');
-
-    $('nSoltas').textContent = contagem(ls.length, v.soltas.length);
-    var htmlSoltas = ls.map(function (x) { return linhaObrigacao(x.obr, { inserir: true }); }).join('');
-    if (novoTemp && !novoTemp.projetoId && !novoTemp.aposId && !novoTemp.coluna) htmlSoltas += linhaTemp(null, '');
-    $('listaSoltas').innerHTML = htmlSoltas || '<div class="vazio">' + (v.soltas.length ? 'Nenhuma obrigação solta casa com o filtro.' : 'Sem obrigações soltas.') + '</div>';
-    return fp.fora + fs.fora;
-  }
-
-  // Agrupado por local / semana em Lista: uma secção por grupo com TODAS as abertas do grupo.
-  function renderListaAgrupada(hoje) {
-    var fora = 0;
-    $('listaAgrupada').innerHTML = gruposDe(hoje).map(function (g) {
-      var f = filtrar(g.itens); fora += f.fora;
-      var sub = grupo === 'local' ? 'Onde se faz. Muda o local em qualquer linha; sem local aparece sempre aqui.' : 'Pelo prazo. Sem prazo fica sempre visível no fim.';
-      return '<div class="sec"><p class="sec-title">' + escapeHtml(g.nome) + ' <span class="n">' + contagem(f.vis.length, g.itens.length) + '</span></p><p class="sec-sub">' + sub + '</p>' +
-        '<div class="lista viva">' + (f.vis.map(function (x) { return linhaObrigacao(x.obr, { inserir: !x.obr.projetoId }); }).join('') || '<div class="vazio">Nada aqui.</div>') + '</div></div>';
-    }).join('');
-    return fora;
-  }
-
-  /* ---------- Render: vista Quadro ---------- */
-  function renderQuadro(hoje) {
-    var fora = 0;
-    $('quadro').innerHTML = gruposDe(hoje).map(function (g) {
-      var f = filtrar(g.itens); fora += f.fora;
-      var dnd = grupo === 'projeto' && !!g.projetoId;
-      var cartoes = f.vis.map(function (x) {
-        var o = x.obr;
-        var sub = g.projetoId || !x.projeto
-          ? '<span class="num">' + (o.duracaoPrevista || G.DURACAO_DEFAULT) + ' min</span>' + (o.prazo && grupo !== 'semana' ? ' · ' + metaPrazo(o, hoje) : '')
-          : '<span class="proj" data-acao="abrir-projeto" data-projeto="' + escapeHtml(o.projetoId) + '">' + escapeHtml(x.projeto.nome) + '</span>';
-        return '<div class="q-card ' + classePrazo(o, hoje) + '" data-id="' + escapeHtml(o.id) + '">' + (dnd ? gripHtml() : '') +
-          '<div class="q-corpo"><div class="t" data-edit="titulo" tabindex="0" title="Clica para editar">' + escapeHtml(o.titulo) + '</div><div class="sub">' + sub + '</div></div>' + maisHtml() + '</div>';
-      }).join('');
-      if (novoTemp && novoTemp.coluna === g.id) cartoes += '<div class="q-card temp" data-temp="1"><div class="q-corpo"><div class="t placeholder" data-edit="novo" data-placeholder="Novo — Enter grava, Esc cancela"></div></div></div>';
-      return '<div class="q-col" data-coluna="' + escapeHtml(g.id) + '" style="--q-cor:var(--grupo-' + g.cor + ')">' +
-        '<div class="q-head"><span class="q-pill"><i></i><span>' + escapeHtml(g.nome) + '</span><span class="n num">' + (f.vis.length !== g.itens.length ? f.vis.length + '/' : '') + g.itens.length + '</span></span>' +
-        '<button type="button" class="l-mais" data-acao="menu-coluna" title="Opções da coluna" aria-label="Opções da coluna">' + icone('more-horizontal', 16) + '</button>' +
-        '<button type="button" class="q-plus" data-acao="novo-coluna" title="Novo neste grupo" aria-label="Novo neste grupo">' + icone('plus', 16) + '</button></div>' +
-        '<div class="q-cards"' + (dnd ? ' data-dnd-projeto="' + escapeHtml(g.projetoId) + '"' : '') + '>' + cartoes + '</div>' +
-        '<button type="button" class="q-novo" data-acao="novo-coluna">+ Novo</button></div>';
-    }).join('');
-    return fora;
-  }
-
-  /* ---------- Render: painel de projeto ---------- */
-  function abrirProjeto(pid) {
+  /* ==========================================================================
+     PÁGINA DO PROJETO — painel à direita com rato, ecrã inteiro ao toque, e um
+     botão que alterna para página inteira no desktop. O URL ganha #projeto={id}
+     para o botão Voltar do iPhone fechar a página e o link ser partilhável.
+     ========================================================================== */
+  var hashEmpurrado = false;
+  var painelPagina = false;
+  function abrirProjeto(pid, viaHash) {
     if (!projs[pid]) return;
-    if (projetoAberto !== pid) { concluirEmCurso = null; prazoEmEdicao = null; duracaoEmEdicao = null; $('decomporBox').classList.remove('on'); fecharSugestao(); }
+    if (projetoAberto !== pid) { concluirEmCurso = null; $('decomporBox').classList.remove('on'); fecharSugestao(); }
     projetoAberto = pid;
-    try { history.replaceState(null, '', '?projeto=' + encodeURIComponent(pid)); } catch (e) {}
+    if (!viaHash) {
+      var alvo = '#projeto=' + encodeURIComponent(pid);
+      if (location.hash !== alvo) { try { history.pushState(null, '', alvo); hashEmpurrado = true; } catch (e) { location.hash = alvo; } }
+    }
     $('painel').classList.add('on'); $('painel').setAttribute('aria-hidden', 'false');
     $('painelFundo').classList.add('on');
     renderProjeto();
     $('painel').scrollTop = 0;
   }
-  function fecharProjeto() {
-    if (edicaoAtiva && edicaoAtiva.tipo !== 'titulo') { var el = document.querySelector('[contenteditable="true"]'); if (el) el.blur(); }
+  function fecharProjeto(viaHash) {
+    if (!viaHash && location.hash.indexOf('#projeto=') === 0) {
+      if (hashEmpurrado) { history.back(); return; }        // o popstate fecha de facto
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    }
+    hashEmpurrado = false;
+    if (edicaoAtiva) { var el = document.querySelector('[contenteditable="true"]'); if (el) el.blur(); }
     projetoAberto = null; novoTemp = null;
-    try { history.replaceState(null, '', location.pathname); } catch (e) {}
     $('painel').classList.remove('on'); $('painel').setAttribute('aria-hidden', 'true');
     $('painelFundo').classList.remove('on');
     render();
   }
-  $('painelFechar').addEventListener('click', fecharProjeto);
-  $('painelFundo').addEventListener('click', fecharProjeto);
+  window.addEventListener('popstate', function () {
+    var m = /^#projeto=(.+)$/.exec(location.hash);
+    var pid = m ? decodeURIComponent(m[1]) : null;
+    if (pid && projs[pid]) { if (projetoAberto !== pid) abrirProjeto(pid, true); }
+    else if (projetoAberto) { hashEmpurrado = false; fecharProjeto(true); }
+  });
+  $('painelFechar').addEventListener('click', function () { fecharProjeto(); });
+  $('painelFundo').addEventListener('click', function () { fecharProjeto(); });
+  $('painelExpandir').addEventListener('click', function () {
+    painelPagina = !painelPagina;
+    $('painel').classList.toggle('pagina', painelPagina);
+    this.innerHTML = icone(painelPagina ? 'minimize-2' : 'maximize-2');
+    this.title = painelPagina ? 'Voltar a painel' : 'Página inteira';
+  });
+
+  function propsHtml(p, c, hoje) {
+    var linha = function (dt, dd) { return '<dt>' + dt + '</dt><dd>' + dd + '</dd>'; };
+    var fechado = c.estado === 'concluido' || p.anulado === true;
+    var h = '';
+    h += linha('Estado', '<span class="pill pill-estado est-' + c.estado + '">' + G.ROTULO_ESTADO_PROJETO[c.estado] + '</span>' +
+      (p.anulado === true ? '<span class="pill estatica">Anulado</span>' : ''));
+    h += linha('Prazo', pillPrazo('proj', p.id, p.prazo, hoje, !fechado) || '<span class="pill estatica">Sem prazo</span>');
+    h += linha('Progresso', progressoHtml(c));
+    h += linha('Horas restantes', '<span class="pill estatica num">' + icone('clock', 12) + G.fmtDuracaoMin(c.minutosRestantes) + '</span>' +
+      (c.bloqueadas ? '<span class="pill estatica aviso num">' + icone('lock', 12) + c.bloqueadas + ' bloqueada' + (c.bloqueadas === 1 ? '' : 's') + '</span>' : ''));
+    h += linha('Próximo prazo', c.proximoPrazo
+      ? '<span class="pill estatica' + (prazoAlerta(c.proximoPrazo, hoje) ? ' alerta' : '') + '">' + icone('calendar', 12) + rotuloPrazo(c.proximoPrazo, hoje) + ' · ' + fmtData(c.proximoPrazo) + '</span>'
+      : '<span class="pill estatica">—</span>');
+    h += linha('Criado em', '<span class="num">' + fmtDataHora(p.criadoEm) + '</span> · último avanço <span class="num">' + fmtDataHora(p.ultimoAvancoEm) + '</span>');
+    return h;
+  }
 
   function renderProjeto() {
     var pid = projetoAberto;
     var p = projs[pid];
     if (!p) { fecharProjeto(); return; }
+    var proj = Object.assign({}, p); proj.id = pid;
     var ativo = projetoAtivo(p);
     var hoje = G.hojeISO();
-    var passos = G.passosDoProjeto(pid, obrs);
-    var abertos = passos.filter(G.estaAberta);
-    var prox = G.proximaAcao(pid, obrs);
-    var dias = G.diasParado(p, hoje);
+    var c = G.calculosProjeto(proj, obrs, hoje);
+    var abertos = c.abertas;
+    var concluidas = c.passos.filter(function (o) { return o.estado === 'concluida'; });
+    var naLista = c.passos.filter(function (o) { return o.estado !== 'concluida'; });
 
     var h = $('projNome');
     if (!(edicaoAtiva && edicaoAtiva.tipo === 'projNome')) h.textContent = p.nome;
-    h.contentEditable = ativo ? h.contentEditable : 'false';
-    var est = $('projEstado');
-    est.className = 'status ' + (p.anulado === true ? 'high' : p.estado === 'concluido' ? 'ok' : (dias > G.LIMITE_PARADO_DIAS ? 'parado' : 'ok'));
-    est.textContent = p.anulado === true ? 'Anulado' : p.estado === 'concluido' ? 'Concluído' : (dias > G.LIMITE_PARADO_DIAS ? 'Parado há ' + dias + ' dias' : 'Ativo');
-    $('projSub').textContent = 'Criado ' + fmtDataHora(p.criadoEm) + ' · último avanço ' + fmtDataHora(p.ultimoAvancoEm) +
-      ' · ' + abertos.length + (abertos.length === 1 ? ' passo aberto' : ' passos abertos') + ' de ' + passos.length;
+    if (!ativo) h.contentEditable = 'false';
+    $('projProps').innerHTML = propsHtml(proj, c, hoje);
+
     $('projDecomporBtn').style.display = ativo ? '' : 'none';
     $('projSugerirBtn').style.display = ativo ? '' : 'none';
-    $('projSugerirBtn').dataset.modo = passos.length ? 'atualizar' : 'sugerir';
-    $('projSugerirBtn').innerHTML = icone('sparkles') + (passos.length ? ' Atualizar passos' : ' Sugerir passos');
+    $('projSugerirBtn').dataset.modo = c.passos.length ? 'atualizar' : 'sugerir';
+    $('projSugerirBtn').innerHTML = icone('sparkles') + (c.passos.length ? ' Atualizar ações' : ' Sugerir ações');
     var ta = $('ctxTexto');
     if (document.activeElement !== ta) ta.value = p.contexto || '';
     ta.disabled = !ativo;
     $('projConcluirBtn').style.display = ativo ? '' : 'none';
     $('projConcluirBtn').disabled = abertos.length > 0;
-    $('projConcluirBtn').title = abertos.length > 0 ? (abertos.length === 1 ? 'Ainda há 1 passo aberto: conclui-o ou anula-o primeiro' : 'Ainda há ' + abertos.length + ' passos abertos: conclui-os ou anula-os primeiro') : 'Marcar o projeto como concluído';
+    $('projConcluirBtn').title = abertos.length > 0
+      ? 'Ainda há ' + abertos.length + (abertos.length === 1 ? ' ação aberta' : ' ações abertas') + ': conclui ou anula primeiro'
+      : 'Marcar o projeto como concluído';
     $('projAnularBtn').style.display = ativo ? '' : 'none';
 
-    $('nPassos').textContent = '(' + passos.length + ')';
+    $('nPassos').textContent = '(' + naLista.length + (concluidas.length ? ' + ' + concluidas.length + ' concluídas' : '') + ')';
     var lista = $('listaPassos');
     if (ativo) lista.setAttribute('data-dnd-projeto', pid); else lista.removeAttribute('data-dnd-projeto');
-    var html = passos.map(function (o, i) {
-      var aberta = G.estaAberta(o);
-      var deps = depsDe(o);
-      var chips = deps.map(function (d) {
-        var dep = obrs[d];
-        var feita = !dep || dep.estado === 'concluida' || dep.anulado === true || dep.estado === 'anulada';
-        return '<span class="dep-chip' + (feita ? '' : ' pendente') + '">' + (feita ? '✓ ' : '') + escapeHtml(dep ? dep.titulo : '(apagado)') +
-          (aberta && ativo ? '<button type="button" data-acao="tirar-dep" data-dep="' + escapeHtml(d) + '" title="Remover dependência">✕</button>' : '') + '</span>';
-      }).join('');
-      var candidatos = passos.filter(function (c) { return c.id !== o.id && deps.indexOf(c.id) < 0 && G.estaAberta(c); });
-      var selDep = (aberta && ativo && candidatos.length)
-        ? '<select data-acao="add-dep" aria-label="Adicionar dependência"><option value="">+ depende de…</option>' +
-          candidatos.map(function (c) { return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.titulo) + '</option>'; }).join('') + '</select>'
-        : '';
-      var bloqueada = aberta && !G.dependenciasSatisfeitas(o, obrs);
-      var extra = '<div class="passo-deps">' + (deps.length ? 'Depende de: ' : '') + chips + selDep +
-        (bloqueada ? '<span class="bloqueada-tag">bloqueado</span>' : '') +
-        (prox && prox.id === o.id ? '<span class="status ok">próxima ação</span>' : '') + '</div>';
-      return linhaObrigacao(o, { semProjeto: true, ordem: i + 1, extra: extra, dnd: ativo, inserir: ativo });
+    var html = naLista.map(function (o, i) {
+      return linhaAcao(o, hoje, { dnd: ativo, inserir: ativo, ordem: i + 1 });
     }).join('');
-    if (novoTemp && novoTemp.projetoId === pid && !novoTemp.aposId && !novoTemp.coluna) html += linhaTemp(pid, passos.length + 1);
-    lista.innerHTML = html || '<div class="vazio">Este projeto ainda não tem passos. Usa «Sugerir passos» para uma proposta automática, «Decompor» para os escrever à mão, ou o + da toolbar.</div>';
+    if (novoTemp && novoTemp.projetoId === pid && !novoTemp.aposId && !novoTemp.coluna) html += linhaTemp(pid);
+    lista.innerHTML = html || '<div class="vazio">Este projeto ainda não tem ações. Usa «Sugerir ações» para uma proposta automática, «Decompor» para as escrever à mão, ou o + da barra.</div>';
+
+    $('sumConcluidas').textContent = 'Concluídas (' + concluidas.length + ')';
+    $('foldConcluidas').style.display = concluidas.length ? '' : 'none';
+    $('listaConcluidas').innerHTML = concluidas.map(function (o) { return linhaAcao(o, hoje, {}); }).join('');
     reporFoco();
   }
 
   function reporFoco() {
     var foco = document.querySelector('[data-real="' + concluirEmCurso + '"]');
-    if (foco) { foco.focus(); foco.select(); }
-    var fp = document.querySelector('[data-prazo="' + prazoEmEdicao + '"]');
-    if (fp) fp.focus();
-    var fd = document.querySelector('[data-duracao="' + duracaoEmEdicao + '"]');
-    if (fd) { fd.focus(); fd.select(); }
+    if (foco) { foco.focus(); if (foco.select) foco.select(); }
   }
 
   function render() {
@@ -1337,7 +2079,6 @@
     renderPrincipal();
     if (projetoAberto) renderProjeto();
   }
-
   /* ---------- Edição inline (título do passo, nome do projeto, linha nova) ----------
      Clicar no texto entra em edição no sítio (contenteditable, mesma fonte). Enter e
      blur gravam, Escape cancela. A gravação é um update() só com o campo no path do
@@ -1418,186 +2159,350 @@
     if (el.dataset && el.dataset.edit && el.contentEditable !== 'true' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); iniciarEdicao(el); }
   });
 
-  /* ---------- Drag & drop pela pega (HTML5 no desktop, pointer + long-press ao toque) ----------
-     Só dentro do MESMO projeto (contentor [data-dnd-projeto]). Largar = renumerar()
-     todos os passos do projeto 1..n, um set() na folha ordem só onde muda. */
-  var dnd = { id: null, pid: null, alvo: null, antes: true, ghost: null, timer: null, ativo: false };
+
+  /* ==========================================================================
+     DRAG & DROP — três modos, uma só máquina de estados:
+       'passo'   reordenar ações dentro do MESMO projeto  → renumerar()
+       'unidade' reordenar projetos na Lista (ordenação Manual) → projetos/{id}/ordem
+       'quadro'  largar um cartão noutra coluna → muda o prazo (ou pede confirmação)
+     Rato: HTML5 drag. Toque: pointer events com long-press de 350 ms, tolerância
+     de 10 px, `pointercancel` como fim limpo e `setPointerCapture` — sem hover não
+     há `dragstart`, e sem `touch-action:none` o ecrã faz scroll por baixo do dedo.
+     ========================================================================== */
+  var dnd = { modo: null, id: null, pid: null, alvo: null, antes: true, coluna: null, ghost: null, timer: null, ativo: false };
   function contentorDnd(el) { return el ? el.closest('[data-dnd-projeto]') : null; }
   function limparMarcas() {
-    Array.prototype.forEach.call(document.querySelectorAll('.largar-antes, .largar-depois, .arrastando'), function (e) { e.classList.remove('largar-antes', 'largar-depois', 'arrastando'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.largar-antes, .largar-depois, .arrastando, .q-col.alvo'), function (e) {
+      e.classList.remove('largar-antes', 'largar-depois', 'arrastando', 'alvo');
+    });
+  }
+  function elemArrastado() {
+    if (dnd.modo === 'passo') return document.querySelector('.acao-linha[data-id="' + dnd.id + '"]');
+    return document.querySelector('[data-unidade="' + dnd.id + '"]');
   }
   function marcarAlvo(item, y) {
     limparMarcas();
-    var src = document.querySelector('[data-id="' + dnd.id + '"]'); if (src) src.classList.add('arrastando');
+    var src = elemArrastado(); if (src) src.classList.add('arrastando');
     dnd.alvo = null;
-    if (!item || item.dataset.id === dnd.id) return;
+    if (!item) return;
+    var chave = dnd.modo === 'passo' ? item.dataset.id : item.dataset.unidade;
+    if (chave === dnd.id) return;
     var r = item.getBoundingClientRect();
     dnd.antes = y < r.top + r.height / 2;
-    dnd.alvo = item.dataset.id;
+    dnd.alvo = chave;
     item.classList.add(dnd.antes ? 'largar-antes' : 'largar-depois');
   }
+  function marcarColuna(col) {
+    limparMarcas();
+    var src = elemArrastado(); if (src) src.classList.add('arrastando');
+    dnd.coluna = null;
+    if (!col || !col.dataset.aceita) return;
+    dnd.coluna = col.dataset.chave;
+    col.classList.add('alvo');
+  }
+  function itemSob(x, y) {
+    var el = document.elementFromPoint(x, y);
+    if (!el || !el.closest) return null;
+    if (dnd.modo === 'quadro') return el.closest('.q-col');
+    if (dnd.modo === 'passo') {
+      var item = el.closest('.acao-linha[data-id]');
+      var c = contentorDnd(item);
+      return (item && c && c.dataset.dndProjeto === dnd.pid) ? item : null;
+    }
+    var u = el.closest('[data-unidade]');
+    return (u && u.closest('#listaUnidades')) ? u : null;
+  }
   function largar() {
-    var pid = dnd.pid, id = dnd.id, alvo = dnd.alvo, antes = dnd.antes;
+    var modo = dnd.modo, id = dnd.id, pid = dnd.pid, alvo = dnd.alvo, antes = dnd.antes, coluna = dnd.coluna;
     limparMarcas();
     if (dnd.ghost) { dnd.ghost.remove(); dnd.ghost = null; }
-    dnd.id = null; dnd.pid = null; dnd.ativo = false;
-    if (!pid || !id || !alvo || alvo === id) return;
-    var ids = G.passosDoProjeto(pid, obrs).map(function (o) { return o.id; });
-    if (ids.indexOf(id) < 0 || ids.indexOf(alvo) < 0) return;
-    ids.splice(ids.indexOf(id), 1);
-    var k = ids.indexOf(alvo) + (antes ? 0 : 1);
-    ids.splice(k, 0, id);
-    renumerar(pid, ids).then(function () { return marcarAvanco(pid); }).catch(erroEscrita);
+    dnd.modo = null; dnd.id = null; dnd.pid = null; dnd.alvo = null; dnd.coluna = null; dnd.ativo = false;
+    if (modo === 'quadro') { if (coluna) largarNaColuna(id, coluna); return; }
+    if (!id || !alvo || alvo === id) return;
+    if (modo === 'passo') {
+      var ids = G.passosDoProjeto(pid, obrs).map(function (o) { return o.id; });
+      if (ids.indexOf(id) < 0 || ids.indexOf(alvo) < 0) return;
+      var antesOrdem = ids.slice();
+      ids.splice(ids.indexOf(id), 1);
+      ids.splice(ids.indexOf(alvo) + (antes ? 0 : 1), 0, id);
+      renumerar(pid, ids).then(function () { return marcarAvanco(pid); })
+        .then(function () {
+          registarDesfazer('Ação movida', function () { return renumerar(pid, antesOrdem); });
+        }).catch(erroEscrita);
+      return;
+    }
+    // 'unidade': ordenação manual dos PROJETOS (as soltas não têm ordem própria).
+    var us = ordenarUnidades(filtrar(unidades(G.hojeISO()), G.hojeISO()).vis, G.hojeISO())
+      .filter(function (u) { return u.tipo === 'projeto'; });
+    var pids = us.map(function (u) { return u.projetoId; });
+    var meu = id.slice(2), oAlvo = alvo.slice(2);
+    if (alvo.indexOf('p:') !== 0 || id.indexOf('p:') !== 0) return;
+    if (pids.indexOf(meu) < 0 || pids.indexOf(oAlvo) < 0) return;
+    var antesPids = pids.slice();
+    pids.splice(pids.indexOf(meu), 1);
+    pids.splice(pids.indexOf(oAlvo) + (antes ? 0 : 1), 0, meu);
+    renumerarProjetos(pids).then(function () {
+      registarDesfazer('Projeto movido', function () { return renumerarProjetos(antesPids); });
+    }).catch(erroEscrita);
   }
-  function itemSob(x, y, pid) {
-    var el = document.elementFromPoint(x, y);
-    var item = el ? el.closest('[data-id]') : null;
-    var c = contentorDnd(item);
-    return (item && c && c.dataset.dndProjeto === pid) ? item : null;
+  // Backfill incluído: um projeto sem `ordem` numérica ganha aqui a posição em que estava.
+  function renumerarProjetos(pids) {
+    var escritas = [];
+    pids.forEach(function (pid, i) {
+      var p = projs[pid]; if (!p) return;
+      if (p.ordem !== i + 1) escritas.push(projetosRef.child(pid).child('ordem').set(i + 1));
+    });
+    return Promise.all(escritas);
   }
-  // HTML5 (rato)
+  function largarNaColuna(unidadeId, chave) {
+    var hoje = G.hojeISO();
+    var ehProj = unidadeId.indexOf('p:') === 0;
+    var alvoId = unidadeId.slice(2);
+    if (grupoEfetivo() === 'estado') {
+      // Colunas calculadas: só «Concluído» aceita, e só com tudo feito.
+      if (chave !== 'concluido') return;
+      if (ehProj) { concluirProjeto(alvoId); return; }
+      var o = obrs[alvoId];
+      if (o && G.estaAberta(o)) { concluirEmCurso = alvoId; render(); }
+      return;
+    }
+    var ref = ehProj ? projetosRef.child(alvoId) : obrigacoesRef.child(alvoId);
+    var reg = ehProj ? projs[alvoId] : obrs[alvoId];
+    if (!reg) return;
+    var nome = ehProj ? reg.nome : reg.titulo;
+    if (chave === 'hoje') { gravarFolha(ref, 'prazo', hoje, 'Prazo de «' + nome + '» → Hoje'); return; }
+    if (chave === 'semana') { var sx = proximaSexta(hoje); gravarFolha(ref, 'prazo', sx, 'Prazo de «' + nome + '» → ' + rotuloPrazo(sx, hoje)); return; }
+    if (chave === 'sem') { gravarFolha(ref, 'prazo', null, 'Prazo de «' + nome + '» removido'); return; }
+    // «Vencido» e «Mais tarde» não se adivinham: abre o seletor de data.
+    seletorPrazo(document.querySelector('[data-unidade="' + unidadeId + '"]') || $('quadro'), ehProj ? 'proj' : 'obr', alvoId);
+  }
+  function arrancarDnd(item, x0, y0) {
+    if (item.classList.contains('acao-linha')) {
+      var c = contentorDnd(item); if (!c) return false;
+      dnd.modo = 'passo'; dnd.id = item.dataset.id; dnd.pid = c.dataset.dndProjeto;
+    } else if (item.dataset.unidade) {
+      dnd.modo = (vista === 'quadro') ? 'quadro' : 'unidade';
+      if (dnd.modo === 'unidade' && (cfg().ordenacao !== 'manual' || item.dataset.unidade.indexOf('p:') !== 0)) return false;
+      dnd.id = item.dataset.unidade; dnd.pid = null;
+    } else return false;
+    dnd.alvo = null; dnd.coluna = null;
+    return true;
+  }
+  function textoArrastado() {
+    if (dnd.modo === 'passo') return (obrs[dnd.id] || {}).titulo || '';
+    var k = dnd.id.slice(2);
+    return dnd.id.indexOf('p:') === 0 ? ((projs[k] || {}).nome || '') : ((obrs[k] || {}).titulo || '');
+  }
+  // --- Rato (HTML5) ---
   document.addEventListener('dragstart', function (ev) {
-    var grip = ev.target.closest ? ev.target.closest('.l-grip') : null;
-    if (!grip) { ev.preventDefault(); return; }
-    var item = grip.closest('[data-id]'); var c = contentorDnd(item);
-    if (!item || !c) { ev.preventDefault(); return; }
-    dnd.id = item.dataset.id; dnd.pid = c.dataset.dndProjeto; dnd.alvo = null;
+    var alvo = ev.target.closest ? ev.target.closest('.l-grip, [data-arrasta]') : null;
+    if (!alvo) { ev.preventDefault(); return; }
+    var item = alvo.classList.contains('l-grip') ? alvo.closest('.acao-linha[data-id], [data-unidade]') : alvo;
+    if (!item || !arrancarDnd(item)) { ev.preventDefault(); return; }
     try { ev.dataTransfer.setData('text/plain', dnd.id); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setDragImage(item, 20, 20); } catch (e) {}
-    setTimeout(function () { var s = document.querySelector('[data-id="' + dnd.id + '"]'); if (s) s.classList.add('arrastando'); }, 0);
+    setTimeout(function () { var s = elemArrastado(); if (s) s.classList.add('arrastando'); }, 0);
   });
   document.addEventListener('dragover', function (ev) {
-    if (!dnd.id) return;
-    var item = itemSob(ev.clientX, ev.clientY, dnd.pid);
-    if (item) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; marcarAlvo(item, ev.clientY); }
+    if (!dnd.modo) return;
+    // Com rato, o alvo do próprio evento é a fonte mais fiável (uma coluna curta
+    // pode não estar debaixo do ponto que o elementFromPoint devolve).
+    var it = (ev.target && ev.target.closest)
+      ? (dnd.modo === 'quadro' ? ev.target.closest('.q-col') : null)
+      : null;
+    if (!it) it = itemSob(ev.clientX, ev.clientY);
+    if (!it) return;
+    ev.preventDefault();
+    try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
+    if (dnd.modo === 'quadro') marcarColuna(it); else marcarAlvo(it, ev.clientY);
   });
-  document.addEventListener('drop', function (ev) { if (!dnd.id) return; ev.preventDefault(); largar(); });
-  document.addEventListener('dragend', function () { if (dnd.id) { dnd.alvo = null; largar(); } });
-  // Pointer events (toque/caneta): long-press de 350 ms na pega inicia; sem hover não há dragstart.
+  document.addEventListener('drop', function (ev) { if (!dnd.modo) return; ev.preventDefault(); largar(); });
+  document.addEventListener('dragend', function () { if (dnd.modo) { dnd.alvo = dnd.alvo; largar(); } });
+  // --- Toque / caneta (long-press) ---
   document.addEventListener('pointerdown', function (ev) {
-    var grip = ev.target.closest ? ev.target.closest('.l-grip') : null;
-    if (!grip || ev.pointerType === 'mouse') return;
-    var item = grip.closest('[data-id]'); var c = contentorDnd(item);
-    if (!item || !c) return;
+    if (ev.pointerType === 'mouse') return;
+    var alvo = ev.target.closest ? ev.target.closest('.l-grip, [data-arrasta]') : null;
+    if (!alvo) return;
+    if (ev.target.closest('button:not(.l-grip), select, input, [data-edit]')) return;
+    var item = alvo.classList.contains('l-grip') ? alvo.closest('.acao-linha[data-id], [data-unidade]') : alvo;
+    if (!item) return;
     ev.preventDefault();
     var x0 = ev.clientX, y0 = ev.clientY;
+    var pid = ev.pointerId;
     dnd.timer = setTimeout(function () {
-      dnd.timer = null; dnd.ativo = true; dnd.id = item.dataset.id; dnd.pid = c.dataset.dndProjeto; dnd.alvo = null;
-      try { grip.setPointerCapture(ev.pointerId); } catch (e) {}
-      var g = document.createElement('div'); g.className = 'dnd-ghost'; g.textContent = (obrs[dnd.id] || {}).titulo || '';
+      dnd.timer = null;
+      if (!arrancarDnd(item, x0, y0)) return;
+      dnd.ativo = true;
+      try { alvo.setPointerCapture(pid); } catch (e) {}
+      var g = document.createElement('div'); g.className = 'dnd-ghost'; g.textContent = textoArrastado();
       g.style.left = (x0 + 12) + 'px'; g.style.top = (y0 - 16) + 'px'; document.body.appendChild(g); dnd.ghost = g;
-      marcarAlvo(null, y0);
+      if (dnd.modo === 'quadro') marcarColuna(null); else marcarAlvo(null, y0);
       if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
     }, 350);
     var mover = function (e) {
-      if (dnd.timer && (Math.abs(e.clientX - x0) > 8 || Math.abs(e.clientY - y0) > 8)) { clearTimeout(dnd.timer); dnd.timer = null; }
+      // Tolerância de 10 px: um toque que desliza é scroll, não um arrasto.
+      if (dnd.timer && (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10)) { clearTimeout(dnd.timer); dnd.timer = null; }
       if (!dnd.ativo) return;
       e.preventDefault();
-      if (dnd.ghost) { dnd.ghost.style.left = (e.clientX + 12) + 'px'; dnd.ghost.style.top = (e.clientY - 16) + 'px'; }
-      if (dnd.ghost) dnd.ghost.style.display = 'none';
-      var it = itemSob(e.clientX, e.clientY, dnd.pid);
+      if (dnd.ghost) { dnd.ghost.style.left = (e.clientX + 12) + 'px'; dnd.ghost.style.top = (e.clientY - 16) + 'px'; dnd.ghost.style.display = 'none'; }
+      var it = itemSob(e.clientX, e.clientY);
       if (dnd.ghost) dnd.ghost.style.display = '';
-      if (it) marcarAlvo(it, e.clientY);
+      if (it) { if (dnd.modo === 'quadro') marcarColuna(it); else marcarAlvo(it, e.clientY); }
     };
     var fim = function () {
-      grip.removeEventListener('pointermove', mover); grip.removeEventListener('pointerup', fim); grip.removeEventListener('pointercancel', fim);
+      alvo.removeEventListener('pointermove', mover);
+      alvo.removeEventListener('pointerup', fim);
+      alvo.removeEventListener('pointercancel', fim);
       if (dnd.timer) { clearTimeout(dnd.timer); dnd.timer = null; }
       if (dnd.ativo) largar();
     };
-    grip.addEventListener('pointermove', mover); grip.addEventListener('pointerup', fim); grip.addEventListener('pointercancel', fim);
+    alvo.addEventListener('pointermove', mover);
+    alvo.addEventListener('pointerup', fim);
+    alvo.addEventListener('pointercancel', fim);
   });
 
-  /* ---------- Menus flutuantes (⋯ da linha, colunas, chips da toolbar, +) ---------- */
-  var menuAncora = null;
-  function abrirMenu(ancora, itens) {
-    var m = $('menuPop');
-    m.innerHTML = itens.map(function (it) {
-      if (it.sep) return '<div class="sep"></div>';
-      if (it.html) return it.html;
-      return '<button type="button" class="' + (it.perigo ? 'perigo' : '') + (it.ativo ? ' ativo' : '') + '" data-menu-i="' + itens.indexOf(it) + '">' + (it.icone ? icone(it.icone, 14) : '') + escapeHtml(it.txt) + '</button>';
-    }).join('');
-    m.classList.add('on');
-    if (menuAncora) menuAncora.classList.remove('on');
-    menuAncora = ancora; ancora.classList.add('on');
-    var r = ancora.getBoundingClientRect();
-    var w = m.offsetWidth, h = m.offsetHeight;
-    var left = r.left + window.scrollX, top = r.bottom + 6 + window.scrollY;
-    if (r.left + w > window.innerWidth - 8) left = Math.max(8, r.right - w) + window.scrollX;
-    if (r.bottom + 6 + h > window.innerHeight - 8) top = r.top - h - 6 + window.scrollY;
-    // Dentro do painel (fixed) o menu tem de ser fixed também, senão fica preso ao scroll da página.
-    var noPainel = !!ancora.closest('#painel');
-    m.style.position = noPainel ? 'fixed' : 'absolute';
-    m.style.left = (noPainel ? left - window.scrollX : left) + 'px';
-    m.style.top = (noPainel ? top - window.scrollY : top) + 'px';
-    m._itens = itens;
-    var inp = m.querySelector('input'); if (inp) { inp.focus(); inp.select(); }
-  }
-  function fecharMenu() {
-    var m = $('menuPop'); m.classList.remove('on'); m.innerHTML = ''; m._itens = null;
-    if (menuAncora) { menuAncora.classList.remove('on'); menuAncora = null; }
-  }
-  $('menuPop').addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-menu-i]');
-    if (b) { var it = $('menuPop')._itens[parseInt(b.dataset.menuI, 10)]; fecharMenu(); if (it && it.acao) it.acao(); return; }
-    var ok = ev.target.closest('[data-menu-dur-ok]');
-    if (ok) { var inp = $('menuPop').querySelector('[data-menu-dur]'); var n = numOuNull(inp.value); var id = inp.dataset.menuDur; fecharMenu(); if (n) setFolha(id, 'duracaoPrevista', n); }
-  });
-  $('menuPop').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape') { fecharMenu(); return; }
-    if (ev.key === 'Enter' && ev.target.dataset && ev.target.dataset.menuDur) { ev.preventDefault(); var ok = $('menuPop').querySelector('[data-menu-dur-ok]'); if (ok) ok.click(); }
-  });
-  document.addEventListener('pointerdown', function (ev) {
-    if (!$('menuPop').classList.contains('on')) return;
-    if (ev.target.closest('#menuPop') || (menuAncora && ev.target.closest('.l-mais, .tb-chip, .tb-ghost, .tb-mais') === menuAncora)) return;
-    fecharMenu();
-  }, true);
-  document.addEventListener('keydown', function (ev) {
-    if (ev.key !== 'Escape') return;
-    if ($('menuPop').classList.contains('on')) { fecharMenu(); return; }
-    if (edicaoAtiva) return;   // o Escape da edição é tratado no próprio elemento
-    if (projetoAberto && !ev.target.closest('#sugBox, #atzBox, #decomporBox')) fecharProjeto();
-  });
+  /* ---------- Menus ⋯ ---------- */
   function menuLinha(btn, id) {
     var o = obrs[id]; if (!o) return;
-    abrirMenu(btn, [
-      { html: '<label>' + icone('clock', 14) + 'Duração <input type="number" min="1" step="5" value="' + escapeHtml(o.duracaoPrevista || G.DURACAO_DEFAULT) + '" data-menu-dur="' + escapeHtml(id) + '" aria-label="Duração prevista em minutos"> min <button type="button" class="b" data-menu-dur-ok>OK</button></label>' },
-      { txt: o.prazo ? 'Alterar prazo' : 'Definir prazo', icone: 'calendar', acao: function () { prazoEmEdicao = id; concluirEmCurso = null; duracaoEmEdicao = null; render(); } },
-      { txt: 'Adiar (conta quantas vezes)', icone: 'chevron-right', acao: function () { adiar(id); } },
-      { txt: 'Duplicar', icone: 'copy', acao: function () { duplicar(id); } },
-      { sep: true },
-      { txt: 'Anular…', icone: 'x', perigo: true, acao: function () { anular(id); } }
-    ]);
+    var itens = [
+      { txt: 'Duração prevista…', icone: 'clock', acao: function () { seletorDuracao(btn, id); } },
+      { txt: o.prazo ? 'Alterar prazo…' : 'Definir prazo…', icone: 'calendar', acao: function () { seletorPrazo(btn, 'obr', id); } },
+      { txt: 'Local…', icone: 'map-pin', acao: function () { seletorLocal(btn, id); } }
+    ];
+    if (o.projetoId && projetoAtivo(projs[o.projetoId])) itens.push({ txt: 'Depende de…', icone: 'lock', acao: function () { menuDependencias(btn, id); } });
+    itens.push({ txt: 'Adiar (conta quantas vezes)', icone: 'chevron-right', acao: function () { adiar(id); } });
+    itens.push({ txt: 'Duplicar', icone: 'copy', acao: function () { duplicar(id); } });
+    if (!o.projetoId) itens.push({ txt: 'Converter em projeto', icone: 'columns', acao: function () { converterEmProjeto(id); } });
+    itens.push({ sep: true });
+    itens.push({ txt: 'Anular…', icone: 'x', perigo: true, acao: function () { anular(id); } });
+    abrirMenu(btn, itens, o.titulo);
   }
-  function menuColuna(btn, col) {
-    var g = grupoPorId(col.dataset.coluna); if (!g) return;
-    var itens = [{ txt: 'Novo neste grupo', icone: 'plus', acao: function () { inserirTemp(Object.assign({ coluna: g.id }, g.novo)); } }];
-    if (g.projetoId) itens.push({ txt: 'Abrir projeto', icone: 'chevron-right', acao: function () { abrirProjeto(g.projetoId); } });
-    itens.push({ html: '<div class="hint">' + g.itens.length + (g.itens.length === 1 ? ' obrigação aberta' : ' obrigações abertas') + '</div>' });
-    abrirMenu(btn, itens);
+  // Dependências: escolher outras AÇÕES do mesmo projeto. Grava dependeDe na folha.
+  function menuDependencias(btn, id) {
+    var o = obrs[id]; if (!o || !o.projetoId) return;
+    var deps = depsDe(o);
+    var candidatos = G.passosDoProjeto(o.projetoId, obrs).filter(function (c) { return c.id !== id && c.anulado !== true && c.estado !== 'anulada'; });
+    var itens = candidatos.map(function (c) {
+      var tem = deps.indexOf(c.id) >= 0;
+      return { txt: c.titulo, ativo: tem, icone: c.estado === 'concluida' ? 'check' : 'lock', acao: function () {
+        var novos = tem ? deps.filter(function (d) { return d !== c.id; }) : deps.concat([c.id]);
+        var antes = deps.length ? deps : null;
+        var folha = obrigacoesRef.child(id).child('dependeDe');
+        var p = novos.length ? folha.set(novos) : folha.remove();
+        p.then(function () {
+          registarDesfazer((tem ? 'Dependência removida' : 'Dependência acrescentada') + ' em «' + o.titulo + '»', function () {
+            return antes ? folha.set(antes) : folha.remove();
+          });
+        }).catch(erroEscrita);
+      } };
+    });
+    if (!itens.length) itens.push({ html: '<div class="hint">Não há outras ações neste projeto.</div>' });
+    else itens.unshift({ html: '<div class="hint">Esta ação fica bloqueada até as escolhidas estarem concluídas.</div>' });
+    abrirMenu(btn, itens, 'Depende de…');
   }
-  function grupoPorId(id) { return gruposDe(G.hojeISO()).filter(function (g) { return g.id === id; })[0] || null; }
+  function menuUnidade(btn, uid) {
+    var hoje = G.hojeISO();
+    if (uid.indexOf('o:') === 0) { menuLinha(btn, uid.slice(2)); return; }
+    var pid = uid.slice(2); var p = projs[pid]; if (!p) return;
+    var ativo = projetoAtivo(p);
+    var itens = [{ txt: 'Abrir página do projeto', icone: 'chevron-right', acao: function () { abrirProjeto(pid); } }];
+    if (ativo) {
+      itens.push({ txt: p.prazo ? 'Alterar prazo do projeto…' : 'Definir prazo do projeto…', icone: 'calendar', acao: function () { seletorPrazo(btn, 'proj', pid); } });
+      itens.push({ txt: 'Decompor…', icone: 'sparkles', acao: function () { abrirProjeto(pid); $('projDecomporBtn').click(); } });
+      itens.push({ sep: true });
+      itens.push({ txt: 'Concluir projeto…', icone: 'check', acao: function () { concluirProjeto(pid); } });
+      itens.push({ txt: 'Anular projeto…', icone: 'x', perigo: true, acao: function () { anularProjeto(pid); } });
+    }
+    abrirMenu(btn, itens, p.nome);
+  }
 
-  // Toolbar
-  $('tbVista').addEventListener('click', function () {
-    abrirMenu(this, [
-      { txt: 'Lista', icone: 'list', ativo: vista === 'lista', acao: function () { vista = 'lista'; gravarLS(LS_VISTA, vista); render(); } },
-      { txt: 'Quadro', icone: 'columns', ativo: vista === 'quadro', acao: function () { vista = 'quadro'; gravarLS(LS_VISTA, vista); render(); } }
-    ]);
-  });
-  $('tbGrupo').addEventListener('click', function () {
-    var f = function (g) { return function () { grupo = g; gravarLS(LS_GRUPO, g); render(); }; };
-    abrirMenu(this, [
-      { txt: 'Projeto', ativo: grupo === 'projeto', acao: f('projeto') },
-      { txt: 'Local', ativo: grupo === 'local', acao: f('local') },
-      { txt: 'Semana', ativo: grupo === 'semana', acao: f('semana') }
-    ]);
+  /* ---------- Concluir e anular um projeto (com confirmação e desfazer) ---------- */
+  function concluirProjeto(pid) {
+    var p = projs[pid]; if (!p || !projetoAtivo(p)) return;
+    var abertas = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; });
+    if (abertas.length) {
+      alert('Faltam ' + abertas.length + (abertas.length === 1 ? ' ação aberta' : ' ações abertas') + ' em «' + p.nome + '». Conclui-as ou anula-as primeiro — nada conclui um projeto sozinho.');
+      return;
+    }
+    if (!confirm('Concluir o projeto «' + p.nome + '»?')) return;
+    var antes = { ultimoAvancoEm: p.ultimoAvancoEm || null };
+    projetosRef.child(pid).update({ estado: 'concluido', ultimoAvancoEm: agoraISO() })
+      .then(function () {
+        registarDesfazer('Projeto «' + p.nome + '» concluído', function () {
+          return projetosRef.child(pid).update({ estado: 'ativo', ultimoAvancoEm: antes.ultimoAvancoEm });
+        });
+      }).catch(erroEscrita);
+  }
+  // Anular um projeto anula EM CASCATA as ações ainda abertas (flag, nunca remove();
+  // anuladoPorProjeto:true e o MESMO anuladoEm do projeto). As concluídas não se tocam.
+  // Ordem: primeiro as ações, o projeto por último — se uma falhar, o projeto continua
+  // ativo e repete-se; nunca fica um projeto anulado com ações soltas.
+  function anularProjeto(pid) {
+    var p = projs[pid]; if (!p || !projetoAtivo(p)) return;
+    var abertos = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; });
+    var n = abertos.length;
+    var msg = n
+      ? 'Anular o projeto «' + p.nome + '» e ' + (n === 1 ? 'a 1 ação aberta' : 'as ' + n + ' ações abertas') + '? As já concluídas ficam como estão. Nada é apagado — fica tudo registado como anulado.'
+      : 'Anular o projeto «' + p.nome + '»? Fica registado como anulado (nunca é apagado).';
+    if (!confirm(msg)) return;
+    var agora = agoraISO();
+    var seq = Promise.resolve();
+    abertos.forEach(function (o) {
+      seq = seq.then(function () {
+        return obrigacoesRef.child(o.id).update({ estado: 'anulada', anulado: true, anuladoEm: agora, anuladoPorProjeto: true });
+      });
+    });
+    seq.then(function () { return projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agora }); })
+      .then(function () {
+        if (projetoAberto === pid) fecharProjeto();
+        registarDesfazer('Projeto «' + p.nome + '» anulado', function () {
+          var s = projetosRef.child(pid).update({ estado: 'ativo', anulado: false, anuladoEm: null });
+          abertos.forEach(function (o) {
+            s = s.then(function () { return obrigacoesRef.child(o.id).update({ estado: 'aberta', anulado: false, anuladoEm: null, anuladoPorProjeto: null }); });
+          });
+          return s;
+        });
+      }).catch(erroEscrita);
+  }
+
+  /* ---------- Restaurar a partir do separador Anulados ---------- */
+  function restaurar(tipo, id) {
+    if (tipo === 'projeto') {
+      var p = projs[id]; if (!p) return;
+      var casc = cascataDoProjeto(id);
+      restaurarProjeto(id).then(function () {
+        if (!casc.length) return;
+        if (!confirm('Restaurar também ' + (casc.length === 1 ? 'a 1 ação anulada' : 'as ' + casc.length + ' ações anuladas') + ' com este projeto?')) return;
+        var s = Promise.resolve();
+        casc.forEach(function (o) { s = s.then(function () { return restaurarObrigacao(o.id); }); });
+        return s;
+      }).then(function () { abrirProjeto(id); }).catch(erroEscrita);
+      return;
+    }
+    restaurarObrigacao(id).catch(erroEscrita);
+  }
+
+  /* ---------- Toolbar ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.vista-tab'), function (b) {
+    b.addEventListener('click', function () { vista = b.dataset.vista; render(); });
   });
   $('tbOrdenar').addEventListener('click', function () {
-    var f = function (o) { return function () { ordenacao = o; render(); }; };
-    abrirMenu(this, [
-      { txt: 'Prazo e antiguidade (regra do motor)', ativo: ordenacao === 'prazo', acao: f('prazo') },
-      { txt: 'Título A–Z', ativo: ordenacao === 'titulo', acao: f('titulo') },
-      { txt: 'Mais recentes primeiro', ativo: ordenacao === 'recente', acao: f('recente') }
-    ]);
+    var btn = this;
+    var f = function (o) { return function () { cfg().ordenacao = o; guardarVista(); render(); }; };
+    abrirMenu(btn, [
+      { txt: 'Próximo prazo', ativo: cfg().ordenacao === 'prazo', acao: f('prazo') },
+      { txt: 'Estado', ativo: cfg().ordenacao === 'estado', acao: f('estado') },
+      { txt: 'Horas restantes', ativo: cfg().ordenacao === 'horas', acao: f('horas') },
+      { txt: 'Criado em', ativo: cfg().ordenacao === 'criado', acao: f('criado') },
+      { txt: 'Manual (arrastar projetos)', ativo: cfg().ordenacao === 'manual', acao: f('manual') }
+    ], 'Ordenar por');
+  });
+  $('tbGrupo').addEventListener('click', function () {
+    var btn = this;
+    var f = function (g) { return function () { cfg().grupo = g; guardarVista(); render(); }; };
+    var itens = [{ txt: 'Estado', ativo: grupoEfetivo() === 'estado', acao: f('estado') },
+                 { txt: 'Prazo', ativo: grupoEfetivo() === 'prazo', acao: f('prazo') }];
+    if (vista !== 'quadro') itens.unshift({ txt: 'Nenhum', ativo: grupoEfetivo() === 'nenhum', acao: f('nenhum') });
+    abrirMenu(btn, itens, 'Agrupar por');
   });
   $('tbProcurar').addEventListener('click', function () {
     var box = $('tbProcura'); var on = !box.classList.contains('on');
@@ -1606,31 +2511,16 @@
     render();
   });
   $('procuraInput').addEventListener('input', function () { procura = this.value.trim(); render(); });
-  $('procuraInput').addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { $('tbProcurar').click(); } });
-  $('tbFiltrar').addEventListener('click', function () {
-    var on = !$('filtroLocal').classList.contains('on');
-    $('filtroLocal').classList.toggle('on', on);
-    if (!on) filtroLocal = '';
-    render();
-  });
+  $('procuraInput').addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.stopPropagation(); $('tbProcurar').click(); } });
+  $('tbFiltrar').addEventListener('click', function () { $('filtrosBox').classList.toggle('on'); });
   $('tbMais').addEventListener('click', function () {
     var itens = [
       { txt: 'Novo projeto', icone: 'plus', acao: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); $('projInput').focus(); } },
-      { txt: 'Nova obrigação solta', icone: 'plus', acao: function () { inserirTemp({}); } }
+      { txt: 'Nova obrigação solta', icone: 'plus', acao: function () { vista = 'lista'; inserirTemp({}); } }
     ];
-    if (projetoAberto && projetoAtivo(projs[projetoAberto])) itens.unshift({ txt: 'Novo passo em «' + projs[projetoAberto].nome + '»', icone: 'plus', acao: function () { inserirTemp({ projetoId: projetoAberto }); } });
-    abrirMenu(this, itens);
+    if (projetoAberto && projetoAtivo(projs[projetoAberto])) itens.unshift({ txt: 'Nova ação em «' + projs[projetoAberto].nome + '»', icone: 'plus', acao: function () { inserirTemp({ projetoId: projetoAberto }); } });
+    abrirMenu(this, itens, 'Criar');
   });
-  $('filtroLocal').addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-filtro-local]'); if (!b) return;
-    filtroLocal = b.dataset.filtroLocal;
-    render();
-  });
-  document.getElementById('main').addEventListener('change', function (ev) {
-    var el = ev.target;
-    if (el.dataset && el.dataset.localSel) gravarLocalManual(el.dataset.localSel, el.value);
-  });
-
   /* ---------- Cabeçalho condensado ao fazer scroll ---------- */
   (function () {
     var barra = $('topoFino'); var on = false;
@@ -1711,12 +2601,19 @@
     if (!m || !m.local) { av.classList.remove('on'); return; }
     var n = G.listaAbertas(obrs).filter(function (o) { return o.local === m.local; }).length;
     $('geoAvisoTexto').textContent = 'Estás na ' + (m.nome || G.ROTULO_LOCAL[m.local]) + ' — ' + n + (n === 1 ? ' obrigação pode' : ' obrigações podem') + ' ser feita' + (n === 1 ? '' : 's') + ' aqui';
-    $('geoAvisoBtn').textContent = filtroLocal === m.local ? 'Filtro aplicado' : 'Ver só ' + G.ROTULO_LOCAL[m.local].toLowerCase();
-    $('geoAvisoBtn').disabled = filtroLocal === m.local;
+    var jaFiltrado = cfg().filtros.local[m.local] === true;
+    $('geoAvisoBtn').textContent = jaFiltrado ? 'Filtro aplicado' : 'Ver só ' + G.ROTULO_LOCAL[m.local].toLowerCase();
+    $('geoAvisoBtn').disabled = jaFiltrado;
     $('geoAvisoBtn').dataset.local = m.local;
     av.classList.add('on');
   }
-  $('geoAvisoBtn').addEventListener('click', function () { filtroLocal = this.dataset.local || ''; render(); });
+  // O aviso de posição NUNCA filtra sozinho: aplica o filtro de local desta vista só ao clique.
+  $('geoAvisoBtn').addEventListener('click', function () {
+    var l = this.dataset.local; if (!l) return;
+    cfg().filtros.local = {}; cfg().filtros.local[l] = true;
+    $('filtrosBox').classList.add('on');
+    guardarVista(); render();
+  });
   mrnLocaisRef.on('value', function (snap) {
     mrnLocais = snap.val() || {};
     renderLocais();
@@ -1801,13 +2698,13 @@
     $('sugLista').innerHTML = '';
     var contexto = contextoAtual();
     gravarContexto();
-    $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de passos para <b>' + escapeHtml(p.nome) + '</b>' +
+    $('sugHead').innerHTML = '<span class="sug-spin"></span> A pedir uma sugestão de ações para <b>' + escapeHtml(p.nome) + '</b>' +
       (contexto ? ' com o contexto escrito' : '') + '…';
     sugEstado(true, null, false);
     S.sugerirPassos(p.nome, { contexto: contexto }).then(function (r) {
       if (meu !== sugPedido) return;
       sugLinhas = r.passos.map(function (x) { return { titulo: x.titulo, duracaoPrevista: x.duracaoPrevista, dependeDePasso: x.dependeDePasso, local: x.local || null }; });
-      $('sugHead').innerHTML = 'Sugestão de <b>' + sugLinhas.length + ' passos</b> (' + escapeHtml(r.modelo) + ') — edita, apaga ou acrescenta; nada fica gravado até confirmares.';
+      $('sugHead').innerHTML = 'Sugestão de <b>' + sugLinhas.length + ' ações</b> (' + escapeHtml(r.modelo) + ') — edita, apaga ou acrescenta; nada fica gravado até confirmares.';
       sugEstado(false, null, false);
       renderSugestao();
     }, function (e) {
@@ -1844,14 +2741,14 @@
       }).join('');
       return '<div class="sug-linha" data-sug-i="' + i + '">' +
         '<span class="passo-ordem num">' + (i + 1) + '.</span>' +
-        '<input type="text" data-sug="titulo" value="' + escapeHtml(l.titulo) + '" placeholder="Título do passo" maxlength="200">' +
+        '<input type="text" data-sug="titulo" value="' + escapeHtml(l.titulo) + '" placeholder="Título da ação" maxlength="200">' +
         '<input type="number" data-sug="dur" min="1" step="5" value="' + l.duracaoPrevista + '" aria-label="Duração prevista em minutos"><span class="min">min</span>' +
         '<select data-sug="dep" aria-label="Dependência">' + opts + '</select>' +
         '<select data-sug="local" aria-label="Local" title="Onde se faz (pré-preenchido pelo modelo)">' + opcoesLocal(l.local) + '</select>' +
         '<button type="button" class="b icone" data-sug-acao="apagar" title="Apagar esta linha">' + icone('x', 12) + '</button>' +
         '</div>';
     }).join('');
-    $('sugCriar').textContent = 'Criar ' + sugLinhas.length + (sugLinhas.length === 1 ? ' passo' : ' passos');
+    $('sugCriar').textContent = 'Criar ' + sugLinhas.length + (sugLinhas.length === 1 ? ' ação' : ' ações');
     $('sugCriar').disabled = !sugLinhas.length;
   }
   $('sugLista').addEventListener('click', function (ev) {
@@ -1937,7 +2834,7 @@
     var abertos = passos.filter(G.estaAberta).map(function (o) { return { id: o.id, titulo: o.titulo, ordem: o.ordem, duracaoPrevista: o.duracaoPrevista, dependeDe: depsDe(o) }; });
     var concluidos = passos.filter(function (o) { return o.estado === 'concluida'; }).map(function (o) { return { titulo: o.titulo }; });
     var anulados = passos.filter(function (o) { return o.anulado === true || o.estado === 'anulada'; }).map(function (o) { return { titulo: o.titulo }; });
-    $('atzHead').innerHTML = '<span class="sug-spin"></span> A pedir uma proposta de alterações para <b>' + escapeHtml(p.nome) + '</b> (' + abertos.length + ' abertos, ' + concluidos.length + ' concluídos)…';
+    $('atzHead').innerHTML = '<span class="sug-spin"></span> A pedir uma proposta de alterações para <b>' + escapeHtml(p.nome) + '</b> (' + abertos.length + ' abertas, ' + concluidos.length + ' concluídas)…';
     atzEstado(true, null, false);
     S.sugerirAlteracoes(p.nome, { contexto: contexto, abertos: abertos, concluidos: concluidos, anulados: anulados }).then(function (r) {
       if (meu !== sugPedido) return;
@@ -1946,7 +2843,7 @@
       if (!n) {
         atzProposta = null;
         $('atzHead').innerHTML = 'Proposta para <b>' + escapeHtml(p.nome) + '</b> (' + escapeHtml(r.modelo) + ')';
-        $('atzLista').innerHTML = '<div class="atz-nada">Nada a alterar — os passos abertos continuam de acordo com o contexto.</div>';
+        $('atzLista').innerHTML = '<div class="atz-nada">Nada a alterar — as ações abertas continuam de acordo com o contexto.</div>';
         atzEstado(false, null, false);
         return;
       }
@@ -1961,7 +2858,7 @@
       atzEstado(false, (e && e.motivo) ? e.motivo : 'Erro inesperado ao contactar o modelo.', !!(e && (e.codigo === 'semChave' || e.codigo === 'chave')));
     });
   }
-  function tituloPasso(id) { var o = obrs[id]; return o ? o.titulo : '(passo desconhecido)'; }
+  function tituloPasso(id) { var o = obrs[id]; return o ? o.titulo : '(ação desconhecida)'; }
   function renderAtualizacao() {
     var a = atzProposta; if (!a) return;
     var item = function (tipo, i, corpo) {
@@ -2019,7 +2916,7 @@
     var sel = selecionadas();
     var n = sel.acrescentar.length + sel.remover.length + sel.alterar.length;
     if (!n) return;
-    // Rede de segurança repetida aqui: só passos ABERTOS deste projeto são tocados.
+    // Rede de segurança repetida aqui: só ações ABERTAS deste projeto são tocados.
     var abertoDoProjeto = function (id) { var o = obrs[id]; return !!o && o.projetoId === pid && G.estaAberta(o); };
     sel.alterar = sel.alterar.filter(function (x) { return abertoDoProjeto(x.id); });
     sel.remover = sel.remover.filter(function (x) { return abertoDoProjeto(x.id); });
@@ -2056,7 +2953,7 @@
     });
     seq.then(function () { return marcarAvanco(pid); })
       .then(function () { fecharAtualizacao(); })
-      .catch(function (e) { erroEscrita(e); $('atzAplicar').disabled = false; $('atzInfo').textContent = 'Falhou a meio — verifica os passos antes de repetir.'; });
+      .catch(function (e) { erroEscrita(e); $('atzAplicar').disabled = false; $('atzInfo').textContent = 'Falhou a meio — verifica as ações antes de repetir.'; });
   });
   $('sugCriar').addEventListener('click', function () {
     var pid = projetoAberto; if (!pid || !sugLinhas || sugProjeto !== pid) return;
@@ -2072,7 +2969,7 @@
     var ids = [];
     var tardias = [];
     $('sugCriar').disabled = true;
-    $('sugInfo').textContent = 'A criar ' + linhas.length + ' passos…';
+    $('sugInfo').textContent = 'A criar ' + linhas.length + ' ações…';
     var seq = Promise.resolve();
     linhas.forEach(function (l, i) {
       seq = seq.then(function () {
@@ -2105,11 +3002,11 @@
   $('decomporCriar').addEventListener('click', function () {
     var pid = projetoAberto; if (!pid) return;
     var linhas = linhasDe($('decomporTexto').value);
-    if (!linhas.length) { $('decomporInfo').textContent = 'Escreve pelo menos um passo.'; return; }
+    if (!linhas.length) { $('decomporInfo').textContent = 'Escreve pelo menos uma ação.'; return; }
     var base = maxOrdem(pid);
     var dur = duracaoDefault();
     $('decomporCriar').disabled = true;
-    $('decomporInfo').textContent = 'A criar ' + linhas.length + ' passos…';
+    $('decomporInfo').textContent = 'A criar ' + linhas.length + ' ações…';
     var seq = Promise.resolve();
     linhas.forEach(function (t, i) { seq = seq.then(function () { return criarObrigacao(t, pid, base + i + 1, dur); }); });
     seq.then(function () { return marcarAvanco(pid); })
@@ -2120,98 +3017,67 @@
       .catch(erroEscrita)
       .then(function () { $('decomporCriar').disabled = false; $('decomporInfo').textContent = ''; });
   });
+  $('projConcluirBtn').addEventListener('click', function () { if (projetoAberto) concluirProjeto(projetoAberto); });
+  $('projAnularBtn').addEventListener('click', function () { if (projetoAberto) anularProjeto(projetoAberto); });
 
-  $('projConcluirBtn').addEventListener('click', function () {
-    var pid = projetoAberto; var p = projs[pid]; if (!p) return;
-    if (G.listaAbertas(obrs).some(function (o) { return o.projetoId === pid; })) return;
-    if (!confirm('Concluir o projeto «' + p.nome + '»?')) return;
-    projetosRef.child(pid).update({ estado: 'concluido', ultimoAvancoEm: agoraISO() }).catch(erroEscrita);
-  });
-  // Anular um projeto anula EM CASCATA os passos ainda abertos (flag, nunca
-  // remove(); anuladoPorProjeto:true e o MESMO anuladoEm do projeto). Os passos
-  // concluídos são factos consumados e não se tocam. Ordem das escritas: primeiro
-  // os passos, o projeto por último — se um passo falhar, o projeto continua
-  // ativo e o Manel repete; nunca fica um projeto anulado com passos soltos.
-  $('projAnularBtn').addEventListener('click', function () {
-    var pid = projetoAberto; var p = projs[pid]; if (!p) return;
-    var abertos = G.listaAbertas(obrs).filter(function (o) { return o.projetoId === pid; });
-    var n = abertos.length;
-    var msg = n
-      ? 'Anular o projeto «' + p.nome + '» e ' + (n === 1 ? 'o 1 passo aberto' : 'os ' + n + ' passos abertos') + '? Os passos já concluídos ficam como estão. Nada é apagado — fica tudo registado como anulado.'
-      : 'Anular o projeto «' + p.nome + '»? Fica registado como anulado (nunca é apagado).';
-    if (!confirm(msg)) return;
-    var agora = agoraISO();
-    $('projAnularBtn').disabled = true;
-    var seq = Promise.resolve();
-    abertos.forEach(function (o) {
-      seq = seq.then(function () {
-        return obrigacoesRef.child(o.id).update({ estado: 'anulada', anulado: true, anuladoEm: agora, anuladoPorProjeto: true });
-      });
-    });
-    seq.then(function () { return projetosRef.child(pid).update({ estado: 'anulado', anulado: true, anuladoEm: agora }); })
-      .catch(erroEscrita)
-      .then(function () { $('projAnularBtn').disabled = false; });
-  });
-
-
-  /* ---------- Delegação de eventos nas listas (vista principal E painel) ---------- */
+  /* ---------- Delegação de eventos (vista principal E página do projeto) ---------- */
   document.getElementById('main').addEventListener('click', function (ev) {
+    var pill = ev.target.closest('[data-pill]');
+    if (pill) {
+      ev.preventDefault();
+      var tipoP = pill.dataset.pill, alvo = pill.dataset.alvo;
+      if (tipoP === 'duracao') seletorDuracao(pill, alvo);
+      else if (tipoP === 'prazo') seletorPrazo(pill, pill.dataset.tipo || 'obr', alvo);
+      else if (tipoP === 'local') seletorLocal(pill, alvo);
+      return;
+    }
+    var gh = ev.target.closest('[data-acao="toggle-grupo"]');
+    if (gh) {
+      var gid = gh.closest('[data-grupo]').dataset.grupo;
+      var gf = cfg().gruposFechados;
+      if (gf[gid]) delete gf[gid]; else gf[gid] = true;
+      guardarVista(); render(); return;
+    }
     var btn = ev.target.closest('[data-acao]');
     if (!btn || btn.tagName === 'SELECT') return;
-    var linha = btn.closest('[data-id]');
-    var id = linha ? linha.dataset.id : null;
     var acao = btn.dataset.acao;
+    var uCard = btn.closest('[data-unidade]');
+    var linha = btn.closest('.acao-linha[data-id], .u-prox[data-id]') || (uCard && uCard.dataset.id ? uCard : null);
+    var id = linha ? linha.dataset.id : null;
+
     if (acao === 'abrir-projeto') { abrirProjeto(btn.dataset.projeto); return; }
-    if (acao === 'menu-coluna') { menuColuna(btn, btn.closest('[data-coluna]')); return; }
-    if (acao === 'novo-coluna') { var g = grupoPorId(btn.closest('[data-coluna]').dataset.coluna); if (g) inserirTemp(Object.assign({ coluna: g.id }, g.novo)); return; }
+    if (acao === 'toggle-unidade') {
+      var uid = uCard.dataset.unidade;
+      var ab = cfg().abertos;
+      if (ab[uid]) delete ab[uid]; else ab[uid] = true;
+      guardarVista(); render(); return;
+    }
+    if (acao === 'menu-unidade') { menuUnidade(btn, uCard.dataset.unidade); return; }
+    if (acao === 'concluir-projeto') { concluirProjeto(btn.dataset.projeto); return; }
+    if (acao === 'decompor-projeto') { abrirProjeto(btn.dataset.projeto); setTimeout(function () { $('projDecomporBtn').click(); }, 60); return; }
+    if (acao === 'novo-coluna') {
+      var col = btn.closest('[data-coluna]');
+      var hoje = G.hojeISO(), ch = col.dataset.chave;
+      var pre = ch === 'hoje' ? { prazo: hoje } : ch === 'semana' ? { prazo: proximaSexta(hoje) } : {};
+      vista = 'lista'; inserirTemp(pre); return;
+    }
+    if (acao === 'restaurar') {
+      var l = btn.closest('[data-anul-id]');
+      restaurar(l.dataset.anulTipo, l.dataset.anulId); return;
+    }
     if (!id) return;
     if (acao === 'menu') { menuLinha(btn, id); }
-    else if (acao === 'concluir') { concluirEmCurso = id; prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
+    else if (acao === 'concluir') { concluirEmCurso = id; render(); }
     else if (acao === 'cancelar-concluir') { concluirEmCurso = null; render(); }
     else if (acao === 'confirmar-concluir') { confirmarConcluir(id); }
     else if (acao === 'adiar') { adiar(id); }
     else if (acao === 'anular') { anular(id); }
-    else if (acao === 'editar-prazo') { prazoEmEdicao = id; concluirEmCurso = null; duracaoEmEdicao = null; render(); }
-    else if (acao === 'limpar-prazo') { prazoEmEdicao = null; setFolha(id, 'prazo', null); }
-    else if (acao === 'editar-duracao') { duracaoEmEdicao = id; concluirEmCurso = null; prazoEmEdicao = null; render(); }
-    else if (acao === 'tirar-dep') {
-      var deps = depsDe(obrs[id]).filter(function (d) { return d !== btn.dataset.dep; });
-      setFolha(id, 'dependeDe', deps.length ? deps : null);
-    }
-  });
-  document.getElementById('main').addEventListener('change', function (ev) {
-    var el = ev.target;
-    if (el.dataset && el.dataset.acao === 'add-dep' && el.value) {
-      var linha = el.closest('[data-id]'); if (!linha) return;
-      var id = linha.dataset.id;
-      var deps = depsDe(obrs[id]);
-      if (deps.indexOf(el.value) < 0) deps.push(el.value);
-      setFolha(id, 'dependeDe', deps);
-      return;
-    }
-    if (el.dataset && el.dataset.prazo) {
-      var pid = el.dataset.prazo; prazoEmEdicao = null;
-      setFolha(pid, 'prazo', /^\d{4}-\d{2}-\d{2}$/.test(el.value) ? el.value : null);
-      return;
-    }
-    if (el.dataset && el.dataset.duracao) {
-      var did = el.dataset.duracao; var n = numOuNull(el.value);
-      duracaoEmEdicao = null;
-      if (n) setFolha(did, 'duracaoPrevista', n); else render();
-    }
   });
   document.getElementById('main').addEventListener('keydown', function (ev) {
     var el = ev.target;
     if (el.dataset && el.dataset.real) {
       if (ev.key === 'Enter') { ev.preventDefault(); confirmarConcluir(el.dataset.real); }
       if (ev.key === 'Escape') { ev.stopPropagation(); concluirEmCurso = null; render(); }
-    }
-    if (el.dataset && (el.dataset.prazo || el.dataset.duracao) && ev.key === 'Escape') { ev.stopPropagation(); prazoEmEdicao = null; duracaoEmEdicao = null; render(); }
-  });
-  document.getElementById('main').addEventListener('focusout', function (ev) {
-    var el = ev.target;
-    if (el.dataset && el.dataset.prazo && prazoEmEdicao === el.dataset.prazo) {
-      setTimeout(function () { if (prazoEmEdicao === el.dataset.prazo && !document.activeElement.closest('[data-id="' + el.dataset.prazo + '"]')) { prazoEmEdicao = null; render(); } }, 150);
     }
   });
   function confirmarConcluir(id) {
@@ -2221,9 +3087,24 @@
     concluirEmCurso = null;
     concluir(id, n).catch(erroEscrita);
   }
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (menuAberto()) { fecharMenu(); return; }
+    if (edicaoAtiva) return;                 // o Escape da edição é tratado no próprio elemento
+    if (projetoAberto && !ev.target.closest('#sugBox, #atzBox, #decomporBox')) fecharProjeto();
+  });
 
-  /* ---------- Listeners ---------- */
-  var projetosLidos = false;
+  /* ---------- Listeners do Firebase ---------- */
+  // O deep-link não se gasta no PRIMEIRO snapshot: um snapshot inicial vazio (cache
+  // fria, rede lenta) deixaria o ?projeto=/#projeto= por abrir para sempre. Só se
+  // considera feito quando o projeto existe mesmo.
+  var deepLinkFeito = false;
+  function deepLinkInicial() {
+    var m = /^#projeto=(.+)$/.exec(location.hash);
+    var pid = m ? decodeURIComponent(m[1]) : null;
+    if (!pid) { var q = /[?&]projeto=([^&]+)/.exec(location.search); pid = q ? decodeURIComponent(q[1]) : null; }
+    return pid;
+  }
   obrigacoesRef.on('value', function (snap) {
     obrs = snap.val() || {};
     obrsCarregadas = true;
@@ -2232,16 +3113,21 @@
   projetosRef.on('value', function (snap) {
     projs = snap.val() || {};
     projsCarregados = true;
-    // Deep-link ?projeto=ID (usado ao voltar ao separador): só na primeira leitura.
-    if (projetoAberto === null && !projetosLidos) {
-      var m = /[?&]projeto=([^&]+)/.exec(location.search);
-      if (m && projs[decodeURIComponent(m[1])] && obrsCarregadas) abrirProjeto(decodeURIComponent(m[1]));
-      else if (m && projs[decodeURIComponent(m[1])]) projetoAberto = decodeURIComponent(m[1]);
+    if (!deepLinkFeito && projetoAberto === null) {
+      var pid = deepLinkInicial();
+      if (pid && projs[pid]) { deepLinkFeito = true; projetoAberto = pid; }
     }
-    projetosLidos = true;
     render();
-    if (projetoAberto && !$('painel').classList.contains('on')) abrirProjeto(projetoAberto);
+    if (projetoAberto && !$('painel').classList.contains('on')) abrirProjeto(projetoAberto, true);
   });
+  // As vistas guardadas chegam do Firebase (iguais no iPhone e no computador).
+  // O snapshot do nosso próprio update() é ignorado enquanto a escrita assenta,
+  // senão um toggle acabado de abrir fechava-se à espera da ida e volta.
+  vistasRef.on('value', function (snap) {
+    if (Date.now() < vistaSujaAte) return;
+    aplicarVistasDoFirebase(snap.val() || {});
+    render();
+  }, function (e) { console.warn('obrigacoesVistas não lido:', e); });
   });
 </script>
 </body>

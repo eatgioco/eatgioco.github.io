@@ -97,6 +97,14 @@
     '<symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>',
     '<symbol id="i-arrow-up-down" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>',
     '<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>',
+    // Set/2026, Bloco 1 da UX Notion da obrigacoes.html (projeto = página, ação = sub-item):
+    '<symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>',
+    '<symbol id="i-rotate-ccw" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>',
+    '<symbol id="i-maximize-2" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></symbol>',
+    '<symbol id="i-minimize-2" viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></symbol>',
+    '<symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>',
+    '<symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>',
+    '<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>',
     '</defs>',
     '</svg>'
   ].join('');
@@ -126,7 +134,9 @@
     // Set/2026, símbolo de tipo nas linhas de Movimentos da caixa.html:
     'arrow-down', 'arrow-up',
     // Set/2026, UX Notion da obrigacoes.html (pega, menu ⋯, Quadro, toolbar, duplicar):
-    'grip-vertical', 'more-horizontal', 'columns', 'filter', 'arrow-up-down', 'copy'
+    'grip-vertical', 'more-horizontal', 'columns', 'filter', 'arrow-up-down', 'copy',
+    // Set/2026, Bloco 1 da UX Notion da obrigacoes.html (pills, cadeado, desfazer, expandir):
+    'check', 'rotate-ccw', 'maximize-2', 'minimize-2', 'map-pin', 'monitor', 'inbox'
   ];
 
   function injectSprite() {

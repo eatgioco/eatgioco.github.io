@@ -38,6 +38,29 @@
                                           totalAbertas, parados:[{projeto, diasParado}] (> LIMITE_PARADO) }
    LIMITE_PARADO_DIAS = 14
 
+   PROJETO COMO PÁGINA (Set/2026, Bloco 1 da UX Notion): um projeto é a unidade das
+   vistas (equivalente a uma tarefa/página do Notion) e uma obrigação com projetoId é
+   uma AÇÃO dentro dele (equivalente a um sub-item). Tudo o que se segue é DERIVADO na
+   leitura e NUNCA é gravado no Firebase.
+   fmtDuracaoMin(min)                   → '30 min' · '1h30' · '2h'. 0/inválido → '0 min'.
+   ESTADOS_PROJETO / ROTULO_ESTADO_PROJETO
+   calculosProjeto(projeto, obrs, hoje) → { estado, passos, vivos, abertas, concluidas,
+                                          progresso:{feitas,total}, minutosRestantes,
+                                          bloqueadas, proximoPrazo, vencido, proxima }.
+                                          PRECEDÊNCIA do estado, por esta ordem:
+                                          (1) concluido — projeto.estado === 'concluido';
+                                          (2) vencido — prazo do projeto OU de uma ação
+                                              aberta já passado (diasEntre > 0);
+                                          (3) porDecompor — sem ações abertas NEM concluídas;
+                                          (4) bloqueado — há abertas mas proximaAcao() é null
+                                              (todas dependem de obrigações ainda abertas);
+                                          (5) emCurso — tudo o resto.
+                                          `vivos` exclui as anuladas: o progresso é 3/7 sobre
+                                          o que conta, não sobre o histórico.
+   calculosSolta(obr, hoje)             → o mesmo formato para uma obrigação SOLTA, que nas
+                                          vistas é uma linha ao nível dos projetos (um projeto
+                                          de uma só ação). Nunca 'porDecompor' nem 'bloqueado'.
+
    LOCAL (Set/2026): campo opcional obr.local ∈ LOCAIS ('loja'|'computador'|'rua'|
    'telefone') ou ausente/null = em qualquer sítio. ROTULO_LOCAL dá o texto.
    casaLocal(obr, filtro)               → true se filtro é null/'' OU obr.local é null OU igual —
@@ -230,6 +253,79 @@
     };
   }
 
+
+  /* ---------- Projeto como página: cálculos derivados (nunca gravados) ---------- */
+  var ESTADOS_PROJETO = ['concluido', 'vencido', 'porDecompor', 'bloqueado', 'emCurso'];
+  var ROTULO_ESTADO_PROJETO = {
+    concluido: 'Concluído', vencido: 'Vencido', porDecompor: 'Por decompor',
+    bloqueado: 'Bloqueado', emCurso: 'Em curso'
+  };
+
+  function fmtDuracaoMin(min){
+    var n = Number(min);
+    n = (isFinite(n) && n > 0) ? Math.round(n) : 0;
+    if (n < 60) return n + ' min';
+    var h = Math.floor(n / 60), m = n % 60;
+    return m ? h + 'h' + (m < 10 ? '0' : '') + m : h + 'h';
+  }
+
+  function prazoValido(v){ return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+
+  function viva(o){ return !!o && o.anulado !== true && o.estado !== 'anulada'; }
+
+  function agregado(projeto, vivos, abertas, concluidas, proxima, hoje, estadoBase){
+    var minutos = 0;
+    abertas.forEach(function(o){ var n = Number(o.duracaoPrevista); if (isFinite(n) && n > 0) minutos += n; });
+    var bloqueadas = 0;
+    var prazos = [];
+    if (projeto && prazoValido(projeto.prazo)) prazos.push(projeto.prazo);
+    abertas.forEach(function(o){ if (prazoValido(o.prazo)) prazos.push(o.prazo); });
+    prazos.sort();
+    var proximoPrazo = prazos.length ? prazos[0] : null;
+    var vencido = proximoPrazo !== null && diasEntre(proximoPrazo, hoje) > 0;
+    var estado;
+    if (estadoBase) estado = estadoBase;
+    else if (vencido) estado = 'vencido';
+    else if (!abertas.length && !concluidas.length) estado = 'porDecompor';
+    else if (!proxima && abertas.length) estado = 'bloqueado';
+    else estado = 'emCurso';
+    return {
+      estado: estado, vivos: vivos, abertas: abertas, concluidas: concluidas,
+      progresso: { feitas: concluidas.length, total: vivos.length },
+      minutosRestantes: minutos, bloqueadas: bloqueadas,
+      proximoPrazo: proximoPrazo, vencido: vencido, proxima: proxima || null
+    };
+  }
+
+  function calculosProjeto(projeto, obrs, hoje){
+    hoje = hoje || hojeISO();
+    var pid = projeto && projeto.id;
+    var passos = pid ? passosDoProjeto(pid, obrs) : [];
+    var vivos = passos.filter(viva);
+    var abertas = vivos.filter(estaAberta);
+    var concluidas = vivos.filter(function(o){ return o.estado === 'concluida'; });
+    var prox = pid ? proximaAcao(pid, obrs) : null;
+    var base = (projeto && projeto.estado === 'concluido') ? 'concluido' : null;
+    var r = agregado(projeto, vivos, abertas, concluidas, prox, hoje, base);
+    r.bloqueadas = abertas.filter(function(o){ return !dependenciasSatisfeitas(o, obrs); }).length;
+    r.passos = passos;
+    return r;
+  }
+
+  // Uma solta é, nas vistas, um projeto de uma só ação: mesmo formato, sem
+  // 'porDecompor' (tem sempre a sua ação) e sem 'bloqueado' (não tem passos a montante).
+  function calculosSolta(obr, hoje){
+    hoje = hoje || hojeISO();
+    var vivos = viva(obr) ? [obr] : [];
+    var abertas = vivos.filter(estaAberta);
+    var concluidas = vivos.filter(function(o){ return o.estado === 'concluida'; });
+    var base = (obr && obr.estado === 'concluida') ? 'concluido' : null;
+    var r = agregado(null, vivos, abertas, concluidas, abertas[0] || null, hoje, base);
+    if (r.estado === 'porDecompor' || r.estado === 'bloqueado') r.estado = 'emCurso';
+    r.passos = vivos;
+    return r;
+  }
+
   var G = {
     LIMITE_PARADO_DIAS: LIMITE_PARADO_DIAS,
     DURACAO_DEFAULT: DURACAO_DEFAULT,
@@ -248,7 +344,13 @@
     ROTULO_LOCAL: ROTULO_LOCAL,
     casaLocal: casaLocal,
     distanciaMetros: distanciaMetros,
-    localMaisProximo: localMaisProximo
+    localMaisProximo: localMaisProximo,
+    ESTADOS_PROJETO: ESTADOS_PROJETO,
+    ROTULO_ESTADO_PROJETO: ROTULO_ESTADO_PROJETO,
+    fmtDuracaoMin: fmtDuracaoMin,
+    prazoValido: prazoValido,
+    calculosProjeto: calculosProjeto,
+    calculosSolta: calculosSolta
   };
   if (typeof window !== 'undefined') window.GiocoObrigacoes = G;
   if (typeof module !== 'undefined' && module.exports) module.exports = G;
