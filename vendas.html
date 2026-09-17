@@ -288,6 +288,21 @@
   #relatorioBody tr.dia-saltado td{ color:var(--muted); text-decoration:line-through; }
   #relatorioBody tr.dia-saltado td:nth-child(2){ color:var(--red-ink); text-decoration:none; }
 
+  /* ---------- Resumo do import (antes de gravar) ---------- */
+  /* Mesma gramática de cor do relatório: a cor é só da coluna da acção. */
+  #resumoBody td:nth-child(2){ font-weight:700; }
+  #resumoBody tr.dia-novo td:nth-child(2){ color:var(--green); }
+  #resumoBody tr.dia-substituido td:nth-child(2){ color:var(--muted); }
+  #resumoBody tr.dia-suspeito td:nth-child(2){ color:var(--amber); }
+  #resumoBody tr.dia-saltado td{ color:var(--muted); }
+  #resumoCard .nota-fina{ font-weight:400; color:var(--muted); font-size:12px; }
+  #resumoCheck{ margin:14px 0 0; }
+  .forcar-linha{ display:flex; align-items:flex-start; gap:8px; margin-top:12px;
+                 font-size:13px; color:var(--red-ink); }
+  .forcar-linha input{ margin-top:2px; }
+  /* Nota da madrugada na barra "A ver: <dia>". */
+  .dia-aviso .madrugada-nota{ color:var(--muted); font-size:12px; }
+
   /* ---------- KPIs ----------
      .kpi-row / .kpi / .k-label / .k-value vêm do shell. Aqui só o que esta
      página precisa a mais: mudar de linha (há vistas com 5 KPIs) e o
@@ -804,7 +819,8 @@
         <p class="card-note">
           O IVA não distingue comida de bebida (água e cafés estão a 13% tal como as focaccias),
           por isso a categoria é explícita. Confirma as sugestões abaixo — os produtos já
-          classificados não voltam a aparecer.
+          classificados não voltam a aparecer. A seguir vês o resumo do import, e só aí é que
+          alguma coisa é gravada (podes voltar aqui, mudar uma categoria e confirmar outra vez).
         </p>
         <div class="table-wrap">
           <table class="cat-grid">
@@ -822,8 +838,46 @@
           </table>
         </div>
         <div class="toolbar">
-          <button class="btn-add" id="btnGravar">Confirmar e gravar</button>
+          <button class="btn-add" id="btnGravar">Confirmar categorias</button>
           <button class="btn" id="btnCancelar">Cancelar import</button>
+        </div>
+      </div>
+
+      <!-- ============ RESUMO DO IMPORT (antes de gravar) ============ -->
+      <div class="card glass-light hidden" id="resumoCard">
+        <p class="card-title">O que este import vai fazer</p>
+        <p class="card-note">
+          Cada documento conta para o <strong>dia de operação</strong>: o que é fechado antes
+          das 5h pertence ao dia anterior. Um dia que o ficheiro cobre por inteiro é
+          substituído; um dia que o ficheiro só toca em parte recebe apenas os documentos
+          novos, sem perder os que já lá estão. Nada é gravado até confirmares.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Dia de operação</th>
+                <th>Acção</th>
+                <th class="num">Total antes</th>
+                <th class="num">Total depois</th>
+                <th class="num">Variação</th>
+                <th class="num">Docs da madrugada</th>
+              </tr>
+            </thead>
+            <tbody id="resumoBody"></tbody>
+          </table>
+        </div>
+        <div class="msg" id="resumoCheck"></div>
+        <div id="resumoAvisos"></div>
+        <div class="hidden" id="resumoForcar">
+          <label class="forcar-linha">
+            <input type="checkbox" id="resumoForcarCheck">
+            Sei o que estou a fazer: os valores mudaram de propósito (ficheiro corrigido) — gravar na mesma.
+          </label>
+        </div>
+        <div class="toolbar">
+          <button class="btn-add" id="btnConfirmarImport">Gravar</button>
+          <button class="btn" id="btnCancelarResumo">Cancelar import</button>
         </div>
       </div>
 
@@ -1270,14 +1324,202 @@
   /* =========================================================
      Parse do SAF-T → agregados intermédios (um por dia)
      ========================================================= */
+  /* =========================================================
+     Dia de operação
+     =========================================================
+     Um serviço que fecha depois da meia-noite pertence ao dia em que abriu:
+     todo o documento fechado ANTES das CORTE_DIA_OPERACAO_H conta para o dia
+     anterior. É uma regra de GESTÃO e só vale dentro da OS — o ficheiro SAF-T
+     e a data fiscal (InvoiceDate) não se alteram, e a contabilidade continua
+     a ser feita pela data do documento. Mudar este número muda a atribuição
+     de todos os imports SEGUINTES; os dias já gravados ficam como estão. */
+  var CORTE_DIA_OPERACAO_H = 5;
+
+  /* Aritmética de datas pelos componentes, via Date.UTC — nunca por fuso
+     local nem por milissegundos: 01/10 00:30 → 30/09 (muda também o mês do
+     nó), 01/01 → 31/12 do ano anterior, e 25/10/2026 (mudança de hora) não é
+     caso especial nenhum, porque não há hora nenhuma nesta conta. */
+  function somaDias(dia, n){
+    var y = parseInt(dia.slice(0, 4), 10);
+    var m = parseInt(dia.slice(5, 7), 10);
+    var d = parseInt(dia.slice(8, 10), 10);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  }
+
+  /* Hora do fecho (SystemEntryDate). -1 = o documento não traz hora. */
+  function horaDoSistema(systemEntry){
+    var hm = String(systemEntry || '').match(/^\d{4}-\d{2}-\d{2}T(\d{2}):/);
+    return hm ? parseInt(hm[1], 10) : -1;
+  }
+
+  /* doc = { systemEntry, invoiceDate }. O SystemEntryDate manda (é o fecho);
+     sem ele vale o InvoiceDate, que não traz hora e por isso nunca recua. */
+  function diaOperacao(doc){
+    var se = doc && doc.systemEntry ? String(doc.systemEntry) : '';
+    var temSe = /^\d{4}-\d{2}-\d{2}/.test(se);
+    var base = temSe ? se : String((doc && doc.invoiceDate) || '');
+    var dia = base.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return '';
+    var h = temSe ? horaDoSistema(se) : -1;
+    return (h >= 0 && h < CORTE_DIA_OPERACAO_H) ? somaDias(dia, -1) : dia;
+  }
+
+  /* A data fiscal do documento, que é o que o SAF-T diz e não muda nunca. */
+  function diaFiscal(doc){
+    var inv = String((doc && doc.invoiceDate) || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(inv)) return inv;
+    var se = String((doc && doc.systemEntry) || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(se) ? se : '';
+  }
+
+  /* Ordem das horas DENTRO do dia de operação: começa no corte e dá a volta
+     (5, 6, …, 23, 0, …, 4). É esta ordem que põe a madrugada a seguir às 23h
+     e não no início do dia. */
+  function horasOperacao(){
+    var out = [];
+    for (var i = 0; i < 24; i++) out.push((CORTE_DIA_OPERACAO_H + i) % 24);
+    return out;
+  }
+  function posOperacao(h){
+    return (((Number(h) || 0) - CORTE_DIA_OPERACAO_H) + 24) % 24;
+  }
+
+  /* =========================================================
+     Parse do SAF-T → documentos e agregados intermédios (um por dia)
+     ========================================================= */
   function novoDia(){
     return {
       bruto:0, liquido:0, docs:0, qtdTotal:0,
       produtos:{},                 // key → { codigo, desc, qtd, valor, iva }
       porDia:{}, porHora:{}, porDiaSemana:{},
       porTipo:{}, porPagamento:{},
-      taloes:[]                    // arrays de keys de produto, por talão
+      taloes:[],                   // arrays de keys de produto, por talão
+      documentos:{},               // docKey → { bruto, fiscal }
+      madrugada:{ bruto:0, docs:0, dataFiscal:null }
     };
+  }
+
+  /* Um documento do ficheiro, já descascado do XML. Guardar o documento (e
+     não só o agregado) é o que permite reimportar sem duplicar: um dia pode
+     ser recomposto a partir de um SUBCONJUNTO dos documentos. */
+  function lerDocumento(inv, indice){
+    var invoiceType = txt(inv, 'InvoiceType') || 'OU';
+    var invoiceNo   = txt(inv, 'InvoiceNo');
+    var invoiceDate = txt(inv, 'InvoiceDate');
+    var systemEntry = txt(inv, 'SystemEntryDate');
+
+    var status = kid(inv, 'DocumentStatus');
+    var anulado = (status ? txt(status, 'InvoiceStatus') : '') === 'A';
+
+    var totais = kid(inv, 'DocumentTotals');
+    var d = {
+      key: keyFor(invoiceNo || (invoiceType + '_' + systemEntry + '_' + indice)),
+      numero: invoiceNo,
+      tipo: invoiceType,
+      anulado: anulado,
+      fiscal: diaFiscal({ invoiceDate: invoiceDate, systemEntry: systemEntry }),
+      diaOp: diaOperacao({ invoiceDate: invoiceDate, systemEntry: systemEntry }),
+      hora: horaDoSistema(systemEntry),
+      bruto: totais ? numTxt(totais, 'GrossTotal') : 0,
+      liquido: totais ? numTxt(totais, 'NetTotal') : 0,
+      pagamentos: [],
+      linhas: []
+    };
+    if (anulado) return d;   // anulada não conta para nada: nem linhas nem pagamentos
+
+    var pagamentos = totais ? kids(totais, 'Payment') : [];
+    for (var p = 0; p < pagamentos.length; p++){
+      d.pagamentos.push({
+        mec: txt(pagamentos[p], 'PaymentMechanism') || 'OU',
+        valor: numTxt(pagamentos[p], 'PaymentAmount')
+      });
+    }
+
+    var linhas = kids(inv, 'Line');
+    for (var l = 0; l < linhas.length; l++){
+      var linha = linhas[l];
+      var codigo = txt(linha, 'ProductCode');
+      var descr  = txt(linha, 'ProductDescription');
+      var qtd    = numTxt(linha, 'Quantity');
+      var pvp    = numTxt(linha, 'UnitPrice');
+
+      var credito = kid(linha, 'CreditAmount');
+      var valorLinha, sinal;
+      if (credito){ valorLinha = numTxt(linha, 'CreditAmount'); sinal = 1; }
+      else { valorLinha = -numTxt(linha, 'DebitAmount'); sinal = -1; }
+
+      var taxEl = kid(linha, 'Tax');
+      var k = keyFor(codigo || descr);
+      d.linhas.push({
+        k: k, codigo: codigo || descr, desc: descr || codigo || k, descRaw: descr,
+        qtd: qtd * sinal, valor: valorLinha,
+        iva: taxEl ? numTxt(taxEl, 'TaxPercentage') : 0, pvp: pvp
+      });
+    }
+    return d;
+  }
+
+  /* Agrega uma LISTA de documentos (já do mesmo dia de operação) na mesma
+     forma intermédia de sempre, a que o construirPayload consome. É pura e é
+     o que permite construir o agregado de um subconjunto de documentos. */
+  function agregarDocs(docs){
+    var m = novoDia();
+    for (var i = 0; i < docs.length; i++){
+      var d = docs[i];
+      m.bruto += d.bruto;
+      m.liquido += d.liquido;
+      m.docs += 1;
+      m.documentos[d.key] = { bruto: d.bruto, fiscal: d.fiscal };
+
+      var pd = m.porDia[d.diaOp] || (m.porDia[d.diaOp] = { bruto:0, docs:0 });
+      pd.bruto += d.bruto; pd.docs += 1;
+
+      // --- por hora (hora de FECHO; a madrugada fica com a hora real, 0..4)
+      if (d.hora >= 0 && d.hora <= 23){
+        var h = m.porHora[d.hora] || (m.porHora[d.hora] = { bruto:0, docs:0 });
+        h.bruto += d.bruto; h.docs += 1;
+      }
+
+      var dow = new Date(d.diaOp + 'T12:00:00').getDay();
+      var ds = m.porDiaSemana[dow] || (m.porDiaSemana[dow] = { bruto:0, docs:0, datas:{} });
+      ds.bruto += d.bruto; ds.docs += 1; ds.datas[d.diaOp] = true;
+
+      var t = m.porTipo[d.tipo] || (m.porTipo[d.tipo] = { bruto:0, docs:0 });
+      t.bruto += d.bruto; t.docs += 1;
+
+      var mecanismosVistos = {};
+      for (var p = 0; p < d.pagamentos.length; p++){
+        var mec = d.pagamentos[p].mec;
+        var pg = m.porPagamento[mec] || (m.porPagamento[mec] = { bruto:0, docs:0 });
+        pg.bruto += d.pagamentos[p].valor;
+        if (!mecanismosVistos[mec]){ pg.docs += 1; mecanismosVistos[mec] = true; }
+      }
+
+      var keysTalao = {};
+      for (var l = 0; l < d.linhas.length; l++){
+        var linha = d.linhas[l];
+        var prod = m.produtos[linha.k];
+        if (!prod){
+          prod = m.produtos[linha.k] = { codigo: linha.codigo, desc: linha.desc, qtd:0, valor:0, iva: linha.iva };
+        }
+        if (linha.descRaw && !prod.desc) prod.desc = linha.descRaw;
+        prod.qtd += linha.qtd;
+        prod.valor += linha.valor;
+        if (linha.iva) prod.iva = linha.iva;
+        if (linha.pvp && !prod.pvpTabela) prod.pvpTabela = linha.pvp;
+        m.qtdTotal += linha.qtd;
+        keysTalao[linha.k] = true;
+      }
+      m.taloes.push(Object.keys(keysTalao));
+
+      // Fechado depois da meia-noite: a data fiscal é o dia seguinte ao de operação.
+      if (d.fiscal && d.fiscal !== d.diaOp){
+        m.madrugada.bruto += d.bruto;
+        m.madrugada.docs += 1;
+        m.madrugada.dataFiscal = d.fiscal;
+      }
+    }
+    return m;
   }
 
   function parseSaft(xmlText, onProgress){
@@ -1311,123 +1553,52 @@
       throw new Error('O SAF-T não contém nenhuma fatura no período.');
     }
 
-    var dias = {};
+    var docsPorDia = {};          // dia de operação → [documento]
+    var anuladosPorDia = {};      // dia de operação → { docKey: true }
     var anuladas = 0;
     var anuladasPorMes = {};
+    var fiscaisNoFicheiro = {};   // dia fiscal → true (inclui os anulados)
     var total = invoices.length;
 
     for (var i = 0; i < total; i++){
-      var inv = invoices[i];
+      var d = lerDocumento(invoices[i], i);
 
-      var invoiceType = txt(inv, 'InvoiceType') || 'OU';
-      var invoiceDate = txt(inv, 'InvoiceDate');
-      var systemEntry = txt(inv, 'SystemEntryDate');
+      if (d.fiscal) fiscaisNoFicheiro[d.fiscal] = true;
 
-      var status = kid(inv, 'DocumentStatus');
-      var invStatus = status ? txt(status, 'InvoiceStatus') : '';
-      if (invStatus === 'A'){
+      if (d.anulado){
         anuladas++;
-        var mesAnulada = (invoiceDate || systemEntry.slice(0, 10)).slice(0, 7);
+        var mesAnulada = (d.fiscal || '').slice(0, 7);
         if (/^\d{4}-\d{2}$/.test(mesAnulada)){
           anuladasPorMes[mesAnulada] = (anuladasPorMes[mesAnulada] || 0) + 1;
         }
-        continue;
-      }
-
-      var dia = (invoiceDate || systemEntry.slice(0, 10)).slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) continue;
-
-      var m = dias[dia] || (dias[dia] = novoDia());
-
-      var totais = kid(inv, 'DocumentTotals');
-      var bruto  = totais ? numTxt(totais, 'GrossTotal') : 0;
-      var liq    = totais ? numTxt(totais, 'NetTotal') : 0;
-
-      m.bruto += bruto;
-      m.liquido += liq;
-      m.docs += 1;
-
-      // --- por dia
-      var d = m.porDia[dia] || (m.porDia[dia] = { bruto:0, docs:0 });
-      d.bruto += bruto; d.docs += 1;
-
-      // --- por hora (SystemEntryDate traz hora; InvoiceDate não)
-      var hora = -1;
-      var hm = systemEntry.match(/T(\d{2}):/);
-      if (hm) hora = parseInt(hm[1], 10);
-      if (hora >= 0 && hora <= 23){
-        var h = m.porHora[hora] || (m.porHora[hora] = { bruto:0, docs:0 });
-        h.bruto += bruto; h.docs += 1;
-      }
-
-      // --- por dia da semana
-      var dow = new Date(dia + 'T12:00:00').getDay();
-      var ds = m.porDiaSemana[dow] || (m.porDiaSemana[dow] = { bruto:0, docs:0, datas:{} });
-      ds.bruto += bruto; ds.docs += 1; ds.datas[dia] = true;
-
-      // --- por tipo de documento (FS / FR / ...)
-      var t = m.porTipo[invoiceType] || (m.porTipo[invoiceType] = { bruto:0, docs:0 });
-      t.bruto += bruto; t.docs += 1;
-
-      // --- meios de pagamento
-      var pagamentos = totais ? kids(totais, 'Payment') : [];
-      var mecanismosVistos = {};
-      for (var p = 0; p < pagamentos.length; p++){
-        var mec = txt(pagamentos[p], 'PaymentMechanism') || 'OU';
-        var valorPag = numTxt(pagamentos[p], 'PaymentAmount');
-        var pg = m.porPagamento[mec] || (m.porPagamento[mec] = { bruto:0, docs:0 });
-        pg.bruto += valorPag;
-        if (!mecanismosVistos[mec]){ pg.docs += 1; mecanismosVistos[mec] = true; }
-      }
-
-      // --- linhas
-      var linhas = kids(inv, 'Line');
-      var keysTalao = {};
-      for (var l = 0; l < linhas.length; l++){
-        var linha = linhas[l];
-        var codigo = txt(linha, 'ProductCode');
-        var descr  = txt(linha, 'ProductDescription');
-        var qtd    = numTxt(linha, 'Quantity');
-        var pvp    = numTxt(linha, 'UnitPrice');
-
-        var credito = kid(linha, 'CreditAmount');
-        var valorLinha, sinal;
-        if (credito){
-          valorLinha = numTxt(linha, 'CreditAmount'); sinal = 1;
-        } else {
-          valorLinha = -numTxt(linha, 'DebitAmount'); sinal = -1;
+        if (d.diaOp){
+          (anuladosPorDia[d.diaOp] || (anuladosPorDia[d.diaOp] = {}))[d.key] = true;
         }
-
-        var taxEl = kid(linha, 'Tax');
-        var iva = taxEl ? numTxt(taxEl, 'TaxPercentage') : 0;
-
-        var k = keyFor(codigo || descr);
-        var prod = m.produtos[k];
-        if (!prod){
-          prod = m.produtos[k] = { codigo: codigo || descr, desc: descr || codigo || k, qtd:0, valor:0, iva: iva };
-        }
-        if (descr && !prod.desc) prod.desc = descr;
-        prod.qtd += qtd * sinal;
-        prod.valor += valorLinha;
-        if (iva) prod.iva = iva;
-        if (pvp && !prod.pvpTabela) prod.pvpTabela = pvp;
-
-        m.qtdTotal += qtd * sinal;
-        keysTalao[k] = true;
+      } else if (d.diaOp){
+        (docsPorDia[d.diaOp] || (docsPorDia[d.diaOp] = [])).push(d);
       }
-
-      m.taloes.push(Object.keys(keysTalao));
 
       if (i % 250 === 0){
         onProgress(0.15 + 0.7 * (i / total), 'A ler faturas… ' + intFmt(i) + ' / ' + intFmt(total));
       }
     }
 
-    if (!Object.keys(dias).length){
+    if (!Object.keys(docsPorDia).length){
       throw new Error('Não foi possível agregar nenhuma fatura (todas anuladas ou sem data válida).');
     }
 
-    return { dias: dias, anuladas: anuladas, anuladasPorMes: anuladasPorMes,
+    /* Intervalo FISCAL coberto pelo ficheiro — é o que diz se um dia de
+       operação está coberto por inteiro (precisa do dia fiscal X e do X+1).
+       Sai dos documentos, não do cabeçalho: é o que se sabe mesmo. */
+    var fiscais = Object.keys(fiscaisNoFicheiro).sort();
+    var intervalo = { inicio: fiscais[0], fim: fiscais[fiscais.length - 1] };
+
+    var dias = {};
+    Object.keys(docsPorDia).forEach(function(dia){ dias[dia] = agregarDocs(docsPorDia[dia]); });
+
+    return { dias: dias, docsPorDia: docsPorDia, anuladosPorDia: anuladosPorDia,
+             intervalo: intervalo, diasFiscais: fiscaisNoFicheiro,
+             anuladas: anuladas, anuladasPorMes: anuladasPorMes,
              totalFaturas: total, header: headerInfo };
   }
 
@@ -1596,6 +1767,30 @@
     };
     payload.pares = topPares(m.taloes, paresLimite || 30);
 
+    /* Registo dos documentos que este dia inclui (chave = número do documento
+       saneado). É isto que torna a reimportação idempotente: sabendo o que já
+       lá está, um ficheiro que só cobre parte do dia junta o que falta em vez
+       de substituir o dia inteiro. Só o valor `true` — o detalhe do documento
+       vive no ficheiro, não no Firebase. O valor é o bruto do documento — é o
+       que permite saber quanto sai do dia quando um documento é anulado numa
+       reimportação, sem ter de reler o ficheiro antigo. */
+    var documentos = {};
+    Object.keys(m.documentos || {}).forEach(function(k){
+      documentos[k] = round(m.documentos[k].bruto, 2);
+    });
+    payload.documentos = documentos;
+
+    /* Vendas fechadas depois da meia-noite, já atribuídas a este dia de
+       operação. Só existe quando há alguma — um dia sem madrugada não ganha
+       o campo. */
+    if (m.madrugada && m.madrugada.docs){
+      payload.madrugada = {
+        bruto: round(m.madrugada.bruto, 2),
+        docs: m.madrugada.docs,
+        dataFiscal: m.madrugada.dataFiscal
+      };
+    }
+
     return payload;
   }
 
@@ -1611,7 +1806,9 @@
     });
   }
 
-  function mergePayloads(lista){
+  /* `limitePares` só existe para o merge de DIAS (que guardam mais pares do
+     que o mês); sem ele o comportamento é o de sempre, 30. */
+  function mergePayloads(lista, limitePares){
     var out = {
       resumo:{ bruto:0, liquido:0, docs:0, dias:0, ticket:0, artigosPorTalao:0, valorPorArtigo:0, qtdTotal:0 },
       produtos:{}, porDia:{}, porHora:{}, porDiaSemana:{}, porTipo:{},
@@ -1689,7 +1886,7 @@
     out.attach.taxa = out.attach.taloesComFocaccia
       ? out.attach.taloesComFocacciaEBebida / out.attach.taloesComFocaccia : 0;
     out.pares = Object.keys(paresMapa).map(function(chave){ return paresMapa[chave]; })
-      .sort(ordemPares).slice(0, 30);
+      .sort(ordemPares).slice(0, limitePares || 30);
 
     return out;
   }
@@ -1774,6 +1971,7 @@
     diasCache: {},         // 'mes/dia' -> payload de vendasDiario/ (null = não existe)
     ordemProdutos: 'valor',
     planoMigracao: null,   // plano calculado por verificarMigracao()
+    planoImport: null,     // { res, novasEntradas, meta, catalogo } — o import à espera de confirmação
     escritorCatalogo: null, // só os testes preenchem, para simular falhas de escrita
     seccoes: lerPrefs(LS_SECCOES),        // estado aberto/fechado por secção
     vistasGrafico: lerPrefs(LS_VISTAS)    // tipo de gráfico escolhido por secção
@@ -2134,12 +2332,17 @@
 
         estado.pendente = {
           dias: parsed.dias,
+          docsPorDia: parsed.docsPorDia,
+          anuladosPorDia: parsed.anuladosPorDia,
+          intervalo: parsed.intervalo,
+          diasFiscais: parsed.diasFiscais,
           anuladas: parsed.anuladas,
           anuladasPorMes: parsed.anuladasPorMes,
           header: parsed.header,
           ficheiro: file.name,
           novos: novos
         };
+        estado.planoImport = null;
 
         esconderProgresso();
 
@@ -2155,7 +2358,8 @@
         mostrarMsg('msgOk',
           'Lido em ' + segundos + 's: ' + intFmt(faturasOk) + ' faturas válidas em ' +
           intFmt(diasLista.length) + ' dia' + (diasLista.length === 1 ? '' : 's') +
-          ' (' + mesesLista.map(nomeMes).join(', ') + ').');
+          ' de operação (' + mesesLista.map(nomeMes).join(', ') + ').' +
+          ' Um documento fechado antes das ' + CORTE_DIA_OPERACAO_H + 'h conta para o dia anterior.');
 
         if (parsed.anuladas > 0){
           var detalhe = Object.keys(parsed.anuladasPorMes).sort().map(function(mes){
@@ -2235,58 +2439,227 @@
     return Math.abs(n - a) / a;
   }
 
-  /* Lê o estado actual de cada dia do import em vendasDiario/ e decide o que
-     fazer com ele. Só pergunta ao utilizador quando um dia que já existia muda
-     de bruto em mais de LIMIAR_SUSPEITA — reimportar o mesmo dia com o mesmo
-     valor, ou juntar dias novos a um mês já importado, é rotina e não leva
-     confirmação nenhuma. */
+  /* Acima deste desvio, um dia que já existia e é substituído aparece
+     marcado no resumo do import — não bloqueia, chama a atenção. */
   var LIMIAR_SUSPEITA = 0.05;
 
-  function planearDias(dias, payloads){
-    var lista = Object.keys(dias).sort();
+  /* --------- Funde dois payloads de dia (PURA) ---------
+     Só se usa quando um dia GANHA documentos sem perder os que já tinha. O
+     mergePayloads soma tudo, incluindo os contadores de dias — mas um dia é
+     um dia, por isso repõem-se a 1. O registo de documentos e a madrugada não
+     passam pelo merge (não são agregados somáveis por chave): juntam-se aqui. */
+  function fundirDiaPayloads(existente, novo, meta){
+    var out = mergePayloads([existente, novo], PARES_POR_DIA);
+    out.resumo.dias = 1;
+    Object.keys(out.porDiaSemana || {}).forEach(function(dow){ out.porDiaSemana[dow].dias = 1; });
+
+    var documentos = {};
+    [existente, novo].forEach(function(p){
+      var reg = (p && p.documentos) || {};
+      Object.keys(reg).forEach(function(k){ documentos[k] = reg[k]; });
+    });
+    out.documentos = documentos;
+
+    var mb = 0, md = 0, df = null;
+    [existente, novo].forEach(function(p){
+      var mg = p && p.madrugada;
+      if (!mg || !mg.docs) return;
+      mb += Number(mg.bruto) || 0;
+      md += Number(mg.docs) || 0;
+      df = mg.dataFiscal || df;
+    });
+
+    out = arredondarPayload(out);
+    if (md) out.madrugada = { bruto: round(mb, 2), docs: md, dataFiscal: df };
+    out.resumo.importadoEm = meta.importadoEm;
+    out.resumo.ficheiro = meta.ficheiro;
+    return out;
+  }
+
+  function dentroDoIntervalo(intervalo, dia){
+    return !!intervalo && dia >= intervalo.inicio && dia <= intervalo.fim;
+  }
+
+  function brutoDe(payload){
+    return (payload && payload.resumo) ? (Number(payload.resumo.bruto) || 0) : 0;
+  }
+
+  /* --------- Plano de importação (PURO, sem Firebase e sem DOM) ---------
+
+     entrada = { docsPorDia, anuladosPorDia, intervalo, estadoDias, catalogo, meta }
+       docsPorDia   dia de operação → [documento] (do parseSaft)
+       intervalo    { inicio, fim } — dias FISCAIS cobertos pelo ficheiro
+       estadoDias   dia → payload que está hoje em vendasDiario/ (null se não
+                    existe). Tem de trazer os dias de operação do ficheiro E os
+                    dias fiscais do ficheiro (os segundos só para saber se já
+                    existiam — é isso que diz se um documento já estava na OS).
+
+     Regras por dia de operação X:
+       · X COM registo de documentos
+           - ficheiro cobre X por inteiro (tem o dia fiscal X e o X+1) → substituir
+           - senão → juntar só os documentos novos, sem nunca apagar nada
+       · X SEM registo (dados antigos, gravados pela data fiscal)
+           - dia fiscal X dentro do ficheiro → substituir por inteiro
+           - senão (X é o dia anterior ao início do ficheiro e só recebe
+             madrugada) → juntar, que nos dados antigos essa madrugada estava
+             no dia seguinte e não duplica
+       · dias fora do ficheiro não são tocados.
+
+     Verificação: Σ das variações dos dias afectados tem de ser igual ao valor
+     dos documentos NOVOS para a OS menos o dos que deixam de contar (anulados
+     retirados num dia substituído). Numa reimportação de dias já gravados pela
+     data fiscal os dois lados são zero. */
+  function planearImportOperacao(entrada){
+    var docsPorDia = entrada.docsPorDia || {};
+    var anuladosPorDia = entrada.anuladosPorDia || {};
+    var intervalo = entrada.intervalo;
+    var estadoDias = entrada.estadoDias || {};
+    var catalogo = entrada.catalogo || {};
+    var meta = entrada.meta || {};
+
+    function existiaAntes(dia){ return !!estadoDias[dia]; }
+    function registoDe(p){ return (p && p.documentos) ? p.documentos : null; }
+    function tem(reg, k){ return !!reg && Object.prototype.hasOwnProperty.call(reg, k); }
+
+    var plano = [], payloads = {}, avisos = [];
+    var deltaTotal = 0, novosTotal = 0, retiradosTotal = 0, novosDocs = 0;
+
+    Object.keys(docsPorDia).sort().forEach(function(dia){
+      var docs = docsPorDia[dia];
+      var existente = estadoDias[dia] || null;
+      var reg = registoDe(existente);
+      var cobertoInteiro = dentroDoIntervalo(intervalo, dia) && dentroDoIntervalo(intervalo, somaDias(dia, 1));
+
+      var acao;
+      if (!existente) acao = 'substituir';
+      else if (reg) acao = cobertoInteiro ? 'substituir' : 'juntar';
+      else acao = dentroDoIntervalo(intervalo, dia) ? 'substituir' : 'juntar';
+
+      var usados = (acao === 'substituir')
+        ? docs
+        : docs.filter(function(d){ return !tem(reg, d.key); });
+
+      // Documentos novos PARA A OS: num dia com registo, os que não estão no
+      // registo; num dia sem registo, os cujo dia fiscal ainda não existia
+      // (nos dados antigos o documento estava gravado no dia fiscal dele).
+      var novosValor = 0, novosN = 0;
+      usados.forEach(function(d){
+        var ja = reg ? tem(reg, d.key) : existiaAntes(d.fiscal);
+        if (ja) return;
+        novosValor += d.bruto; novosN += 1;
+      });
+
+      var reatribuidos = usados.filter(function(d){ return d.fiscal && d.fiscal !== dia; }).length;
+
+      // Documentos que deixam de contar: só num dia substituído com registo
+      // (o que lá estava e o ficheiro já não traz — tipicamente uma anulação).
+      var retiradosValor = 0, retiradosN = 0;
+      if (acao === 'substituir' && reg){
+        var vivos = {};
+        usados.forEach(function(d){ vivos[d.key] = true; });
+        Object.keys(reg).forEach(function(k){
+          if (vivos[k]) return;
+          retiradosValor += Number(reg[k]) || 0;
+          retiradosN += 1;
+        });
+      }
+
+      var payload = null;
+      if (acao === 'substituir'){
+        payload = construirPayload(agregarDocs(usados), catalogo, meta, PARES_POR_DIA);
+      } else if (usados.length){
+        payload = fundirDiaPayloads(existente, construirPayload(agregarDocs(usados), catalogo, meta, PARES_POR_DIA), meta);
+      } else {
+        acao = 'semAlteracao';
+      }
+
+      // Num dia que se junta, uma anulação de documento já gravado não pode
+      // ser retirada sem recompor o dia — dizer-se, nunca apagar às cegas.
+      var anuladosPresos = 0;
+      if (acao !== 'substituir' && reg){
+        Object.keys(anuladosPorDia[dia] || {}).forEach(function(k){ if (tem(reg, k)) anuladosPresos++; });
+        if (anuladosPresos){
+          avisos.push(anuladosPresos + ' documento' + (anuladosPresos === 1 ? '' : 's') +
+            ' anulado' + (anuladosPresos === 1 ? '' : 's') + ' de ' + dia +
+            ' continua' + (anuladosPresos === 1 ? '' : 'm') + ' a contar: o ficheiro não cobre esse dia' +
+            ' por inteiro. Importa o período completo de ' + dia + ' para os retirar.');
+        }
+      }
+
+      var brutoAntes = brutoDe(existente);
+      var brutoDepois = payload ? brutoDe(payload) : brutoAntes;
+      var entradaPlano = {
+        dia: dia, mes: dia.slice(0, 7), acao: acao,
+        existia: !!existente, tinhaRegisto: !!reg,
+        brutoAntes: existente ? brutoAntes : null,
+        brutoDepois: brutoDepois,
+        delta: round(brutoDepois - brutoAntes, 2),
+        docsFicheiro: docs.length, docsUsados: usados.length,
+        docsNovos: novosN, novosValor: round(novosValor, 2),
+        retiradosN: retiradosN, retiradosValor: round(retiradosValor, 2),
+        reatribuidos: reatribuidos, anuladosPresos: anuladosPresos,
+        variacao: existente ? variacaoBruto(brutoAntes, brutoDepois) : 0,
+        suspeito: false,
+        gravar: acao !== 'semAlteracao'
+      };
+      entradaPlano.suspeito = !!existente && entradaPlano.variacao > LIMIAR_SUSPEITA;
+
+      if (payload) payloads[dia] = payload;
+      deltaTotal += entradaPlano.delta;
+      novosTotal += novosValor;
+      retiradosTotal += retiradosValor;
+      novosDocs += novosN;
+      plano.push(entradaPlano);
+    });
+
+    /* Caso de canto: um dia FISCAL dentro do ficheiro que já existia na OS e
+       que, pela regra nova, deixou de ter documentos nenhuns (todas as vendas
+       desse dia foram fechadas antes do corte). Não se apaga nada às cegas —
+       avisa-se, que a alternativa era duplicar. */
+    Object.keys(entrada.diasFiscais || {}).forEach(function(f){
+      if (docsPorDia[f] || !estadoDias[f]) return;
+      if (registoDe(estadoDias[f])) return;
+      avisos.push('O dia ' + f + ' já estava gravado e, pela regra do dia de operação, ' +
+        'este ficheiro não lhe atribui documento nenhum — ficou como estava. Confirma-o à mão.');
+    });
+
+    var esperado = round(novosTotal - retiradosTotal, 2);
+    deltaTotal = round(deltaTotal, 2);
+    // Tolerância = o arredondamento a 2 casas de cada dia envolvido.
+    var tolerancia = round(0.01 * (plano.length + 1), 2);
+    return {
+      plano: plano, payloads: payloads, avisos: avisos,
+      verificacao: {
+        deltaTotal: deltaTotal, novosTotal: round(novosTotal, 2),
+        retiradosTotal: round(retiradosTotal, 2), esperado: esperado,
+        diferenca: round(deltaTotal - esperado, 2), tolerancia: tolerancia,
+        novosDocs: novosDocs,
+        ok: Math.abs(deltaTotal - esperado) <= tolerancia
+      }
+    };
+  }
+
+  /* Lê de vendasDiario/ o estado actual de todos os dias que o import toca —
+     os dias de OPERAÇÃO do ficheiro e também os dias FISCAIS dele (estes só
+     para saber se já existiam). Um dia por leitura, como o resto da página. */
+  function lerEstadoDias(dias){
+    var lista = dias.slice().sort();
     return lista.reduce(function(cadeia, dia){
-      return cadeia.then(function(plano){
-        var mes = dia.slice(0, 7);
-        return diarioRef.child(mes).child(dia).child('resumo').once('value').then(function(snap){
-          var anterior = snap.val();
-          var brutoNovo = payloads[dia].resumo.bruto;
-          var entrada = {
-            dia: dia,
-            mes: mes,
-            novo: !anterior,
-            brutoAnterior: anterior ? (Number(anterior.bruto) || 0) : null,
-            brutoNovo: brutoNovo,
-            ficheiroAnterior: anterior ? (anterior.ficheiro || '') : '',
-            variacao: 0,
-            gravar: true,
-            suspeito: false
-          };
-          if (anterior){
-            entrada.variacao = variacaoBruto(entrada.brutoAnterior, brutoNovo);
-            if (entrada.variacao > LIMIAR_SUSPEITA){
-              entrada.suspeito = true;
-              entrada.gravar = window.confirm(
-                'O dia ' + dia + ' já tinha sido importado e o valor mudou muito.\n\n' +
-                'Bruto anterior: ' + eur(entrada.brutoAnterior) +
-                '  (' + (entrada.ficheiroAnterior || '—') + ')\n' +
-                'Bruto novo:     ' + eur(brutoNovo) + '\n' +
-                'Diferença:      ' + pct(entrada.variacao, 1) + '\n\n' +
-                'Uma diferença desta dimensão pode significar que este é o ficheiro errado.\n' +
-                'Substituir este dia? (os outros dias do import seguem na mesma)'
-              );
-            }
-          }
-          plano.push(entrada);
-          return plano;
+      return cadeia.then(function(mapa){
+        return diarioRef.child(dia.slice(0, 7)).child(dia).once('value').then(function(snap){
+          mapa[dia] = snap.val() || null;
+          return mapa;
         });
       });
-    }, Promise.resolve([]));
+    }, Promise.resolve({}));
   }
 
   /* Escreve dia a dia, nunca em lote: no RTDB deste projecto as escritas
-     multi-chave já se mostraram pouco fiáveis (ver escreverCatalogo). */
+     multi-chave já se mostraram pouco fiáveis (ver escreverCatalogo). O
+     payload de cada dia já vem completo (substituído ou fundido com o que lá
+     estava), por isso o set() do dia nunca perde nada. */
   function gravarDias(plano, payloads, aoProgredir){
-    var aceites = plano.filter(function(e){ return e.gravar; });
+    var aceites = plano.filter(function(e){ return e.gravar && payloads[e.dia]; });
     var feitos = 0;
     return aceites.reduce(function(cadeia, entrada){
       return cadeia.then(function(){
@@ -2343,22 +2716,23 @@
     });
   }
 
-  /* Quadro dia a dia do que este import fez. Substitui o confirm() por mês:
-     o normal é ver aqui o que mudou, não ter de responder a perguntas. */
+  /* Quadro dia a dia do que este import fez (depois de gravar). O que se
+     decide vê-se ANTES, no resumo do import; isto é o registo do que ficou. */
   function relatorioDias(plano){
     var alvo = el('relatorioBody');
     if (!alvo) return;
     alvo.innerHTML = plano.map(function(e){
       var estadoTxt, cls;
-      if (!e.gravar){ estadoTxt = 'não gravado'; cls = 'dia-saltado'; }
-      else if (e.novo){ estadoTxt = 'novo'; cls = 'dia-novo'; }
+      if (!e.gravar){ estadoTxt = 'sem alteração'; cls = 'dia-saltado'; }
+      else if (!e.existia){ estadoTxt = 'novo'; cls = 'dia-novo'; }
+      else if (e.acao === 'juntar'){ estadoTxt = 'juntado'; cls = 'dia-substituido'; }
       else { estadoTxt = 'substituído'; cls = e.suspeito ? 'dia-suspeito' : 'dia-substituido'; }
       return '<tr class="' + cls + '">' +
         '<td class="mono">' + esc(e.dia) + '</td>' +
         '<td>' + estadoTxt + '</td>' +
-        '<td class="num">' + (e.brutoAnterior === null ? '—' : eur(e.brutoAnterior)) + '</td>' +
-        '<td class="num">' + eur(e.brutoNovo) + '</td>' +
-        '<td class="num">' + (e.brutoAnterior === null ? '—' : pct(e.variacao || 0, 1)) + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : eur(e.brutoAntes)) + '</td>' +
+        '<td class="num">' + eur(e.brutoDepois) + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : pct(e.variacao || 0, 1)) + '</td>' +
         '</tr>';
     }).join('');
     el('relatorioCard').classList.remove('hidden');
@@ -2369,6 +2743,64 @@
     if (card) card.classList.add('hidden');
   }
 
+  function esconderResumoImport(){
+    var card = el('resumoCard');
+    if (card) card.classList.add('hidden');
+  }
+
+  var ROTULO_ACCAO = { substituir:'substituir', juntar:'juntar', semAlteracao:'sem alteração' };
+
+  /* Resumo do import ANTES de gravar: dia a dia, o que estava, o que fica, o
+     que se faz e quantos documentos mudaram de dia. Mais a verificação
+     automática — se a soma das variações não bater certo com o que é novo
+     para a OS, alguma coisa está a ser criada ou destruída pelo caminho e o
+     botão de gravar fica trancado. */
+  function mostrarResumoImport(res){
+    var corpo = el('resumoBody');
+    if (!corpo) return;
+
+    corpo.innerHTML = res.plano.map(function(e){
+      var cls = !e.gravar ? 'dia-saltado' : (!e.existia ? 'dia-novo' : (e.suspeito ? 'dia-suspeito' : 'dia-substituido'));
+      return '<tr class="' + cls + '">' +
+        '<td class="mono">' + esc(e.dia) + '</td>' +
+        '<td>' + ROTULO_ACCAO[e.acao] + (e.tinhaRegisto ? '' : (e.existia ? ' <span class="nota-fina">(dados antigos)</span>' : ' <span class="nota-fina">(dia novo)</span>')) + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : eur(e.brutoAntes)) + '</td>' +
+        '<td class="num">' + eur(e.brutoDepois) + '</td>' +
+        '<td class="num">' + (e.delta > 0 ? '+' : '') + eur(e.delta) + '</td>' +
+        '<td class="num">' + (e.reatribuidos ? intFmt(e.reatribuidos) : '—') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var v = res.verificacao;
+    var linhas = [];
+    linhas.push('Soma das variações: <strong>' + (v.deltaTotal > 0 ? '+' : '') + eur(v.deltaTotal) + '</strong>');
+    linhas.push('Documentos novos para a OS: <strong>' + intFmt(v.novosDocs) + '</strong> (' + eur(v.novosTotal) + ')');
+    if (v.retiradosTotal) linhas.push('Documentos que deixam de contar: <strong>−' + eur(v.retiradosTotal) + '</strong>');
+
+    var caixa = el('resumoCheck');
+    caixa.className = 'msg ' + (v.ok ? 'ok' : 'erro') + ' on';
+    caixa.innerHTML = linhas.join(' · ') +
+      (v.ok
+        ? ' · <strong>verificação OK</strong>' + (v.esperado === 0 ? ' — variação total zero, nada foi criado nem perdido.' : '.')
+        : ' · <strong>VERIFICAÇÃO FALHOU</strong>: esperava ' + eur(v.esperado) + ' e a soma das variações dá ' +
+          eur(v.deltaTotal) + ' (diferença ' + eur(v.diferenca) + '). Isto quer dizer que este import criaria ou destruiria vendas.');
+
+    var avisos = el('resumoAvisos');
+    avisos.innerHTML = res.avisos.length
+      ? '<p class="card-note">⚠ ' + res.avisos.map(esc).join('<br>⚠ ') + '</p>'
+      : '';
+
+    var escape = el('resumoForcar');
+    escape.classList.toggle('hidden', !!v.ok);
+    el('resumoForcarCheck').checked = false;
+    el('btnConfirmarImport').disabled = !v.ok;
+
+    el('resumoCard').classList.remove('hidden');
+  }
+
+  /* --------- Passo 1: preparar (não escreve nada) ---------
+     Lê o estado dos dias afectados, calcula o plano e mostra o resumo. Só o
+     botão do resumo é que grava. */
   function gravar(){
     var pend = estado.pendente;
     if (!pend) return;
@@ -2384,44 +2816,79 @@
       };
     });
 
+    // Catálogo efectivo só em memória: o que está gravado mais o que está a
+    // ser classificado agora. Nada vai para o Firebase antes da confirmação.
+    var catalogo = {};
+    Object.keys(estado.catalogo).forEach(function(k){ catalogo[k] = estado.catalogo[k]; });
+    Object.keys(novasEntradas).forEach(function(k){ catalogo[k] = novasEntradas[k]; });
+
+    var meta = { importadoEm: new Date().toISOString(), ficheiro: pend.ficheiro };
+
+    // Dias a ler: os de operação do ficheiro e os fiscais dele (estes só para
+    // saber se já existiam — é o que diz se um documento já estava na OS).
+    var aLer = {};
+    Object.keys(pend.docsPorDia).forEach(function(d){ aLer[d] = true; });
+    Object.keys(pend.diasFiscais || {}).forEach(function(d){ aLer[d] = true; });
+
     el('btnGravar').disabled = true;
     limparMensagens();
     esconderRelatorio();
+    esconderResumoImport();
+    progresso(0.3, 'A ler os dias já gravados…');
+
+    lerEstadoDias(Object.keys(aLer))
+      .then(function(estadoDias){
+        progresso(0.7, 'A preparar os dias…');
+        var res = planearImportOperacao({
+          docsPorDia: pend.docsPorDia,
+          anuladosPorDia: pend.anuladosPorDia,
+          intervalo: pend.intervalo,
+          diasFiscais: pend.diasFiscais,
+          estadoDias: estadoDias,
+          catalogo: catalogo,
+          meta: meta
+        });
+        estado.planoImport = {
+          res: res, novasEntradas: novasEntradas, meta: meta, catalogo: catalogo
+        };
+        esconderProgresso();
+        el('btnGravar').disabled = false;
+        mostrarResumoImport(res);
+      })
+      .catch(function(err){
+        esconderProgresso();
+        el('btnGravar').disabled = false;
+        mostrarMsg('msgErro', 'Não foi possível preparar o import: ' +
+          (err && err.message ? err.message : String(err)));
+      });
+  }
+
+  /* --------- Passo 2: gravar (depois da confirmação) --------- */
+  function confirmarImport(){
+    var ctx = estado.planoImport;
+    if (!ctx) return;
+    var res = ctx.res;
+    var plano = res.plano;
+    var payloads = res.payloads;
+    var meta = ctx.meta;
+
+    el('btnConfirmarImport').disabled = true;
+    limparMensagens();
     progresso(0.1, 'A gravar catálogo…');
 
-    var diasLista = Object.keys(pend.dias).sort();
-    var agora = new Date().toISOString();
-    var meta = { importadoEm: agora, ficheiro: pend.ficheiro };
-    var payloads = {};
-    var plano = null;
-
-    escreverCatalogo(novasEntradas, function(feitas, total){
+    escreverCatalogo(ctx.novasEntradas, function(feitas, total){
         progresso(0.1 + 0.1 * (feitas / total), 'A gravar catálogo… ' + feitas + '/' + total);
       }, estado.escritorCatalogo)
       .then(function(escritas){
         // Só depois de o servidor confirmar é que o catálogo em memória passa a
         // dar estes produtos como classificados.
-        escritas.forEach(function(k){ estado.catalogo[k] = novasEntradas[k]; });
+        escritas.forEach(function(k){ estado.catalogo[k] = ctx.novasEntradas[k]; });
       })
       .then(function(){
-        // Um payload completo por dia — o formato de sempre, só que a
-        // representar um dia em vez de um mês. `pares` guarda mais do que os 30
-        // do mês: como o merge do mês soma os tops de cada dia, um top curto por
-        // dia perderia pares que só somados chegariam ao top do mês.
-        progresso(0.2, 'A preparar ' + diasLista.length + ' dia' + (diasLista.length === 1 ? '' : 's') + '…');
-        diasLista.forEach(function(dia){
-          payloads[dia] = construirPayload(pend.dias[dia], estado.catalogo, meta, PARES_POR_DIA);
-        });
-        return planearDias(pend.dias, payloads);
-      })
-      .then(function(p){
-        plano = p;
         var aGravar = plano.filter(function(e){ return e.gravar; }).length;
         if (!aGravar){
           esconderProgresso();
-          el('btnGravar').disabled = false;
-          relatorioDias(plano);
-          mostrarMsg('msgAviso', 'Nada gravado — nenhum dia foi confirmado.');
+          mostrarMsg('msgAviso', 'Nada gravado — nenhum dia mudou.');
           return null;
         }
         return gravarDias(plano, payloads, function(feitos, total, dia){
@@ -2430,7 +2897,9 @@
       })
       .then(function(aceites){
         if (!aceites) return null;
-        // Meses tocados por este import — só esses precisam de recálculo.
+        // Meses tocados por este import — só esses precisam de recálculo. A
+        // madrugada do dia 1 traz o mês anterior para esta lista sozinha: o dia
+        // de operação 30/09 é do mês 2026-09, mesmo vindo de um ficheiro de Outubro.
         var meses = [];
         aceites.forEach(function(e){ if (meses.indexOf(e.mes) === -1) meses.push(e.mes); });
         meses.sort();
@@ -2446,28 +2915,30 @@
           return { meses: meses, aceites: aceites, recalculos: recalculos };
         });
       })
-      .then(function(res){
-        el('btnGravar').disabled = false;
-        if (!res) return;
+      .then(function(res2){
+        el('btnConfirmarImport').disabled = false;
+        if (!res2) return;
         esconderProgresso();
         esconderCatalogo();
+        esconderResumoImport();
         estado.pendente = null;
+        estado.planoImport = null;
         relatorioDias(plano);
 
-        var saltados = plano.length - res.aceites.length;
-        var mesesFeitos = res.recalculos.filter(function(r){ return !r.saltado; });
-        var mesesSaltados = res.recalculos.filter(function(r){ return r.saltado; });
+        var semAlteracao = plano.length - res2.aceites.length;
+        var mesesFeitos = res2.recalculos.filter(function(r){ return !r.saltado; });
+        var mesesSaltados = res2.recalculos.filter(function(r){ return r.saltado; });
 
         mostrarMsg('msgOk',
-          'Gravados ' + res.aceites.length + ' dia' + (res.aceites.length === 1 ? '' : 's') +
+          'Gravados ' + res2.aceites.length + ' dia' + (res2.aceites.length === 1 ? '' : 's') +
           ' em vendasDiario/.' +
           (mesesFeitos.length
             ? ' Recalculado: ' + mesesFeitos.map(function(r){
                 return nomeMes(r.mes) + ' (' + r.dias + ' dia' + (r.dias === 1 ? '' : 's') + ')';
               }).join(', ') + '.'
             : '') +
-          (saltados ? ' ' + saltados + ' dia' + (saltados === 1 ? '' : 's') + ' não gravado' +
-            (saltados === 1 ? '' : 's') + ' (ver quadro abaixo).' : ''));
+          (semAlteracao ? ' ' + semAlteracao + ' dia' + (semAlteracao === 1 ? '' : 's') +
+            ' sem alteração (ver quadro abaixo).' : ''));
 
         if (mesesSaltados.length){
           mostrarMsg('msgAviso',
@@ -2476,11 +2947,11 @@
             ' importa o SAF-T do período completo para o mês passar a ser somado a partir dos dias.');
         }
 
-        return carregarDados(res.meses[res.meses.length - 1]);
+        return carregarDados(res2.meses[res2.meses.length - 1]);
       })
       .catch(function(err){
         esconderProgresso();
-        el('btnGravar').disabled = false;
+        el('btnConfirmarImport').disabled = false;
         var base = 'Erro ao gravar: ' + (err && err.message ? err.message : String(err));
 
         // Falha a meio da escrita do catálogo: dizer exactamente quantos
@@ -2488,13 +2959,7 @@
         if (err && err.escritas) {
           var feitas = err.escritas.length;
           var falta = err.total - feitas;
-
-          // O catálogo em memória ficou dessincronizado do servidor: alguns
-          // produtos foram gravados mas não entraram no mapa local. Forçar
-          // releitura no próximo import, senão voltavam a aparecer para
-          // classificar dentro desta mesma sessão.
           estado.catalogoCarregado = false;
-
           mostrarMsg('msgErro', base +
             ' — catálogo gravado parcialmente: ' + intFmt(feitas) + ' de ' + intFmt(err.total) +
             ' produto' + (err.total === 1 ? '' : 's') + ' ficaram gravados, ' + intFmt(falta) +
@@ -2503,8 +2968,6 @@
           return;
         }
 
-        // Falha a meio da gravação dos dias: os que já foram escritos ficaram
-        // escritos, e o mês pode não ter chegado a ser recalculado.
         mostrarMsg('msgErro', base +
           ' — os dias já gravados ficaram em vendasDiario/; volta a correr o' +
           ' import para recompor os meses afectados.');
@@ -2767,8 +3230,17 @@
 
   function avisoDia(p){
     var texto = estado.diaSemanaActivo ? descricaoDiaSemana(p) : dataExtenso(estado.diaActivo);
+    /* Nota discreta: quanto deste dia foi fechado depois da meia-noite — e,
+       por isso, com data fiscal do dia seguinte. Só aparece nos dias gravados
+       com a regra do dia de operação (é esse import que grava a madrugada). */
+    var mg = (!estado.diaSemanaActivo && p && p.madrugada) ? p.madrugada : null;
+    var nota = (mg && mg.docs)
+      ? '<span>·</span><span class="madrugada-nota">inclui ' + eur(mg.bruto) +
+        ' fechados após a meia-noite' + (mg.dataFiscal ? ' (data fiscal ' + esc(mg.dataFiscal.slice(8) + '/' + mg.dataFiscal.slice(5, 7)) + ')' : '') + '</span>'
+      : '';
     return '<div class="dia-aviso">' +
       '<span>A ver: <strong>' + esc(texto) + '</strong></span>' +
+      nota +
       '<span>·</span>' +
       '<button type="button" class="sec-link" data-voltar-mes="1">Voltar ao mês inteiro</button>' +
       '</div>';
@@ -2969,17 +3441,25 @@
     dias = Number(dias) || 0;
     var mediaHora = [], acumulado = [], soma = 0;
     var primeira = null, ultima = null;
-    for (var h = 0; h < 24; h++){
+    var i, h;
+    for (h = 0; h < 24; h++){ mediaHora.push(0); acumulado.push(0); }
+    /* A ordem é a do DIA DE OPERAÇÃO (começa no corte e dá a volta): a
+       madrugada acumula a seguir às 23h, não antes da abertura. Com o corte a
+       0 esta função é exactamente a de sempre. */
+    var ordem = horasOperacao();
+    for (i = 0; i < 24; i++){
+      h = ordem[i];
       var tem = !!porHora[h];
       var m = (tem && dias > 0) ? (Number(porHora[h].bruto) || 0) / dias : 0;
       if (tem){ if (primeira === null) primeira = h; ultima = h; }
-      mediaHora.push(m);
+      mediaHora[h] = m;
       soma += m;
-      acumulado.push(soma);
+      acumulado[h] = soma;
     }
     var H = agora.getHours(), M = agora.getMinutes();
-    var completo = ultima !== null && H > ultima;
-    var ateAgora = completo ? soma : ((H > 0 ? acumulado[H - 1] : 0) + mediaHora[H] * (M / 60));
+    var completo = ultima !== null && posOperacao(H) > posOperacao(ultima);
+    var anterior = posOperacao(H) === 0 ? 0 : acumulado[(H + 23) % 24];
+    var ateAgora = completo ? soma : (anterior + mediaHora[H] * (M / 60));
     return {
       mediaHora: mediaHora, acumulado: acumulado, ateAgora: ateAgora,
       horaAtual: porHora[H] ? mediaHora[H] : null, total: soma,
@@ -3006,7 +3486,9 @@
     Object.keys(porHora).forEach(function(k){
       var h = Number(k);
       if (!isFinite(h) || !porHora[k]) return;
-      var alvo = h < HORA_CORTE_TURNO ? t1 : t2;
+      /* A comparação é na ordem do DIA DE OPERAÇÃO: a madrugada (0h–4h) é o
+         fim do 2.º turno, não o princípio do 1.º. */
+      var alvo = posOperacao(h) < posOperacao(HORA_CORTE_TURNO) ? t1 : t2;
       alvo.bruto += Number(porHora[k].bruto) || 0;
       alvo.docs  += Number(porHora[k].docs) || 0;
     });
@@ -3146,7 +3628,10 @@
 
   function vistaHoras(p){
     var horas = p.porHora || {};
-    var chaves = Object.keys(horas).map(Number).sort(function(a, b){ return a - b; });
+    /* Ordem do dia de operação: 5h → 23h → 0h → 4h. As horas da madrugada
+       aparecem DEPOIS das 23h do próprio dia, que é onde elas aconteceram. */
+    var ordemDia = horasOperacao();
+    var chaves = ordemDia.filter(function(h){ return !!horas[h]; });
     if (!chaves.length) return seccao('Vendas por hora', 'Sem hora nos documentos deste mês.', '');
 
     /* Divisor "dias" da média, por modo: dia da semana → nº de dias agregados
@@ -3174,12 +3659,14 @@
     chaves.forEach(function(h){ max = Math.max(max, horas[h].bruto || 0); });
     max = max / divisor;
 
-    var min = chaves[0], fim = chaves[chaves.length - 1];
+    var iMin = ordemDia.indexOf(chaves[0]);
+    var iFim = ordemDia.indexOf(chaves[chaves.length - 1]);
     var linhas = [];
     var itens = [];
     var itensAcum = [];
     var anterior = null;
-    for (var h = min; h <= fim; h++){
+    for (var i = iMin; i <= iFim; i++){
+      var h = ordemDia[i];
       var v = (horas[h] ? (horas[h].bruto || 0) : 0) / divisor;
       var docs = (horas[h] ? (horas[h].docs || 0) : 0) / divisor;
       var rotulo = (h < 10 ? '0' : '') + h + ':00';
@@ -3229,7 +3716,9 @@
     }
 
     sub += ' Os turnos cortam às ' + HORA_CORTE_TURNO + ':00, e a hora é a do fecho do documento ' +
-      '(SystemEntryDate): uma venda fechada logo a seguir às ' + HORA_CORTE_TURNO + 'h conta para o 2.º turno.';
+      '(SystemEntryDate): uma venda fechada logo a seguir às ' + HORA_CORTE_TURNO + 'h conta para o 2.º turno.' +
+      ' O dia começa às ' + CORTE_DIA_OPERACAO_H + 'h: as horas da madrugada estão no fim, a seguir às 23h,' +
+      ' porque pertencem ao serviço que abriu na véspera.';
 
     var ctrl = botoesVista('horas', VISTAS_TEMPO, vista);
     if (temMedia && !individual){
@@ -4218,6 +4707,21 @@
   ligarZoneSoft();
 
   el('btnGravar').addEventListener('click', gravar);
+  el('btnConfirmarImport').addEventListener('click', confirmarImport);
+  el('btnCancelarResumo').addEventListener('click', function(){
+    estado.planoImport = null;
+    esconderResumoImport();
+    esconderCatalogo();
+    estado.pendente = null;
+    limparMensagens();
+    mostrarMsg('msgAviso', 'Import cancelado — nada foi gravado.');
+  });
+  /* A verificação automática tranca o botão. O escape existe para o caso
+     legítimo de os valores terem mesmo mudado (ficheiro corrigido) e é sempre
+     um segundo gesto, deliberado. */
+  el('resumoForcarCheck').addEventListener('change', function(){
+    el('btnConfirmarImport').disabled = !this.checked;
+  });
 
   el('btnMigrar').addEventListener('click', function(){
     if (estado.planoMigracao) aplicarMigracao(estado.planoMigracao);
@@ -4267,7 +4771,6 @@
     mergePayloads: mergePayloads,
     arredondarPayload: arredondarPayload,
     payloadDoMes: payloadDoMes,
-    planearDias: planearDias,
     gravarDias: gravarDias,
     recalcularMes: recalcularMes,
     sugerirCategoria: sugerirCategoria,
@@ -4297,6 +4800,18 @@
     payloadActivo: payloadActivo,
     renderVistas: renderVistas,
     giocoAcumuladoHoras: giocoAcumuladoHoras,
+    diaOperacao: diaOperacao,
+    diaFiscal: diaFiscal,
+    somaDias: somaDias,
+    horasOperacao: horasOperacao,
+    posOperacao: posOperacao,
+    agregarDocs: agregarDocs,
+    planearImportOperacao: planearImportOperacao,
+    fundirDiaPayloads: fundirDiaPayloads,
+    lerEstadoDias: lerEstadoDias,
+    confirmarImport: confirmarImport,
+    mostrarResumoImport: mostrarResumoImport,
+    CORTE_DIA_OPERACAO_H: CORTE_DIA_OPERACAO_H,
     giocoTurnos: giocoTurnos,
     HORA_CORTE_TURNO: HORA_CORTE_TURNO,
     vistaHoras: vistaHoras,

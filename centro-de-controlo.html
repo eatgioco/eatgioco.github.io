@@ -2930,22 +2930,39 @@ window.addEventListener('load', function () {
        para isto). Função pura: média por hora, acumulado hora a hora e
        acumulado até ao instante `agora` (aproximação LINEAR dentro da hora
        corrente). Ver o comentário completo no vendas.html. */
+    /* O dia de operação começa às CORTE_DIA_OPERACAO_H: o que é fechado antes
+       do corte pertence ao dia anterior, e por isso a madrugada acumula a
+       seguir às 23h. Tem de ser o MESMO número do vendas.html. */
+    var CORTE_DIA_OPERACAO_H = 5;
+    function horasOperacao(){
+      var out = [];
+      for (var i = 0; i < 24; i++) out.push((CORTE_DIA_OPERACAO_H + i) % 24);
+      return out;
+    }
+    function posOperacao(h){
+      return (((Number(h) || 0) - CORTE_DIA_OPERACAO_H) + 24) % 24;
+    }
     function giocoAcumuladoHoras(porHora, dias, agora){
       porHora = porHora || {};
       dias = Number(dias) || 0;
       var mediaHora = [], acumulado = [], soma = 0;
       var primeira = null, ultima = null;
-      for (var h = 0; h < 24; h++){
+      var i, h;
+      for (h = 0; h < 24; h++){ mediaHora.push(0); acumulado.push(0); }
+      var ordem = horasOperacao();
+      for (i = 0; i < 24; i++){
+        h = ordem[i];
         var tem = !!porHora[h];
         var m = (tem && dias > 0) ? (Number(porHora[h].bruto) || 0) / dias : 0;
         if (tem){ if (primeira === null) primeira = h; ultima = h; }
-        mediaHora.push(m);
+        mediaHora[h] = m;
         soma += m;
-        acumulado.push(soma);
+        acumulado[h] = soma;
       }
       var H = agora.getHours(), M = agora.getMinutes();
-      var completo = ultima !== null && H > ultima;
-      var ateAgora = completo ? soma : ((H > 0 ? acumulado[H - 1] : 0) + mediaHora[H] * (M / 60));
+      var completo = ultima !== null && posOperacao(H) > posOperacao(ultima);
+      var anterior = posOperacao(H) === 0 ? 0 : acumulado[(H + 23) % 24];
+      var ateAgora = completo ? soma : (anterior + mediaHora[H] * (M / 60));
       return {
         mediaHora: mediaHora, acumulado: acumulado, ateAgora: ateAgora,
         horaAtual: porHora[H] ? mediaHora[H] : null, total: soma,
