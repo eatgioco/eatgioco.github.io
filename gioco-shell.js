@@ -330,6 +330,9 @@
     ],
     privada: [
       { href: 'index.html',      icone: 'layout-dashboard', label: 'Home' },
+      /* dashboard.html: novo dashboard privado do Manel (Set/2026), em teste em
+         paralelo com a mrn-dashboard.html — que continua fora de qualquer conjunto. */
+      { href: 'dashboard.html',  icone: 'layout-dashboard', label: 'Dashboard' },
       { href: 'tesouraria.html', icone: 'receipt',          label: 'Tesouraria' },
       { href: 'calendario.html', icone: 'calendar',         label: 'Calendário' },
       { href: 'tarefas.html',    icone: 'pencil',           label: 'Tarefas' },
