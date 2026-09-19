@@ -26,6 +26,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <!-- Mesmo JSZip e mesma versão do vendas.html: os SAF-T do ZoneSoft chegam em ZIP. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Motor partilhado do dinheiro físico: o check do numerário do Cartão A. -->
+<script src="gioco-caixa.js"></script>
 
 <style>
   /* ============================================================
@@ -40,9 +42,12 @@
      MUDANÇA DE PRINCÍPIO (Set/2026): a página deixa de ser só-leitura —
      escreve reconciliacaoDescartes/ e reconciliacaoResolvidos/. Os
      ficheiros carregados continuam só em memória, nunca gravados.
-     A reconciliação da CAIXA (contagens do OS) NÃO vive aqui — foi
-     removida desta página; fica confinada ao caixa.html.
-     Nomes visíveis: só POS, TPA ABANCA, TPA VERIFONE, CAIXA.
+     CAIXA (numerário) — 19 Set/2026, decisão do Manel que reverte a
+     remoção anterior: o Cartão A ganha um terceiro mecanismo, o check
+     diário do numerário (caixaContagens + caixaMovimentos + NU do
+     vendasDiario − saídas do POS do Fecho de Caixa ZS), calculado pelo
+     GiocoCaixa.reconciliarNumerario. A caixa.html não mudou.
+     Nomes visíveis: só POS, TPA ABANCA, TPA VERIFONE, CAIXA (numerário).
      Prefixo rec- em todas as classes próprias.
      ============================================================ */
   body{ -webkit-font-smoothing:antialiased; }
@@ -74,7 +79,7 @@
   .rec-cartao-titulo p{ margin:0; font-size:12.5px; color:var(--muted); }
 
   /* ---------- Cartão A ---------- */
-  .rec-a-topo{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:16px; }
+  .rec-a-topo{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:16px; }
   .rec-a-head{ padding:16px 18px; border-radius:12px; background:var(--white); border:2px solid var(--red); }
   .rec-a-head.zero{ border-color:var(--green); }
   .rec-a-head .k{ font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
@@ -107,6 +112,26 @@
   .rec-a-tag.aMenos{ background:var(--red); color:var(--on-red); }
   .rec-a-tag.aMais{ background:var(--amber-bg); color:var(--amber); }
   .rec-a-tag.ambiguo{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  /* Estados do numerário (CAIXA): falta = A Menos, sobra = A Mais, provisório e em aberto neutros. */
+  .rec-a-tag.falta{ background:var(--red); color:var(--on-red); }
+  .rec-a-tag.sobra{ background:var(--amber-bg); color:var(--amber); }
+  .rec-a-tag.provisorio{ background:transparent; color:var(--muted); border:1px dashed var(--line); }
+  .rec-a-tag.aberto{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  tr.rec-nu-linha{ cursor:pointer; }
+  tr.rec-nu-linha td:first-child::before{ content:'▸'; color:var(--muted); font-size:10px; margin-right:4px; }
+  tr.rec-nu-linha.aberta td:first-child::before{ content:'▾'; }
+  .rec-nu-nota{ display:block; font-size:11px; color:var(--muted); font-weight:500; }
+  tr.rec-nu-detalhe > td{ padding:0 8px 14px; background:transparent; }
+  .rec-nu-conta{ border-radius:10px; padding:12px 16px; background:var(--white); border:1px solid var(--line); font-size:12.5px; color:var(--ink); overflow-x:auto; }
+  .rec-nu-conta table{ width:auto; min-width:420px; }
+  .rec-nu-conta td{ padding:4px 10px 4px 0; vertical-align:top; color:var(--ink); }
+  .rec-nu-conta td.num{ text-align:right; padding-left:18px; }
+  .rec-nu-conta tr.total td{ border-top:1px solid var(--line); font-weight:700; padding-top:7px; }
+  .rec-nu-conta .rec-mov{ color:var(--muted); }
+  .rec-nu-conta .rec-mov b{ color:var(--ink); font-weight:600; }
+  .rec-nu-porque{ margin:10px 0 0; padding:8px 12px; border-left:3px solid var(--red); background:var(--dough); border-radius:0 8px 8px 0; font-size:12.5px; }
+  .rec-nu-porque b{ font-weight:700; }
+  .rec-nu-aviso{ margin:0 0 12px; padding:8px 12px; border-radius:8px; background:var(--amber-bg); color:var(--amber); font-size:12px; }
   .rec-a-descartar{
     padding:4px 11px; border-radius:100px; cursor:pointer;
     font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
@@ -299,7 +324,7 @@
     </div>
     <div class="card glass-light rec-upload">
       <h3>Fecho de Caixa ZS</h3>
-      <p>Relatórios do ZSBMS em .xls (é HTML, não Excel): o <b>Fecho de Caixa</b> (Data / Início / Entradas / Saídas) e, quando não coincide com o dia, a <b>Listagem de Sessões</b>. Ambos aqui; o tipo é detectado pelo cabeçalho. Não entra no casamento — fica só como registo.</p>
+      <p>Relatórios do ZSBMS em .xls (é HTML, não Excel): o <b>Fecho de Caixa</b> (Data / Início / Entradas / Saídas) e, quando não coincide com o dia, a <b>Listagem de Sessões</b>. Ambos aqui; o tipo é detectado pelo cabeçalho. As colunas <b>Saídas</b> e <b>Entradas</b> do Fecho de Caixa alimentam o check <b>CAIXA (numerário)</b> do cartão A (sem ele a linha fica «Provisório»); não entra no casamento talão a talão.</p>
       <div class="rec-upload-row">
         <input type="file" id="inFecho" multiple accept=".xls,.htm,.html,text/html,application/vnd.ms-excel">
       </div>
@@ -396,6 +421,11 @@ window.addEventListener('load', function () {
   // ('CD' < 'OU' inverteria a ordem à letra).
   var MEIO_ORDEM = {};
   MEIOS.forEach(function(m, i){ MEIO_ORDEM[m.mec] = i; });
+  // Terceiro mecanismo do Cartão A (19 Set/2026): o numerário. Não é um
+  // terminal — não entra em MEIOS (que alimenta a atribuição de créditos do
+  // banco e o casamento do Cartão B) — mas ocupa a mesma tabela, com o mesmo
+  // padrão visual e o mesmo Descartar. NU = código do SAF-T para numerário.
+  var MEIO_NU = { mec:'NU', label:'CAIXA (numerário)', labelCurto:'CAIXA' };
   var ORIGEM_LABEL = { ABANCA:'TPA ABANCA', CD:'TPA VERIFONE' };
   function labelMeio(meio){ return meio.label; }
   function labelCurtoMeio(meio){ return meio.labelCurto; }
@@ -414,7 +444,7 @@ window.addEventListener('load', function () {
   var terminal = {};         // origem → { nOperacao → transação }
   var termFicheiros = [];    // { nome, origem, res:{inicio, fim, txs, avisos}, novos, repetidos, fora, erro }
   var termCobertura = {};    // origem → { dia → true }
-  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } — só registo, não entra no casamento
+  var fecho = {};            // dia → { inicio, entradas, saidas, movimento, fecho } — alimenta o check do numerário (posPorDia); não entra no casamento talão a talão
   var fechoFicheiros = [];   // { nome, tipo:'fecho'|'sessoes', res, novos, repetidos, erro }
   var sessoes = [];          // Listagem de Sessões — só registo
 
@@ -424,6 +454,9 @@ window.addEventListener('load', function () {
   var baseCarregada = false;
   var baseErros = [];
 
+  var caixaContagens = {};   // caixaContagens (once) — só leitura
+  var caixaMovs = {};        // caixaMovimentos (once) — só leitura
+  var nuAberto = null;       // chave da linha CAIXA expandida no cartão A
   var descartes = {};        // reconciliacaoDescartes/{chave} → registo
   var resolvidos = {};       // reconciliacaoResolvidos/{chave} → registo
 
@@ -790,8 +823,9 @@ window.addEventListener('load', function () {
   var PARSERS = { ABANCA: parseAbanca, CD: parseIntercard };
 
   /* ============================================================
-     FECHO DE CAIXA (ZSBMS) — só registo neste cartão, não entra no
-     casamento (a reconciliação da caixa saiu desta página).
+     FECHO DE CAIXA (ZSBMS) — as colunas Entradas/Saídas alimentam o check
+     do numerário do Cartão A (posPorDia, só em memória); não entra no
+     casamento talão a talão do Cartão B.
      ============================================================ */
   function numZs(s){
     s = String(s == null ? '' : s).replace(/€/g, '').replace(/&euro;/g, '').replace(/\s| /g, '').trim();
@@ -1110,6 +1144,8 @@ window.addEventListener('load', function () {
     return Promise.all([
       le('contasBancarias/abanca/movimentos', function(v){ banco.abanca = v; }),
       le('contasBancarias/revolut/movimentos', function(v){ banco.revolut = v; }),
+      le('caixaContagens', function(v){ caixaContagens = v; }),
+      le('caixaMovimentos', function(v){ caixaMovs = v; }),
       le('reconciliacaoDescartes', function(v){ descartes = v; }),
       le('reconciliacaoResolvidos', function(v){ resolvidos = v; })
     ]).then(function(){ baseCarregada = true; });
@@ -1324,6 +1360,72 @@ window.addEventListener('load', function () {
   function chaveFirebase(k){ return k; }
 
   /* ============================================================
+     CAIXA (numerário) — check diário (19 Set/2026). Toda a conta vive no
+     GiocoCaixa.reconciliarNumerario (gioco-caixa.js), em cêntimos inteiros e
+     SEM tolerância: só Δ = 0,00 € é OK. Aqui só se ligam os dados:
+       nuPorDia  = vendasDiario/{mês}/{dia}/porPagamento/NU.bruto (já em vendasMes)
+       posPorDia = Fecho de Caixa ZS carregado no Cartão B (só memória; três
+                   casas → o motor arredonda ao cêntimo à entrada)
+     Nada disto escreve; o único registo é o Descartar, chave {dias}~NU.
+     ============================================================ */
+  function nuPorDia(){
+    var out = {};
+    Object.keys(vendasMes).forEach(function(m){
+      Object.keys(vendasMes[m]).forEach(function(d){
+        var p = vendasMes[m][d] && vendasMes[m][d].NU;
+        out[d] = p && p.bruto != null ? parseFloat(p.bruto) : 0;
+      });
+    });
+    return out;
+  }
+  function posPorDia(){
+    var out = {}, tem = false;
+    Object.keys(fecho).forEach(function(d){ out[d] = { saidas: fecho[d].saidas, entradas: fecho[d].entradas }; tem = true; });
+    return tem ? out : null;
+  }
+  var memoNu = null;
+  function calcularNumerario(){
+    if (memoNu) return memoNu;
+    var r = GiocoCaixa.reconciliarNumerario(caixaContagens, caixaMovs, nuPorDia(), posPorDia());
+    r.linhas.forEach(function(it){
+      var d = descartes[chaveFirebase(it.chave)];
+      it.descartado = !!(d && d.anulado !== true);
+    });
+    memoNu = r;
+    return r;
+  }
+  function fmtHoraIso(iso){
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  var ESTADO_NU_LABEL = { ok:'OK', falta:'Falta', sobra:'Sobra', provisorio:'Provisório', aberto:'Em aberto' };
+
+  function detalheNumerarioHtml(it){
+    function linha(k, v, cls){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + k + '</td><td class="num">' + v + '</td></tr>'; }
+    var h = '<div class="rec-nu-conta"><table><tbody>';
+    h += linha('Âncora ' + esc(fmtDia(it.dias[0])) + ' · ' + esc(fmtHoraIso(it.ancoraDe.dataHora)) + (it.ancoraDe.pessoa ? ' · ' + esc(it.ancoraDe.pessoa) : ''), fmtEuro(it.ancoraDe.total));
+    h += linha('+ Numerário POS (NU)' + (it.dias.length > 1 ? ' · ' + it.dias.length + ' dias' : '') + (it.semNu.length ? ' <span class="rec-neg">sem vendas importadas: ' + it.semNu.map(fmtDia).join(', ') + '</span>' : ''), fmtEuroSinal(it.nu));
+    it.movimentos.forEach(function(m){
+      h += linha('<span class="rec-mov">' + esc(fmtHoraIso(m.dataHora)) + ' · ' + (m.tipo === 'entrada' ? 'Entrada' : 'Saída') + ' · <b>' + esc(m.motivo || '—') + '</b>' +
+        (m.tipo !== 'entrada' && m.estado === 'acertado' && m.valorDevolvido ? ' (' + fmtEuro(m.valor) + ' − troco ' + fmtEuro(m.valorDevolvido) + ')' : '') +
+        (m.tipo !== 'entrada' && m.estado === 'aberto' ? ' (por acertar)' : '') + '</span>', fmtEuroSinal(m.efeito));
+    });
+    if (!it.movimentos.length) h += linha('<span class="rec-mov">Sem movimentos do OS na janela</span>', '—');
+    h += linha('− Saídas POS (Fecho de Caixa ZS)' + (it.semPos.length ? ' <span class="rec-neg">sem Fecho de Caixa: ' + it.semPos.map(fmtDia).join(', ') + '</span>' : ''), it.saidasPos == null ? '—' : fmtEuroSinal(-it.saidasPos));
+    if (it.entradasPos != null) h += linha('+ Entradas POS (Fecho de Caixa ZS)', fmtEuroSinal(it.entradasPos));
+    h += linha('= Esperado', fmtEuro(it.esperado), 'total');
+    if (it.ancoraAte){
+      h += linha('Contado · âncora seguinte ' + esc(fmtDia(GiocoCaixa.dayKeyLocal(it.ancoraAte.dataHora))) + ' · ' + esc(fmtHoraIso(it.ancoraAte.dataHora)) + (it.ancoraAte.pessoa ? ' · ' + esc(it.ancoraAte.pessoa) : ''), fmtEuro(it.contado));
+      h += linha('Δ (contado − esperado)', '<span' + (it.delta < 0 ? ' class="rec-neg"' : '') + '>' + fmtEuroSinal(it.delta) + '</span>', 'total');
+    } else {
+      h += linha('<span class="rec-mov">Ainda sem âncora seguinte — confirma-se com a próxima contagem da manhã</span>', '—');
+    }
+    h += '</tbody></table>';
+    if (it.ancoraAte && it.motivoDiferenca) h += '<p class="rec-nu-porque"><b>Porquê? (gravado na contagem):</b> ' + esc(it.motivoDiferenca) + '</p>';
+    return h + '</div>';
+  }
+
+  /* ============================================================
      CARTÃO B — casamento por dia (SAF-T ↔ extrato), pela ordem exacta da
      spec: 1) global por menor distância ±60 min; 2) valor alterado ±3 min
      (1 candidato de cada lado); 3) conta dividida ±5 min (tolerância 5
@@ -1486,14 +1588,14 @@ window.addEventListener('load', function () {
     if (!db) return Promise.resolve();
     var registo = { data: dataTxt, motivo: motivo, autor: autor, criadoEm: new Date().toISOString() };
     descartes[chave] = registo;
-    memoA = null;
+    memoA = null; memoNu = null;
     return db.ref('reconciliacaoDescartes/' + chave).set(registo);
   }
   function reativarLinha(chave){
     if (!db) return Promise.resolve();
     var anuladoEm = new Date().toISOString();
     if (descartes[chave]) descartes[chave] = Object.assign({}, descartes[chave], { anulado: true, anuladoEm: anuladoEm });
-    memoA = null;
+    memoA = null; memoNu = null;
     return db.ref('reconciliacaoDescartes/' + chave).update({ anulado: true, anuladoEm: anuladoEm });
   }
 
@@ -1520,6 +1622,33 @@ window.addEventListener('load', function () {
     var sel = document.getElementById('selFiltroA');
     if (!sel) return;
     sel.value = filtroA;
+  }
+
+  function linhaNumerarioHtml(it, dataMostrar){
+    var dataTxt = fmtDias(it.dias);
+    var chave = it.chave, jaDesc = it.descartado;
+    var aberta = nuAberto === chave;
+    var deltaPct = it.delta != null && it.esperado ? (it.delta / it.esperado * 100) : null;
+    var nota = it.estado === 'provisorio' ? '<span class="rec-nu-nota">' + (it.semPos.length ? 'sem saídas do POS' : 'sem vendas importadas') + '</span>' : '';
+    var h = '<tr class="rec-nu-linha' + (aberta ? ' aberta' : '') + '" data-nu="' + esc(chave) + '" data-chave="' + esc(chave) + '"' + (jaDesc ? ' style="opacity:.55"' : '') + '>' +
+      '<td class="rec-mono">' + esc(dataMostrar) + '</td><td><b>' + esc(MEIO_NU.label) + '</b></td>' +
+      '<td class="num">' + fmtEuro(it.esperado) + '</td><td class="num">' + (it.contado == null ? '—' : fmtEuro(it.contado)) + '</td>' +
+      '<td class="num' + (it.delta != null && it.delta < 0 ? ' rec-neg' : '') + '">' + (it.delta == null ? '—' : fmtEuroSinal(it.delta)) + nota + '</td>' +
+      '<td class="num">' + fmtPct(deltaPct) + '</td>' +
+      '<td><span class="rec-a-tag ' + it.estado + '">' + ESTADO_NU_LABEL[it.estado] + '</span></td>' +
+      '<td>' + (it.estado === 'aberto' ? '' : (
+        (jaDesc
+          ? '<button type="button" class="rec-a-reativar" data-acao="reativar" data-chave="' + esc(chave) + '">reactivar</button>'
+          : '<button type="button" class="rec-a-descartar" data-acao="descartar" data-chave="' + esc(chave) + '" data-data="' + esc(dataTxt) + '">descartar</button>') +
+        '<div class="rec-inline-form" data-form="' + esc(chave) + '" hidden>' +
+          '<input type="text" placeholder="Motivo" data-campo="motivo">' +
+          '<input type="text" placeholder="Quem" value="' + esc(nomeAutorGuardado()) + '" data-campo="autor" style="max-width:110px">' +
+          '<button type="button" data-confirmar="' + esc(chave) + '">Confirmar</button>' +
+          '<button type="button" class="cancelar" data-cancelar="' + esc(chave) + '">Cancelar</button>' +
+        '</div>'
+      )) + '</td></tr>';
+    if (aberta) h += '<tr class="rec-nu-detalhe"><td colspan="8">' + detalheNumerarioHtml(it) + '</td></tr>';
+    return h;
   }
 
   function renderCartaoA(){
@@ -1563,14 +1692,28 @@ window.addEventListener('load', function () {
       });
     }
 
+    // Terceira família de linhas: CAIXA (numerário). it.numerario = true marca-as.
+    var nu = calcularNumerario();
+    nu.linhas.forEach(function(it){ it.numerario = true; it.creditos = []; linhas.push({ meio: MEIO_NU, it: it }); });
+    var avisoNu = '';
+    if (nu.contagensInvalidas.length || nu.movimentosInvalidos.length){
+      avisoNu = '<p class="rec-nu-aviso">Fora do check do numerário por dataHora inválida: ' +
+        (nu.contagensInvalidas.length ? plural(nu.contagensInvalidas.length, 'contagem', 'contagens') : '') +
+        (nu.contagensInvalidas.length && nu.movimentosInvalidos.length ? ' e ' : '') +
+        (nu.movimentosInvalidos.length ? plural(nu.movimentosInvalidos.length, 'movimento', 'movimentos') : '') + ' — corrigir na caixa.</p>';
+    }
+    var ORDEM_A = { OU: 0, CD: 1, NU: 2 };
+
     var meses = {};
     linhas.forEach(function(l){ (l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]).forEach(function(d){ meses[d.slice(0, 7)] = true; }); });
     var listaM = Object.keys(meses).sort().reverse();
 
     // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
-    var totalAMenos = 0, totalAMenosOU = 0, totalAMenosCD = 0;
+    var totalAMenos = 0, totalAMenosOU = 0, totalAMenosCD = 0, totalFaltaNu = 0;
     linhas.forEach(function(l){
-      if (l.it.descartado || l.it.estado !== 'aMenos') return;
+      if (l.it.descartado) return;
+      if (l.it.numerario){ if (l.it.estado === 'falta') totalFaltaNu = round2(totalFaltaNu + l.it.delta); return; }
+      if (l.it.estado !== 'aMenos') return;
       var d = round2(l.it.credito - l.it.pos);
       totalAMenos = round2(totalAMenos + d);
       if (l.meio.mec === 'OU') totalAMenosOU = round2(totalAMenosOU + d); else totalAMenosCD = round2(totalAMenosCD + d);
@@ -1579,14 +1722,14 @@ window.addEventListener('load', function () {
     var visiveis = linhas.filter(function(l){
       if (l.it.descartado && !mostrarDescartados) return false;
       if (l.it.descartado && mostrarDescartados) return true;
-      if (filtroA === 'naoReconciliados') return l.it.estado === 'aMenos';
+      if (filtroA === 'naoReconciliados') return l.it.estado === 'aMenos' || l.it.estado === 'falta' || l.it.estado === 'sobra';
       if (filtroA){ var ord = l.it.dias.length ? l.it.dias : [l.it.creditos[0].dia]; return ord.some(function(d){ return d.slice(0, 7) === filtroA; }); }
       return true;
     });
     visiveis.sort(function(a2, b2){
       var da = a2.it.dias.length ? a2.it.dias[a2.it.dias.length - 1] : a2.it.creditos[0].dia;
       var db2 = b2.it.dias.length ? b2.it.dias[b2.it.dias.length - 1] : b2.it.creditos[0].dia;
-      return da < db2 ? 1 : (da > db2 ? -1 : (MEIO_ORDEM[a2.meio.mec] - MEIO_ORDEM[b2.meio.mec]));
+      return da < db2 ? 1 : (da > db2 ? -1 : (ORDEM_A[a2.meio.mec] - ORDEM_A[b2.meio.mec]));
     });
 
     var nDescartados = linhas.filter(function(l){ return l.it.descartado; }).length;
@@ -1596,7 +1739,8 @@ window.addEventListener('load', function () {
       '<div class="s">soma dos Δ das linhas <b>A Menos</b>, sem descontar comissão · fora as descartadas</div></div>' +
       '<div class="rec-a-tipo' + (totalAMenosOU ? '' : ' zero') + '"><div class="k">A menos TPA ABANCA</div><div class="v num">' + fmtEuro(totalAMenosOU) + '</div></div>' +
       '<div class="rec-a-tipo' + (totalAMenosCD ? '' : ' zero') + '"><div class="k">A menos TPA VERIFONE</div><div class="v num">' + fmtEuro(totalAMenosCD) + '</div></div>' +
-      '</div>';
+      '<div class="rec-a-tipo' + (totalFaltaNu ? '' : ' zero') + '"><div class="k">Falta em caixa</div><div class="v num">' + fmtEuro(totalFaltaNu) + '</div><div class="s">numerário · linhas Falta, fora as descartadas</div></div>' +
+      '</div>' + avisoNu;
 
     h += '<p class="rec-nota-comissao">O crédito do banco vem sempre líquido de comissão do terminal — por isso o Δ deste cartão <b>nunca</b> é o valor exacto em falta, inclui a comissão do dia. O valor exacto está no cartão B, com os extratos dos terminais.</p>';
 
@@ -1604,16 +1748,17 @@ window.addEventListener('load', function () {
       '<option value="naoReconciliados">Não Reconciliados</option>' +
       '<option value="">Todos os meses</option>' +
       listaM.map(function(m){ return '<option value="' + m + '">' + fmtMes(m) + '</option>'; }).join('') +
-      '</select><span class="rec-a-legenda">Comissão típica: TPA ABANCA ' + esc(MEIO_POR_MEC.OU.comissaoObservada) + ' · TPA VERIFONE ' + esc(MEIO_POR_MEC.CD.comissaoObservada) + '</span><div class="spacer"></div></div>';
+      '</select><span class="rec-a-legenda">Comissão típica: TPA ABANCA ' + esc(MEIO_POR_MEC.OU.comissaoObservada) + ' · TPA VERIFONE ' + esc(MEIO_POR_MEC.CD.comissaoObservada) + ' · CAIXA: esperado = âncora + NU + movimentos do OS − saídas POS; só Δ 0,00 € é OK</span><div class="spacer"></div></div>';
 
     h += '<div class="rec-a-tabela">';
     if (!visiveis.length){
-      h += '<div class="rec-vazio">' + (filtroA === 'naoReconciliados' ? 'Nenhuma linha A Menos por reconciliar.' : 'Sem linhas para este filtro.') + '</div>';
+      h += '<div class="rec-vazio">' + (filtroA === 'naoReconciliados' ? 'Nenhuma linha A Menos, Falta ou Sobra por reconciliar.' : 'Sem linhas para este filtro.') + '</div>';
     } else {
       var ultimaData = null;
-      h += '<table><thead><tr><th>Data</th><th>TPA</th><th class="num">Faturado POS</th><th class="num">Creditado Banco</th><th class="num">Δ</th><th class="num">Δ%</th><th>Estado</th><th></th></tr></thead><tbody>' +
+      h += '<table><thead><tr><th>Data</th><th>Meio</th><th class="num">Faturado POS<span class="rec-nu-nota">caixa: esperado</span></th><th class="num">Creditado Banco<span class="rec-nu-nota">caixa: contado</span></th><th class="num">Δ</th><th class="num">Δ%</th><th>Estado</th><th></th></tr></thead><tbody>' +
         visiveis.map(function(l){
           var it = l.it;
+          if (it.numerario) return linhaNumerarioHtml(it, ultimaData === fmtDias(it.dias) ? '' : (ultimaData = fmtDias(it.dias)));
           var dataTxt = it.dias.length ? fmtDias(it.dias) : fmtDia(it.creditos[0].dia);
           // Δ = Creditado Banco − Faturado POS: falta dinheiro → negativo.
           var delta = round2(it.credito - it.pos);
@@ -1655,6 +1800,14 @@ window.addEventListener('load', function () {
     var toggle = document.getElementById('toggleDescartados');
     if (toggle) toggle.addEventListener('click', function(){ mostrarDescartados = !mostrarDescartados; renderCartaoA(); });
 
+    el.querySelectorAll('tr.rec-nu-linha').forEach(function(tr){
+      tr.addEventListener('click', function(e){
+        if (e.target.closest('button, input, .rec-inline-form')) return;
+        var k = tr.getAttribute('data-nu');
+        nuAberto = nuAberto === k ? null : k;
+        renderCartaoA();
+      });
+    });
     el.querySelectorAll('[data-acao="descartar"]').forEach(function(btn){
       btn.addEventListener('click', function(){
         var chave = btn.getAttribute('data-chave');
@@ -1824,7 +1977,7 @@ window.addEventListener('load', function () {
   }
 
   function renderTudo(){
-    memoMeio = {}; memoA = null;
+    memoMeio = {}; memoA = null; memoNu = null;
     renderCartaoA();
     renderFicheiros();
     renderDiasB();
