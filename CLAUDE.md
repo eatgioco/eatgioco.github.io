@@ -1674,8 +1674,8 @@ lista plana derivada):
 - **GERAL** — contactos · **ANÁLISE** — vendas · padroes · resultados ·
   reconciliacao · custos · tesouraria · **OPERAÇÕES** — compras · pagamentos ·
   leitura-faturas · contagens · equipa · gestao · centro-de-controlo ·
-  **PRODUTO** — receitas · foodcost · **LOJA** — loja-sao-bento · caixa ·
-  **MARCA** — social.
+  **PRODUTO** — receitas · foodcost · **MARCA** — social · **LOJA** —
+  loja-sao-bento · caixa (Loja em último, decisão do Manel).
 
 Acordeão **estrito** (abrir um grupo fecha os outros). Ao carregar uma página
 abre o grupo dela; na Home não abre nenhum; o grupo aberto fica em

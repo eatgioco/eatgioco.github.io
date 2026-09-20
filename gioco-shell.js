@@ -367,14 +367,15 @@
       { href: 'receitas.html',   icone: 'chef-hat',         label: 'Receitas' },
       { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' }
     ]},
-    { id: 'loja', label: 'Loja', icone: 'store', paginas: [
-      { href: 'loja-sao-bento.html', icone: 'store',        label: 'Loja São Bento' },
-      { href: 'caixa.html',      icone: 'coins',            label: 'Caixa' }
-    ]},
     { id: 'marca', label: 'Marca', icone: 'message-square', paginas: [
       /* Social: Instagram (só leitura de social/instagram/) e calendário de
          publicações (social/calendario/). */
       { href: 'social.html',     icone: 'message-square',   label: 'Social' }
+    ]},
+    /* Loja em último (decisão do Manel, Set/2026). */
+    { id: 'loja', label: 'Loja', icone: 'store', paginas: [
+      { href: 'loja-sao-bento.html', icone: 'store',        label: 'Loja São Bento' },
+      { href: 'caixa.html',      icone: 'coins',            label: 'Caixa' }
     ]}
   ];
 
