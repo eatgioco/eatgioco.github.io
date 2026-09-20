@@ -708,7 +708,7 @@ function foraLimite(e,v){
 
 /* ============ ESTADO ============ */
 var DEMO={ativo:false,dia:4,hora:9,min:40};
-var user=null,pinBuf='',alvo=null,pinModo='verificar',pinPrimeiro='';
+var user=null,pinBuf='',alvo=null;
 var tick=null;
 var TAB='hoje',chkAberto=false;
 var tmp={},mBackFn=null;
@@ -1487,8 +1487,10 @@ function toast(m){
 /* ============ PIN (hash) ============
    O PIN NUNCA é guardado em claro: testeLojaApp/pins/{pessoaId} = { hash }
    com hash = SHA-256 hex de "pessoaId:PIN". A comparação é feita no cliente.
-   Uma pessoa sem PIN define-o na primeira entrada (duas vezes). Para
-   repor um PIN, apaga-se testeLojaApp/pins/{pessoaId} no console.
+   ESTA APP NÃO DEFINE PINs: quem não tem PIN vê a lista mas não entra — o
+   PIN define-se, repõe-se e remove-se SÓ na equipa.html (separador Pessoas).
+   Sem auto-registo, senão a primeira pessoa a abrir o URL ficava com o PIN
+   de outra.
    LIMITE ASSUMIDO: com o Firebase em modo de teste o hash é legível por
    quem tiver o URL, e 6 dígitos são forçáveis offline — isto impede entrar
    como outra pessoa ao balcão, não protege contra quem ler a base. */
@@ -1529,14 +1531,13 @@ function renderPeople(){
  else el.innerHTML=PESSOAS.map(function(p){
   return '<button class="p-row" onclick="escolhe(\''+p.id+'\')">'+
    '<span class="avatar" style="background:'+esc(p.c)+'">'+esc(ini(p.n))+'</span>'+
-   '<span class="p-n"><b>'+esc(p.n)+'</b><small>'+esc(p.f)+(PINS[p.id]?'':' · sem PIN — define na 1.ª entrada')+'</small></span>'+
+   '<span class="p-n"><b>'+esc(p.n)+'</b><small>'+esc(p.f)+(PINS[p.id]?'':' · sem PIN')+'</small></span>'+
    ic('chev','var(--muted)',20)+'</button>';}).join('');
  document.getElementById('pBack').innerHTML=ic('back',null,18);
  ctxLogin();
 }
 function escolhe(id){
- alvo=PESSOAS.filter(function(p){return p.id===id;})[0];pinBuf='';pinPrimeiro='';
- pinModo=PINS[id]?'verificar':'definir';
+ alvo=PESSOAS.filter(function(p){return p.id===id;})[0];pinBuf='';
  document.getElementById('lStep1').style.display='none';
  var e2=document.getElementById('lStep2');
  e2.style.display='block';
@@ -1546,13 +1547,14 @@ function escolhe(id){
  document.getElementById('pNome').textContent=alvo.n;
  document.getElementById('pFn').textContent=alvo.f+' · PIN de 6 dígitos';
  pinMsg();dots();
- document.getElementById('pinPad').innerHTML=numPad('kp');
+ /* sem PIN não há teclado: não existe caminho para o definir aqui */
+ document.getElementById('pinPad').innerHTML=temPin(id)?numPad('kp'):'';
 }
+function temPin(id){return !!(PINS[id]&&PINS[id].hash);}
 function pinMsg(){
  var el=document.getElementById('pMsg');
- if(pinModo==='verificar')el.innerHTML='Escreve o teu PIN';
- else if(pinModo==='definir')el.innerHTML='<b>Ainda não tens PIN.</b> Escolhe 6 dígitos — vais escrevê-los duas vezes.';
- else el.innerHTML='<b>Repete o PIN</b> para confirmar';
+ if(temPin(alvo.id))el.innerHTML='Escreve o teu PIN';
+ else el.innerHTML='<b>Ainda não tens PIN.</b> Pede ao Manel para to definir na página da equipa — só depois consegues entrar.';
 }
 function ctxLogin(){
  var d=agora(),hh=d.getHours();
@@ -1580,35 +1582,20 @@ function dots(){var h='';for(var i=0;i<6;i++)h+='<div class="pdot'+(i<pinBuf.len
 var pinOcupado=false;
 function kp(k){
  if(pinOcupado)return;
+ if(!temPin(alvo.id))return;
  if(k==='←'){if(!pinBuf.length)return voltarPessoas();pinBuf=pinBuf.slice(0,-1);}
  else if(pinBuf.length<6)pinBuf+=k;
  dots();
  if(pinBuf.length===6)setTimeout(pinCompleto,170);
 }
+/* SÓ verifica. Nunca escreve em testeLojaApp/pins/. */
 function pinCompleto(){
- var pin=pinBuf,p=alvo;
+ var pin=pinBuf,p=alvo,reg=PINS[p.id];
  pinOcupado=true;
- if(pinModo==='verificar'){
-  var reg=PINS[p.id];
-  hashPin(p.id,pin).then(function(h){
-   pinOcupado=false;
-   if(reg&&reg.hash===h)entrarApp();else pinErrado();
-  }).catch(function(e){pinOcupado=false;console.error(e);toast('Não consegui verificar o PIN');pinErrado();});
-  return;
- }
- if(pinModo==='definir'){
-  pinOcupado=false;
-  if(/^(\d)\1{5}$/.test(pin)||pin==='123456'){toast('PIN demasiado fácil — escolhe outro');return pinErrado();}
-  pinPrimeiro=pin;pinModo='confirmar';pinBuf='';pinMsg();dots();return;
- }
- /* confirmar */
- if(pin!==pinPrimeiro){pinOcupado=false;toast('Os PINs não coincidem — começa de novo');pinModo='definir';pinPrimeiro='';pinMsg();return pinErrado();}
  hashPin(p.id,pin).then(function(h){
-  var reg={hash:h,alg:'sha256(pessoaId:pin)',criadoEm:new Date().toISOString(),pessoa:p.n};
-  if(!(NET.online&&NET.ligado)){pinOcupado=false;toast('Sem ligação — o PIN só se define com rede');pinBuf='';dots();return;}
-  return db.ref(RAIZ+'/pins/'+p.id).set(reg).then(function(){
-   PINS[p.id]=reg;pinOcupado=false;toast('PIN definido');entrarApp();});
- }).catch(function(e){pinOcupado=false;console.error(e);toast('Falha ao guardar o PIN: '+(e&&e.message?e.message:e));pinErrado();});
+  pinOcupado=false;
+  if(reg&&reg.hash===h)entrarApp();else pinErrado();
+ }).catch(function(e){pinOcupado=false;console.error(e);toast('Não consegui verificar o PIN');pinErrado();});
 }
 function pinErrado(){
  var d=document.getElementById('pdots');
@@ -1739,7 +1726,9 @@ autenticarEContinuar(function(){
   if(!user&&!retomarSessao())renderPeople();
   else if(user&&!PESSOAS.some(function(p){return p.id===user.id;}))sair();
  });
- db.ref(RAIZ+'/pins').on('value',function(s){PINS=s.val()||{};if(!user)renderPeople();});
+ db.ref(RAIZ+'/pins').on('value',function(s){PINS=s.val()||{};
+  if(user&&!temPin(user.id)){toast('O teu PIN foi removido');sair();return;}
+  if(!user){renderPeople();if(alvo&&document.getElementById('lStep2').style.display==='block'){pinBuf='';pinMsg();dots();document.getElementById('pinPad').innerHTML=temPin(alvo.id)?numPad('kp'):'';}}});
  /* equipamentos/ — só leitura; sem nenhum com termómetro cai para
     testeLojaApp/equipamentos/ (semeado uma vez se estiver vazio) */
  db.ref('equipamentos').on('value',function(s){

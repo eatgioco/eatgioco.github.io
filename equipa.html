@@ -960,6 +960,12 @@
   }
 
   /* ---------- Modal (shared pattern with compras.html / mrn-dashboard.html) ---------- */
+  .pessoa-pin{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px; color:var(--muted); }
+  .pessoa-pin-estado.tem{ color:var(--green); font-weight:600; }
+  .btn-pin{ font-family:'Inter', sans-serif; font-size:12px; padding:3px 9px; border-radius:8px; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; }
+  .btn-pin:hover{ border-color:var(--red); }
+  .pin-erro{ color:var(--red-ink); font-size:13px; min-height:18px; margin:0 0 6px; }
+
   .modal-overlay{
     display:none;
     position:fixed;
@@ -2574,6 +2580,30 @@
   </div>
 </div>
 
+<!-- PIN da app de loja: define/repõe o PIN de uma pessoa (ver pinLinhaHtml no script) -->
+<div class="modal-overlay" id="pinLojaModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pinLojaTitulo">Definir PIN</h2>
+      <button type="button" class="modal-close" id="pinLojaClose" aria-label="Fechar">×</button>
+    </div>
+    <p class="comp-hint" style="margin:0 0 14px;">6 dígitos, escritos duas vezes. O PIN nunca é guardado em claro — só a impressão digital que a app de loja compara.</p>
+    <div class="field">
+      <label class="field-label">PIN (6 dígitos)</label>
+      <input type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" id="pinLoja1">
+    </div>
+    <div class="field">
+      <label class="field-label">Repete o PIN</label>
+      <input type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" id="pinLoja2">
+    </div>
+    <p class="pin-erro" id="pinLojaErro"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="pinLojaCancel">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnGuardarPinLoja">Guardar PIN</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Ir para data (mini-calendário de navegação, não é uma vista) -->
 <div class="modal-overlay" id="calModalOverlay">
   <div class="modal cal-modal">
@@ -3140,10 +3170,118 @@ window.addEventListener('load', function () {
     if (p.email) html += '<a href="mailto:' + escapeHtml(p.email) + '">✉️ ' + escapeHtml(p.email) + '</a>';
     html += '    </div>';
     html += '  </div>';
+    html += '    <div class="pessoa-pin">' + pinLinhaHtml(p) + '</div>';
+    html += '  </div>';
     html += '  <button type="button" class="btn-editar-pessoa" onclick="editPessoa(\'' + p.id + '\')">✎</button>';
     html += '</div>';
     return html;
   }
+
+  /* ---------- PIN da app de loja (loja-app-teste.html) ----------
+     Só aqui se define, repõe ou remove o PIN de uma pessoa. A app deixou
+     de ter auto-registo. Mostra-se apenas SE há PIN — nunca o PIN nem o
+     hash. Escreve SÓ em testeLojaApp/pins/{pessoaId} (set() do registo ao
+     definir, remove() ao remover) e nunca regista o PIN em claro em lado
+     nenhum. O hash tem de ser byte a byte o mesmo que a app calcula:
+     SHA-256 hex de "pessoaId:PIN". Fica atrás do MESMO travão visual da
+     remuneração (pedirPinRemuneracao) — que NÃO é segurança, ver acima. */
+  var pinsLojaRef = db.ref('testeLojaApp/pins');
+  var pinsLoja = {};
+  var pinsLojaCarregados = false;
+  pinsLojaRef.on('value', function(snapshot){
+    pinsLoja = snapshot.val() || {};
+    pinsLojaCarregados = true;
+    renderPessoas();
+  });
+
+  function pinLinhaHtml(p){
+    if (!pinsLojaCarregados) return '<span class="pessoa-pin-estado">PIN loja: …</span>';
+    var tem = !!(pinsLoja[p.id] && pinsLoja[p.id].hash);
+    var h = '<span class="pessoa-pin-estado' + (tem ? ' tem' : '') + '">PIN loja: ' + (tem ? 'definido' : 'sem PIN') + '</span>';
+    h += '<button type="button" class="btn-pin" onclick="abrirPinLoja(\'' + p.id + '\')">' + (tem ? 'Repor PIN' : 'Definir PIN') + '</button>';
+    if (tem) h += '<button type="button" class="btn-pin" onclick="removerPinLoja(\'' + p.id + '\')">Remover PIN</button>';
+    return h;
+  }
+
+  function pinLojaObvio(pin){
+    return pin === '000000' || pin === '123456' || /^(\d)\1{5}$/.test(pin);
+  }
+
+  function hashPinLoja(pessoaId, pin){
+    var bytes = new TextEncoder().encode(pessoaId + ':' + pin);
+    if (!(window.crypto && crypto.subtle && crypto.subtle.digest)){
+      return Promise.reject(new Error('crypto.subtle indisponível (abre a página por https)'));
+    }
+    return crypto.subtle.digest('SHA-256', bytes).then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+    });
+  }
+
+  var pinLojaPessoaId = null;
+
+  function abrirPinLoja(id){
+    if (!pedirPinRemuneracao()) return;
+    var p = pessoas[id];
+    if (!p) return;
+    pinLojaPessoaId = id;
+    document.getElementById('pinLojaTitulo').textContent = (pinsLoja[id] && pinsLoja[id].hash ? 'Repor PIN · ' : 'Definir PIN · ') + (p.nome || '');
+    document.getElementById('pinLoja1').value = '';
+    document.getElementById('pinLoja2').value = '';
+    document.getElementById('pinLojaErro').textContent = '';
+    document.getElementById('pinLojaModal').classList.add('open');
+    setTimeout(function(){ document.getElementById('pinLoja1').focus(); }, 50);
+  }
+
+  function fecharPinLoja(){
+    pinLojaPessoaId = null;
+    document.getElementById('pinLoja1').value = '';
+    document.getElementById('pinLoja2').value = '';
+    document.getElementById('pinLojaModal').classList.remove('open');
+  }
+
+  function guardarPinLoja(){
+    var id = pinLojaPessoaId;
+    var p = pessoas[id];
+    var a = document.getElementById('pinLoja1').value.trim();
+    var b = document.getElementById('pinLoja2').value.trim();
+    var erro = document.getElementById('pinLojaErro');
+    if (!id || !p) return;
+    if (!/^\d{6}$/.test(a)){ erro.textContent = 'O PIN são exactamente 6 dígitos.'; return; }
+    if (a !== b){ erro.textContent = 'Os dois PINs não coincidem.'; return; }
+    if (pinLojaObvio(a)){ erro.textContent = 'PIN demasiado óbvio (000000, 123456 ou seis dígitos iguais).'; return; }
+    var btn = document.getElementById('btnGuardarPinLoja');
+    btn.disabled = true;
+    hashPinLoja(id, a).then(function(hash){
+      a = b = null;
+      document.getElementById('pinLoja1').value = '';
+      document.getElementById('pinLoja2').value = '';
+      return pinsLojaRef.child(id).set({
+        hash: hash,
+        alg: 'sha256(pessoaId:pin)',
+        criadoEm: new Date().toISOString(),
+        pessoa: p.nome || '',
+        definidoEm: 'equipa.html'
+      });
+    }).then(function(){
+      btn.disabled = false;
+      fecharPinLoja();
+    }).catch(function(err){
+      btn.disabled = false;
+      erro.textContent = 'Erro ao guardar o PIN: ' + (err && err.message ? err.message : err);
+    });
+  }
+
+  function removerPinLoja(id){
+    if (!pedirPinRemuneracao()) return;
+    var p = pessoas[id];
+    if (!p) return;
+    if (!confirm('Remover o PIN da app de loja de ' + (p.nome || '') + '? A pessoa deixa de conseguir entrar até lhe definires um novo.')) return;
+    pinsLojaRef.child(id).remove().catch(function(err){
+      alert('Erro ao remover o PIN: ' + (err && err.message ? err.message : err));
+    });
+  }
+  window.abrirPinLoja = abrirPinLoja;
+  window.removerPinLoja = removerPinLoja;
 
   function renderPessoas(){
     var ativas = pessoasAtivasArray();
@@ -3399,6 +3537,10 @@ window.addEventListener('load', function () {
   document.getElementById('btnNovaPessoa').addEventListener('click', function(){ openPessoaModal(null); });
   document.getElementById('pessoaModalClose').addEventListener('click', closePessoaModal);
   document.getElementById('pessoaModalCancel').addEventListener('click', closePessoaModal);
+  document.getElementById('pinLojaCancel').addEventListener('click', fecharPinLoja);
+  document.getElementById('pinLojaClose').addEventListener('click', fecharPinLoja);
+  document.getElementById('btnGuardarPinLoja').addEventListener('click', guardarPinLoja);
+  document.getElementById('pinLoja2').addEventListener('keydown', function(e){ if (e.key === 'Enter') guardarPinLoja(); });
   document.getElementById('pessoaModalOverlay').addEventListener('click', function(e){
     if (e.target === document.getElementById('pessoaModalOverlay')) closePessoaModal();
   });

@@ -102,15 +102,13 @@ let fail=0;function ok(c,m){console.log((c?'PASS ':'FAIL ')+m);if(!c)fail++;}
  // 7. NADA fora de testeLojaApp/
  const fora=w.filter(x=>!x.path.startsWith('testeLojaApp/'));
  ok(fora.length===0,'zero escritas fora de testeLojaApp/ ('+w.length+' escritas no total)'+(fora.length?' FORA: '+fora.map(x=>x.path):''));
- // 8. definir PIN pela primeira vez (Beatriz)
+ // 8. pessoa SEM PIN não entra e não consegue definir (o PIN é só da equipa.html)
  await page.evaluate(()=>sair());await page.evaluate(()=>escolhe('pB'));
- ok((await page.textContent('#pMsg')).includes('Ainda não tens PIN'),'pessoa sem PIN → definir');
- await kp('111111');
- ok((await page.textContent('#pMsg')).includes('Ainda não tens PIN'),'PIN repetido recusado');
- await page.waitForTimeout(700);await kp('135790');await kp('135790');await page.waitForTimeout(300);
- const pinW=(await page.evaluate(()=>window.__FB.writes)).find(x=>x.path==='testeLojaApp/pins/pB');
- ok(!!pinW&&pinW.valor.hash===sha256('pB:135790')&&!JSON.stringify(pinW.valor).includes('135790'),'PIN da Beatriz guardado como hash, sem PIN em claro');
- ok((await page.textContent('#gTitle')).includes('Beatriz'),'entra como Beatriz');
+ ok((await page.textContent('#pMsg')).toLowerCase().includes('pede ao manel'),'pessoa sem PIN → mensagem "pede ao Manel"');
+ ok((await page.$eval('#pinPad',e=>e.children.length))===0,'sem PIN não há teclado');
+ await kp('135790');await kp('135790');
+ ok(!(await page.$eval('#login',e=>e.classList.contains('hidden'))),'sem PIN não entra');
+ ok(!(await page.evaluate(()=>window.__FB.writes)).some(x=>x.path.startsWith('testeLojaApp/pins')),'a app nunca escreve em testeLojaApp/pins');
  // 9. sha256 JS puro == subtle
  const js=await page.evaluate(()=>sha256Js(new TextEncoder().encode('pA:246813')));
  ok(js===sha256('pA:246813'),'sha256Js bate com o node');
