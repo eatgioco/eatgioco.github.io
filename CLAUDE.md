@@ -100,7 +100,7 @@ essencial no cartão, resto no `giocoModal`; ver secção "Loja SB154 — músic
 | `gioco-correspondencia.js` | Motor partilhado de **correspondência valor ↔ movimentos** (`giocoCorrespondencia({cents, dia, janela, movimentos, toleranciaCents, descritivosConhecidos, regexFallback, aprendido, estrategias})` → `{estado: confirmado|sugestao|ambiguo|semCandidato, movimentos, estrategia, confianca, candidatos}`), função PURA sem Firebase nem DOM (Set/2026). Pipeline que pára na primeira estratégia com resultado: `exacto` (mesmos cêntimos ± tolerância) → `soma2` (PAR de movimentos do mesmo dia de banco e da mesma conta cuja soma bate exactamente; tecto fixo em 2, nunca 3+) → `descritivo` (só com `cents:null` ou quando as anteriores deram zero: raiz normalizada em `descritivosConhecidos` → confirmado se `aprendido`, senão sugestao; `regexFallback` → sugestao; 2+ → ambiguo). `candidatos` é uma lista de GRUPOS (1 ou 2 movimentos), sempre ordenados por dia e depois id. É aqui que vive a ÚNICA `normalizarDescritivo` do OS (o `gioco-reconciliacao.js` só a re-exporta). Recebe movimentos JÁ filtrados pelo chamador (livres, sem INTERNA, sem excluídos) — disputas entre itens, escritas e UI ficam fora. Usado pelo `gioco-reconciliacao.js` (pagamentos em modo único `['exacto','soma2']`; receitas CD só `['exacto']`; débitos fixos `['exacto','soma2']`; débitos variáveis `['descritivo']`) e pelo `mrn-dashboard.html` (depósitos, `['exacto']`). Testes: `scripts/testa-correspondencia.js` (Node, ou no browser com um shim de `require`/`assert`). Carregar SEMPRE antes do `gioco-reconciliacao.js` (lança erro se faltar). Nunca reimplementar por página | — |
 | `gioco-reconciliacao.js` | Motor partilhado de **reconciliação bancária** (`giocoReconciliacaoEngine({getPaymentRequests, getPagamentosConcluidos, getMovimentos, getReconciliacao, compromissos: CE, ref})`, no molde do `gioco-compromissos.js`). `pagamentosConcluidos()` achata linhas pagas + ocorrências de compromissos; `calcular()` → `{itens, porEstado, contadores, autoNovas}`; `pesquisaManual(item)` (±30 dias, 90–110 % do valor); `ligar(chave, mov, 'auto'|'manual')`, `aplicarAutomaticas(res)` e `desligar(chave)` — as únicas escritas, sempre `update()` no caminho `reconciliacaoBancaria/{chave}` (desligar marca `ligado:false` + `excluidos/`, nunca `remove()`). Generalizado em 05/09/2026: `movimentos(indicador, filtroRegex, excluirRegex)` (`movimentosDebito()` = DBIT sem INTERNA, `movimentosCredito()`), núcleo `reconciliar(itens, movs, hoje)` com janela/tolerâncias/modo (`unico`|`soma`)/filtro por item, estado `aproximado`, e `calcularReceitas()` sobre `getVendasDiario` (regras A/B no nó). Para receitas `ligar(chave, mov|[movs], metodo, item, estado)`. `calcular()` dos pagamentos ficou com resultado idêntico (testado antes/depois com os dados reais). Regra de match e estados documentados no cabeçalho do ficheiro e no nó abaixo. **Set/2026 (motor de correspondência):** `candidatosDe` foi substituída por `correspondenciaDe`, que chama o `gioco-correspondencia.js` — pagamentos com `['exacto','soma2']`, receitas CD só `['exacto']`; a passagem soma-de-N das receitas OU e a regra aproximada A2 ficaram FORA do motor, tal e qual. Cada item traz `it.correspondencia` (resultado do motor), `it.candidatosGrupos` (grupos: 1 ou 2 movs) e `it.candidatos` (lista plana, como antes). A camada de disputas (`reclamacoes`/`reservados`) continua por cima e conta também as metades de um par soma2. `candidatosDebitoFixo` → motor `['exacto','soma2']` (resolve a Mensalidade Abanca 10,00 + 0,40 sem código próprio); `candidatosDebitoVariavel` → motor `['descritivo']` com `aprendido = estadoAprendizagemDebito(...) === 'aprendido'`; em ambos, confirmado → automático, sugestao → clique, ambiguo/semCandidato → nada (pára, manual). `ligar()`/`registo()`/`desligar()` aceitam vários movimentos em QUALQUER chave (ver `movimentoKeys` no nó). Usado só pela `tesouraria.html`; nunca reimplementar por página | — |
 | `gioco-shell.css` | Design system: tokens de cor, tema claro/escuro, sidebar, vidro, `.card`, `.kpi`, `.status`, `.btn-add`, tabelas | — |
-| `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (hover/pin) e toggle de tema com persistência. **Campos de valor** (Set/2026): `parseValor(str)` → Number ou NaN (aceita "4,50", "4.50", "1.234,56", "€ 12", "-0,5"; vazio → NaN, nunca 0), `formatValor(n, casas=2)` → "4,50" (vírgula, sem separador de milhar) e `giocoValorErro(input, msg|null)` (mensagem inline `.valor-erro` a seguir ao campo + classe `.invalido`). Todo o campo monetário/decimal do OS é `<input type="text" inputmode="decimal" autocomplete="off" data-valor[="casas"]>` — NUNCA `type="number"` com decimais: no iOS com teclado pt-PT o utilizador escreve "4,50", o `type="number"` só aceita ponto e devolve "" (o valor perdia-se em silêncio). Quem lê usa `parseValor(input.value)`, nunca `parseFloat`/`Number`; vazio/NaN/≤ 0 bloqueia a gravação com aviso inline onde o zero não faz sentido. No `focusout` o shell reformata `input[data-valor]` com `formatValor` (`data-valor="1"` → 1 casa) e dispara `input` para o estado da página acompanhar; texto que não é número fica como está, marcado `.invalido`. Os `type="number"` que sobram são inteiros (quantidades, dias, minutos, ordem) | — |
+| `gioco-shell.js` | Sprite de ícones SVG, `giocoIcon()`, sidebar (aberta 230px / encolhida 84px por clique no pin, persistida; nav pública em grupos com acordeão estrito e flyout no modo encolhido — sem hover-collapse desde Set/2026) e toggle de tema com persistência. **Campos de valor** (Set/2026): `parseValor(str)` → Number ou NaN (aceita "4,50", "4.50", "1.234,56", "€ 12", "-0,5"; vazio → NaN, nunca 0), `formatValor(n, casas=2)` → "4,50" (vírgula, sem separador de milhar) e `giocoValorErro(input, msg|null)` (mensagem inline `.valor-erro` a seguir ao campo + classe `.invalido`). Todo o campo monetário/decimal do OS é `<input type="text" inputmode="decimal" autocomplete="off" data-valor[="casas"]>` — NUNCA `type="number"` com decimais: no iOS com teclado pt-PT o utilizador escreve "4,50", o `type="number"` só aceita ponto e devolve "" (o valor perdia-se em silêncio). Quem lê usa `parseValor(input.value)`, nunca `parseFloat`/`Number`; vazio/NaN/≤ 0 bloqueia a gravação com aviso inline onde o zero não faz sentido. No `focusout` o shell reformata `input[data-valor]` com `formatValor` (`data-valor="1"` → 1 casa) e dispara `input` para o estado da página acompanhar; texto que não é número fica como está, marcado `.invalido`. Os `type="number"` que sobram são inteiros (quantidades, dias, minutos, ordem) | — |
 | `gioco-charts.css` | Camada de gráficos: barras horizontais/verticais, linha, donut, tokens `--fatia-*` | — |
 | `gioco-charts.js` | `GiocoChart.*` — funções que desenham barras/colunas/linha/donut em HTML/SVG | — |
 | `estilo.html` | Montra do design system: todos os componentes e a grelha de ícones | — |
@@ -1664,17 +1664,49 @@ próprio que percorre `#sidebarEl .nav-row` antes do `DOMContentLoaded` (o menu
 ao toque), e com a nav a aparecer mais tarde esse JS não encontrava linha
 nenhuma. Não passar isto para `DOMContentLoaded`.
 
-Há dois conjuntos, e é **allow-list, nunca deny-list**: o conjunto por omissão
-é `publica` (8 entradas: Dashboard, Receitas, Compras, Pagamentos, Vendas,
-Contagens, Equipa, Definições). O `mrn-dashboard.html` é privado e pede
-`giocoNav('index.html', 'privada')` — lista própria (Home, Dashboard [`dashboard.html`, Set/2026], Tesouraria, Calendário, Tarefas,
-Obrigações, Conta bancária) que **nunca se lista a si própria**. Nenhum conjunto contém
+Há dois conjuntos, e é **allow-list, nunca deny-list**. O conjunto por omissão
+é `publica`, e desde Set/2026 é **em grupos** (`GIOCO_NAV_HOME` +
+`GIOCO_NAV_GRUPOS` no `gioco-shell.js`; `GIOCO_NAV_CONJUNTOS.publica` é a
+lista plana derivada):
+
+- **Home** (`index.html`) — linha própria no topo, fora de qualquer grupo,
+  sempre visível, sem chevron nem maiúsculas.
+- **GERAL** — contactos · **ANÁLISE** — vendas · padroes · resultados ·
+  reconciliacao · custos · tesouraria · **OPERAÇÕES** — compras · pagamentos ·
+  leitura-faturas · contagens · equipa · gestao · centro-de-controlo ·
+  **PRODUTO** — receitas · foodcost · **LOJA** — loja-sao-bento · caixa ·
+  **MARCA** — social.
+
+Acordeão **estrito** (abrir um grupo fecha os outros). Ao carregar uma página
+abre o grupo dela; na Home não abre nenhum; o grupo aberto fica em
+`localStorage['gioco-nav-grupo']` (fallback só para páginas com nav pública
+sem entrada, como a `contabilidade.html`). Não há atalhos nem favoritos.
+`calendario.html` e `tarefas.html` são pessoais e **não** entram na nav
+pública (sem autenticação, o PC da loja não as pode mostrar). Páginas sem
+entrada hoje (`contabilidade.html`) continuam sem entrada até decisão em
+contrário.
+
+**Sidebar sem hover-collapse.** Aberta a 230px por omissão; o `#sidebarPinBtn`
+(clique) encolhe-a para 84px e o estado fica em `localStorage['gioco-sidebar']`.
+O `giocoNav()` aplica esse estado síncrono, antes do primeiro paint — a classe
+`collapsed` no markup das páginas é só o valor inicial. Encolhida: ícone da
+Home (navega direto) e UM ícone por grupo; clicar num abre um **flyout**
+(`#giocoNavFlyout`, `position:fixed`, criado uma vez no body) com as páginas
+do grupo — por clique, nunca por hover; fecha com Esc, clique fora, scroll ou
+ao mexer no pin. Não empurra conteúdo nem provoca reflow. O menu ao toque
+(`shell-mobile`) não mudou: os grupos dissolvem-se em `display:contents` e a
+barra/painel continuam planos.
+
+O `mrn-dashboard.html` é privado e pede `giocoNav('index.html', 'privada')` —
+lista própria e plana (Home, Dashboard [`dashboard.html`, Set/2026], Tesouraria,
+Calendário, Tarefas, Obrigações, Conta bancária) que **nunca se lista a si
+própria**. Nenhum conjunto contém
 `mrn-dashboard.html`: numa deny-list, esquecer a flag numa página nova expunha
 o link.
 
-A primeira entrada do conjunto privado chama-se "Home" e não "Dashboard" de
-propósito — nas páginas públicas há um `Dashboard → index.html` que convida a
-ser "corrigido" para `mrn-dashboard.html`, e era assim que o link privado saía.
+A primeira entrada de ambos os conjuntos chama-se "Home" e aponta para
+`index.html` — nunca a "corrigir" para `mrn-dashboard.html`, que era assim que
+o link privado saía.
 
 O `estilo.html` mantém a nav escrita à mão de propósito: são `<div>` sem href,
 uma montra do componente `.nav-row`, não navegação a sério.

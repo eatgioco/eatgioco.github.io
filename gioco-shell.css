@@ -188,6 +188,9 @@ body{
 
 /* ===== SHELL / SIDEBAR ===== */
 .shell{display:flex; min-height:100vh; padding:0; gap:20px; align-items:flex-start;}
+/* Sidebar: aberta a 230px; .collapsed (por CLIQUE no pin, persistido) encolhe
+   para 84px. Sem hover-collapse (Set/2026): mudar a largura ao passar o rato
+   provocava reflow do layout inteiro a cada passagem. */
 .sidebar{
   width:230px; color:var(--sidebar-text); display:flex; flex-direction:column; padding:22px 16px;
   flex-shrink:0; border-radius:0 28px 28px 0; position:sticky; top:14px;
@@ -201,7 +204,6 @@ body{
 .main{ padding-right:28px; padding-top:20px; }
 .sidebar.collapsed{ width:84px; padding:22px 12px; }
 .sidebar{ overflow:hidden; }
-.sidebar.hidden{ width:0; padding:0; border:none; margin-left:0; box-shadow:none; opacity:0; pointer-events:none; }
 .sidebar-pin-btn{ width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); border:none; padding:0; margin-right:16px; flex-shrink:0; transition: transform .1s ease; }
 .sidebar-pin-btn:hover{ transform:translateY(-1px); }
 .sidebar-pin-btn:active{ transform:scale(0.94); }
@@ -241,6 +243,55 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .nav-row{ display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:12px; font-size:13.5px; font-weight:500; color:var(--sidebar-text-muted); cursor:pointer; text-decoration:none; transition:background .15s ease,color .15s ease; }
 .nav-row:hover{ background:var(--sidebar-hover); color:var(--sidebar-text); }
 .nav-row.active{ background:var(--sidebar-active-bg); color:var(--sidebar-text); border:1px solid var(--sidebar-active-border); }
+
+/* ===== NAV EM GRUPOS (Set/2026) =====
+   Home em linha própria no topo (.nav-home, um .nav-row normal); depois um
+   .nav-group por grupo: cabeçalho (ícone + label em maiúsculas + chevron que
+   roda) e lista indentada de .nav-row. Acordeão estrito gerido pelo
+   gioco-shell.js (classe .aberto). Item ativo: o fundo suave e os cantos
+   arredondados do .nav-row.active de sempre. */
+.nav-home{ margin-bottom:8px; }
+.nav-group{ display:flex; flex-direction:column; }
+.nav-group-head{
+  display:flex; align-items:center; gap:12px; width:100%;
+  padding:10px 14px; border:none; background:none; border-radius:12px;
+  font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--sidebar-text-muted); cursor:pointer; text-align:left; overflow:hidden;
+  transition:background .15s ease,color .15s ease;
+}
+.nav-group-head:hover{ background:var(--sidebar-hover); color:var(--sidebar-text); }
+.nav-group.aberto > .nav-group-head{ color:var(--sidebar-text); }
+.nav-group-label{ flex:1; display:inline-block; white-space:nowrap; overflow:hidden; max-width:200px; transform:translateX(0); opacity:1;
+  transition: transform .32s cubic-bezier(.2,.85,.25,1) var(--nav-d,.06s), opacity .22s ease var(--nav-d,.06s), max-width .32s cubic-bezier(.2,.85,.25,1) var(--nav-d,.06s); }
+.nav-chevron{ margin-left:auto; transition:transform .2s ease; }
+.nav-group.aberto .nav-chevron{ transform:rotate(90deg); }
+.nav-group-list{ display:none; flex-direction:column; gap:2px; padding-left:14px; margin:2px 0 6px; }
+.nav-group.aberto > .nav-group-list{ display:flex; }
+.nav-group-list .nav-row{ padding:9px 12px; font-size:13px; }
+
+/* Encolhida (84px): Home e UM ícone por grupo; as listas não existem — o
+   grupo abre num flyout por clique (gioco-shell.js). */
+.sidebar.collapsed .nav-home{ justify-content:center; }
+.sidebar.collapsed .nav-group-list{ display:none; }
+.sidebar.collapsed .nav-group-head{ justify-content:center; padding:11px 0; }
+.sidebar.collapsed .nav-group-label{ transform:translateX(-16px); opacity:0; max-width:0; transition-delay:0s; }
+.sidebar.collapsed .nav-chevron{ display:none; }
+.sidebar.collapsed .nav-group-head.flyout-aberto{ background:var(--sidebar-active-bg); color:var(--sidebar-text); }
+
+/* Flyout: camada fixa por cima do conteúdo, fora da sidebar (que tem
+   overflow:hidden). Não empurra nada, não provoca reflow. */
+.nav-flyout{
+  display:none; position:fixed; z-index:80; min-width:210px; max-width:280px;
+  flex-direction:column; gap:2px; padding:10px;
+  border-radius:16px; background:var(--sidebar-bg); color:var(--sidebar-text);
+  border:1px solid var(--sidebar-active-border);
+  box-shadow:0 20px 50px rgba(0,0,0,0.18);
+  backdrop-filter:blur(20px) saturate(108%); -webkit-backdrop-filter:blur(20px) saturate(108%);
+}
+.nav-flyout.aberto{ display:flex; }
+.nav-flyout-title{ font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--sidebar-text-muted); padding:4px 12px 8px; }
+.nav-flyout .nav-row{ padding:9px 12px; font-size:13px; }
+.nav-flyout .nav-row span{ transition:none; }
 .sidebar-foot{ border-top:1px solid var(--sidebar-line); padding-top:14px; margin-top:14px; }
 .foot-user{ display:flex; align-items:center; gap:10px; padding:9px 12px; font-size:13px; border-radius:12px; background:var(--sidebar-foot-bg); color:var(--sidebar-text); }
 .foot-user .dot{ width:8px; height:8px; border-radius:50%; background:var(--lime); margin-left:auto; }
@@ -493,8 +544,7 @@ body.gioco-modal-open{ overflow:hidden; }
 
     /* --- Base: vale nos dois estados --- */
     body.shell-mobile .sidebar,
-    body.shell-mobile .sidebar.collapsed,
-    body.shell-mobile .sidebar.hidden{
+    body.shell-mobile .sidebar.collapsed{
       position:fixed;
       top:auto; right:0; bottom:0; left:0;
       width:auto; height:auto; min-height:0; margin:0;
@@ -513,6 +563,15 @@ body.gioco-modal-open{ overflow:hidden; }
     /* Marca e rodapé não cabem numa barra de 52px. */
     body.shell-mobile .sidebar .brand,
     body.shell-mobile .sidebar .sidebar-foot{ display:none; }
+
+    /* Nav em grupos (Set/2026): ao toque a barra/painel continuam PLANOS,
+       exatamente como antes — os grupos dissolvem-se (display:contents) e os
+       cabeçalhos não existem. O flyout só nasce por clique num cabeçalho,
+       por isso nunca aparece ao toque. */
+    body.shell-mobile .sidebar .nav-group,
+    body.shell-mobile .sidebar .nav-group-list{ display:contents; }
+    body.shell-mobile .sidebar .nav-group-head{ display:none; }
+    body.shell-mobile .sidebar .nav-home{ margin:0; }
 
     /* flex-direction explícito: o shell tem `nav{ flex-direction:column }`. */
     body.shell-mobile .sidebar nav{ display:flex; width:100%; }

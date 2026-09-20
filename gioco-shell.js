@@ -176,25 +176,49 @@
   }
 
   /* ---------- SIDEBAR ----------
-     hover -> expande / colapsa.
-     pin  -> fixa completamente fechada (largura zero). Enquanto fixada,
-             o hover deixa de reagir. Clicar outra vez volta ao colapsado. */
+     Aberta a 230px por omissão. O #sidebarPinBtn (CLIQUE) encolhe-a para
+     84px e volta a abri-la; o estado persiste em localStorage['gioco-sidebar']
+     por dispositivo.
+
+     Já NÃO há hover-collapse (Set/2026): expandir/encolher ao passar o rato
+     mudava a largura da sidebar a cada passagem e obrigava a um reflow do
+     layout inteiro — era isso que tornava o site lento. Agora a largura só
+     muda por clique.
+
+     A classe .collapsed no markup das páginas é só o valor inicial: o
+     giocoNav(), que corre síncrono DENTRO da sidebar, aplica o estado guardado
+     antes do primeiro paint, por isso não há salto visível. Sem localStorage
+     (modo privado) fica aberta. */
+  var SIDEBAR_KEY = 'gioco-sidebar';
   var sidebarEl = null;
-  var sidebarPinnedClosed = false;
+
+  function readSidebarCollapsed() {
+    try { return window.localStorage.getItem(SIDEBAR_KEY) === 'collapsed'; }
+    catch (e) { return false; }
+  }
+  function writeSidebarCollapsed(v) {
+    try { window.localStorage.setItem(SIDEBAR_KEY, v ? 'collapsed' : 'open'); }
+    catch (e) { /* silencioso */ }
+  }
+  function tituloPin() {
+    var sb = document.getElementById('sidebarEl');
+    return (sb && sb.classList.contains('collapsed')) ? 'Expandir a barra lateral' : 'Encolher a barra lateral';
+  }
+  function applySidebarState() {
+    sidebarEl = document.getElementById('sidebarEl');
+    if (!sidebarEl) return;
+    sidebarEl.classList.toggle('collapsed', readSidebarCollapsed());
+    sidebarEl.classList.remove('hidden');
+  }
 
   function initSidebar() {
     try {
-      sidebarEl = document.getElementById('sidebarEl');
+      applySidebarState();
       if (!sidebarEl) return;
-      sidebarEl.addEventListener('mouseenter', function () {
-        if (!sidebarPinnedClosed) sidebarEl.classList.remove('collapsed');
-      });
-      sidebarEl.addEventListener('mouseleave', function () {
-        if (!sidebarPinnedClosed) sidebarEl.classList.add('collapsed');
-      });
       var pin = document.getElementById('sidebarPinBtn');
-      if (pin && !pin.getAttribute('onclick')) {
-        pin.addEventListener('click', toggleSidebarPin);
+      if (pin) {
+        if (!pin.getAttribute('onclick')) pin.addEventListener('click', toggleSidebarPin);
+        if (!ehToque()) pin.setAttribute('title', tituloPin());
       }
     } catch (e) { /* nunca travar o resto do script */ }
   }
@@ -203,15 +227,15 @@
     try {
       if (!sidebarEl) sidebarEl = document.getElementById('sidebarEl');
       if (!sidebarEl) return;
-      sidebarPinnedClosed = !sidebarPinnedClosed;
-      if (sidebarPinnedClosed) {
-        sidebarEl.classList.add('collapsed', 'hidden');
-      } else {
-        sidebarEl.classList.remove('hidden');
-        sidebarEl.classList.add('collapsed');
-      }
+      fecharFlyout();
+      var v = !sidebarEl.classList.contains('collapsed');
+      sidebarEl.classList.toggle('collapsed', v);
+      writeSidebarCollapsed(v);
+      var pin = document.getElementById('sidebarPinBtn');
+      if (pin && !ehToque()) pin.setAttribute('title', tituloPin());
     } catch (e) { /* nunca travar o resto do script */ }
   }
+
 
   /* ---------- THEME TOGGLE ----------
      knob desliza, ícone dentro troca (sol/lua), ghost aparece do lado vazio,
@@ -288,46 +312,83 @@
      "não mostrar"), esquecer a flag numa página nova expunha o link privado.
 
      O conjunto 'privada' é o cluster que só se alcança a partir do dashboard
-     (tesouraria, tarefas, conta bancária). A primeira entrada chama-se "Home"
-     e não "Dashboard" de propósito — nas páginas públicas há um
-     "Dashboard → index.html" que convida a ser "corrigido" para
-     mrn-dashboard.html, e era assim que o link privado sairia.
+     (tesouraria, calendário, tarefas, obrigações, conta bancária). Calendário e
+     tarefas são páginas pessoais do Manel: sem autenticação, o PC da loja não
+     as pode mostrar, por isso NÃO entram na nav pública.
 
-     Máximo 9 entradas por conjunto: as regras :nth-child do gioco-shell.css
-     param na 9ª e a partir daí perde-se a animação escalonada. */
-  var GIOCO_NAV_CONJUNTOS = {
-    publica: [
-      { href: 'index.html',      icone: 'layout-dashboard', label: 'Dashboard' },
-      { href: 'receitas.html',   icone: 'chef-hat',         label: 'Receitas' },
-      { href: 'compras.html',    icone: 'shopping-cart',    label: 'Compras' },
-      { href: 'pagamentos.html', icone: 'receipt',          label: 'Pagamentos' },
+     NAV PÚBLICA EM GRUPOS (Set/2026). A Home (index.html) é a raiz: linha
+     própria no topo, fora de qualquer grupo, sempre visível, sem chevron.
+     Abaixo, seis grupos em acordeão ESTRITO (abrir um fecha os outros). Ao
+     carregar uma página abre o grupo dela; na Home não abre nenhum. O grupo
+     aberto persiste em localStorage['gioco-nav-grupo'] — só serve de
+     fallback para páginas com nav pública mas sem entrada (contabilidade).
+     Com a sidebar encolhida (84px): a Home é um ícone que navega direto, e há
+     UM ícone por grupo que abre, por CLIQUE, um flyout sobreposto ao conteúdo
+     (position:fixed, sem reflow) com as páginas do grupo.
+
+     Ícones de grupo reutilizados do sprite (sem SVG novos): Geral 'list',
+     Análise 'bar-chart-2' (o das vendas), Operações 'settings' (libertado
+     pelo antigo link morto "Definições"), Produto 'chef-hat' (o das
+     receitas), Loja 'store' (o do cartão da loja no index), Marca
+     'message-square' (o do social). */
+  var GIOCO_NAV_HOME = { href: 'index.html', icone: 'layout-dashboard', label: 'Home' };
+
+  var GIOCO_NAV_GRUPOS = [
+    { id: 'geral', label: 'Geral', icone: 'list', paginas: [
+      { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' }
+    ]},
+    { id: 'analise', label: 'Análise', icone: 'bar-chart-2', paginas: [
       { href: 'vendas.html',     icone: 'bar-chart-2',      label: 'Vendas' },
-      { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
-      /* Gestão: folha de cálculo de ingredientes e produtos (edição em massa). */
-      { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
-      { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' },
+      /* Padrões: vendas × contexto externo (calendário + meteo), só leitura. */
+      { href: 'padroes.html',    icone: 'layout-dashboard', label: 'Padrões' },
       { href: 'resultados.html', icone: 'trending-up',      label: 'Resultados' },
+      /* Reconciliação: dois cartões (banco ↔ pedidos). 'columns' é o mais
+         próximo de "duas colunas a casar" no sprite. */
+      { href: 'reconciliacao.html', icone: 'columns',       label: 'Reconciliação' },
       /* Custos: nó canónico custos/ (competência, com IVA) — validação de rubricas. */
       { href: 'custos.html',     icone: 'wallet',           label: 'Custos' },
+      { href: 'tesouraria.html', icone: 'receipt',          label: 'Tesouraria' }
+    ]},
+    { id: 'operacoes', label: 'Operações', icone: 'settings', paginas: [
+      { href: 'compras.html',    icone: 'shopping-cart',    label: 'Compras' },
+      { href: 'pagamentos.html', icone: 'receipt',          label: 'Pagamentos' },
+      /* Leitura de faturas: 'scan', o mesmo do cartão no index. */
+      { href: 'leitura-faturas.html', icone: 'scan',        label: 'Leitura de faturas' },
+      { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
-      { href: 'contactos.html',  icone: 'phone',            label: 'Contactos' },
-      /* Centro de controlo: cameras, HACCP, vendas do dia e consumo por loja.
-         Icone 'scan' (moldura de visor) por ser o mais proximo de uma camara
-         no sprite — o 'store' ja e o da loja-sao-bento no index. */
-      { href: 'centro-de-controlo.html', icone: 'scan',       label: 'Centro de controlo' },
-      /* Padrões: vendas × contexto externo (calendário + meteo), só leitura.
-         'layout-dashboard' é o mais próximo de uma grelha/calendário no sprite. */
-      { href: 'padroes.html',    icone: 'layout-dashboard', label: 'Padrões' },
+      /* Gestão: folha de cálculo de ingredientes e produtos (edição em massa). */
+      { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
+      /* Centro de controlo: câmaras, A/C, música, HACCP. 'video' (câmara)
+         entrou no sprite depois do 'scan' que aqui se usava; na nav em grupo
+         o 'scan' ficou para a leitura de faturas. */
+      { href: 'centro-de-controlo.html', icone: 'video',    label: 'Centro de controlo' }
+    ]},
+    { id: 'produto', label: 'Produto', icone: 'chef-hat', paginas: [
+      { href: 'receitas.html',   icone: 'chef-hat',         label: 'Receitas' },
+      { href: 'foodcost.html',   icone: 'trending-down',    label: 'Food cost' }
+    ]},
+    { id: 'loja', label: 'Loja', icone: 'store', paginas: [
+      { href: 'loja-sao-bento.html', icone: 'store',        label: 'Loja São Bento' },
+      { href: 'caixa.html',      icone: 'coins',            label: 'Caixa' }
+    ]},
+    { id: 'marca', label: 'Marca', icone: 'message-square', paginas: [
       /* Social: Instagram (só leitura de social/instagram/) e calendário de
-         publicações (social/calendario/). 'message-square' é o ícone de
-         conversa do sprite — o mais próximo de rede social. */
-      { href: 'social.html',     icone: 'message-square',   label: 'Social' },
-      /* Definições ainda não tem página. Link morto de propósito: fica à vista
-         no menu, mas não navega para lado nenhum. Com os Resultados a lista
-         passou a 10 entradas: é o link morto que fica na 10ª, a única sem
-         animação escalonada (as :nth-child do shell param na 9ª). */
-      { href: '#',               icone: 'settings',         label: 'Definições' }
-    ],
+         publicações (social/calendario/). */
+      { href: 'social.html',     icone: 'message-square',   label: 'Social' }
+    ]}
+  ];
+
+  /* Lista plana do conjunto público (Home + páginas de todos os grupos),
+     derivada dos grupos: mantém window.GIOCO_NAV_CONJUNTOS.publica como
+     inventário de links para quem quiser percorrê-lo. */
+  function navPublicaPlana() {
+    var out = [GIOCO_NAV_HOME];
+    for (var g = 0; g < GIOCO_NAV_GRUPOS.length; g++) out = out.concat(GIOCO_NAV_GRUPOS[g].paginas);
+    return out;
+  }
+
+  var GIOCO_NAV_CONJUNTOS = {
+    publica: navPublicaPlana(),
     privada: [
       { href: 'index.html',      icone: 'layout-dashboard', label: 'Home' },
       /* dashboard.html: novo dashboard privado do Manel (Set/2026), em teste em
@@ -345,6 +406,45 @@
     ]
   };
 
+  var NAV_GRUPO_KEY = 'gioco-nav-grupo';
+  function readGrupoAberto() {
+    try { return window.localStorage.getItem(NAV_GRUPO_KEY) || ''; } catch (e) { return ''; }
+  }
+  function writeGrupoAberto(id) {
+    try { window.localStorage.setItem(NAV_GRUPO_KEY, id || ''); } catch (e) { /* silencioso */ }
+  }
+  function grupoDe(href) {
+    for (var g = 0; g < GIOCO_NAV_GRUPOS.length; g++) {
+      var ps = GIOCO_NAV_GRUPOS[g].paginas;
+      for (var i = 0; i < ps.length; i++) if (ps[i].href === href) return GIOCO_NAV_GRUPOS[g].id;
+    }
+    return '';
+  }
+  function grupoPorId(id) {
+    for (var g = 0; g < GIOCO_NAV_GRUPOS.length; g++) if (GIOCO_NAV_GRUPOS[g].id === id) return GIOCO_NAV_GRUPOS[g];
+    return null;
+  }
+
+  function linhaNav(e, ativo, i) {
+    /* --nav-d: stagger da animação dos labels (.03s × posição), lido
+       pelo gioco-shell.css — vale para qualquer número de entradas. */
+    return '<a class="nav-row' + (e.href === ativo ? ' active' : '') +
+           '" href="' + e.href + '">' + giocoIcon(e.icone, { size: 17 }) +
+           ' <span style="--nav-d:' + (0.03 * (i + 1)).toFixed(2) + 's">' + e.label + '</span></a>';
+  }
+
+  /* Acordeão estrito: abre `id` e fecha todos os outros; id vazio fecha tudo. */
+  function abrirGrupo(nav, id, guardar) {
+    var grupos = nav.querySelectorAll('.nav-group');
+    for (var i = 0; i < grupos.length; i++) {
+      var aberto = grupos[i].getAttribute('data-grupo') === id;
+      grupos[i].classList.toggle('aberto', aberto);
+      var head = grupos[i].querySelector('.nav-group-head');
+      if (head) head.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+    }
+    if (guardar) writeGrupoAberto(id);
+  }
+
   /* ---------- giocoNav(ativo, conjunto) ----------
      Preenche o <nav> da sidebar (por omissão o #giocoNav) com as entradas do
      conjunto, marcando `ativo` como .active. `ativo` é o href tal como está
@@ -354,26 +454,136 @@
      assim: há páginas (contagens, equipa) com JS próprio que percorre
      '#sidebarEl .nav-row' para fechar o painel do menu ao toque, e esse JS
      corre antes do DOMContentLoaded. Se a nav só aparecesse mais tarde, esse
-     JS não encontrava linha nenhuma e o painel deixava de fechar. */
+     JS não encontrava linha nenhuma e o painel deixava de fechar.
+
+     Aproveita o mesmo momento para aplicar o estado guardado da sidebar
+     (aberta/encolhida) antes do primeiro paint. */
   function giocoNav(ativo, conjunto, alvo) {
     try {
-      var lista = GIOCO_NAV_CONJUNTOS[conjunto || 'publica'];
-      if (!lista) return;
+      applySidebarState();
       var nav = alvo || document.getElementById('giocoNav');
       if (!nav) return;
-      var html = '';
-      for (var i = 0; i < lista.length; i++) {
-        var e = lista[i];
-        /* --nav-d: stagger da animação dos labels (.03s × posição), lido
-           pelo gioco-shell.css — vale para qualquer número de entradas,
-           ao contrário das antigas regras :nth-child que paravam na 9ª. */
-        html += '<a class="nav-row' + (e.href === ativo ? ' active' : '') +
-                '" href="' + e.href + '">' + giocoIcon(e.icone, { size: 17 }) +
-                ' <span style="--nav-d:' + (0.03 * (i + 1)).toFixed(2) + 's">' + e.label + '</span></a>';
+      conjunto = conjunto || 'publica';
+      var html = '', i, e;
+
+      if (conjunto !== 'publica') {
+        var lista = GIOCO_NAV_CONJUNTOS[conjunto];
+        if (!lista) return;
+        for (i = 0; i < lista.length; i++) html += linhaNav(lista[i], ativo, i);
+        nav.innerHTML = html;
+        return;
+      }
+
+      /* Home: linha própria, fora dos grupos. */
+      e = GIOCO_NAV_HOME;
+      html += '<a class="nav-row nav-home' + (e.href === ativo ? ' active' : '') +
+              '" href="' + e.href + '">' + giocoIcon(e.icone, { size: 17 }) +
+              ' <span style="--nav-d:0.03s">' + e.label + '</span></a>';
+
+      var n = 1;
+      for (var g = 0; g < GIOCO_NAV_GRUPOS.length; g++) {
+        var gr = GIOCO_NAV_GRUPOS[g];
+        html += '<div class="nav-group" data-grupo="' + gr.id + '">' +
+                '<button type="button" class="nav-group-head" aria-expanded="false" title="' + gr.label + '">' +
+                giocoIcon(gr.icone, { size: 17 }) +
+                ' <span class="nav-group-label" style="--nav-d:' + (0.03 * (++n)).toFixed(2) + 's">' + gr.label + '</span>' +
+                giocoIcon('chevron-right', { size: 14, className: 'nav-chevron' }) +
+                '</button><div class="nav-group-list">';
+        for (i = 0; i < gr.paginas.length; i++) html += linhaNav(gr.paginas[i], ativo, ++n);
+        html += '</div></div>';
       }
       nav.innerHTML = html;
+
+      /* Grupo inicial: o da página; na Home nenhum; página sem grupo → o guardado. */
+      var inicial = grupoDe(ativo);
+      if (!inicial && ativo !== GIOCO_NAV_HOME.href) {
+        var guardado = readGrupoAberto();
+        if (grupoPorId(guardado)) inicial = guardado;
+      }
+      abrirGrupo(nav, inicial, true);
+
+      if (!nav.__giocoGrupos) {
+        nav.__giocoGrupos = true;
+        nav.addEventListener('click', function (ev) {
+          var head = ev.target && ev.target.closest ? ev.target.closest('.nav-group-head') : null;
+          if (!head || !nav.contains(head)) return;
+          var grupo = head.parentNode;
+          var id = grupo.getAttribute('data-grupo');
+          var sb = document.getElementById('sidebarEl');
+          if (sb && sb.classList.contains('collapsed')) {
+            toggleFlyout(head, id, ativo);
+            return;
+          }
+          abrirGrupo(nav, grupo.classList.contains('aberto') ? '' : id, true);
+        });
+      }
     } catch (e) { /* nunca travar o resto do script */ }
   }
+
+  /* ---------- FLYOUT (sidebar encolhida) ----------
+     Um só elemento, criado no body à primeira abertura e reutilizado.
+     position:fixed — é uma camada por cima do conteúdo: não empurra nada nem
+     provoca reflow. Abre por CLIQUE no ícone de grupo, nunca por hover.
+     Fecha com Esc, clique fora, scroll, redimensionar, ou ao encolher/expandir
+     a sidebar. */
+  var flyoutEl = null, flyoutGrupo = '', flyoutHead = null;
+
+  function garantirFlyout() {
+    if (flyoutEl) return flyoutEl;
+    flyoutEl = document.createElement('div');
+    flyoutEl.className = 'nav-flyout';
+    flyoutEl.id = 'giocoNavFlyout';
+    flyoutEl.setAttribute('role', 'menu');
+    document.body.appendChild(flyoutEl);
+    document.addEventListener('click', function (ev) {
+      if (!flyoutEl.classList.contains('aberto')) return;
+      var t = ev.target;
+      if (flyoutEl.contains(t)) return;
+      if (flyoutHead && flyoutHead.contains(t)) return;
+      fecharFlyout();
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && flyoutEl.classList.contains('aberto')) { fecharFlyout(); ev.stopPropagation(); }
+    });
+    window.addEventListener('resize', fecharFlyout);
+    window.addEventListener('scroll', fecharFlyout, true);
+    return flyoutEl;
+  }
+
+  function fecharFlyout() {
+    try {
+      if (!flyoutEl) return;
+      flyoutEl.classList.remove('aberto');
+      if (flyoutHead) flyoutHead.classList.remove('flyout-aberto');
+      flyoutGrupo = ''; flyoutHead = null;
+    } catch (e) { /* silencioso */ }
+  }
+
+  function toggleFlyout(head, id, ativo) {
+    try {
+      if (flyoutGrupo === id) { fecharFlyout(); return; }
+      var gr = grupoPorId(id);
+      if (!gr) return;
+      var el = garantirFlyout();
+      fecharFlyout();
+      var html = '<div class="nav-flyout-title">' + gr.label + '</div>';
+      for (var i = 0; i < gr.paginas.length; i++) html += linhaNav(gr.paginas[i], ativo, i);
+      el.innerHTML = html;
+      var r = head.getBoundingClientRect();
+      var sb = document.getElementById('sidebarEl');
+      var left = (sb ? sb.getBoundingClientRect().right : r.right) + 8;
+      el.style.left = left + 'px';
+      el.style.top = r.top + 'px';
+      el.classList.add('aberto');
+      /* Não deixar sair do ecrã por baixo. */
+      var alt = el.offsetHeight;
+      var maxTop = window.innerHeight - alt - 12;
+      if (r.top > maxTop) el.style.top = Math.max(12, maxTop) + 'px';
+      head.classList.add('flyout-aberto');
+      flyoutGrupo = id; flyoutHead = head;
+    } catch (e) { /* silencioso */ }
+  }
+
 
   /* ---------- MENU AO TOQUE ----------
      Companheiro do bloco @media (hover: none) do gioco-shell.css, e igualmente
@@ -425,7 +635,7 @@
         mq.addEventListener('change', function(){
           mostrarPainel(false);
           var btn = document.getElementById('sidebarPinBtn');
-          if (btn && !ehToque()) btn.setAttribute('title', 'Fixar a barra lateral fechada');
+          if (btn && !ehToque()) btn.setAttribute('title', tituloPin());
         });
       }
       mostrarPainel(false);
@@ -637,6 +847,8 @@
   window.giocoNav = giocoNav;
   window.giocoToggleMenu = giocoToggleMenu;
   window.GIOCO_NAV_CONJUNTOS = GIOCO_NAV_CONJUNTOS;
+  window.GIOCO_NAV_GRUPOS = GIOCO_NAV_GRUPOS;
+  window.GIOCO_NAV_HOME = GIOCO_NAV_HOME;
   window.GIOCO_ICON_NAMES = GIOCO_ICON_NAMES;
   window.giocoShellInit = giocoShellInit;
   window.setIcon = setIcon;
