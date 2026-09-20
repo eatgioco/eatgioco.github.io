@@ -147,18 +147,17 @@ body{
   border-top:1px solid rgba(255,255,255,0.9);
   border-left:1px solid rgba(255,255,255,0.7);
   border-right:1px solid rgba(255,255,255,0.3);
-  border-bottom:1px solid rgba(20,18,14,0.12);
-  /* moldura uniforme por dentro do rebordo; outline (e não border) para não
-     destruir a iluminação assimétrica do vidro nem interferir com o box-shadow */
-  outline: 1px solid var(--line);
-  outline-offset: -1px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.03), 0 6px 20px rgba(20,20,20,0.045);
+  border-bottom:1px solid rgba(20,18,14,0.08);
+  /* Set/2026: caiu a moldura (outline --line) — superfície elevada subtil em
+     vez de borda marcada; a elevação vem da sombra, mais difusa e mais baixa
+     em contraste. */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.02), 0 10px 32px rgba(20,20,20,0.05);
   transition: box-shadow .2s ease, transform .2s ease;
 }
 /* A sombra dura vermelha é assinatura da marca (herdada do design antigo) e
    coexiste sempre com as sombras de vidro — nunca as substitui. */
 .glass-light:hover{
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.03), 0 14px 34px rgba(20,20,20,0.10), 4px 4px 0 var(--red);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -4px 10px rgba(20,18,14,0.02), 0 18px 44px rgba(20,20,20,0.09), 4px 4px 0 var(--red);
   transform: translateY(-2px);
 }
 .glass-light::before{
@@ -170,10 +169,10 @@ body{
   background: rgba(40,36,30,0.4);
   border-top-color: rgba(255,255,255,0.14); border-left-color: rgba(255,255,255,0.08);
   border-right-color: rgba(255,255,255,0.03); border-bottom-color: rgba(0,0,0,0.3);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 20px rgba(0,0,0,0.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 32px rgba(0,0,0,0.24);
 }
 [data-theme="dark"] .glass-light:hover{
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 14px 34px rgba(0,0,0,0.35), 4px 4px 0 var(--red);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 18px 44px rgba(0,0,0,0.34), 4px 4px 0 var(--red);
   transform: translateY(-2px);
 }
 [data-theme="dark"] .glass-light::before{
@@ -201,7 +200,6 @@ body{
   margin:14px 0;
   transition: width .3s cubic-bezier(.2,.8,.2,1), padding .3s cubic-bezier(.2,.8,.2,1);
 }
-.main{ padding-right:28px; padding-top:20px; }
 .sidebar.collapsed{ width:84px; padding:22px 12px; }
 .sidebar{ overflow:hidden; }
 .sidebar-pin-btn{ width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); border:none; padding:0; margin-right:16px; flex-shrink:0; transition: transform .1s ease; }
@@ -297,13 +295,19 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .foot-user .dot{ width:8px; height:8px; border-radius:50%; background:var(--lime); margin-left:auto; }
 .foot-logout{ display:flex; align-items:center; gap:12px; padding:10px 12px; font-size:13px; color:var(--sidebar-text-muted); }
 
-/* ===== MAIN ===== */
-.main{ flex:1; padding:20px 28px 40px 0; min-width:0; }
+/* ===== MAIN =====
+   Passe de design Set/2026: o conteúdo usa a largura toda. O .shell já dá
+   20px de gap a seguir à sidebar; com os 12px à esquerda ficam 32px de
+   margem lateral de cada lado. */
+.main{ flex:1; padding:24px 32px 48px 12px; min-width:0; }
 
-/* Largura de leitura comum a todas as páginas migradas. Centrado com
-   margin auto: quando a sidebar colapsa, o espaço ganho divide-se
-   pelos dois lados em vez de se acumular à direita. */
-.page{ max-width:1200px; margin:0 auto; }
+/* Sem max-width (Set/2026): em ecrãs largos o .page de 1200px deixava faixas
+   vazias dos dois lados. O limite de leitura vive agora no ELEMENTO que
+   precisa dele (ver .table-panel abaixo e os max-width próprios das
+   páginas), nunca no contentor. As grelhas de cartões das páginas usam
+   repeat(auto-fill, minmax(…)) e ganham colunas com o espaço em vez de
+   esticar os cartões. */
+.page{ max-width:none; margin:0; }
 
 .topbar{ display:flex; align-items:center; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--line); margin-bottom:20px; margin-top:6px; }
 .datetime{ font-size:12.5px; color:var(--muted); font-weight:500; }
@@ -344,17 +348,17 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
    desaparece (1,73:1). Fixar o preto, como já se faz nos selos. */
 [data-theme="dark"] .user-drop .avatar{ color:#141414; }
 
-.greet-row{ display:flex; align-items:center; margin-bottom:22px; }
+.greet-row{ display:flex; align-items:center; margin-bottom:28px; }
 .greet-row h1{ font-family:'Antonio',sans-serif; font-weight:700; text-transform:uppercase; font-size:28px; margin:0; letter-spacing:.01em; }
 .greet-row h1 b{ color:var(--red); }
 /* .greet-row .icon-btn herda o vidro de .icon-btn, sem override */
 
 /* ===== KPI ROW — número + tendência + sparkline inline ===== */
-.kpi-row{ display:flex; gap:16px; margin-bottom:16px; }
-.kpi{ flex:1; border-radius:18px; padding:18px 20px; }
+.kpi-row{ display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px; }
+.kpi{ flex:1 1 200px; border-radius:20px; padding:22px 24px; }
 .kpi-top-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:2px; }
 .dots{ color:var(--muted); cursor:pointer; }
-.kpi .k-label{ font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:8px; }
+.kpi .k-label{ font-size:12px; font-weight:500; color:var(--muted); margin-bottom:10px; }
 .kpi-main{ display:flex; align-items:flex-end; justify-content:space-between; }
 .kpi .k-value{ font-family:'Inter',sans-serif; font-weight:700; font-size:24px; }
 .kpi .k-trend{ font-size:11.5px; font-weight:600; color:#4a7c1f; margin-top:4px; display:flex; align-items:center; gap:3px; }
@@ -362,15 +366,15 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .sparkline{ width:64px; height:28px; }
 
 /* ===== GRID 2x2 / PAINÉIS ===== */
-.grid2{ display:flex; gap:16px; margin-bottom:16px; }
+.grid2{ display:flex; gap:18px; margin-bottom:22px; }
 .grid2 .col-wide{ flex:1.6; }
 .grid2 .col-narrow{ flex:1; }
-.panel{ border-radius:14px; padding:20px; }
-.panel h3{ font-family:'Inter',sans-serif; font-weight:700; font-size:14.5px; margin:0 0 16px; }
+.panel{ border-radius:16px; padding:24px; }
+.panel h3{ font-family:'Inter',sans-serif; font-weight:600; font-size:14px; margin:0 0 18px; letter-spacing:.01em; }
 /* .card — contentor genérico; mesma geometria de .panel, sem o estilo de h3.
    Combinar sempre com .glass-light (ou .glass) para o vidro.
    NOTA: não existia na referência, foi acrescentado a pedido. */
-.card{ border-radius:14px; padding:20px; }
+.card{ border-radius:16px; padding:24px; }
 .legend{ display:flex; gap:14px; font-size:11.5px; color:var(--muted); margin-bottom:4px; }
 .legend span{ display:inline-flex; align-items:center; gap:5px; }
 .legend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
@@ -396,9 +400,11 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
 .health-row .dot{ width:7px; height:7px; border-radius:50%; background:var(--lime); }
 
 /* ===== TABLE PANEL ===== */
-.table-panel{ border-radius:14px; padding:20px; }
-.table-panel .head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-.table-panel h3{ font-family:'Inter',sans-serif; font-weight:700; font-size:15px; margin:0; }
+/* Leitura longa: o limite de largura vive aqui, no elemento, não no .page —
+   uma tabela densa a 1700px de largura deixa de se ler em linha. */
+.table-panel{ border-radius:16px; padding:24px; max-width:1440px; }
+.table-panel .head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.table-panel h3{ font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; margin:0; letter-spacing:.01em; }
 .btn-add{ background:var(--red); color:var(--on-red); border:none; border-radius:100px; padding:10px 18px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer; position:relative; overflow:hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 16px rgba(217,17,36,0.3); transition: transform .1s ease; }
 .btn-add:hover{ transform: translateY(-1px); }
 .btn-add:active{ transform: scale(0.96); }
@@ -413,8 +419,8 @@ nav{ display:flex; flex-direction:column; gap:2px; flex:1; }
   background: linear-gradient(115deg, rgba(255,255,255,0.55) 6%, rgba(255,255,255,0.05) 22%, transparent 42%, transparent 72%, rgba(255,255,255,0.2) 100%);
 }
 table{ width:100%; border-collapse:collapse; font-size:12.5px; }
-th{ text-align:left; color:var(--muted); font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; padding:8px; border-bottom:1px solid var(--line); }
-td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
+th{ text-align:left; color:var(--muted); font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:10px; border-bottom:1px solid var(--line); }
+td{ padding:14px 10px; border-bottom:1px solid var(--line); font-weight:500; }
 .who-cell{ display:flex; align-items:center; gap:10px; font-weight:600; }
 .who-cell .av{ width:26px; height:26px; border-radius:50%; background:var(--blush); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--navy); }
 .actions-cell{ display:flex; gap:10px; color:var(--muted); }
@@ -424,13 +430,13 @@ td{ padding:13px 8px; border-bottom:1px solid var(--line); font-weight:500; }
 
 /* ===== RIGHT PANEL — "App" + Quick Actions ===== */
 .right-panel{ width:230px; flex-shrink:0; padding:20px 20px 20px 0; }
-.app-card{ border-radius:14px; padding:18px; margin-bottom:16px; }
+.app-card{ border-radius:16px; padding:22px; margin-bottom:18px; }
 .app-card .head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-.app-card h3{ font-size:13.5px; font-weight:700; margin:0; }
+.app-card h3{ font-size:13.5px; font-weight:600; margin:0; }
 .app-item{ display:flex; align-items:center; gap:10px; padding:9px 6px; font-size:13px; font-weight:500; color:var(--ink); border-radius:8px; cursor:pointer; }
 .app-item:hover{ background:var(--dough); }
-.qa-card{ border-radius:14px; padding:18px; }
-.qa-card h3{ font-size:13.5px; font-weight:700; margin:0 0 12px; }
+.qa-card{ border-radius:16px; padding:22px; }
+.qa-card h3{ font-size:13.5px; font-weight:600; margin:0 0 14px; }
 .qa-btn{ width:100%; text-align:left; background:var(--dough); border:none; border-radius:9px; padding:11px 14px; font-size:12.5px; font-weight:600; margin-bottom:8px; cursor:pointer; color:var(--ink); }
 .qa-btn:last-child{ margin-bottom:0; }
 .qa-btn.primary{ background:var(--red); color:var(--on-red); }
@@ -474,10 +480,10 @@ body.gioco-modal-open{ overflow:hidden; }
   max-height:88dvh;
   overflow:auto;
   -webkit-overflow-scrolling:touch;
-  border-radius:18px;
-  padding:22px 24px 24px;
+  border-radius:20px;
+  padding:24px 28px 28px;
   color:var(--ink);
-  box-shadow:0 24px 60px rgba(0,0,0,0.28);
+  box-shadow:0 28px 70px rgba(0,0,0,0.26);
 }
 /* O vidro do .glass-light é translúcido; por cima de uma página cheia ficava
    ilegível, por isso o modal leva fundo sólido por baixo do vidro. */

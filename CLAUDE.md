@@ -12,8 +12,11 @@ Sistema de gestão interno da GIOCO, uma focacciaria italiana de balcão em Lisb
 - Fundo: `#F5F2EC` | Vermelho: `#D91124` | Preto: `#141414`
 - Fontes: Space Mono (títulos/labels) + Inter (texto corrido)
 - Header vermelho com `● GIOCO®`, botão `🏠 Home` em todas as páginas internas
-- **Shell desktop-first.** O shell é desenhado para o computador: `.page` com `max-width:1200px`,
-  sidebar lateral, e a maioria das páginas com `<meta name="viewport" content="width=1200">`
+- **Shell desktop-first.** O shell é desenhado para o computador: `.page` SEM `max-width`
+  (desde Set/2026 o conteúdo usa a largura toda, com 32px de margem lateral; o limite de
+  leitura vive no elemento — `.table-panel` a 1440px e os `max-width` próprios das páginas —
+  e as grelhas de cartões usam `repeat(auto-fill, minmax(…))` para ganhar colunas em vez de
+  esticar), sidebar lateral, e a maioria das páginas com `<meta name="viewport" content="width=1200">`
   (no telemóvel aparecem reduzidas, não reorganizadas). **Páginas com uso móvel real podem usar
   um único `@media (max-width:768px)` próprio**, documentado aqui com a justificação — o limite
   é de LARGURA de viewport, escolhido por página, e quando o JS também depende dele lê o MESMO
