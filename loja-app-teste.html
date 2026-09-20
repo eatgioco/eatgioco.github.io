@@ -3,18 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>GIOCO · Loja (teste · novo design)</title>
+<title>GIOCO · Loja (versão de teste)</title>
 <meta name="theme-color" content="#F3F1EE">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="GIOCO Loja">
 <meta name="robots" content="noindex">
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   MOCKUP · NOVO DESIGN (minimal, plano, espaçoso).
+   APP DO STAFF · VERSÃO DE TESTE (grava no Firebase, nó testeLojaApp/).
+   Apresentação: novo design minimal, plano, espaçoso.
    O que mudou face à versão anterior é SÓ apresentação:
      - .glass-light (vidro, blur, brilho) -> .surface (branco plano)
      - selos em gradiente -> tintas planas
@@ -364,6 +368,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .login{position:absolute;inset:0;z-index:100;background:var(--dough);
   display:flex;flex-direction:column;overflow-y:auto;}
 .login.hidden{display:none;}
+/* auth anónima (padrão único do OS, ver Restrição 5 do CLAUDE.md) */
+#authErro{display:none;padding:12px 18px 0;}
+#authErro.on{display:block;}
+.auth-box{border-left:4px solid var(--red);background:var(--white);border-radius:12px;padding:18px 20px;}
+.auth-box h2{margin:0 0 8px;font-family:'Inter',sans-serif;font-size:16px;font-weight:700;}
+.auth-box p{margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.5;}
+.pin-msg{font-size:13px;color:var(--muted);text-align:center;margin:0 0 10px;line-height:1.45;}
+.pin-msg b{color:var(--ink);}
+#fotoInput{display:none;}
+.foto-prev{width:100%;max-height:160px;object-fit:cover;border-radius:12px;margin-top:10px;display:block;}
 .mark-logo{height:26px;width:auto;display:block;}
 .mark-text{font-family:'Antonio',sans-serif;font-weight:700;font-size:26px;line-height:1;
   color:var(--red);letter-spacing:.02em;}
@@ -420,6 +434,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         onerror="this.outerHTML='&lt;span class=&quot;mark-text&quot;&gt;GIOCO&lt;/span&gt;'">
       <span class="login-loja"><i></i> São Bento 154</span>
     </div>
+    <div id="authErro">
+      <div class="auth-box">
+        <h2>Sem ligação ao Firebase</h2>
+        <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+        <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+      </div>
+    </div>
     <div class="login-body">
       <div class="greet-row">
         <div>
@@ -442,6 +463,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
             <span class="avatar" id="pAv" style="width:44px;height:44px;font-size:13px"></span>
             <div><div class="pin-nome" id="pNome"></div><div class="pin-fn" id="pFn"></div></div>
           </div>
+          <p class="pin-msg" id="pMsg"></p>
           <div class="dots" id="pdots"></div>
           <div class="pad" id="pinPad"></div>
         </div>
@@ -451,7 +473,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
 
   <!-- ===== FAIXA DE TESTE (sempre visível) + SIMULAÇÃO (escondida) ===== -->
-  <div class="aviso-teste" onclick="toqueSecreto()">Versão de teste · dados de demonstração · nada é gravado</div>
+  <div class="aviso-teste" onclick="toqueSecreto()">Versão de teste · os registos são gravados</div>
   <div class="demobar" id="demobar">
     <em>Teste</em>
     <select id="dDia" onchange="setDemo()" aria-label="Dia simulado"></select>
@@ -476,7 +498,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="screen" id="sc-entradas"></div>
       <div class="screen" id="sc-pedidos"></div>
       <div class="screen" id="sc-turnos"></div>
-      <div class="rodape" onclick="toqueSecreto()">Versão de teste · dados de demonstração</div>
+      <div class="rodape" onclick="toqueSecreto()">Versão de teste · os registos são gravados em testeLojaApp/</div>
     </div>
   </div>
 
@@ -498,6 +520,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="notif-h">GIOCO Loja · agora</div></div>
   </div>
   <div class="toast" id="toast"></div>
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="fotoEscolhida(this)">
 </div>
 
 <script>
@@ -528,61 +551,112 @@ function ic(n,c,s){
 }
 document.getElementById('mBack').innerHTML=ic('back',null,18);
 document.getElementById('mClose').innerHTML=ic('x',null,18);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
-/* ============ DADOS DEMO ============ */
-var PESSOAS=[
- {id:'p1',n:'Alfredo',f:'Operações',c:'#004476'},{id:'p2',n:'Beatriz',f:'Balcão',c:'#D91124'},
- {id:'p3',n:'Filipe',f:'Cozinha',c:'#4a7c1f'},{id:'p4',n:'Sofia',f:'Balcão',c:'#8A6508'},
- {id:'p5',n:'Miguel',f:'Cozinha',c:'#4A3F7A'},{id:'p6',n:'Carolina',f:'Balcão',c:'#8C3F6B'}
-];
-var EQUIP=[
- {id:'e1',n:'Bancada Fria EDENOX MPS-250HC',lim:5,manha:{v:3.2,h:'11:14'},noite:null},
- {id:'e2',n:'Bancada Fria AMITEK AK941',lim:5,manha:{v:4.1,h:'11:16'},noite:null},
- {id:'e3',n:'Bancada Fria AMITEK AK943T',lim:5,manha:null,noite:null},
- {id:'e4',n:'Armário Refrigerado GN 2/1',lim:5,manha:{v:7.4,h:'11:18'},noite:null},
- {id:'e5',n:'Congelador',lim:-18,manha:{v:-19.5,h:'11:20'},noite:null},
- {id:'e6',n:'Placa Fria Drop-in 3GN',lim:5,manha:null,noite:null}
-];
+/* ============ FIREBASE ============
+   TODA a escrita desta app vai para o nó isolado testeLojaApp/ (RAIZ).
+   Lê-se, só em leitura, pessoas/, equipamentos/ e lojaChecklistTemplates/.
+   Nunca se escreve em nenhum nó de produção. */
+var firebaseConfig = {
+  apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+  authDomain: "gioco-fornecedores.firebaseapp.com",
+  databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "gioco-fornecedores",
+  storageBucket: "gioco-fornecedores.firebasestorage.app",
+  messagingSenderId: "441783294427",
+  appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+};
+firebase.initializeApp(firebaseConfig);
+var RAIZ='testeLojaApp';
+var db=null;
+
+// NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+// leitura/escrita no Firebase. Padrão único do OS (ver Restrição 5 do
+// CLAUDE.md): timeout de 8 s, caixa #authErro e botão "Tentar de novo".
+var authArrancou = false;
+var authCallback = null;
+
+function autenticarEContinuar(callback) {
+  if (callback) authCallback = callback;
+
+  var resolvido = false;
+  var caixaErro = document.getElementById('authErro');
+  var detalhe = document.getElementById('authErroDetalhe');
+
+  if (caixaErro) caixaErro.classList.remove('on');
+
+  function falhar(msg) {
+    if (resolvido) return;
+    resolvido = true;
+    if (detalhe) detalhe.textContent = msg;
+    if (caixaErro) caixaErro.classList.add('on');
+  }
+
+  var timer = setTimeout(function () {
+    falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+  }, 8000);
+
+  firebase.auth().signInAnonymously()
+    .then(function () {
+      if (resolvido) return;
+      resolvido = true;
+      clearTimeout(timer);
+      if (caixaErro) caixaErro.classList.remove('on');
+      // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+      // a página inteira por cima da que já lá estava.
+      if (authArrancou) return;
+      authArrancou = true;
+      if (authCallback) authCallback();
+    })
+    .catch(function (erro) {
+      clearTimeout(timer);
+      console.error('Falha na autenticação anónima:', erro);
+      falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+    });
+}
+
+(function () {
+  var btn = document.getElementById('authRetryBtn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var detalhe = document.getElementById('authErroDetalhe');
+    if (detalhe) detalhe.textContent = 'A ligar…';
+    autenticarEContinuar(null);
+  });
+})();
+
+/* ============ DADOS ============
+   PESSOAS e EQUIP são preenchidos a partir do Firebase (só leitura). As
+   listas ficam vazias até o primeiro snapshot chegar. */
+var PESSOAS=[];          /* {id, n, f, c} de pessoas/ (ativo !== false) */
+var PINS={};             /* testeLojaApp/pins/{pessoaId} = {hash,…} */
+var EQUIP=[];            /* {id, n, lim, limMin, zona, estado} */
+var EQUIP_ORIGEM='';     /* 'equipamentos' | 'testeLojaApp' */
 var CHK={
  abertura:{n:'Checklist de abertura',i:[
-  'Ligar equipamentos de frio e verificar funcionamento','Verificar e registar temperaturas',
-  'Repor vitrine com produtos do dia','Confirmar fundo de caixa',
-  'Limpar e preparar bancadas','Ligar máquina de café e forno',
-  'Verificar stock de sacos e embalagens','Abrir loja — luzes e música'],f:[]},
+  'Ligar equipamentos de frio e verificar funcionamento','Verificar e registar temperaturas das câmaras/bancadas',
+  'Repor vitrine com produtos do dia','Confirmar fundo de caixa (troco)',
+  'Limpar e preparar bancadas de trabalho','Ligar máquina de café e forno',
+  'Verificar stock de sacos e embalagens','Abrir loja — ligar luzes e música']},
  fecho:{n:'Checklist de fecho',i:[
   'Desligar equipamentos não essenciais','Arrumar câmaras e etiquetar sobras',
-  'Retirar lixo e substituir sacos','Limpar chão da cozinha e sala',
-  'Fechar caixa e guardar valores','Verificar portas e alarme'],f:[]}
+  'Retirar lixo e substituir sacos','Limpar bancadas e superfícies',
+  'Limpar chão e casa de banho','Fecho de caixa no POS',
+  'Repor vitrine para o dia seguinte','Fechar portas e ativar alarme']}
 };
 var CHK_R={abertura:'manha',fecho:'noite'};
 var JAN={manha:{abre:'10:00',lim:'12:00',n:'Ronda da manhã'},
          noite:{abre:'22:00',lim:'23:59',n:'Ronda da noite'}};
+/* Entregas previstas: lista INDICATIVA (janelas habituais), só para leitura.
+   O registo de entradas está DESLIGADO nesta ronda. */
 var FORN=[
  {id:'f1',n:'IL BOCCONCINO',frio:true,dias:[1,4],de:'08:00',ate:'11:00'},
  {id:'f2',n:'BIDFOOD',frio:true,dias:[2,5],de:'07:30',ate:'10:00'},
  {id:'f3',n:'SOGENAVE',frio:true,dias:[3],de:'09:00',ate:'13:00'},
- {id:'f4',n:'SUPER BOCK',frio:false,dias:[4],de:'14:00',ate:'18:00'},
- {id:'f5',n:'Outro fornecedor',frio:false,dias:[],de:null,ate:null}
-];
-var ENTRADAS=[{f:'IL BOCCONCINO',doc:'Guia GR 2026/4471',h:'09:12',q:'Alfredo',l:14,p:1}];
-var LINHAS=[
- {n:'Farinha Tipo 00 Caputo 25kg',q:'4 sacos'},{n:'Mozzarella Fior di Latte 3kg',q:'6 un'},
- {n:'Tomate Pelado San Marzano 2,5kg',q:'12 latas'},{n:'Presunto Crudo fatiado 500g',q:'8 un'},
- {n:'Azeite Extra Virgem 5L',q:'2 un'},{n:'Rúcula selvagem 500g',q:'6 sacos'}
-];
-var PEDIDOS=[
- {t:'Acabou o papel vegetal para as focaccias',c:'Ruptura',e:'novo',q:'Beatriz',w:'hoje, 10:42'},
- {t:'Torneira da bancada da cozinha a pingar',c:'Avaria · Cozinha',e:'curso',q:'Filipe',w:'ontem, 18:05'},
- {t:'Segundo suporte de sacos ao balcão',c:'Ideia · Bar',e:'novo',q:'Sofia',w:'ontem, 15:20'}
+ {id:'f4',n:'SUPER BOCK',frio:false,dias:[4],de:'14:00',ate:'18:00'}
 ];
 var TURNOS=[{i:'11:00',f:'16:00'},{i:'16:00',f:'17:30'},{i:'17:30',f:'23:00'}];
-var SEMANA=[
- {d:'Sex 14 ago',h:'11:00–16:00',hoje:true},{d:'Sáb 15 ago',h:'11:00–16:00'},
- {d:'Dom 16 ago',h:'17:30–23:00'},{d:'Seg 17 ago',h:'folga',off:true},
- {d:'Ter 18 ago',h:'11:00–16:00'},{d:'Qua 19 ago',h:'folga',off:true},
- {d:'Qui 20 ago',h:'17:30–23:00'}
-];
-var HOJE_EQ=[{n:'Alfredo',h:'11:00–23:00'},{n:'Beatriz',h:'11:00–16:00'},{n:'Filipe',h:'17:30–23:00'}];
 var FERIADOS={'2026-04-03':'Sexta-feira Santa','2026-04-25':'Liberdade','2026-05-01':'Dia do Trabalhador',
  '2026-06-04':'Corpo de Deus','2026-06-10':'Dia de Portugal','2026-06-13':'Santo António',
  '2026-08-15':'Assunção','2026-10-05':'Implantação da República','2026-11-01':'Todos os Santos',
@@ -592,24 +666,61 @@ var FERIADOS={'2026-04-03':'Sexta-feira Santa','2026-04-25':'Liberdade','2026-05
  '2027-06-13':'Santo António','2027-08-15':'Assunção','2027-10-05':'Implantação da República',
  '2027-11-01':'Todos os Santos','2027-12-01':'Restauração','2027-12-08':'Imaculada Conceição',
  '2027-12-25':'Natal'};
-var SALDO={direito:22,gozados:8,marcados:5};
-var AUSENCIAS=[{t:'Férias',de:'2026-09-07',ate:'2026-09-13',d:5,e:'pendente'}];
+
+/* Semente dos equipamentos com termómetro (cópia dos 9 de EQUIPAMENTOS_2026
+   da loja-sao-bento.html, limites por tipo). Só se usa se equipamentos/ não
+   tiver nenhum com registaTemperatura — nesse caso é gravada UMA vez em
+   testeLojaApp/equipamentos/ e a app lê de lá. */
+var EQUIP_SEMENTE={
+ refhorizbebidas:    {nome:'2 - Refrigerado Horizontal (Bebidas)',              zona:'Sala principal',      ordem:1,  tipo:'refrigeracao', limiteMin:0,   limiteMax:5,   registaTemperatura:true, ativo:true},
+ refhorizqueijos:    {nome:'3 - Refrigerado Horizontal (Queijo e charcutaria)', zona:'Sala principal',      ordem:2,  tipo:'refrigeracao', limiteMin:0,   limiteMax:5,   registaTemperatura:true, ativo:true},
+ maqgelo:            {nome:'Máquina de gelo',                                   zona:'Sala principal',      ordem:10, tipo:'outro',        limiteMin:null,limiteMax:null,registaTemperatura:true, ativo:true},
+ maqlavarcopos:      {nome:'Máquina de lavar copos',                            zona:'Sala principal',      ordem:11, tipo:'lavagem',      limiteMin:82,  limiteMax:null,registaTemperatura:true, ativo:true},
+ placafriaexpositor: {nome:'Placa fria / expositor',                            zona:'Sala principal',      ordem:12, tipo:'refrigeracao', limiteMin:0,   limiteMax:5,   registaTemperatura:true, ativo:true},
+ friohorizcongelados:{nome:'1 - Frio horizontal congelados',                    zona:'Zona de preparações', ordem:1,  tipo:'congelacao',   limiteMin:-25, limiteMax:-18, registaTemperatura:true, ativo:true, estado:'manutencao'},
+ friovertical:       {nome:'2 - Frio Vertical',                                 zona:'Zona de preparações', ordem:2,  tipo:'refrigeracao', limiteMin:0,   limiteMax:5,   registaTemperatura:true, ativo:true, estado:'avariado'},
+ camarafrigorifica:  {nome:'Câmara Frigorífica horizontal',                     zona:'Área técnica',        ordem:2,  tipo:'refrigeracao', limiteMin:0,   limiteMax:5,   registaTemperatura:true, ativo:true},
+ maqlavarloica:      {nome:'Máquina de Lavar Loiça',                            zona:'Área técnica',        ordem:4,  tipo:'lavagem',      limiteMin:82,  limiteMax:null,registaTemperatura:true, ativo:true}
+};
+var ZONA_ORDEM=['Sala principal','Zona de preparações','Área técnica'];
+function equipDeNo(val){
+ return Object.keys(val||{}).map(function(id){var e=val[id]||{};
+  var max=(typeof e.limiteMax==='number')?e.limiteMax:(typeof e.limite==='number'?e.limite:null);
+  var min=(typeof e.limiteMin==='number')?e.limiteMin:null;
+  return {id:id,n:e.nome||id,zona:e.zona||'',ordem:e.ordem||0,tipo:e.tipo||'outro',
+   lim:max,limMin:min,estado:e.estado||'operacional',
+   reg:e.registaTemperatura===true,ativo:e.ativo!==false};})
+  .filter(function(e){return e.reg&&e.ativo;})
+  .sort(function(a,b){var za=ZONA_ORDEM.indexOf(a.zona),zb=ZONA_ORDEM.indexOf(b.zona);
+   if(za===-1)za=99;if(zb===-1)zb=99;return za-zb||a.ordem-b.ordem;});
+}
+function limTxt(e){
+ if(e.lim!=null&&e.limMin!=null)return e.limMin+'° a '+e.lim+'°';
+ if(e.lim!=null)return 'máx. '+e.lim+'°';
+ if(e.limMin!=null)return 'mín. '+e.limMin+'°';
+ return 'sem limite';
+}
+function foraLimite(e,v){
+ if(e.lim!=null&&v>e.lim)return true;
+ if(e.limMin!=null&&v<e.limMin)return true;
+ return false;
+}
 
 /* ============ ESTADO ============ */
-/* DEMO só conta quando DEMO.ativo === true (barra de simulação aberta e
-   uma escolha feita). Por omissão a app corre sobre o relógio do telemóvel. */
 var DEMO={ativo:false,dia:4,hora:9,min:40};
-var user=null,pinBuf='',alvo=null;
-var emTurno=false,tIn=null,tick=null,hLog='',hDur='00:00:00',hHora='';
+var user=null,pinBuf='',alvo=null,pinModo='verificar',pinPrimeiro='';
+var tick=null;
 var TAB='hoje',chkAberto=false;
-var tmp={},wiz=null,pv=null,mBackFn=null;
-var NET={online:true,fila:0};
-var avisado={};   /* para não repetir a notificação do mesmo prazo */
+var tmp={},mBackFn=null;
+var NET={online:navigator.onLine!==false,ligado:false,fila:0};
+var avisado={};
+var DIAS7={};   /* últimos 7 dias de testeLojaApp/registos (snapshot) */
+var carregado={pessoas:false,equip:false,registos:false};
 
 /* ============ TEMPO ============
-   hm(), ag() e dow() são a ÚNICA porta para a hora: tudo o resto (rondas,
-   prazos, pressão, turnos, entregas) corre por cima delas. Em hora real
-   leem o relógio do sistema; em hora simulada leem o DEMO. */
+   hm(), ag() e dow() são a ÚNICA porta para a hora de APRESENTAÇÃO (rondas,
+   prazos, pressão). Em hora simulada leem o DEMO. A hora GRAVADA em cada
+   registo (dataHora) é SEMPRE o relógio real do telemóvel — ver carimbo(). */
 function p2(n){return n<10?'0'+n:''+n;}
 function agora(){
  var d=new Date();
@@ -620,36 +731,113 @@ function hm(){var d=agora();return p2(d.getHours())+':'+p2(d.getMinutes());}
 function mn(s){var a=s.split(':');return +a[0]*60+ +a[1];}
 function ag(){var d=agora();return d.getHours()*60+d.getMinutes();}
 function dow(){return DEMO.ativo?DEMO.dia:new Date().getDay();}
+function iso(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function diaKey(){return iso(new Date());}   /* data LOCAL do telemóvel */
+function carimbo(){var d=new Date();return {dataHora:d.toISOString(),hora:p2(d.getHours())+':'+p2(d.getMinutes()),dia:iso(d)};}
+function hhmm(isoStr){var d=new Date(isoStr);return isNaN(d)?'—':p2(d.getHours())+':'+p2(d.getMinutes());}
+function novoId(){return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);}
 
 /* ============ REDE E FILA DE ENVIO ============
-   Sem rede a app grava no telemóvel e marca o registo como por enviar.
-   Nunca finge que gravou no servidor. */
-function rede(){
- NET.online=!NET.online;
- document.getElementById('nBtn').textContent=NET.online?'Rede':'Sem rede';
- if(NET.online&&NET.fila>0){
-  var n=NET.fila;
-  EQUIP.forEach(function(e){['manha','noite'].forEach(function(r){
-   if(e[r])e[r].sync=true;});});
-  ENTRADAS.forEach(function(x){x.sync=true;});
-  NET.fila=0;render();
-  toast(n+' registo'+(n>1?'s':'')+' enviado'+(n>1?'s':'')+' agora que há ligação');
- } else render();
+   Cada escrita entra PRIMEIRO na fila local (localStorage) e só sai quando
+   o set() no Firebase resolve. Sem rede, o registo fica no telemóvel com a
+   hora em que foi feito (dataHora) e sobe quando houver ligação — ao
+   reabrir a app a fila é reenviada (set() no mesmo path é idempotente).
+   A app nunca finge que gravou no servidor: "por enviar" enquanto está na fila. */
+var FILA_KEY='testeLojaApp.fila';
+var fila=[];
+var aEnviar={};
+function filaLer(){try{fila=JSON.parse(localStorage.getItem(FILA_KEY)||'[]');if(!Array.isArray(fila))fila=[];}catch(e){fila=[];}NET.fila=fila.length;}
+function filaGravar(){try{localStorage.setItem(FILA_KEY,JSON.stringify(fila));}catch(e){console.warn('fila local cheia',e);}NET.fila=fila.length;}
+function filaTem(path){return fila.some(function(x){return x.path===path;});}
+function gravar(path,valor){
+ var item={path:path,valor:valor,em:new Date().toISOString(),id:novoId()};
+ fila=fila.filter(function(x){return x.path!==path;});
+ fila.push(item);filaGravar();
+ enviar(item);
+ render();
 }
-function fila(){
- if(NET.online)return '';
+function enviar(item){
+ if(!db||aEnviar[item.id])return;
+ aEnviar[item.id]=true;
+ db.ref(item.path).set(item.valor).then(function(){
+  delete aEnviar[item.id];
+  fila=fila.filter(function(x){return x.id!==item.id;});filaGravar();
+  render();
+ }).catch(function(err){
+  delete aEnviar[item.id];
+  console.error('Falha ao gravar '+item.path,err);
+  toast('Falha ao gravar no Firebase: '+(err&&err.message?err.message:err));
+ });
+}
+function despachar(){
+ if(!db)return;
+ var n=fila.filter(function(x){return !aEnviar[x.id];}).length;
+ fila.slice().forEach(enviar);
+ if(n&&NET.ligado)toast(n+' registo'+(n>1?'s':'')+' a enviar agora que há ligação');
+}
+window.addEventListener('online',function(){NET.online=true;despachar();render();});
+window.addEventListener('offline',function(){NET.online=false;render();});
+
+/* dados = snapshot do Firebase + o que está na fila por cima (para render
+   ver o registo mesmo sem rede e sem cache do SDK) */
+function dados(){
+ var d=JSON.parse(JSON.stringify(DIAS7||{}));
+ var pref=RAIZ+'/registos/';
+ fila.forEach(function(x){
+  if(x.path.indexOf(pref)!==0)return;
+  var partes=x.path.slice(pref.length).split('/'),o=d;
+  for(var i=0;i<partes.length-1;i++){if(!o[partes[i]]||typeof o[partes[i]]!=='object')o[partes[i]]={};o=o[partes[i]];}
+  o[partes[partes.length-1]]=x.valor;
+ });
+ return d;
+}
+function hoje(){return dados()[diaKey()]||{};}
+function porEnviar(tipo,id){return filaTem(RAIZ+'/registos/'+diaKey()+'/'+tipo+'/'+id);}
+function fila_html(){
+ if(NET.online&&NET.ligado&&!NET.fila)return '';
+ var semRede=!NET.online||!NET.ligado;
  return '<div class="netbar"><span>'+ic('alert','var(--amber)',20)+'</span>'+
-  '<span><b>Sem ligação</b>'+(NET.fila
+  '<span><b>'+(semRede?'Sem ligação':'A enviar')+'</b>'+(NET.fila
    ?NET.fila+' registo'+(NET.fila>1?'s':'')+' guardado'+(NET.fila>1?'s':'')+
-    ' no telemóvel · sobem assim que houver rede'
+    ' no telemóvel · sobe'+(NET.fila>1?'m':'')+' assim que houver rede, com a hora em que '+(NET.fila>1?'foram feitos':'foi feito')
    :'Podes continuar a trabalhar — nada se perde')+'</span></div>';
 }
 
+/* ============ LEITURAS DO DIA ============ */
+function tempsDe(r){  /* temperaturas de hoje na ronda r, por equipamento */
+ var t=hoje().temperaturas||{},out={};
+ Object.keys(t).forEach(function(id){var x=t[id];if(!x||x.ronda!==r)return;
+  if(!out[x.equipamentoId]||x.dataHora>out[x.equipamentoId].dataHora)out[x.equipamentoId]=Object.assign({id:id},x);});
+ return out;
+}
+function tempDe(eqId,r){return tempsDe(r)[eqId]||null;}
+function chkDe(k){var c=(hoje().checklists||{})[k]||{};var f=[];
+ Object.keys(c.itens||{}).forEach(function(i){if(c.itens[i]===true)f.push(+i);});
+ return {f:f,concluido:!!c.concluidoEm,reg:c};}
+function chkFeita(k){var c=chkDe(k);return c.f.length>=CHK[k].i.length&&CHK[k].i.length>0;}
+function picagensHoje(){var p=hoje().picagens||{};
+ return Object.keys(p).map(function(id){return Object.assign({id:id},p[id]);})
+  .sort(function(a,b){return a.dataHora<b.dataHora?-1:1;});}
+function ultimaPicagem(pessoaId){var l=picagensHoje().filter(function(x){return x.pessoaId===pessoaId;});return l[l.length-1]||null;}
+function emTurnoDe(pessoaId){var u=ultimaPicagem(pessoaId);return !!(u&&u.tipo==='entrada');}
+function pedidosTodos(){
+ var d=dados(),out=[];
+ Object.keys(d).forEach(function(dia){var p=(d[dia]||{}).pedidos||{};
+  Object.keys(p).forEach(function(id){out.push(Object.assign({id:id,_dia:dia},p[id]));});});
+ return out.sort(function(a,b){return a.dataHora<b.dataHora?1:-1;});
+}
+function quando(isoStr){
+ var d=new Date(isoStr);if(isNaN(d))return '—';
+ var h=hhmm(isoStr),k=iso(d),hj=diaKey();
+ var ont=new Date();ont.setDate(ont.getDate()-1);
+ if(k===hj)return 'hoje, '+h;if(k===iso(ont))return 'ontem, '+h;
+ return d.getDate()+' '+MES[d.getMonth()]+', '+h;
+}
+
 /* ============ REGRAS DE RONDA ============ */
-function tFalta(r){r=r||ronda();return EQUIP.filter(function(e){return !e[r];}).length;}
-function tAlerta(r){r=r||ronda();return EQUIP.filter(function(e){return e[r]&&e[r].v>e.lim;}).length;}
-function rondaOk(r){var k=r==='manha'?'abertura':'fecho';
- return tFalta(r)===0&&CHK[k].f.length===CHK[k].i.length;}
+function tFalta(r){r=r||ronda();var t=tempsDe(r);return EQUIP.filter(function(e){return !t[e.id];}).length;}
+function tAlerta(r){r=r||ronda();var t=tempsDe(r);return EQUIP.filter(function(e){return t[e.id]&&foraLimite(e,t[e.id].temperatura);}).length;}
+function rondaOk(r){var k=r==='manha'?'abertura':'fecho';return tFalta(r)===0&&chkFeita(k);}
 function est(r){var m=ag(),j=JAN[r];
  if(m<mn(j.abre))return 'fechada';
  if(m<=mn(j.lim))return 'aberta';
@@ -659,7 +847,7 @@ function ronda(){var m=ag();
  if(m<mn(JAN.noite.abre))return rondaOk('manha')?'noite':'manha';
  return 'noite';}
 function pode(r){return est(r)!=='fechada';}
-function faltaPrazo(r){return mn(JAN[r].lim)-ag();}   /* minutos até ao limite */
+function faltaPrazo(r){return mn(JAN[r].lim)-ag();}
 function pressao(r){
  if(est(r)!=='aberta')return '';
  var m=faltaPrazo(r);
@@ -677,8 +865,7 @@ function turno(){
 }
 function entregas(){
  return FORN.filter(function(f){return f.dias.indexOf(dow())>-1;}).map(function(f){
-  var r=ENTRADAS.filter(function(e){return e.f===f.n;})[0];
-  return {f:f,e:r?'recebida':(ag()>mn(f.ate)?'atraso':'espera'),r:r};});
+  return {f:f,e:(ag()>mn(f.ate)?'atraso':'espera')};});
 }
 
 /* ============ HELPERS DE MARCAÇÃO ============ */
@@ -698,9 +885,8 @@ function kpi(seal,label,icon,value,note,btn){
 }
 var SEAL={cream:'cream',lime:'lime',mustard:'mustard',blush:'blush',navy:'navy',sky:'sky'};
 
-/* lançadores: atalhos de um toque para o que mais se faz de pé */
 function lancadores(){
- var L=[['temp','Temperaturas',"go('registos')"],['truck','Dar entrada','novaEntrada()'],
+ var L=[['temp','Temperaturas',"go('registos')"],['truck','Entregas',"go('entradas')"],
         ['box','Está a acabar','abrirRuptura()'],['plus','Novo pedido','abrirPedido()']];
  return '<div class="launch">'+L.map(function(x){
   return '<button class="l-btn" onclick="'+x[2]+'"><span class="l-c">'+ic(x[0],null,24)+
@@ -708,12 +894,11 @@ function lancadores(){
 }
 
 /* ============ NAVEGAÇÃO ============ */
-/* Hoje ao centro e elevado: é o ecrã de regresso */
 var NAV=[['registos','Registos','temp'],['entradas','Entradas','box'],
          ['hoje','Hoje','clock'],
          ['pedidos','Pedidos','note'],['turnos','Turnos','cal']];
 function renderNav(){
- var novos=PEDIDOS.filter(function(p){return p.e==='novo';}).length;
+ var novos=pedidosTodos().filter(function(p){return p.estado==='novo';}).length;
  document.getElementById('nav').innerHTML=NAV.map(function(t){
   var on=TAB===t[0]?' active':'';
   if(t[0]==='hoje')
@@ -735,21 +920,36 @@ function go(id){
 /* ============ ECRÃ · HOJE ============ */
 var MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 var DIAS=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function durTxt(ms){var s=Math.max(0,Math.floor(ms/1000));return p2(Math.floor(s/3600))+':'+p2(Math.floor(s/60)%60)+':'+p2(s%60);}
+function logTurno(){
+ var l=picagensHoje().filter(function(x){return x.pessoaId===user.id;});
+ if(!l.length)return '';
+ var h='',ent=null;
+ l.forEach(function(p){
+  h+='<div class="kv"><span>'+(p.tipo==='entrada'?'Entrada':'Saída')+'</span><span>'+hhmm(p.dataHora)+
+   (porEnviar('picagens',p.id)?' · por enviar':'')+'</span></div>'+
+   (p.motivo?'<div class="kv warn"><span>Motivo</span><span>'+esc(p.motivo)+'</span></div>':'');
+  if(p.tipo==='entrada')ent=p;
+  else if(ent){h+='<div class="kv tot"><span>Total</span><span>'+durTxt(new Date(p.dataHora)-new Date(ent.dataHora))+'</span></div>';ent=null;}
+ });
+ return h;
+}
 function renderHoje(){
- var t=turno(),r=ronda(),e=est(r),j=JAN[r],k=r==='manha'?'abertura':'fecho',c=CHK[k];
- var falta=tFalta(r),alerta=tAlerta(r),feita=c.f.length===c.i.length;
- var h=fila();
+ var t=turno(),r=ronda(),e=est(r),j=JAN[r],k=r==='manha'?'abertura':'fecho',c=CHK[k],cd=chkDe(k);
+ var falta=tFalta(r),alerta=tAlerta(r),feita=chkFeita(k);
+ var h=fila_html();
+ var emTurno=emTurnoDe(user.id),ult=ultimaPicagem(user.id);
 
  if(emTurno){
-  var s=Math.floor((Date.now()-tIn)/1000);
   h+=kpi(SEAL.lime,'Em turno','clock',
-   {v:'<span id="cron">'+p2(Math.floor(s/3600))+':'+p2(Math.floor(s/60)%60)+':'+p2(s%60)+'</span>',cls:'big'},
-   'Entrada às <b>'+hHora+'</b> · previsto '+t.i+'–'+t.f,
+   {v:'<span id="cron">'+durTxt(Date.now()-new Date(ult.dataHora))+'</span>',cls:'big'},
+   'Entrada às <b>'+hhmm(ult.dataHora)+'</b> · previsto '+t.i+'–'+t.f,
    '<button class="btn-add wide ink" style="margin-top:18px" onclick="picar()">Picar saída</button>');
  } else {
-  h+=kpi(hLog?SEAL.sky:SEAL.cream,hLog?'Turno terminado':'Fora de turno','clock',
-   {v:hDur,cls:'big dim'},
-   'Turno previsto <b>'+t.i+'–'+t.f+'</b>'+(hLog?'<div style="margin-top:10px">'+hLog+'</div>':''),
+  var log=logTurno();
+  h+=kpi(log?SEAL.sky:SEAL.cream,log?'Turno terminado':'Fora de turno','clock',
+   {v:log?'—':'00:00:00',cls:'big dim'},
+   'Turno previsto <b>'+t.i+'–'+t.f+'</b>'+(log?'<div style="margin-top:10px">'+log+'</div>':''),
    '<button class="btn-add wide" style="margin-top:18px" onclick="picar()">Picar entrada</button>');
  }
 
@@ -765,6 +965,8 @@ function renderHoje(){
    (falta>0&&!feita?' · ':'')+(feita?'':'checklist por concluir')+'</small></span></div>';
  }
  h+='<div class="panel surface"><h3>A fazer agora</h3>';
+ if(!EQUIP.length&&carregado.equip)
+  h+='<div class="msg warn"><b>Sem equipamentos</b>Não há equipamentos com termómetro na lista. Fala com o Manel.</div>';
  if(e==='fechada'){
   h+='<div class="msg mute"><b>'+j.n+' abre às '+j.abre+'</b>'+
    'As temperaturas e a checklist ficam disponíveis às '+j.abre+', com prazo até às '+j.lim+'.</div>';
@@ -775,7 +977,7 @@ function renderHoje(){
   var pesoChk=(!feita&&pr)?' pressing':'';
   var pesoT=(falta>0&&pr)?' pressing':'';
   h+=row(r==='manha'?'sun':'moon',c.n,
-   feita?'concluída':c.f.length+' de '+c.i.length+' feitos · '+
+   feita?'concluída':cd.f.length+' de '+c.i.length+' feitos · '+
     (pr?'faltam '+mFalta+' min':'prazo '+j.lim),
    feita?st('Feito','ok'):st(e==='tarde'?'Atrasado':(pr==='urg'?'Urgente':'Por fazer'),
     (e==='tarde'||pr==='urg')?'high':'warn'),
@@ -790,47 +992,47 @@ function renderHoje(){
   h+=row('alert','Ronda da manhã incompleta','ficou por concluir dentro do prazo',
    st('Falha','high'),"go('registos')",'high');
  if(alerta>0)
-  h+=row('alert','Temperatura fora do limite',alerta+' equipamento acima do limite',
+  h+=row('alert','Temperatura fora do limite',alerta+' equipamento'+(alerta>1?'s':'')+' fora do limite',
    st('Ação','high'),"go('registos')",'high');
  h+='</div>';
 
  var eg=entregas();
- h+='<div class="table-panel surface"><div class="head"><h3>Entregas de hoje</h3>'+
-  (eg.length?st(eg.filter(function(x){return x.e==='recebida';}).length+' de '+eg.length,'mute'):'')+'</div>';
+ h+='<div class="table-panel surface"><div class="head"><h3>Entregas previstas hoje</h3>'+st('só leitura','mute')+'</div>';
  h+=eg.length?eg.map(function(x){
-  var s=x.e==='recebida'?('entrada às '+x.r.h+' por '+x.r.q)
-   :(x.e==='atraso'?'passou da janela · ainda não chegou':'janela '+x.f.de+'–'+x.f.ate);
-  return row('truck',x.f.n,s,x.e==='recebida'?st('Recebida','ok')
-   :(x.e==='atraso'?st('Atraso','high'):st(x.f.de,'mute')),
-   "tocaEntrega('"+x.f.id+"')",x.e==='recebida'?'ok':(x.e==='atraso'?'high':''));
+  var s=x.e==='atraso'?'passou da janela habitual':'janela habitual '+x.f.de+'–'+x.f.ate;
+  return row('truck',x.f.n,s,x.e==='atraso'?st('Atraso','warn'):st(x.f.de,'mute'),"go('entradas')",'');
  }).join(''):'<div class="empty">Nenhum fornecedor entrega hoje.</div>';
  h+='</div>';
 
- h+='<div class="panel surface"><h3>Na loja hoje</h3>'+HOJE_EQ.map(function(p){
-  var d=(user&&p.n===user.n)?emTurno:(p.n!=='Filipe');
-  return row('user',p.n,p.h,st(d?'Presente':'Ainda não',d?'ok':'mute'),'',d?'ok':'');
- }).join('')+'</div>';
+ var pic=picagensHoje(),vistos={};
+ var lista=[];pic.forEach(function(p){if(vistos[p.pessoaId])return;vistos[p.pessoaId]=true;lista.push(p.pessoaId);});
+ h+='<div class="panel surface"><h3>Na loja hoje</h3>'+(lista.length?lista.map(function(id){
+  var em=emTurnoDe(id),u=ultimaPicagem(id);
+  return row('user',esc(u.pessoa),(em?'entrou às ':'saiu às ')+hhmm(u.dataHora),st(em?'Presente':'Saiu',em?'ok':'mute'),'',em?'ok':'');
+ }).join(''):'<div class="empty">Ainda ninguém picou entrada hoje.</div>')+'</div>';
 
  document.getElementById('sc-hoje').innerHTML=h;
- if(emTurno)cron();
+ if(emTurno)cron(ult.dataHora);
 }
 
-/* ============ PICAGEM ============ */
+/* ============ PICAGEM ============
+   testeLojaApp/registos/{dia}/picagens/{id} — entrada e saída, com motivo
+   quando fora do previsto. Hora = relógio real (carimbo()). */
 function picar(){
  var t=turno();
- if(!emTurno){
+ if(!emTurnoDe(user.id)){
   var d=ag()-mn(t.i);
   if(Math.abs(d)>15)return motivo('in',
    d<0?'Faltam '+Math.abs(d)+' min para o turno começar ('+t.i+').'
       :'O turno começou há '+d+' min ('+t.i+').',
    d<0?['Cheguei mais cedo','Vim substituir alguém','O turno mudou']
       :['Cheguei atrasado','Esqueci-me de picar','O turno mudou']);
-  entrar(null);
+  picagem('entrada',null);
  } else {
   var s=ag()-mn(t.f);
   if(s<-15)return motivo('out','Faltam '+Math.abs(s)+' min para o fim do turno ('+t.f+').',
    ['Fui dispensado','Troquei com colega','Outro motivo']);
-  sairTurno(null);
+  picagem('saida',null);
  }
 }
 function motivo(tipo,txt,ops){
@@ -840,36 +1042,30 @@ function motivo(tipo,txt,ops){
    '<span>'+o+'</span></button>';}).join('')+
   '<p class="note">O motivo fica no registo. Não bloqueia a picagem.</p>');
 }
-function okMotivo(t,m){fecharModal();t==='in'?entrar(m):sairTurno(m);}
-function entrar(m){
- emTurno=true;tIn=Date.now();hHora=hm();
- hLog='<div class="kv"><span>Entrada</span><span>'+hm()+'</span></div>'+
-  (m?'<div class="kv warn"><span>Motivo</span><span>'+m+'</span></div>':'');
- render();toast('Entrada registada às '+hm());
+function okMotivo(t,m){fecharModal();picagem(t==='in'?'entrada':'saida',m);}
+function picagem(tipo,m){
+ var c=carimbo(),t=turno(),id=novoId();
+ var reg={id:id,tipo:tipo,dataHora:c.dataHora,hora:c.hora,pessoa:user.n,pessoaId:user.id,
+  motivo:m||null,turnoPrevisto:t.i+'–'+t.f,registadoOffline:!(NET.online&&NET.ligado)};
+ if(tipo==='saida'){var u=ultimaPicagem(user.id);if(u&&u.tipo==='entrada')reg.entradaId=u.id;}
+ gravar(RAIZ+'/registos/'+c.dia+'/picagens/'+id,reg);
+ clearInterval(tick);
+ toast((tipo==='entrada'?'Entrada':'Saída')+' registada às '+c.hora+(reg.registadoOffline?' · por enviar':''));
 }
-function sairTurno(m){
- var el=document.getElementById('cron');hDur=el?el.textContent:hDur;
- emTurno=false;clearInterval(tick);
- hLog+='<div class="kv"><span>Saída</span><span>'+hm()+'</span></div>'+
-  (m?'<div class="kv warn"><span>Motivo</span><span>'+m+'</span></div>':'')+
-  '<div class="kv tot"><span>Total</span><span>'+hDur+'</span></div>';
- render();toast('Saída registada · '+hDur+' neste turno');
-}
-function cron(){
+function cron(inicio){
  clearInterval(tick);
  tick=setInterval(function(){
   var el=document.getElementById('cron');
-  if(!el||!emTurno)return clearInterval(tick);
-  var s=Math.floor((Date.now()-tIn)/1000);
-  el.textContent=p2(Math.floor(s/3600))+':'+p2(Math.floor(s/60)%60)+':'+p2(s%60);
+  if(!el)return clearInterval(tick);
+  el.textContent=durTxt(Date.now()-new Date(inicio));
  },1000);
 }
 
 /* ============ ECRÃ · REGISTOS ============ */
 function renderRegistos(){
- var r=ronda(),e=est(r),j=JAN[r],k=r==='manha'?'abertura':'fecho',c=CHK[k];
- var falta=tFalta(r),feita=c.f.length===c.i.length;
- var h=fila()+kpi(e==='tarde'?SEAL.mustard:SEAL.sky,j.n,r==='manha'?'sun':'moon',
+ var r=ronda(),e=est(r),j=JAN[r],k=r==='manha'?'abertura':'fecho',c=CHK[k],cd=chkDe(k);
+ var falta=tFalta(r),feita=chkFeita(k);
+ var h=fila_html()+kpi(e==='tarde'?SEAL.mustard:SEAL.sky,j.n,r==='manha'?'sun':'moon',
   {v:e==='fechada'?'Abre às '+j.abre:(EQUIP.length-falta)+' / '+EQUIP.length},
   e==='fechada'?'Abre às '+j.abre+', prazo até <b>'+j.lim+'</b>.'
    :(e==='tarde'?'Passou o prazo das <b>'+j.lim+'</b>. Os registos ficam assinalados.'
@@ -883,36 +1079,40 @@ function renderRegistos(){
  }
 
  h+='<div class="panel surface"><div class="head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-  '<h3 style="margin:0">'+c.n+'</h3>'+(feita?st('Feito','ok'):st(c.f.length+'/'+c.i.length,'warn'))+'</div>';
+  '<h3 style="margin:0">'+c.n+'</h3>'+(feita?st('Feito','ok'):st(cd.f.length+'/'+c.i.length,'warn'))+'</div>';
  if(chkAberto){
-  var pc=Math.round(c.f.length/c.i.length*100);
+  var pc=c.i.length?Math.round(cd.f.length/c.i.length*100):0;
   h+='<div class="bar"><span style="width:'+pc+'%"></span></div>'+
    c.i.map(function(it,i){
-    var on=c.f.indexOf(i)>-1;
+    var on=cd.f.indexOf(i)>-1;
     return '<button class="check-row'+(on?' done':'')+'" onclick="tog(\''+k+'\','+i+')">'+
-     '<span class="cbox">'+(on?ic('check','#fff',16):'')+'</span><span>'+it+'</span></button>';
+     '<span class="cbox">'+(on?ic('check','#fff',16):'')+'</span><span>'+esc(it)+'</span></button>';
    }).join('')+
+   (cd.concluido?'<p class="note">Concluída às '+hhmm(cd.reg.concluidoEm)+' por '+esc(cd.reg.concluidoPor||'')+
+    (cd.reg.foraPrazo?' · fora de prazo':'')+'</p>':
    '<button class="btn-add wide" style="margin-top:16px" '+(feita?'':'disabled')+
-    ' onclick="fecharChk(\''+k+'\')">Concluir checklist</button>';
+    ' onclick="fecharChk(\''+k+'\')">Concluir checklist</button>');
  } else {
   h+='<button class="qa-btn" onclick="abrirChk(\''+k+'\')">'+ic(r==='manha'?'sun':'moon',null,20)+
-   '<span>'+(feita?'Rever a checklist':'Fazer a checklist')+'<small>'+c.f.length+' de '+c.i.length+
+   '<span>'+(feita?'Rever a checklist':'Fazer a checklist')+'<small>'+cd.f.length+' de '+c.i.length+
    ' feitos</small></span></button>';
  }
  h+='</div>';
 
+ var T=tempsDe(r),M=tempsDe('manha');
  h+='<div class="table-panel surface"><div class="head"><h3>Temperaturas</h3>'+
   st(falta>0?falta+' em falta':'completo',falta>0?'warn':'ok')+'</div>'+
-  EQUIP.map(function(x){
-   var reg=x[r],v='—',tone='';
-   if(reg){v=reg.v.toFixed(1)+'°';tone=reg.v>x.lim?'high':'ok';}
-   var s=reg?('às '+reg.h+(reg.fora?' · fora de prazo':'')+
-     (reg.sync===false?' · por enviar':'')+(reg.anom?' · anomalia':'')+' · limite '+x.lim+'°')
-            :('por registar · limite '+x.lim+'°');
-   if(r==='noite')s+=x.manha?' · manhã '+x.manha.v.toFixed(1)+'°':' · manhã sem registo';
-   return row('temp',x.n,s,'<span class="ar-v '+(reg?(reg.v>x.lim?'high':'ok'):'none')+'">'+v+'</span>',
+  (EQUIP.length?EQUIP.map(function(x){
+   var reg=T[x.id],v='—',tone='',fora=false;
+   if(reg){v=Number(reg.temperatura).toFixed(1)+'°';fora=foraLimite(x,reg.temperatura);tone=fora?'high':'ok';}
+   var s=reg?('às '+hhmm(reg.dataHora)+' · '+esc(reg.pessoa)+(reg.foraPrazo?' · fora de prazo':'')+
+     (porEnviar('temperaturas',reg.id)?' · por enviar':'')+(reg.anomalia?' · anomalia':'')+' · '+limTxt(x))
+            :('por registar · '+limTxt(x));
+   if(x.estado&&x.estado!=='operacional')s+=' · '+x.estado;
+   if(r==='noite')s+=M[x.id]?' · manhã '+Number(M[x.id].temperatura).toFixed(1)+'°':' · manhã sem registo';
+   return row('temp',esc(x.n),s,'<span class="ar-v '+(reg?(fora?'high':'ok'):'none')+'">'+v+'</span>',
     "abrirTemp('"+x.id+"')",tone);
-  }).join('')+'</div>';
+  }).join(''):'<div class="empty">'+(carregado.equip?'Sem equipamentos com termómetro.':'A carregar equipamentos…')+'</div>')+'</div>';
  document.getElementById('sc-registos').innerHTML=h;
 }
 function abrirChk(k){
@@ -921,27 +1121,42 @@ function abrirChk(k){
  if(TAB!=='registos'){TAB='registos';go('registos');}
  chkAberto=true;renderRegistos();
 }
+/* Cada visto é gravado NO MOMENTO numa folha própria:
+   testeLojaApp/registos/{dia}/checklists/{tipo}/itens/{i} = true|false */
 function tog(k,i){
- var f=CHK[k].f,x=f.indexOf(i);
- if(x>-1)f.splice(x,1);else f.push(i);
- chkAberto=true;renderRegistos();renderHoje();
+ var cd=chkDe(k),on=cd.f.indexOf(i)>-1,c=carimbo();
+ if(cd.concluido)return toast('Checklist já concluída');
+ var base=RAIZ+'/registos/'+c.dia+'/checklists/'+k;
+ chkAberto=true;
+ gravar(base+'/itens/'+i,!on);
+ gravar(base+'/atualizadoEm',c.dataHora);
+ gravar(base+'/atualizadoPor',user.n);
+ gravar(base+'/tipo',k);
+ gravar(base+'/total',CHK[k].i.length);
+ gravar(base+'/textos/'+i,CHK[k].i[i]);
 }
 function fecharChk(k){
+ var c=carimbo(),base=RAIZ+'/registos/'+c.dia+'/checklists/'+k;
+ gravar(base+'/concluidoEm',c.dataHora);
+ gravar(base+'/concluidoPor',user.n);
+ gravar(base+'/concluidoPorId',user.id);
+ gravar(base+'/foraPrazo',tarde(CHK_R[k]));
  chkAberto=false;render();
- toast(CHK[k].n+' concluída às '+hm()+(tarde(CHK_R[k])?' · fora de prazo':''));
+ toast(CHK[k].n+' concluída às '+c.hora+(tarde(CHK_R[k])?' · fora de prazo':''));
 }
 function abrirTemp(id){
  var r=ronda();
  if(!pode(r))return toast('Os registos só abrem às '+JAN[r].abre);
  var e=EQUIP.filter(function(x){return x.id===id;})[0];
- tmp={e:e,v:'',foto:false};
- modal(e.n.split(' ').slice(0,3).join(' '),
+ tmp={e:e,v:'',foto:null};
+ modal(e.n.split(' ').slice(0,4).join(' '),
   (tarde(r)?'<div class="msg warn"><b>Fora de prazo</b>O prazo era '+JAN[r].lim+
    '. O registo vai ficar assinalado.</div>':'')+
-  '<div class="readout" id="ro">--.-°<small>limite '+e.lim+'°</small></div>'+
+  '<div class="readout" id="ro">--.-°<small>'+limTxt(e)+'</small></div>'+
   '<div class="pad">'+numPad('tk',true)+'</div>'+
   '<div class="field" style="margin-top:18px"><span class="field-label">Foto do termómetro · obrigatória</span>'+
-  '<button class="qa-btn" id="fb" onclick="fotoTemp()">'+ic('cam',null,20)+'<span>Tirar foto</span></button></div>'+
+  '<button class="qa-btn" id="fb" onclick="fotoTemp()">'+ic('cam',null,20)+'<span>Tirar foto</span></button>'+
+  '<div id="fotoPrev"></div></div>'+
   '<button class="btn-add wide" id="tsave" disabled onclick="salvaTemp()">Registar temperatura</button>'+
   '<p class="note">Sem foto o registo não é aceite. Fica em teu nome, com hora automática.</p>');
 }
@@ -949,322 +1164,140 @@ function numPad(fn,neg){
  return ['1','2','3','4','5','6','7','8','9',neg?'−':'','0','←'].map(function(k){
   return k?'<button class="key" onclick="'+fn+'(\''+k+'\')">'+k+'</button>':'<div></div>';}).join('');
 }
+function valTemp(){var v=tmp.v;if(v===''||v==='-')return null;
+ return parseInt(v.replace('-',''),10)/10*(v.charAt(0)==='-'?-1:1);}
 function tk(k){
  if(k==='←')tmp.v=tmp.v.slice(0,-1);
  else if(k==='−')tmp.v=tmp.v.charAt(0)==='-'?tmp.v.slice(1):'-'+tmp.v;
  else if(tmp.v.replace('-','').length<3)tmp.v+=k;
- var v=tmp.v,s=(v===''||v==='-')?'--.-°'
-  :(parseInt(v.replace('-',''),10)/10*(v.charAt(0)==='-'?-1:1)).toFixed(1)+'°';
- document.getElementById('ro').innerHTML=s+'<small>limite '+tmp.e.lim+'°</small>';
- document.getElementById('tsave').disabled=(v===''||v==='-'||!tmp.foto);
+ var n=valTemp(),s=n===null?'--.-°':n.toFixed(1)+'°';
+ document.getElementById('ro').innerHTML=s+'<small>'+limTxt(tmp.e)+'</small>';
+ document.getElementById('tsave').disabled=(n===null||!tmp.foto);
 }
-function fotoTemp(){
- tmp.foto=true;
- var b=document.getElementById('fb');
- b.className='qa-btn primary';b.innerHTML=ic('check','#fff',20)+'<span>Foto guardada</span>';
- document.getElementById('tsave').disabled=(tmp.v===''||tmp.v==='-');
- toast('Foto guardada com o registo');
+/* Foto real da câmara, comprimida no telemóvel (máx. 1024 px, JPEG 0.6) e
+   gravada em testeLojaApp/fotos/{registoId} como dataUrl — o mesmo formato
+   do lojaTemperaturasFotos (Storage não está ativo). */
+function fotoTemp(){document.getElementById('fotoInput').click();}
+function fotoEscolhida(inp){
+ var f=inp.files&&inp.files[0];inp.value='';
+ if(!f)return;
+ comprimir(f,1024,0.6).then(function(dataUrl){
+  tmp.foto=dataUrl;
+  var b=document.getElementById('fb');
+  if(b){b.className='qa-btn primary';b.innerHTML=ic('check','#fff',20)+'<span>Foto guardada · toca para repetir</span>';}
+  var pv=document.getElementById('fotoPrev');if(pv)pv.innerHTML='<img class="foto-prev" src="'+dataUrl+'" alt="">';
+  var s=document.getElementById('tsave');if(s)s.disabled=(valTemp()===null);
+  toast('Foto guardada com o registo ('+Math.round(dataUrl.length*0.75/1024)+' KB)');
+ }).catch(function(err){console.error(err);toast('Não consegui ler a foto — tenta outra vez');});
+}
+function comprimir(file,maxLado,q){
+ return new Promise(function(res,rej){
+  var url=URL.createObjectURL(file),img=new Image();
+  img.onload=function(){
+   var w=img.width,h=img.height,esc_=Math.min(1,maxLado/Math.max(w,h));
+   var c=document.createElement('canvas');c.width=Math.round(w*esc_);c.height=Math.round(h*esc_);
+   c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+   URL.revokeObjectURL(url);
+   try{res(c.toDataURL('image/jpeg',q));}catch(e){rej(e);}
+  };
+  img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('imagem inválida'));};
+  img.src=url;
+ });
 }
 /* Um valor errado é pior do que um valor em falta: parece correcto. */
 function plausivel(e,n){
- var ref=e.manha?e.manha.v:e.lim;
- if(e.lim<0)return n>=-40&&n<=-5;
+ var m=tempDe(e.id,'manha');
+ var ref=m?m.temperatura:(e.lim!=null?e.lim:(e.limMin!=null?e.limMin:null));
+ if(e.tipo==='congelacao')return n>=-40&&n<=-5;
+ if(e.tipo==='lavagem')return n>=40&&n<=99;
+ if(ref===null)return n>=-30&&n<=99;
  return n>=-5&&n<=20&&Math.abs(n-ref)<=12;
 }
 function salvaTemp(){
- var n=parseInt(tmp.v.replace('-',''),10)/10*(tmp.v.charAt(0)==='-'?-1:1);
+ var n=valTemp();if(n===null||!tmp.foto)return;
  if(!plausivel(tmp.e,n))return confirmaTemp(n);
  gravaTemp(n);
 }
 function confirmaTemp(n){
- var e=tmp.e,ref=e.manha?e.manha.v.toFixed(1)+'° esta manhã':'limite '+e.lim+'°';
+ var e=tmp.e,m=tempDe(e.id,'manha'),ref=m?Number(m.temperatura).toFixed(1)+'° esta manhã':limTxt(e);
  modal('Confirma o valor',
   '<div class="msg warn"><b>'+n.toFixed(1)+'° parece fora do normal</b>'+
-  e.n+' costuma andar perto de '+ref+'. Se o valor estiver certo, o equipamento '+
+  esc(e.n)+' costuma andar perto de '+ref+'. Se o valor estiver certo, o equipamento '+
   'pode estar avariado — e isso é para comunicar já.</div>'+
   '<button class="btn-add wide ink" onclick="voltaTeclado()">Corrigir o valor</button>'+
   '<button class="qa-btn" style="margin-top:10px" onclick="gravaTemp('+n+',true)">'+
    ic('check',null,20)+'<span>O valor está certo<small>fica assinalado como anomalia</small></span></button>');
 }
-function voltaTeclado(){abrirTemp(tmp.e.id);}
+function voltaTeclado(){var v=tmp.v,f=tmp.foto;abrirTemp(tmp.e.id);tmp.v=v;tmp.foto=f;tk('');}
+/* testeLojaApp/registos/{dia}/temperaturas/{id} + testeLojaApp/fotos/{id} */
 function gravaTemp(n,anomalia){
- var r=ronda();
- tmp.e[r]={v:n,h:hm(),fora:tarde(r),sync:NET.online,anom:!!anomalia};
- if(!NET.online)NET.fila++;
+ var r=ronda(),c=carimbo(),e=tmp.e,id=novoId();
+ var reg={id:id,dataHora:c.dataHora,hora:c.hora,ronda:r,equipamentoId:e.id,equipamento:e.n,
+  temperatura:n,limiteMin:e.limMin,limiteMax:e.lim,foraLimite:foraLimite(e,n),
+  foraPrazo:tarde(r),anomalia:!!anomalia,temFoto:!!tmp.foto,
+  pessoa:user.n,pessoaId:user.id,registadoOffline:!(NET.online&&NET.ligado),
+  horaSimulada:DEMO.ativo?hm():null};
+ gravar(RAIZ+'/registos/'+c.dia+'/temperaturas/'+id,reg);
+ if(tmp.foto)gravar(RAIZ+'/fotos/'+id,tmp.foto);
+ if(anomalia||reg.foraLimite)novoPedido('anomalia',(anomalia?'Leitura anómala: ':'Fora do limite: ')+e.n+' a '+n.toFixed(1)+'°',
+  'HACCP · equipamento',null,{temperaturaId:id,equipamentoId:e.id,temperatura:n});
  fecharModal();render();
  if(anomalia)toast('Registado '+n.toFixed(1)+'° · anomalia comunicada ao Alfredo');
- else toast((n>tmp.e.lim?'Atenção: '+n.toFixed(1)+'° acima do limite — avisa o Alfredo'
-  :'Registado '+n.toFixed(1)+'° · '+tmp.e.n.split(' ')[0])+(NET.online?'':' · por enviar'));
- if(anomalia)PEDIDOS.unshift({t:'Leitura anómala: '+tmp.e.n+' a '+n.toFixed(1)+'°',
-  c:'HACCP · equipamento',e:'novo',q:user.n,w:'agora'});
+ else toast((reg.foraLimite?'Atenção: '+n.toFixed(1)+'° fora do limite — avisa o Alfredo'
+  :'Registado '+n.toFixed(1)+'° · '+e.n.split(' ')[0])+(reg.registadoOffline?' · por enviar':''));
 }
 
-/* ============ ECRÃ · ENTRADAS ============ */
+/* ============ ECRÃ · ENTRADAS (SÓ LEITURA nesta ronda) ============ */
 function renderEntradas(){
- var pend=entregas().filter(function(x){return x.e!=='recebida';}),px=pend[0];
- var h=kpi(px&&px.e==='atraso'?SEAL.blush:SEAL.cream,px?'Próxima entrega':'Entregas de hoje','truck',
-  {v:px?px.f.n:'Tudo recebido'},
-  px?(px.e==='atraso'?'Passou a janela das <b>'+px.f.ate+'</b> e ainda não chegou.'
+ var eg=entregas(),pend=eg,px=pend[0];
+ var h=fila_html()+kpi(px&&px.e==='atraso'?SEAL.blush:SEAL.cream,px?'Próxima entrega prevista':'Entregas de hoje','truck',
+  {v:px?px.f.n:'Nada previsto'},
+  px?(px.e==='atraso'?'Passou a janela habitual das <b>'+px.f.ate+'</b>.'
    :'Janela habitual <b>'+px.f.de+'–'+px.f.ate+'</b>')
-   :'Não há mais entregas previstas para hoje.',
-  '<button class="btn-add wide" style="margin-top:18px" onclick="novaEntrada()">'+
-   ic('plus','#fff',18)+' Dar entrada a mercadoria</button>');
-
- h+='<div class="table-panel surface"><div class="head"><h3>Entradas de hoje</h3>'+
-  st(ENTRADAS.length,'mute')+'</div>'+
-  (ENTRADAS.length?ENTRADAS.map(function(e,i){
-   return row('box',e.f,e.doc+' · '+e.l+' linhas · '+e.h+' · '+e.q+
-    (e.sync===false?' · por enviar':''),
-    e.p>0?st(e.p+' divergência','high'):st('Conferido','ok'),"verEntrada("+i+")",e.p>0?'high':'ok');
-  }).join(''):'<div class="empty">Ainda não deste entrada a nada hoje.</div>')+'</div>';
-
- if(pend.length)
-  h+='<div class="table-panel surface"><div class="head"><h3>Por receber</h3></div>'+
-   pend.map(function(x){
-    return row('truck',x.f.n,x.e==='atraso'?'passou da janela':'janela '+x.f.de+'–'+x.f.ate,
-     x.e==='atraso'?st('Atraso','high'):st(x.f.de,'mute'),
-     "wizFornDireto('"+x.f.id+"')",x.e==='atraso'?'high':'');
-   }).join('')+'</div>';
+   :'Não há entregas previstas para hoje.');
+ h+='<div class="msg mute"><b>Registo de entradas ainda não ativo</b>Nesta ronda de teste as entregas são só de consulta: não se dá entrada a mercadoria, não se lê documento e não é criado nenhum pedido de pagamento. Divergências ou frio fora de temperatura comunicam-se por «Novo pedido».</div>';
+ h+='<div class="table-panel surface"><div class="head"><h3>Previstas hoje</h3>'+st('indicativo','mute')+'</div>'+
+  (eg.length?eg.map(function(x){
+   return row('truck',x.f.n,(x.e==='atraso'?'passou da janela habitual':'janela habitual '+x.f.de+'–'+x.f.ate)+
+    (x.f.frio?' · tem produtos refrigerados':''),x.e==='atraso'?st('Atraso','warn'):st(x.f.de,'mute'),'','');
+  }).join(''):'<div class="empty">Nenhum fornecedor entrega hoje.</div>')+'</div>';
  document.getElementById('sc-entradas').innerHTML=h;
 }
-function verEntrada(i){
- var e=ENTRADAS[i];
- toast(e.f+' · entrada às '+e.h+(e.p?' · '+e.p+' divergência comunicada':''));
-}
-function tocaEntrega(id){
- var f=FORN.filter(function(x){return x.id===id;})[0];
- var r=ENTRADAS.filter(function(e){return e.f===f.n;})[0];
- if(r)return toast(f.n+' · entrada já registada às '+r.h);
- wizFornDireto(id);
-}
-function wizFornDireto(id){
- go('entradas');
- wiz={p:2,forn:FORN.filter(function(x){return x.id===id;})[0],tipo:null,ver:[],frio:null,
-      ft:null,linhas:null,probs:{}};
- renderWiz();
-}
-function novaEntrada(){
- wiz={p:1,forn:null,tipo:null,ver:[],frio:null,ft:null,linhas:null,probs:{}};
- renderWiz();
-}
-function wizBack(){
- if(wiz.p===4){wiz.p=3;return renderWiz();}
- if(wiz.p===3){if(wiz.linhas){wiz.linhas=null;return renderWiz();}wiz.p=2;return renderWiz();}
- if(wiz.p===2){wiz.p=1;return renderWiz();}
- fecharModal();
-}
-function renderWiz(){
- var back=wiz.p>1?wizBack:null;
- var b='<div class="steps">'+[1,2,3,4].map(function(i){
-  return '<div class="step'+(i<=wiz.p?' on':'')+'"></div>';}).join('')+'</div>';
 
- if(wiz.p===1){
-  b+='<span class="field-label">De quem é a entrega?</span>'+FORN.map(function(f){
-   return '<button class="opt-row" onclick="wForn(\''+f.id+'\')"><span>'+f.n+
-    '<small>'+(f.frio?'tem produtos refrigerados':'sem cadeia de frio')+'</small></span></button>';
-  }).join('');
-  return modal('Nova entrada',b,null);
- }
- if(wiz.p===2){
-  var itens=['Embalagens intactas, sem danos','Prazos de validade conferidos','Transporte limpo e sem odores'];
-  if(wiz.forn.frio){
-   b+='<span class="field-label">Como vieram os produtos de frio?</span>'+
-    [['toque','Frios ao toque','sem termómetro disponível'],
-     ['medido','Medi com termómetro','registar o valor'],
-     ['mornos','Vieram mornos','marca como problema na receção']].map(function(o){
-      return '<button class="opt-row'+(wiz.frio===o[0]?' active':'')+'" onclick="wFrio(\''+o[0]+'\')">'+
-       '<span>'+o[1]+'<small>'+o[2]+'</small></span></button>';}).join('');
-   if(wiz.frio==='medido')
-    b+='<div class="readout sm" id="fr" style="margin-top:12px">'+
-     (wiz.ft===null?'--.-°':wiz.ft.toFixed(1)+'°')+'<small>máx. 5°</small></div>'+
-     '<div class="pad">'+numPad('fk',true)+'</div>';
-   if(wiz.frio==='mornos')
-    b+='<div class="msg high" style="margin-top:12px"><b>Vai ser comunicado</b>'+
-     'Não arrumes nas câmaras antes de falar com o Alfredo.</div>';
-   b+='<span class="field-label" style="margin-top:18px;display:block">Restantes verificações</span>';
-  } else b+='<span class="field-label">Verificação de receção</span>';
-  b+=itens.map(function(it,i){
-   var on=wiz.ver.indexOf(i)>-1;
-   return '<button class="check-row'+(on?' done':'')+'" onclick="wVer('+i+')">'+
-    '<span class="cbox">'+(on?ic('check','#fff',16):'')+'</span><span>'+it+'</span></button>';
-  }).join('')+
-   '<button class="btn-add wide ink" style="margin-top:16px" onclick="wGo(3)">Continuar</button>'+
-   '<p class="note">Fica no registo HACCP da receção, com o teu nome.</p>';
-  return modal('Receção',b,back);
- }
- if(wiz.p===3&&!wiz.linhas){
-  b+='<span class="field-label">Que documento veio com a mercadoria?</span>'+
-   '<div class="chips" style="margin-bottom:16px">'+['guia','fatura'].map(function(t){
-    return '<button class="cat-chip'+(wiz.tipo===t?' active':'')+'" onclick="wTipo(\''+t+'\')">'+
-     '<span class="circle">'+ic(t==='guia'?'note':'box',null,16)+'</span>'+
-     '<span>'+(t==='guia'?'Guia':'Fatura')+'</span></button>';}).join('')+'</div>'+
-   '<button class="qa-btn" style="min-height:120px;flex-direction:column;justify-content:center;text-align:center" '+
-    'onclick="wScan()">'+ic('cam',null,28)+'<span style="flex:0 0 auto">Fotografar documento</span></button>'+
-   '<p class="note">As linhas são lidas automaticamente. A guia de remessa não gera pedido de pagamento — a fatura chega depois e é aí que o pagamento é criado.</p>';
-  return modal('Documento',b,back);
- }
- if(wiz.p===3){
-  var np=Object.keys(wiz.probs).length;
-  b+='<span class="field-label">Confere o que chegou · toca para marcar problema</span>'+
-   wiz.linhas.map(function(l,i){
-    var p=wiz.probs[i];
-    return row(p?'alert':'check',l.n,p?p.txt:l.q,'',"wProb("+i+")",p?'high':'ok');
-   }).join('')+
-   '<button class="btn-add wide'+(np?'':' ink')+'" style="margin-top:16px" onclick="wGo(4)">'+
-    (np?'Continuar com '+np+' divergência'+(np>1?'s':''):'Está tudo certo')+'</button>'+
-   '<p class="note">Voltar atrás apaga a leitura e deixa fotografar outra vez.</p>';
-  return modal('Conferência',b,back);
- }
- var n2=Object.keys(wiz.probs).length;
- b+='<div class="kv tot" style="border:none;margin:0;padding:0 0 10px"><span>'+wiz.forn.n+'</span>'+
-  '<span>'+hm()+'</span></div>'+
-  '<div class="kv"><span>Documento</span><span>'+(wiz.tipo==='fatura'?'Fatura':'Guia de remessa')+'</span></div>'+
-  '<div class="kv"><span>Linhas conferidas</span><span>'+wiz.linhas.length+'</span></div>'+
-  (wiz.frio?'<div class="kv'+(wiz.frio==='mornos'?' warn':'')+'"><span>Frio à chegada</span><span>'+
-   txtFrio()+'</span></div>':'')+
-  '<div class="kv"><span>Por</span><span>'+user.n+'</span></div>'+
-  (n2?'<div class="msg high" style="margin-top:14px"><b>O que vai ser comunicado</b>'+
-   Object.keys(wiz.probs).map(function(i){return wiz.linhas[i].n+' — '+wiz.probs[i].txt;}).join('<br>')+
-   '</div>':'<div class="msg ok" style="margin-top:14px"><b>Tudo certo</b>Nenhuma divergência a comunicar.</div>')+
-  '<div class="field"><span class="field-label">Nota para o Alfredo (opcional)</span>'+
-   '<textarea class="textarea" id="eN" placeholder="ex: o resto vem amanhã"></textarea></div>'+
-  '<button class="btn-add wide" onclick="wSave()">Guardar entrada</button>'+
-  '<p class="note">'+(wiz.tipo==='fatura'?'Vai ser criado um pedido de pagamento a partir desta fatura.'
-   :'Não é criado pedido de pagamento — é uma guia de remessa.')+'</p>';
- modal('Resumo',b,back);
+/* ============ PEDIDOS ============
+   testeLojaApp/registos/{dia}/pedidos/{id}: rupturas, pedidos (avaria,
+   material, ideia), anomalias HACCP, férias e trocas. */
+function novoPedido(tipo,titulo,categoria,zona,extra){
+ var c=carimbo(),id=novoId();
+ var reg=Object.assign({id:id,tipo:tipo,titulo:titulo,categoria:categoria,zona:zona||null,estado:'novo',
+  dataHora:c.dataHora,hora:c.hora,pessoa:user.n,pessoaId:user.id,
+  registadoOffline:!(NET.online&&NET.ligado)},extra||{});
+ gravar(RAIZ+'/registos/'+c.dia+'/pedidos/'+id,reg);
+ return id;
 }
-function txtFrio(){
- if(wiz.frio==='toque')return 'frios ao toque';
- if(wiz.frio==='mornos')return 'FORA DE TEMPERATURA';
- return wiz.ft!==null?wiz.ft.toFixed(1)+'°':'medido';
-}
-function wForn(id){wiz.forn=FORN.filter(function(f){return f.id===id;})[0];wiz.p=2;renderWiz();}
-function wFrio(v){wiz.frio=v;if(v!=='medido')wiz.ft=null;renderWiz();}
-function wVer(i){var x=wiz.ver.indexOf(i);if(x>-1)wiz.ver.splice(x,1);else wiz.ver.push(i);renderWiz();}
-function fk(k){
- var v=wiz.ft===null?'':String(Math.round(Math.abs(wiz.ft)*10)),neg=wiz.ft!==null&&wiz.ft<0;
- if(k==='←')v=v.slice(0,-1);else if(k==='−')neg=!neg;else if(v.length<3)v+=k;
- wiz.ft=v===''?null:parseInt(v,10)/10*(neg?-1:1);
- document.getElementById('fr').innerHTML=(wiz.ft===null?'--.-°':wiz.ft.toFixed(1)+'°')+
-  '<small>máx. 5°</small>';
-}
-function wTipo(t){wiz.tipo=t;renderWiz();}
-function wScan(){
- if(!wiz.tipo)return toast('Escolhe primeiro se é guia ou fatura');
- toast('A ler documento…');
- setTimeout(function(){wiz.linhas=LINHAS.slice();renderWiz();
-  toast(wiz.linhas.length+' linhas lidas');},1000);
-}
-function wGo(p){
- if(p===3&&wiz.forn.frio&&!wiz.frio)return toast('Diz como vieram os produtos de frio');
- if(p===3&&wiz.frio==='medido'&&wiz.ft===null)return toast('Regista a temperatura medida');
- wiz.p=p;renderWiz();
-}
-function wProb(i){
- if(wiz.probs[i])
-  return modal('Divergência',
-   '<div class="msg high"><b>'+wiz.linhas[i].n+'</b>'+wiz.probs[i].txt+'</div>'+
-   '<button class="btn-add wide ink" onclick="escolheProb('+i+')">Mudar</button>'+
-   '<button class="qa-btn" style="margin-top:10px" onclick="limpaProb('+i+')">'+
-    ic('check',null,20)+'<span>Remover · está certo</span></button>',renderWiz);
- escolheProb(i);
-}
-function escolheProb(i){
- modal('O que se passa?',
-  '<div class="msg mute"><b>'+wiz.linhas[i].n+'</b>documento diz: '+wiz.linhas[i].q+'</div>'+
-  ['Não veio nada','Veio menos','Veio a mais','Veio danificado','Validade curta'].map(function(o){
-   return '<button class="opt-row" onclick="detProb('+i+',\''+o+'\')"><span>'+o+'</span></button>';
-  }).join(''),renderWiz);
-}
-function limpaProb(i){delete wiz.probs[i];renderWiz();}
-function detProb(i,tipo){
- pv={i:i,tipo:tipo,q:'',data:'',foto:false};
- var l=wiz.linhas[i];
- var b='<div class="msg mute"><b>'+l.n+'</b>documento diz: '+l.q+' · '+tipo.toLowerCase()+'</div>';
- if(tipo==='Não veio nada'){
-  b+='<div class="field"><span class="field-label">O fornecedor disse alguma coisa?</span>'+
-   '<div class="chips" id="pp">'+['Vem depois','Sem stock','Não disse'].map(function(o,x){
-    return '<button class="cat-chip'+(x===0?' active':'')+'" onclick="pill(this)">'+
-     '<span>'+o+'</span></button>';}).join('')+'</div></div>';
- } else if(tipo==='Veio menos'||tipo==='Veio a mais'){
-  b+='<div class="field"><span class="field-label">Quanto veio na realidade?</span>'+
-   '<div class="readout sm" id="pr">—<small>documento diz '+l.q+'</small></div>'+
-   '<div class="pad">'+numPad('pk')+'</div></div>';
- } else if(tipo==='Veio danificado'){
-  b+='<div class="field"><span class="field-label">Quantas unidades danificadas?</span>'+
-   '<div class="readout sm" id="pr">—<small>de '+l.q+'</small></div>'+
-   '<div class="pad">'+numPad('pk')+'</div></div>'+
-   '<div class="field"><span class="field-label">Foto do dano · obrigatória</span>'+
-   '<button class="qa-btn" id="pf" onclick="probFoto()">'+ic('cam',null,20)+'<span>Tirar foto</span></button></div>';
- } else {
-  b+='<div class="field"><span class="field-label">Validade que veio no produto</span>'+
-   '<input class="input" type="date" id="pd" onchange="probData(this.value)"></div>';
- }
- b+='<div class="field"><span class="field-label">Nota (opcional)</span>'+
-  '<input class="input" id="pn" placeholder="ex: caixa aberta no transporte"></div>'+
-  '<button class="btn-add wide" id="ps" onclick="salvaProb()">Marcar divergência</button>';
- modal('Detalhe',b,function(){escolheProb(i);});
- if(tipo!=='Não veio nada')document.getElementById('ps').disabled=true;
-}
-function pill(el){
- el.parentNode.querySelectorAll('.cat-chip').forEach(function(x){x.classList.remove('active');});
- el.classList.add('active');
-}
-function pk(k){
- if(k==='←')pv.q=pv.q.slice(0,-1);else if(pv.q.length<4)pv.q+=k;
- var l=wiz.linhas[pv.i];
- document.getElementById('pr').innerHTML=(pv.q||'—')+'<small>'+
-  (pv.tipo==='Veio danificado'?'de '+l.q:'documento diz '+l.q)+'</small>';
- document.getElementById('ps').disabled=!pv.q||(pv.tipo==='Veio danificado'&&!pv.foto);
-}
-function probFoto(){
- pv.foto=true;var b=document.getElementById('pf');
- b.className='qa-btn primary';b.innerHTML=ic('check','#fff',20)+'<span>Foto guardada</span>';
- document.getElementById('ps').disabled=!pv.q;
-}
-function probData(v){pv.data=v;document.getElementById('ps').disabled=!v;}
-function salvaProb(){
- var l=wiz.linhas[pv.i],t=pv.tipo,txt='';
- var nota=(document.getElementById('pn')||{value:''}).value.trim();
- if(t==='Não veio nada')txt='não veio · '+document.querySelector('#pp .cat-chip.active').textContent.trim().toLowerCase();
- else if(t==='Veio menos')txt='veio '+pv.q+' em vez de '+l.q;
- else if(t==='Veio a mais')txt='veio '+pv.q+', documento diz '+l.q;
- else if(t==='Veio danificado')txt=pv.q+' danificadas de '+l.q+' · com foto';
- else txt='validade '+pv.data;
- if(nota)txt+=' · '+nota;
- wiz.probs[pv.i]={tipo:t,txt:txt};pv=null;renderWiz();
-}
-function wSave(){
- var np=Object.keys(wiz.probs).length;
- ENTRADAS.unshift({f:wiz.forn.n,doc:(wiz.tipo==='fatura'?'Fatura':'Guia')+' · lida por foto',
-  h:hm(),q:user.n,l:wiz.linhas.length,p:np,sync:NET.online});
- if(!NET.online)NET.fila++;
- if(np)PEDIDOS.unshift({t:'Divergência na entrega '+wiz.forn.n+' ('+np+' linha'+(np>1?'s':'')+')',
-  c:'Entrada de mercadoria',e:'novo',q:user.n,w:'agora'});
- if(wiz.frio==='mornos')PEDIDOS.unshift({t:'Frio fora de temperatura na entrega '+wiz.forn.n,
-  c:'HACCP · receção',e:'novo',q:user.n,w:'agora'});
- fecharModal();render();
- toast(np?'Entrada guardada · '+np+' divergência comunicada':'Entrada guardada · tudo conferido');
-}
-
-/* ============ ECRÃ · PEDIDOS ============ */
 function renderPedidos(){
- var novos=PEDIDOS.filter(function(p){return p.e==='novo';}).length;
- var h=kpi(novos?SEAL.blush:SEAL.lime,'Em aberto','note',{v:novos,cls:'big'},
-  novos?'pedidos por responder':'nada por responder');
+ var P=pedidosTodos(),novos=P.filter(function(p){return p.estado==='novo';}).length;
+ var h=fila_html()+kpi(novos?SEAL.blush:SEAL.lime,'Em aberto','note',{v:novos,cls:'big'},
+  novos?'pedidos por responder (últimos 7 dias)':'nada por responder');
  h+='<div class="qa-card surface"><h3>Avisar rápido</h3>'+
   '<button class="qa-btn primary" onclick="abrirRuptura()">'+ic('box','#fff',20)+
    '<span>Está a acabar<small>aviso de ruptura</small></span></button>'+
   '<button class="qa-btn" onclick="abrirPedido()">'+ic('plus',null,20)+
    '<span>Novo pedido<small>avaria · material · ideia</small></span></button></div>';
  h+='<div class="table-panel surface"><div class="head"><h3>Pedidos da loja</h3>'+
-  st(PEDIDOS.length,'mute')+'</div>'+
-  (PEDIDOS.length?PEDIDOS.map(function(p){
-   return row(p.c.indexOf('Ruptura')>-1?'box':'note',p.t,p.c+' · '+p.q+' · '+p.w,
-    p.e==='novo'?st('Novo','high'):(p.e==='curso'?st('Em curso','warn'):st('Feito','ok')),'',
-    p.e==='novo'?'high':(p.e==='curso'?'warn':'ok'));
-  }).join(''):'<div class="empty">Sem pedidos em aberto.</div>')+'</div>';
+  st(P.length,'mute')+'</div>'+
+  (P.length?P.map(function(p){
+   var pe=filaTem(RAIZ+'/registos/'+p._dia+'/pedidos/'+p.id);
+   return row(p.tipo==='ruptura'?'box':(p.tipo==='anomalia'?'alert':'note'),esc(p.titulo),
+    esc(p.categoria)+(p.zona?' · '+esc(p.zona):'')+' · '+esc(p.pessoa)+' · '+quando(p.dataHora)+(pe?' · por enviar':''),
+    p.estado==='novo'?st('Novo','high'):(p.estado==='curso'?st('Em curso','warn'):st('Feito','ok')),'',
+    p.estado==='novo'?'high':(p.estado==='curso'?'warn':'ok'));
+  }).join(''):'<div class="empty">Sem pedidos nos últimos 7 dias.</div>')+'</div>';
  document.getElementById('sc-pedidos').innerHTML=h;
+}
+function pill(el){
+ el.parentNode.querySelectorAll('.cat-chip').forEach(function(x){x.classList.remove('active');});
+ el.classList.add('active');
 }
 function abrirRuptura(){
  modal('Está a acabar',
@@ -1275,15 +1308,15 @@ function abrirRuptura(){
     return '<button class="cat-chip'+(i===0?' active':'')+'" onclick="pill(this)"><span>'+o+
      '</span></button>';}).join('')+'</div></div>'+
   '<button class="btn-add wide" onclick="salvaRuptura()">Avisar</button>'+
-  '<p class="note">Vai direto para o Alfredo.</p>');
+  '<p class="note">Fica registado em teu nome.</p>');
  setTimeout(function(){var i=document.getElementById('rI');if(i)i.focus();},320);
 }
 function salvaRuptura(){
  var v=document.getElementById('rI').value.trim();
  if(!v)return toast('Escreve o que está a acabar');
- PEDIDOS.unshift({t:'Está a acabar: '+v,c:'Ruptura · '+
-  document.querySelector('#rP .cat-chip.active').textContent.trim(),e:'novo',q:user.n,w:'agora'});
- fecharModal();render();toast('Aviso enviado ao Alfredo');
+ var urg=document.querySelector('#rP .cat-chip.active').textContent.trim();
+ novoPedido('ruptura','Está a acabar: '+v,'Ruptura · '+urg,null,{urgencia:urg,item:v});
+ fecharModal();render();toast('Aviso de ruptura registado');
 }
 function abrirPedido(){
  modal('Novo pedido',
@@ -1294,19 +1327,21 @@ function abrirPedido(){
   '<div class="field"><span class="field-label">O que se passa?</span>'+
   '<textarea class="textarea" id="qT" placeholder="Descreve em duas linhas"></textarea></div>'+
   '<div class="field"><span class="field-label">Zona</span><select class="select" id="qZ">'+
-   '<option>Cozinha</option><option>Bar/Sala</option><option>Arrumos</option><option>WC</option>'+
+   '<option>Sala principal</option><option>Zona de preparações</option><option>Área técnica</option><option>WC</option>'+
    '</select></div><button class="btn-add wide" onclick="salvaPedido()">Enviar</button>');
 }
 function salvaPedido(){
  var v=document.getElementById('qT').value.trim();
  if(!v)return toast('Descreve o pedido');
- PEDIDOS.unshift({t:v,c:document.querySelector('#qP .cat-chip.active').textContent.trim()+' · '+
-  document.getElementById('qZ').value,e:'novo',q:user.n,w:'agora'});
- fecharModal();render();toast('Pedido enviado');
+ novoPedido('pedido',v,document.querySelector('#qP .cat-chip.active').textContent.trim(),
+  document.getElementById('qZ').value);
+ fecharModal();render();toast('Pedido registado');
 }
 
-/* ============ ECRÃ · TURNOS ============ */
-function iso(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+/* ============ ECRÃ · TURNOS ============
+   A escala e o saldo de férias NÃO estão ligados nesta ronda (a escala vive
+   em turnos/padroes/ferias e é de outra fase). Os pedidos de férias e de
+   troca FICAM gravados em testeLojaApp/ como pedidos. */
 function dc(s){var a=s.split('-');return (+a[2])+' '+MES[+a[1]-1];}
 function conta(de,ate){
  var d=new Date(de+'T00:00:00'),f=new Date(ate+'T00:00:00'),cal=0,u=0,fer=[],fds=0;
@@ -1316,32 +1351,18 @@ function conta(de,ate){
  return {cal:cal,u:u,fer:fer,fds:fds};
 }
 function renderTurnos(){
- var px=SEMANA.filter(function(t){return !t.off;})[0];
- var livre=SALDO.direito-SALDO.gozados-SALDO.marcados;
- var h=kpi(SEAL.sky,'Próximo turno','cal',{v:px.h},px.d+' · contigo Alfredo e Beatriz');
-
- h+='<div class="table-panel surface"><div class="head"><h3>A tua semana</h3></div>'+
-  SEMANA.map(function(t){
-   return row(t.off?'moon':'clock',t.d+(t.hoje?' · hoje':''),'',
-    t.off?st('Folga','mute'):'<span class="ar-v" style="font-size:14px">'+t.h+'</span>','');
-  }).join('')+'</div>';
-
- h+='<div class="panel surface"><h3>Quem está hoje</h3>'+HOJE_EQ.map(function(p){
-  return row('user',p.n,'','<span class="ar-v" style="font-size:14px">'+p.h+'</span>','');
- }).join('')+'</div>';
-
- h+='<div class="panel surface"><h3>Férias</h3><div class="split">'+
-  '<div><div class="n">'+SALDO.gozados+'</div><div class="l">Gozados</div></div>'+
-  '<div><div class="n warn">'+SALDO.marcados+'</div><div class="l">Marcados</div></div>'+
-  '<div><div class="n ok">'+livre+'</div><div class="l">Por marcar</div></div></div>'+
-  (AUSENCIAS.length?AUSENCIAS.map(function(a){
-   return row('cal',a.t+' · '+dc(a.de)+' a '+dc(a.ate),a.d+' dias úteis',
-    a.e==='pendente'?st('Por aprovar','warn'):st('Aprovado','ok'),'',a.e==='pendente'?'warn':'ok');
-  }).join(''):'<div class="empty">Sem férias marcadas.</div>')+'</div>';
-
+ var t=turno();
+ var h=fila_html()+kpi(SEAL.sky,'Turno de hoje','cal',{v:t.i+'–'+t.f},'Turno previsto mais próximo da hora atual');
+ h+='<div class="msg mute"><b>Escala e férias ainda não ligadas</b>Nesta ronda a app não lê a escala nem o saldo de férias. Os pedidos de férias e de troca ficam registados na mesma.</div>';
+ var meus=pedidosTodos().filter(function(p){return p.pessoaId===user.id&&(p.tipo==='ferias'||p.tipo==='troca');});
+ h+='<div class="table-panel surface"><div class="head"><h3>Os teus pedidos de horário</h3>'+st(meus.length,'mute')+'</div>'+
+  (meus.length?meus.map(function(p){
+   return row('cal',esc(p.titulo),esc(p.pessoa)+' · '+quando(p.dataHora),
+    p.estado==='novo'?st('Por aprovar','warn'):st('Aprovado','ok'),'',p.estado==='novo'?'warn':'ok');
+  }).join(''):'<div class="empty">Sem pedidos de horário nos últimos 7 dias.</div>')+'</div>';
  h+='<div class="qa-card surface"><h3>Pedir</h3>'+
   '<button class="qa-btn" onclick="abrirFerias()">'+ic('cal',null,20)+
-   '<span>Férias<small>'+livre+' dias úteis por marcar</small></span></button>'+
+   '<span>Férias<small>contam-se dias úteis</small></span></button>'+
   '<button class="qa-btn" onclick="abrirTroca()">'+ic('clock',null,20)+
    '<span>Troca ou folga<small>precisa de aprovação</small></span></button></div>';
  h+='<button class="qa-btn" style="margin-bottom:20px" onclick="sair()">'+ic('door',null,20)+
@@ -1349,11 +1370,7 @@ function renderTurnos(){
  document.getElementById('sc-turnos').innerHTML=h;
 }
 function abrirFerias(){
- var livre=SALDO.direito-SALDO.gozados-SALDO.marcados;
  modal('Pedir férias',
-  '<div class="msg mute"><div class="kv"><span>Direito este ano</span><span>'+SALDO.direito+'</span></div>'+
-  '<div class="kv"><span>Gozados e marcados</span><span>'+(SALDO.gozados+SALDO.marcados)+'</span></div>'+
-  '<div class="kv tot"><span>Podes marcar</span><span>'+livre+' dias úteis</span></div></div>'+
   '<div class="field"><span class="field-label">Primeiro dia</span>'+
    '<input class="input" type="date" id="fDe" onchange="calcF()"></div>'+
   '<div class="field"><span class="field-label">Último dia</span>'+
@@ -1370,16 +1387,13 @@ function calcF(){
  if(!de||!ate){box.innerHTML='';btn.disabled=true;return;}
  if(ate<de){box.innerHTML='<div class="msg high"><b>Datas trocadas</b>O último dia é anterior ao primeiro.</div>';
   btn.disabled=true;return;}
- var r=conta(de,ate),livre=SALDO.direito-SALDO.gozados-SALDO.marcados;
+ var r=conta(de,ate);
  var hj=new Date();hj.setHours(0,0,0,0);
  var ant=Math.round((new Date(de+'T00:00:00')-hj)/86400000);
  var h='<div class="msg mute"><div class="kv"><span>Dias de calendário</span><span>'+r.cal+'</span></div>'+
   '<div class="kv"><span>Fins de semana</span><span>−'+r.fds+'</span></div>'+
   r.fer.map(function(x){return '<div class="kv warn"><span>'+x.n+'</span><span>−1</span></div>';}).join('')+
-  '<div class="kv tot"><span>Desconta ao saldo</span><span>'+r.u+' dias úteis</span></div>'+
-  '<div class="kv"><span>Ficas com</span><span>'+(livre-r.u)+'</span></div></div>';
- if(r.u>livre)h+='<div class="msg warn"><b>Ultrapassa o saldo</b>São '+(r.u-livre)+
-  ' dia(s) além do que tens. Podes enviar — o Alfredo decide.</div>';
+  '<div class="kv tot"><span>Dias úteis</span><span>'+r.u+'</span></div></div>';
  if(ant>=0&&ant<15)h+='<div class="msg warn"><b>Pouca antecedência</b>Faltam '+ant+
   ' dias. Pode ser difícil arranjar cobertura.</div>';
  if(ant<0)h+='<div class="msg high"><b>Data no passado</b>O primeiro dia já passou.</div>';
@@ -1388,18 +1402,15 @@ function calcF(){
 }
 function salvaFerias(){
  var de=document.getElementById('fDe').value,ate=document.getElementById('fAte').value;
- var r=conta(de,ate);
- AUSENCIAS.unshift({t:'Férias',de:de,ate:ate,d:r.u,e:'pendente'});
- SALDO.marcados+=r.u;
- PEDIDOS.unshift({t:'Férias — '+dc(de)+' a '+dc(ate)+' ('+r.u+' dias úteis)',c:'Horário',
-  e:'novo',q:user.n,w:'agora'});
- fecharModal();render();toast('Pedido de '+r.u+' dias úteis enviado · por aprovar');
+ var r=conta(de,ate),nota=document.getElementById('fN').value.trim();
+ novoPedido('ferias','Férias — '+dc(de)+' a '+dc(ate)+' ('+r.u+' dias úteis)','Horário',null,
+  {de:de,ate:ate,diasUteis:r.u,nota:nota||null});
+ fecharModal();render();toast('Pedido de '+r.u+' dias úteis registado · por aprovar');
 }
 function abrirTroca(){
  modal('Troca ou folga',
-  '<div class="field"><span class="field-label">Que dia?</span><select class="select" id="tD">'+
-   SEMANA.filter(function(t){return !t.off;}).map(function(t){
-    return '<option>'+t.d+' · '+t.h+'</option>';}).join('')+'</select></div>'+
+  '<div class="field"><span class="field-label">Que dia?</span>'+
+   '<input class="input" type="date" id="tD"></div>'+
   '<div class="field"><span class="field-label">O que precisas?</span><div class="chips" id="tP">'+
    ['Trocar','Folga'].map(function(o,i){
     return '<button class="cat-chip'+(i===0?' active':'')+'" onclick="pill(this)"><span>'+o+
@@ -1410,14 +1421,13 @@ function abrirTroca(){
   '<p class="note">O horário não muda até o Alfredo confirmar.</p>');
 }
 function salvaTroca(){
- PEDIDOS.unshift({t:document.querySelector('#tP .cat-chip.active').textContent.trim()+' — '+
-  document.getElementById('tD').value,c:'Horário',e:'novo',q:user.n,w:'agora'});
- fecharModal();render();toast('Pedido enviado ao Alfredo');
+ var d=document.getElementById('tD').value;if(!d)return toast('Escolhe o dia');
+ var o=document.querySelector('#tP .cat-chip.active').textContent.trim(),nota=document.getElementById('tN').value.trim();
+ novoPedido('troca',o+' — '+dc(d),'Horário',null,{diaPedido:d,nota:nota||null});
+ fecharModal();render();toast('Pedido registado');
 }
 
-/* ============ NOTIFICAÇÃO ============
-   No mockup é uma pré-visualização. Em produção é uma notificação push
-   do PWA, disparada no telemóvel de quem está de turno. */
+/* ============ NOTIFICAÇÃO (in-app; sem push nesta fase) ============ */
 var notifT=null,notifAlvo=null;
 function notificar(titulo,texto,alvo){
  notifAlvo=alvo||'hoje';
@@ -1434,12 +1444,11 @@ function abrirNotif(){
  document.getElementById('notif').classList.remove('on');
  if(notifAlvo)go(notifAlvo);
 }
-/* dispara uma vez por ronda, aos 20 minutos do prazo */
 function verificaAvisos(){
  var r=ronda();
  if(est(r)!=='aberta')return;
  var m=faltaPrazo(r),k=r==='manha'?'abertura':'fecho';
- var falta=tFalta(r),feita=CHK[k].f.length===CHK[k].i.length;
+ var falta=tFalta(r),feita=chkFeita(k);
  if(falta===0&&feita)return;
  var chave=r+'-20';
  if(m<=20&&m>0&&!avisado[chave]){
@@ -1475,19 +1484,59 @@ function toast(m){
  clearTimeout(tt);tt=setTimeout(function(){el.classList.remove('on');},2800);
 }
 
+/* ============ PIN (hash) ============
+   O PIN NUNCA é guardado em claro: testeLojaApp/pins/{pessoaId} = { hash }
+   com hash = SHA-256 hex de "pessoaId:PIN". A comparação é feita no cliente.
+   Uma pessoa sem PIN define-o na primeira entrada (duas vezes). Para
+   repor um PIN, apaga-se testeLojaApp/pins/{pessoaId} no console.
+   LIMITE ASSUMIDO: com o Firebase em modo de teste o hash é legível por
+   quem tiver o URL, e 6 dígitos são forçáveis offline — isto impede entrar
+   como outra pessoa ao balcão, não protege contra quem ler a base. */
+function sha256Hex(str){
+ var bytes=new TextEncoder().encode(str);
+ if(window.crypto&&crypto.subtle&&crypto.subtle.digest){
+  return crypto.subtle.digest('SHA-256',bytes).then(function(buf){
+   return Array.prototype.map.call(new Uint8Array(buf),function(b){return ('0'+b.toString(16)).slice(-2);}).join('');});
+ }
+ return Promise.resolve(sha256Js(bytes));
+}
+/* SHA-256 em JS puro — só para contextos sem crypto.subtle (file://). */
+function sha256Js(msg){
+ var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+ var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+ var l=msg.length,L=((l+9+63)>>6)<<6,b=new Uint8Array(L);b.set(msg);b[l]=0x80;
+ var bits=l*8;for(var i=0;i<8;i++)b[L-1-i]=(bits/Math.pow(2,8*i))&0xff;
+ var w=new Uint32Array(64);
+ function rr(x,n){return (x>>>n)|(x<<(32-n));}
+ for(var off=0;off<L;off+=64){
+  for(i=0;i<16;i++)w[i]=(b[off+i*4]<<24)|(b[off+i*4+1]<<16)|(b[off+i*4+2]<<8)|b[off+i*4+3];
+  for(i=16;i<64;i++){var s0=rr(w[i-15],7)^rr(w[i-15],18)^(w[i-15]>>>3),s1=rr(w[i-2],17)^rr(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;}
+  var a=H[0],b2=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+  for(i=0;i<64;i++){var S1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+w[i])>>>0,S0=rr(a,2)^rr(a,13)^rr(a,22),mj=(a&b2)^(a&c)^(b2&c),t2=(S0+mj)>>>0;
+   h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b2;b2=a;a=(t1+t2)>>>0;}
+  H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b2)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
+ }
+ return H.map(function(x){return ('00000000'+x.toString(16)).slice(-8);}).join('');
+}
+function hashPin(pessoaId,pin){return sha256Hex(pessoaId+':'+pin);}
+
 /* ============ ENTRADA ============ */
-function ini(n){return n.slice(0,2).toUpperCase();}
+function ini(n){return String(n||'?').slice(0,2).toUpperCase();}
 function renderPeople(){
- document.getElementById('people').innerHTML=PESSOAS.map(function(p){
+ var el=document.getElementById('people');
+ if(!carregado.pessoas){el.innerHTML='<div class="empty">A carregar a equipa…</div>';}
+ else if(!PESSOAS.length){el.innerHTML='<div class="empty">Sem pessoas ativas em pessoas/.</div>';}
+ else el.innerHTML=PESSOAS.map(function(p){
   return '<button class="p-row" onclick="escolhe(\''+p.id+'\')">'+
-   '<span class="avatar" style="background:'+p.c+'">'+ini(p.n)+'</span>'+
-   '<span class="p-n"><b>'+p.n+'</b><small>'+p.f+'</small></span>'+
+   '<span class="avatar" style="background:'+esc(p.c)+'">'+esc(ini(p.n))+'</span>'+
+   '<span class="p-n"><b>'+esc(p.n)+'</b><small>'+esc(p.f)+(PINS[p.id]?'':' · sem PIN — define na 1.ª entrada')+'</small></span>'+
    ic('chev','var(--muted)',20)+'</button>';}).join('');
  document.getElementById('pBack').innerHTML=ic('back',null,18);
  ctxLogin();
 }
 function escolhe(id){
- alvo=PESSOAS.filter(function(p){return p.id===id;})[0];pinBuf='';
+ alvo=PESSOAS.filter(function(p){return p.id===id;})[0];pinBuf='';pinPrimeiro='';
+ pinModo=PINS[id]?'verificar':'definir';
  document.getElementById('lStep1').style.display='none';
  var e2=document.getElementById('lStep2');
  e2.style.display='block';
@@ -1496,10 +1545,15 @@ function escolhe(id){
  a.textContent=ini(alvo.n);a.style.background=alvo.c;
  document.getElementById('pNome').textContent=alvo.n;
  document.getElementById('pFn').textContent=alvo.f+' · PIN de 6 dígitos';
- dots();
+ pinMsg();dots();
  document.getElementById('pinPad').innerHTML=numPad('kp');
 }
-/* contexto da loja antes de haver sessão — não revela nada de ninguém */
+function pinMsg(){
+ var el=document.getElementById('pMsg');
+ if(pinModo==='verificar')el.innerHTML='Escreve o teu PIN';
+ else if(pinModo==='definir')el.innerHTML='<b>Ainda não tens PIN.</b> Escolhe 6 dígitos — vais escrevê-los duas vezes.';
+ else el.innerHTML='<b>Repete o PIN</b> para confirmar';
+}
 function ctxLogin(){
  var d=agora(),hh=d.getHours();
  document.getElementById('lSaud').textContent=
@@ -1523,15 +1577,38 @@ function ctxLogin(){
 }
 function dots(){var h='';for(var i=0;i<6;i++)h+='<div class="pdot'+(i<pinBuf.length?' on':'')+'"></div>';
  document.getElementById('pdots').innerHTML=h;}
+var pinOcupado=false;
 function kp(k){
+ if(pinOcupado)return;
  if(k==='←'){if(!pinBuf.length)return voltarPessoas();pinBuf=pinBuf.slice(0,-1);}
  else if(pinBuf.length<6)pinBuf+=k;
  dots();
- if(pinBuf.length===6){
-  /* no mockup, 000000 demonstra o PIN errado */
-  if(pinBuf==='000000')return setTimeout(pinErrado,180);
-  setTimeout(entrarApp,170);
+ if(pinBuf.length===6)setTimeout(pinCompleto,170);
+}
+function pinCompleto(){
+ var pin=pinBuf,p=alvo;
+ pinOcupado=true;
+ if(pinModo==='verificar'){
+  var reg=PINS[p.id];
+  hashPin(p.id,pin).then(function(h){
+   pinOcupado=false;
+   if(reg&&reg.hash===h)entrarApp();else pinErrado();
+  }).catch(function(e){pinOcupado=false;console.error(e);toast('Não consegui verificar o PIN');pinErrado();});
+  return;
  }
+ if(pinModo==='definir'){
+  pinOcupado=false;
+  if(/^(\d)\1{5}$/.test(pin)||pin==='123456'){toast('PIN demasiado fácil — escolhe outro');return pinErrado();}
+  pinPrimeiro=pin;pinModo='confirmar';pinBuf='';pinMsg();dots();return;
+ }
+ /* confirmar */
+ if(pin!==pinPrimeiro){pinOcupado=false;toast('Os PINs não coincidem — começa de novo');pinModo='definir';pinPrimeiro='';pinMsg();return pinErrado();}
+ hashPin(p.id,pin).then(function(h){
+  var reg={hash:h,alg:'sha256(pessoaId:pin)',criadoEm:new Date().toISOString(),pessoa:p.n};
+  if(!(NET.online&&NET.ligado)){pinOcupado=false;toast('Sem ligação — o PIN só se define com rede');pinBuf='';dots();return;}
+  return db.ref(RAIZ+'/pins/'+p.id).set(reg).then(function(){
+   PINS[p.id]=reg;pinOcupado=false;toast('PIN definido');entrarApp();});
+ }).catch(function(e){pinOcupado=false;console.error(e);toast('Falha ao guardar o PIN: '+(e&&e.message?e.message:e));pinErrado();});
 }
 function pinErrado(){
  var d=document.getElementById('pdots');
@@ -1546,15 +1623,27 @@ function voltarPessoas(){
  e1.classList.remove('lstep');void e1.offsetWidth;e1.classList.add('lstep');
  pinBuf='';
 }
+/* Sessão guardada no telemóvel por 12 h: fechar e reabrir a app não pede o
+   PIN outra vez (é o que permite ver o registo depois de reabrir). */
+var SESSAO_KEY='testeLojaApp.sessao';
 function entrarApp(){
  user=alvo;
+ try{localStorage.setItem(SESSAO_KEY,JSON.stringify({pessoaId:user.id,em:Date.now()}));}catch(e){}
  document.getElementById('login').classList.add('hidden');
  var a=document.getElementById('gAv');
  a.textContent=ini(user.n);a.style.background=user.c;
  boot();
 }
+function retomarSessao(){
+ var s=null;try{s=JSON.parse(localStorage.getItem(SESSAO_KEY)||'null');}catch(e){}
+ if(!s||!s.pessoaId||Date.now()-s.em>12*3600*1000)return false;
+ var p=PESSOAS.filter(function(x){return x.id===s.pessoaId;})[0];
+ if(!p)return false;
+ alvo=p;entrarApp();return true;
+}
 function sair(){
- user=null;pinBuf='';emTurno=false;hLog='';hDur='00:00:00';
+ user=null;pinBuf='';
+ try{localStorage.removeItem(SESSAO_KEY);}catch(e){}
  if(tick)clearInterval(tick);
  voltarPessoas();
  document.getElementById('login').classList.remove('hidden');
@@ -1565,8 +1654,9 @@ function sair(){
 
 /* ============ SIMULAÇÃO (escondida por omissão) ============
    5 toques seguidos (< 1,5 s entre cada) na faixa "Versão de teste" ou no
-   rodapé abrem a barra. A hora simulada só entra em vigor quando se escolhe
-   um dia ou uma hora na barra, e dura até recarregar a página. */
+   rodapé abrem a barra. A hora simulada muda só a APRESENTAÇÃO (ronda,
+   prazos); o dataHora gravado é sempre o relógio real, e o registo leva
+   horaSimulada quando a barra estava ativa. */
 var DN=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 var toques=0,toqueT=null;
 function toqueSecreto(){
@@ -1582,7 +1672,6 @@ function mostrarDemobar(){
 }
 function initDemo(){
  var d=agora();
- /* a barra arranca na hora e dia actuais (reais ou já simulados) */
  var dia=dow(),hora=d.getHours(),min=Math.floor(d.getMinutes()/20)*20;
  document.getElementById('dDia').innerHTML=DN.map(function(n,i){
   return '<option value="'+i+'"'+(i===dia?' selected':'')+'>'+n+'</option>';}).join('');
@@ -1604,33 +1693,82 @@ function tema(){
  document.documentElement.setAttribute('data-theme',d?'light':'dark');
  document.getElementById('tBtn').textContent=d?'Escuro':'Claro';
 }
+/* O botão "Rede" da barra já não simula: mostra o estado real da ligação. */
+function rede(){toast((NET.online&&NET.ligado?'Ligado ao Firebase':'Sem ligação')+' · '+NET.fila+' na fila');}
 
 /* ============ RENDER ============ */
 function render(){
+ if(!user){renderPeople();return;}
  var d=agora();
  document.getElementById('gTitle').textContent=TAB==='hoje'
   ?'Olá, '+user.n:NAV.filter(function(t){return t[0]===TAB;})[0][1];
  document.getElementById('gSub').textContent=DIAS[dow()]+', '+d.getDate()+' '+MES[d.getMonth()]+' · '+hm();
+ document.getElementById('nBtn').textContent=NET.online&&NET.ligado?'Rede':'Sem rede';
  renderHoje();renderRegistos();renderEntradas();renderPedidos();renderTurnos();renderNav();
  verificaAvisos();
 }
 function boot(){render();}
 
-/* ============ RELÓGIO ============
-   A app actualiza-se sozinha a cada 60 s e quando a página volta a estar
-   visível, para o countdown e os estados não ficarem congelados. O render
-   só toca nos ecrãs de fundo: uma folha aberta nunca é fechada nem
-   redesenhada (o modal vive em #modal, fora dos .screen). */
 function refrescar(){
- if(!document.getElementById('login').classList.contains('hidden'))return ctxLogin();
- if(!user)return;
+ if(!user)return ctxLogin();
  render();
 }
 setInterval(refrescar,60000);
 document.addEventListener('visibilitychange',function(){
- if(document.visibilityState==='visible')refrescar();
+ if(document.visibilityState==='visible'){despachar();refrescar();}
 });
+
+/* ============ ARRANQUE ============ */
+filaLer();
 renderPeople();
+autenticarEContinuar(function(){
+ db=firebase.database();
+ db.ref('.info/connected').on('value',function(s){
+  NET.ligado=s.val()===true;
+  if(NET.ligado)despachar();
+  render();
+ });
+ /* pessoas/ — só leitura */
+ db.ref('pessoas').on('value',function(s){
+  var v=s.val()||{};
+  PESSOAS=Object.keys(v).map(function(id){var p=v[id]||{};
+   return {id:id,n:p.nome||'(sem nome)',f:p.funcao||'Equipa',c:p.cor||'#004476',ativo:p.ativo!==false};})
+   .filter(function(p){return p.ativo;})
+   .sort(function(a,b){return a.n.localeCompare(b.n);});
+  carregado.pessoas=true;
+  if(!user&&!retomarSessao())renderPeople();
+  else if(user&&!PESSOAS.some(function(p){return p.id===user.id;}))sair();
+ });
+ db.ref(RAIZ+'/pins').on('value',function(s){PINS=s.val()||{};if(!user)renderPeople();});
+ /* equipamentos/ — só leitura; sem nenhum com termómetro cai para
+    testeLojaApp/equipamentos/ (semeado uma vez se estiver vazio) */
+ db.ref('equipamentos').on('value',function(s){
+  var lista=equipDeNo(s.val());
+  if(lista.length){EQUIP=lista;EQUIP_ORIGEM='equipamentos';carregado.equip=true;render();return;}
+  db.ref(RAIZ+'/equipamentos').once('value').then(function(s2){
+   var l2=equipDeNo(s2.val());
+   if(!l2.length){
+    console.warn('equipamentos/ sem termómetros: a semear '+RAIZ+'/equipamentos');
+    return db.ref(RAIZ+'/equipamentos').set(EQUIP_SEMENTE).then(function(){EQUIP=equipDeNo(EQUIP_SEMENTE);});
+   }
+   EQUIP=l2;
+  }).then(function(){EQUIP_ORIGEM='testeLojaApp';carregado.equip=true;render();});
+ });
+ /* lojaChecklistTemplates/ — só leitura; sem nó ficam os textos por omissão */
+ db.ref('lojaChecklistTemplates').on('value',function(s){
+  var v=s.val()||{};
+  ['abertura','fecho'].forEach(function(k){
+   var arr=v[k];if(arr&&typeof arr==='object'&&!Array.isArray(arr))arr=Object.keys(arr).map(function(i){return arr[i];});
+   if(Array.isArray(arr)&&arr.length)CHK[k].i=arr.map(String);
+  });
+  render();
+ });
+ /* os últimos 7 dias de registos desta app */
+ db.ref(RAIZ+'/registos').orderByKey().limitToLast(7).on('value',function(s){
+  DIAS7=s.val()||{};carregado.registos=true;render();
+ });
+ despachar();
+});
 </script>
 </body>
 </html>
