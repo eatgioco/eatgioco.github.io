@@ -5,8 +5,9 @@
 set -u
 cd "$(dirname "$0")/.."
 
-# Exceções: páginas de suporte com design próprio, arquivo e montra.
-EXCECOES='abanca-callback.html privacidade.html termos.html _referencia-fase0.html estilo.html prototipo-barra-mobile.html loja-app-teste.html'
+# Exceções: páginas de suporte com design próprio, arquivo, montra e as páginas
+# públicas do menu (standalone, fora do shell — ver "Páginas públicas" no CLAUDE.md).
+EXCECOES='abanca-callback.html privacidade.html termos.html _referencia-fase0.html estilo.html prototipo-barra-mobile.html loja-app-teste.html menu-en.html menu-en-web.html'
 
 excecao(){ for e in $EXCECOES; do [ "$1" = "$e" ] && return 0; done; return 1; }
 
