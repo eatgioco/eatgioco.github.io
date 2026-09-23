@@ -287,6 +287,13 @@ async function main(){
   assert.strictEqual(porId['banco:revolut~rX'].entidade.id, 'sup4');
   assert.strictEqual(porId['banco:revolut~rY'].rubrica, null); assert.strictEqual(porId['banco:revolut~rY'].validacao.estado, 'porValidar', 'payreq sem ficha → porValidar');
 
+  // 1b) valorFonte: documento | movimento | orcamentado (Set/2026)
+  var fonte = function(id){ return porId[id].valorFonte; };
+  ['fat:fatA', 'fat:fatB', 'cxf:cx1', 'rec:p1', 'tsu'].forEach(function(id){ assert.strictEqual(fonte(id), 'documento', id + ' documento'); });
+  ['cxf:cx2', 'banco:abanca~mD', 'banco:revolut~rO', 'fixo:fx1', 'fixo:fx2', 'fixo:fx4', 'fixo:fx5', 'fixo:fx9'].forEach(function(id){ assert.strictEqual(fonte(id), 'movimento', id + ' movimento'); });
+  ['fixo:fx3', 'fixo:fx6', 'fixo:fx10', 'fixo:fx11'].forEach(function(id){ assert.strictEqual(fonte(id), 'orcamentado', id + ' orcamentado'); });
+  plano.registos.forEach(function(r){ assert.ok(['documento', 'movimento', 'orcamentado'].indexOf(r.valorFonte) !== -1, r.id + ' tem valorFonte'); });
+
   // 2) regenerar três vezes: mesmo nº de registos, mesmos totais, zero escritas depois da 1.ª
   var r1 = await CC.regenerar('2099-01');
   var n1 = registos(store, '2099-01').length, t1 = JSON.stringify(store.custos['2099-01']._resumo.porRubrica), tot1 = store.custos['2099-01']._resumo.total;
@@ -312,6 +319,18 @@ async function main(){
   assert.strictEqual(r4.escritos, 0, 'nada muda ao regenerar depois de validar');
   assert.strictEqual(r4.resumo.porValidar, 16);
   assert.strictEqual(r4.resumo.porRubrica.outros, 0.38, 'mC + mD + fat4 + fat7 + rX + mN(0,08) + mPO(0,25)');
+
+  // 3b) registos gravados ANTES do valorFonte: a 1.ª regeneração reescreve-os uma vez,
+  //     sem mudar valor nem rubrica nem duplicar; as três seguintes não escrevem nada.
+  var antesVF = {};
+  registos(store, '2099-01').forEach(function(id){ var r = store.custos['2099-01'][id]; antesVF[id] = [r.valor, r.rubrica, r.despesa, r.validacao.estado]; delete r.valorFonte; });
+  var rv1 = await CC.regenerar('2099-01'), rv2 = await CC.regenerar('2099-01'), rv3 = await CC.regenerar('2099-01'), rv4 = await CC.regenerar('2099-01');
+  console.log('sem valorFonte → regenerar ×4: escritos', rv1.escritos, rv2.escritos, rv3.escritos, rv4.escritos);
+  assert.strictEqual(rv1.escritos, registos(store, '2099-01').length, 'todos reescritos uma vez');
+  assert.deepStrictEqual([rv2.escritos, rv3.escritos, rv4.escritos], [0, 0, 0], 'idempotente depois');
+  assert.strictEqual(registos(store, '2099-01').length, Object.keys(antesVF).length, 'sem duplicados');
+  registos(store, '2099-01').forEach(function(id){ var r = store.custos['2099-01'][id]; assert.deepStrictEqual([r.valor, r.rubrica, r.despesa, r.validacao.estado], antesVF[id], id + ' inalterado'); assert.ok(r.valorFonte, id + ' ganhou valorFonte'); });
+  assert.strictEqual(store.custos['2099-01']['banco:abanca~mD'].valorFonte, 'movimento', 'validado também leva valorFonte');
 
   // 4) origem deixa de produzir → anulado:true, nunca remove; volta → anulado sai
   var fatB = d.faturasProcessadas.fatB; delete d.faturasProcessadas.fatB;

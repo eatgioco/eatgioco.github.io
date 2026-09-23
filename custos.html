@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#FFEDDA">
 <meta name="apple-mobile-web-app-title" content="GIOCO Custos">
-<meta name="viewport" content="width=1200">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GIOCO · Custos</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +30,10 @@
 <style>
   /* ============================================================
      custos.html — o nó canónico custos/ (Set/2026).
-     Selector de mês, "Regenerar mês", totais por rubrica, contador de
+     Dois separadores (Set/2026): "Analisar" (por omissão, SÓ leitura de
+     custos/{mês} × 6 meses e vendas/{mês}/resumo.bruto — nunca regenera)
+     e "Validar" (a vista de sempre).
+     Validar: selector de mês, "Regenerar mês", totais por rubrica, contador de
      porValidar, lista de registos (porValidar primeiro, depois valor
      desc.) com filtros por rubrica e estado. Cada porValidar deixa
      escolher rubrica/despesa e marcar validado. Escreve SÓ em custos/,
@@ -102,9 +105,68 @@
   .cu-motivo.rasto{ color:var(--muted); }
   .cu-vazio{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
   .cu-nota{ font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.5; }
+  body.shell-touch .cu-kpis{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+  /* ---------- separadores Analisar | Validar ---------- */
+  .cu-tabs{ display:inline-flex; gap:4px; padding:4px; border-radius:100px; background:var(--white); border:1px solid var(--line); margin:0 0 18px; }
+  .cu-tab{ font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:8px 18px; border-radius:100px; border:none; cursor:pointer;
+           background:transparent; color:var(--ink); }
+  .cu-tab.on{ background:var(--ink); color:var(--dough); }
+  .cu-painel.off{ display:none; }
+
+  /* ---------- Analisar: rubrica → despesa → entidade × 6 meses ---------- */
+  .cu-an{ border-radius:16px; padding:18px; max-width:1440px; }
+  .cu-an-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; }
+  .cu-an-tab{ width:100%; min-width:960px; border-collapse:separate; border-spacing:0; background:var(--white); color:var(--ink); }
+  .cu-an-tab th, .cu-an-tab td{ padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; white-space:nowrap; }
+  .cu-an-tab th{ font-size:11.5px; font-weight:700; color:var(--ink); background:var(--white); }
+  .cu-an-tab .lab{ position:sticky; left:0; z-index:2; background:var(--white); text-align:left; min-width:190px; max-width:260px;
+                   white-space:normal; border-right:1px solid var(--line); }
+  .cu-an-tab th.lab{ z-index:3; }
+  body.shell-touch .cu-an-tab .lab{ min-width:124px; max-width:150px; }
+  body.shell-touch .cu-an-tab tr.nv-d td.lab{ padding-left:22px; }
+  body.shell-touch .cu-an-tab tr.nv-e td.lab{ padding-left:34px; }
+  .cu-an-tab .v{ font-size:13px; font-weight:600; color:var(--ink); }
+  .cu-an-tab .p{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .cu-an-tab .ng{ font-size:11.5px; color:var(--muted); font-style:italic; }
+  .cu-an-tab td.clic{ cursor:pointer; }
+  .cu-an-tab td.clic:hover{ background:color-mix(in srgb, var(--red) 7%, var(--white)); }
+  .cu-an-tab .corrente, .cu-an-tab .corrente .v{ color:var(--muted); }
+  .cu-an-tab th .emcurso{ display:block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .cu-an-tab th .mes{ display:block; }
+  .cu-an-tab .media{ border-left:2px solid var(--line); }
+  .cu-an-tab th.media .emcurso{ text-transform:none; letter-spacing:0; font-weight:500; }
+  /* destaque */
+  .cu-an-tab tr.dest td{ background:color-mix(in srgb, var(--mustard) 14%, var(--white)); }
+  .cu-an-tab tr.dest td.lab{ font-weight:700; }
+  .cu-an-tab tr.dest.resultado td{ border-bottom:2px solid var(--ink); }
+  .cu-an-tab tr.dest.total .v{ color:var(--red-ink); }
+  .cu-an-tab tr.dest .neg{ color:var(--red-ink); }
+  /* hierarquia */
+  .cu-an-tab tr.nv-r td.lab{ font-weight:700; font-size:13px; }
+  .cu-an-tab tr.nv-d td.lab{ padding-left:30px; font-size:12.5px; }
+  .cu-an-tab tr.nv-e td.lab{ padding-left:52px; font-size:12px; color:var(--muted); }
+  .cu-an-tab tr.nv-d .v{ font-weight:500; }
+  .cu-an-tab tr.nv-e .v{ font-weight:400; }
+  .cu-an-tab tr.fora td{ opacity:.6; }
+  .cu-an-seta{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-right:4px; border:none; padding:0;
+               background:transparent; color:var(--muted); cursor:pointer; font-size:11px; border-radius:4px; vertical-align:1px; }
+  .cu-an-seta.vazia{ visibility:hidden; }
+  .cu-an-lab-txt{ cursor:pointer; }
+  /* barra de fiabilidade */
+  .cu-fiab{ display:flex; height:6px; border-radius:100px; overflow:hidden; background:var(--line); margin-top:6px; min-width:90px; }
+  .cu-fiab span{ display:block; height:100%; }
+  .cu-fiab .lido{ background:var(--green); }
+  .cu-fiab .orc{ background:var(--muted); }
+  .cu-fiab .pv{ background:var(--amber); }
+  .cu-fiab-txt{ font-size:10.5px; font-weight:500; color:var(--muted); margin-top:3px; }
+  .cu-legenda{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin:12px 0 0; }
+  .cu-legenda i{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .cu-legenda i.lido{ background:var(--green); } .cu-legenda i.orc{ background:var(--muted); } .cu-legenda i.pv{ background:var(--amber); }
+  .cu-an-vazio{ padding:28px; text-align:center; color:var(--muted); font-size:13px; }
 </style>
 </head>
-<body>
+<body class="shell-mobile">
 <script src="gioco-shell.js"></script>
 
 <div class="shell">
@@ -130,7 +192,7 @@
     <div class="page">
 
       <div class="greet-row">
-        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="toggleSidebarPin()" title="Fixar a barra lateral fechada">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
           <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
         </button>
         <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-wallet"/></svg>GIOCO · <b>Custos</b></h1>
@@ -152,6 +214,24 @@
       </div>
 
 <main>
+  <div class="cu-tabs" role="tablist">
+    <button type="button" class="cu-tab on" role="tab" data-tab="analisar" aria-selected="true">Analisar</button>
+    <button type="button" class="cu-tab" role="tab" data-tab="validar" aria-selected="false">Validar</button>
+  </div>
+
+  <section class="cu-painel" id="cuPainelAnalisar">
+    <div class="cu-an card glass-light">
+      <div class="cu-an-scroll" id="cuAnScroll"><div class="cu-an-vazio">A carregar…</div></div>
+      <div class="cu-legenda">
+        <span><i class="lido"></i>Lido (documento ou movimento)</span>
+        <span><i class="orc"></i>Orçamentado (compromisso sem movimento)</span>
+        <span><i class="pv"></i>Por validar</span>
+      </div>
+      <p class="cu-nota">Custos com IVA, em competência (mês do documento), lidos de <b>custos/</b> — esta vista nunca regenera nada. Vendas = <b>vendas/{mês}/resumo.bruto</b>, também com IVA. A percentagem de cada célula é sobre as vendas desse mês. O mês corrente está em curso (as faturas ainda estão a chegar) e fica fora da média; um mês sem <b>custos/</b> gerado diz "não gerado" e também fica fora. A média é a dos meses fechados mostrados e a percentagem dela é a soma dos custos sobre a soma das vendas desses meses. A rubrica Interno fica fora do total. Clicar numa célula abre o Validar nesse mês com os filtros aplicados.</p>
+    </div>
+  </section>
+
+  <section class="cu-painel off" id="cuPainelValidar">
   <div class="cu-barra">
     <label for="cuMes">Mês</label>
     <select id="cuMes"></select>
@@ -171,6 +251,8 @@
     </select>
     <label for="cuFiltroDespesa">Despesa</label>
     <select id="cuFiltroDespesa"><option value="">Todas</option></select>
+    <label for="cuFiltroEntidade">Entidade</label>
+    <select id="cuFiltroEntidade"><option value="">Todas</option></select>
     <label for="cuFiltroEstado">Estado</label>
     <select id="cuFiltroEstado">
       <option value="">Todos</option>
@@ -187,10 +269,14 @@
     <div id="cuLista"><div class="cu-vazio">A carregar…</div></div>
     <p class="cu-nota">Ordem: por validar primeiro, depois por valor descendente. A rubrica dos custos de fornecedor vem só da categoria da ficha (Serviços → Outros; Alimentar, Bebidas e Packaging → CMV, com a despesa a dizer qual); a dos movimentos bancários, das regras de classificação; um registo sem quem lhe saiba a rubrica fica por validar. Os movimentos bancários que já pagam uma fatura, um recibo, a TSU ou um compromisso nunca geram registo próprio.</p>
   </div>
+  </section>
 </main>
 
     </div>
   </div>
+
+  <!-- Menu ao toque: tocar fora fecha o painel. Ver gioco-shell.css/.js. -->
+  <div class="nav-overlay" id="navOverlay"></div>
 </div>
 
 <script>
@@ -233,6 +319,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var d = new Date(); d.setDate(1);
     for (var i = 0; i < 18; i++){ meses[d.getFullYear() + '-' + pad2(d.getMonth() + 1)] = true; d.setMonth(d.getMonth() - 1); }
     Object.keys(custosMes).forEach(function(m){ meses[m] = true; });
+    meses[mesAtivo] = true;   // um clique na vista Analisar pode abrir um mês fora dos 18
     var lista = Object.keys(meses).sort().reverse();
     sel.innerHTML = lista.map(function(m){ return '<option value="' + m + '"' + (m === mesAtivo ? ' selected' : '') + '>' + labelMes(m) + '</option>'; }).join('');
   }
@@ -276,23 +363,47 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function estadoDe(r){ return r.anulado === true ? 'anulado' : ((r.validacao && r.validacao.estado) || 'auto'); }
 
+  // Filtros vindos de um clique na vista Analisar: ficam pendentes até a
+  // opção existir no select (o mês pode ainda não estar em memória) e
+  // caem assim que o utilizador mexe no select à mão.
+  var filtroPendente = {};
+  function entidadeNome(r){ return (r.entidade && r.entidade.nome) || '—'; }
+
   function preencherDespesas(){
-    var sel = document.getElementById('cuFiltroDespesa'), atual = sel.value;
+    var sel = document.getElementById('cuFiltroDespesa');
+    var atual = filtroPendente.despesa !== undefined ? filtroPendente.despesa : sel.value;
     var set = {};
     registosDoMes().forEach(function(r){ if (r.anulado !== true) set[r.despesa || ''] = true; });
     var lista = Object.keys(set).filter(Boolean).sort();
     sel.innerHTML = '<option value="">Todas</option>' + lista.map(function(d){ return '<option value="' + escapeHtml(d) + '">' + escapeHtml(d) + '</option>'; }).join('') + (set[''] ? '<option value="__sem__">Sem despesa</option>' : '');
-    sel.value = (atual && (lista.indexOf(atual) !== -1 || atual === '__sem__')) ? atual : '';
+    var existe = atual && (lista.indexOf(atual) !== -1 || (atual === '__sem__' && set['']));
+    sel.value = existe ? atual : '';
+    if (existe) delete filtroPendente.despesa;
+  }
+
+  function preencherEntidades(){
+    var sel = document.getElementById('cuFiltroEntidade');
+    var atual = filtroPendente.entidade !== undefined ? filtroPendente.entidade : sel.value;
+    var set = {};
+    registosDoMes().forEach(function(r){ if (r.anulado !== true) set[entidadeNome(r)] = true; });
+    var lista = Object.keys(set).sort(function(a, b){ return a.localeCompare(b, 'pt'); });
+    sel.innerHTML = '<option value="">Todas</option>' + lista.map(function(d){ return '<option value="' + escapeHtml(d) + '">' + escapeHtml(d) + '</option>'; }).join('');
+    var existe = atual && lista.indexOf(atual) !== -1;
+    sel.value = existe ? atual : '';
+    if (existe) delete filtroPendente.entidade;
   }
 
   function renderLista(){
     preencherDespesas();
+    preencherEntidades();
     var fr = document.getElementById('cuFiltroRubrica').value;
     var fd = document.getElementById('cuFiltroDespesa').value;
+    var fen = document.getElementById('cuFiltroEntidade').value;
     var fe = document.getElementById('cuFiltroEstado').value;
     var regs = registosDoMes().filter(function(r){
       if (fr && (r.rubrica || 'semRubrica') !== fr) return false;
       if (fd && (fd === '__sem__' ? !!r.despesa : r.despesa !== fd)) return false;
+      if (fen && entidadeNome(r) !== fen) return false;
       var e = estadoDe(r);
       if (fe) return e === fe;
       return e !== 'anulado';
@@ -378,8 +489,237 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   document.getElementById('cuMes').addEventListener('change', function(){ ligarMes(this.value); });
   document.getElementById('cuFiltroRubrica').addEventListener('change', renderLista);
-  document.getElementById('cuFiltroDespesa').addEventListener('change', renderLista);
+  document.getElementById('cuFiltroDespesa').addEventListener('change', function(){ delete filtroPendente.despesa; renderLista(); });
+  document.getElementById('cuFiltroEntidade').addEventListener('change', function(){ delete filtroPendente.entidade; renderLista(); });
   document.getElementById('cuFiltroEstado').addEventListener('change', renderLista);
+
+
+  /* ============================================================
+     SEPARADORES
+     ============================================================ */
+  function mostrarSeparador(qual){
+    document.querySelectorAll('.cu-tab').forEach(function(b){
+      var on = b.getAttribute('data-tab') === qual;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.getElementById('cuPainelAnalisar').classList.toggle('off', qual !== 'analisar');
+    document.getElementById('cuPainelValidar').classList.toggle('off', qual !== 'validar');
+  }
+  document.querySelectorAll('.cu-tab').forEach(function(b){
+    b.addEventListener('click', function(){ mostrarSeparador(b.getAttribute('data-tab')); });
+  });
+
+  // Clique numa célula da análise → Validar no mês, com os filtros dessa célula.
+  function irParaValidar(mes, f){
+    f = f || {};
+    document.getElementById('cuFiltroRubrica').value = f.rubrica || '';
+    document.getElementById('cuFiltroEstado').value = '';
+    filtroPendente = { despesa: f.despesa || '', entidade: f.entidade || '' };
+    if (!custosMes[mes] && anCustos[mes]) custosMes[mes] = anCustos[mes];
+    mostrarSeparador('validar');
+    mesAtivo = mes;
+    preencherMeses();
+    if (db) ligarMes(mes); else renderTudo();
+    window.scrollTo(0, 0);
+  }
+
+  /* ============================================================
+     ANALISAR — só leitura de custos/{mês} (6 meses) e de
+     vendas/{mês}/resumo.bruto (com IVA, a mesma base dos custos).
+     Aritmética toda em cêntimos inteiros; percentagens com 1 casa,
+     arredondadas meio-para-cima em inteiros (nunca em vírgula flutuante).
+     ============================================================ */
+  var AN_RUBRICAS = ['cmv', 'pessoal', 'fixos', 'outros', 'impostos'];
+  var AN_MESES = 6;
+  var anCustos = {};      // custos/{mês} tal como está no RTDB (null = não gerado)
+  var anVendas = {};      // cêntimos de vendas/{mês}/resumo.bruto (null = sem vendas)
+  var anCarregados = {};  // 'c:{mes}' / 'v:{mes}' → true quando a primeira leitura voltou
+  var anAbertos = {};     // linhas expandidas: 'r:{rubrica}', 'd:{rubrica}|{despesa}'
+
+  function mesesAnalise(){
+    var out = [], d = new Date(); d.setDate(1);
+    for (var i = 0; i < AN_MESES; i++){ out.unshift(d.getFullYear() + '-' + pad2(d.getMonth() + 1)); d.setMonth(d.getMonth() - 1); }
+    return out;
+  }
+  function cents(v){ var n = typeof v === 'number' ? v : parseFloat(v); return isNaN(n) ? 0 : Math.round(n * 100); }
+  function euroC(c){ return formatEuro(c / 100); }
+  // % com 1 casa, em inteiros: décimas = round(c × 1000 / v), meio para cima (simétrico no sinal).
+  function pctDecimas(c, v){
+    if (!v) return null;
+    var n = Math.abs(c) * 1000, d = Math.abs(v);
+    var q = Math.floor((2 * n + d) / (2 * d));
+    return ((c < 0) !== (v < 0)) ? -q : q;
+  }
+  function pctTxt(dec){ return dec === null ? '—' : (dec / 10).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %'; }
+  function mediaC(soma, n){ if (!n) return null; var q = Math.floor((2 * Math.abs(soma) + n) / (2 * n)); return soma < 0 ? -q : q; }
+
+  // Origem do número: documento | movimento | orcamentado. Registos gravados
+  // antes do valorFonte existir são deduzidos (compromisso sem movimento =
+  // orçamentado; banco = movimento; o resto = documento).
+  function fonteDe(r){
+    if (r.valorFonte) return r.valorFonte;
+    if (r.origem === 'banco') return 'movimento';
+    if (r.origem === 'compromisso') return (r.pagamento && r.pagamento.movimentoIds && r.pagamento.movimentoIds.length) ? 'movimento' : 'orcamentado';
+    return 'documento';
+  }
+
+  // Um mês → { gerado, tree, porRubrica, total, fiab }
+  function agregarMes(mes){
+    var n = anCustos[mes];
+    if (!n) return { gerado: false };
+    var out = { gerado: true, tree: {}, porRubrica: {}, total: 0, fiab: { lido: 0, orc: 0, pv: 0 } };
+    Object.keys(n).forEach(function(k){
+      if (k.charAt(0) === '_') return;
+      var r = n[k];
+      if (!r || r.anulado === true) return;
+      var c = cents(r.valor);
+      var rub = r.rubrica || 'semRubrica', desp = r.despesa || '', ent = entidadeNome(r);
+      var tr = out.tree[rub] || (out.tree[rub] = {});
+      var td = tr[desp] || (tr[desp] = {});
+      td[ent] = (td[ent] || 0) + c;
+      out.porRubrica[rub] = (out.porRubrica[rub] || 0) + c;
+      if (rub === 'interno') return;           // fora do total, como no _resumo
+      out.total += c;
+      if (r.validacao && r.validacao.estado === 'porValidar') out.fiab.pv += c;
+      else if (fonteDe(r) === 'orcamentado') out.fiab.orc += c;
+      else out.fiab.lido += c;
+    });
+    return out;
+  }
+
+  function carregarAnalise(){
+    mesesAnalise().forEach(function(m){
+      db.ref('custos/' + m).on('value', function(snap){
+        anCustos[m] = snap.val() || null;
+        anCarregados['c:' + m] = true;
+        renderAnalise();
+      }, function(err){ console.error('Analisar: custos/' + m, err); anCarregados['c:' + m] = true; renderAnalise(); });
+      db.ref('vendas/' + m + '/resumo').once('value').then(function(snap){
+        var v = snap.val();
+        anVendas[m] = (v && v.bruto !== undefined && v.bruto !== null) ? cents(v.bruto) : null;
+      }).catch(function(err){ console.error('Analisar: vendas/' + m, err); anVendas[m] = null; })
+        .then(function(){ anCarregados['v:' + m] = true; renderAnalise(); });
+    });
+  }
+
+  function renderAnalise(){
+    var host = document.getElementById('cuAnScroll');
+    var meses = mesesAnalise();
+    var pronto = meses.every(function(m){ return anCarregados['c:' + m] && anCarregados['v:' + m]; });
+    if (!pronto){ host.innerHTML = '<div class="cu-an-vazio">A carregar…</div>'; return; }
+    var corrente = mesDeHoje();
+    var ag = {}; meses.forEach(function(m){ ag[m] = agregarMes(m); });
+    // Meses que entram na média: fechados (não o corrente) e gerados.
+    var fechados = meses.filter(function(m){ return m !== corrente && ag[m].gerado; });
+
+    function celula(m, c, alvo, semPct){
+      var cls = (m === corrente ? ' corrente' : '') + (alvo ? ' clic' : '');
+      var attr = alvo ? ' data-mes="' + m + '" data-alvo="' + escapeHtml(JSON.stringify(alvo)) + '"' : '';
+      if (c === undefined) return '<td class="' + cls + '"' + attr + '><span class="ng">não gerado</span></td>';
+      if (c === null) return '<td class="' + cls + '"><div class="v num">—</div></td>';
+      var p = pctDecimas(c, anVendas[m]);
+      return '<td class="' + cls + '"' + attr + '><div class="v num' + (c < 0 ? ' neg' : '') + '">' + euroC(c) + '</div>' + (semPct ? '' : '<div class="p num">' + (anVendas[m] ? pctTxt(p) : 'sem vendas') + '</div>') + '</td>';
+    }
+    // valorDe(m) → cêntimos | null (sem valor) | undefined (mês não gerado)
+    function linha(cls, labelHtml, valorDe, alvo, semPct){
+      var somaC = 0, somaV = 0, somaCV = 0, n = 0;
+      var tds = meses.map(function(m){
+        var c = valorDe(m);
+        if (fechados.indexOf(m) !== -1 && c !== null && c !== undefined){
+          n++; somaC += c;
+          if (anVendas[m]){ somaV += anVendas[m]; somaCV += c; }
+        }
+        return celula(m, c, alvo, semPct);
+      }).join('');
+      var med = mediaC(somaC, n);
+      var tdMed = med === null ? '<td class="media"><div class="v num">—</div></td>'
+        : '<td class="media"><div class="v num' + (med < 0 ? ' neg' : '') + '">' + euroC(med) + '</div>' + (semPct ? '' : '<div class="p num">' + (somaV ? pctTxt(pctDecimas(somaCV, somaV)) : 'sem vendas') + '</div>') + '</td>';
+      return '<tr class="' + cls + '"><td class="lab">' + labelHtml + '</td>' + tds + tdMed + '</tr>';
+    }
+
+    // ---- cabeçalho + barra de fiabilidade ----
+    var head = '<tr><th class="lab">Rubrica · despesa · entidade</th>' + meses.map(function(m){
+      var a = ag[m], barra;
+      if (!a.gerado) barra = '<div class="cu-fiab"></div><div class="cu-fiab-txt">não gerado</div>';
+      else if (!a.total) barra = '<div class="cu-fiab"></div><div class="cu-fiab-txt">sem custos</div>';
+      else {
+        var pl = pctDecimas(a.fiab.lido, a.total), po = pctDecimas(a.fiab.orc, a.total), pp = pctDecimas(a.fiab.pv, a.total);
+        var tt = 'Lido ' + euroC(a.fiab.lido) + ' (' + pctTxt(pl) + ') · Orçamentado ' + euroC(a.fiab.orc) + ' (' + pctTxt(po) + ') · Por validar ' + euroC(a.fiab.pv) + ' (' + pctTxt(pp) + ')';
+        barra = '<div class="cu-fiab" title="' + escapeHtml(tt) + '" data-lido="' + a.fiab.lido + '" data-orc="' + a.fiab.orc + '" data-pv="' + a.fiab.pv + '">' +
+          '<span class="lido" style="width:' + (a.fiab.lido * 100 / a.total) + '%" title="Lido ' + escapeHtml(euroC(a.fiab.lido)) + '"></span>' +
+          '<span class="orc" style="width:' + (a.fiab.orc * 100 / a.total) + '%" title="Orçamentado ' + escapeHtml(euroC(a.fiab.orc)) + '"></span>' +
+          '<span class="pv" style="width:' + (a.fiab.pv * 100 / a.total) + '%" title="Por validar ' + escapeHtml(euroC(a.fiab.pv)) + '"></span></div>' +
+          '<div class="cu-fiab-txt num" title="' + escapeHtml(tt) + '">' + pctTxt(pl) + ' · ' + pctTxt(po) + ' · ' + pctTxt(pp) + '</div>';
+      }
+      return '<th class="' + (m === corrente ? 'corrente' : '') + '" data-mes="' + m + '"><span class="mes">' + labelMes(m) + '</span>' +
+        (m === corrente ? '<span class="emcurso">em curso</span>' : '') + barra + '</th>';
+    }).join('') + '<th class="media"><span class="mes">Média</span><span class="emcurso">' + fechados.length + ' ' + (fechados.length === 1 ? 'mês fechado' : 'meses fechados') + '</span></th></tr>';
+
+    // ---- destaque ----
+    function totalDe(m){ return ag[m].gerado ? ag[m].total : undefined; }
+    function primeDe(m){ return ag[m].gerado ? (ag[m].porRubrica.cmv || 0) + (ag[m].porRubrica.pessoal || 0) : undefined; }
+    var corpo = '';
+    corpo += linha('dest vendas', 'Vendas do mês', function(m){ return anVendas[m] === null ? null : anVendas[m]; }, null, true);
+    corpo += linha('dest total', 'Total de custos', totalDe, {});
+    corpo += linha('dest prime', 'Prime cost <span class="p">(CMV + Pessoal)</span>', primeDe, null);
+    corpo += linha('dest resultado', 'Resultado <span class="p">(vendas − custos)</span>', function(m){
+      if (!ag[m].gerado) return undefined;
+      return anVendas[m] === null ? null : anVendas[m] - ag[m].total;
+    }, null);
+
+    // ---- rubrica → despesa → entidade ----
+    var rubricas = AN_RUBRICAS.slice();
+    ['semRubrica', 'interno'].forEach(function(k){ if (meses.some(function(m){ return ag[m].gerado && ag[m].tree[k]; })) rubricas.push(k); });
+    function somaNos(m, rub, desp, ent){
+      var a = ag[m]; if (!a.gerado) return undefined;
+      var tr = a.tree[rub] || {};
+      if (desp === undefined) return a.porRubrica[rub] || 0;
+      var td = tr[desp] || {};
+      if (ent === undefined) return Object.keys(td).reduce(function(s, k){ return s + td[k]; }, 0);
+      return td[ent] || 0;
+    }
+    function ordenarPorPeso(chaves, peso){ return chaves.sort(function(a, b){ return (peso(b) - peso(a)) || a.localeCompare(b, 'pt'); }); }
+    function seta(chave, temFilhos){
+      if (!temFilhos) return '<button type="button" class="cu-an-seta vazia" tabindex="-1" aria-hidden="true"></button>';
+      var ab = !!anAbertos[chave];
+      return '<button type="button" class="cu-an-seta" data-toggle="' + escapeHtml(chave) + '" aria-expanded="' + ab + '" title="' + (ab ? 'Fechar' : 'Abrir') + '">' + (ab ? '▾' : '▸') + '</button>';
+    }
+    rubricas.forEach(function(rub){
+      var despesas = {};
+      meses.forEach(function(m){ if (ag[m].gerado && ag[m].tree[rub]) Object.keys(ag[m].tree[rub]).forEach(function(d){ despesas[d] = true; }); });
+      var listaD = ordenarPorPeso(Object.keys(despesas), function(d){ return meses.reduce(function(s, m){ return s + (somaNos(m, rub, d) || 0); }, 0); });
+      var chR = 'r:' + rub;
+      var fora = rub === 'interno';
+      corpo += linha('nv-r' + (fora ? ' fora' : ''), seta(chR, listaD.length) + '<span class="cu-an-lab-txt" data-toggle="' + chR + '">' + RUBRICA_NOME[rub] + (fora ? ' <span class="p">(fora do total)</span>' : '') + '</span>',
+        function(m){ return somaNos(m, rub); }, { rubrica: rub });
+      if (!anAbertos[chR]) return;
+      listaD.forEach(function(desp){
+        var ents = {};
+        meses.forEach(function(m){ var td = ag[m].gerado && ag[m].tree[rub] && ag[m].tree[rub][desp]; if (td) Object.keys(td).forEach(function(e){ ents[e] = true; }); });
+        var listaE = ordenarPorPeso(Object.keys(ents), function(e){ return meses.reduce(function(s, m){ return s + (somaNos(m, rub, desp, e) || 0); }, 0); });
+        var chD = 'd:' + rub + '|' + desp;
+        var nomeD = desp ? escapeHtml(desp) : '<i>Sem despesa</i>';
+        corpo += linha('nv-d' + (fora ? ' fora' : ''), seta(chD, listaE.length) + '<span class="cu-an-lab-txt" data-toggle="' + escapeHtml(chD) + '">' + nomeD + '</span>',
+          function(m){ return somaNos(m, rub, desp); }, { rubrica: rub, despesa: desp || '__sem__' });
+        if (!anAbertos[chD]) return;
+        listaE.forEach(function(ent){
+          corpo += linha('nv-e' + (fora ? ' fora' : ''), escapeHtml(ent),
+            function(m){ return somaNos(m, rub, desp, ent); }, { rubrica: rub, despesa: desp || '__sem__', entidade: ent });
+        });
+      });
+    });
+
+    var sx = host.scrollLeft;
+    host.innerHTML = '<table class="cu-an-tab" id="cuAnTabela"><thead>' + head + '</thead><tbody>' + corpo + '</tbody></table>';
+    host.scrollLeft = sx;
+  }
+
+  document.getElementById('cuAnScroll').addEventListener('click', function(ev){
+    var t = ev.target.closest('[data-toggle]');
+    if (t){ var k = t.getAttribute('data-toggle'); if (anAbertos[k]) delete anAbertos[k]; else anAbertos[k] = true; renderAnalise(); return; }
+    var td = ev.target.closest('td[data-alvo]');
+    if (td) irParaValidar(td.getAttribute('data-mes'), JSON.parse(td.getAttribute('data-alvo')));
+  });
 
   /* ---------- fontes (só leitura) ---------- */
   function carregarBase(){
@@ -494,6 +834,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   autenticarEContinuar(function () {
     db = firebase.database();
+    carregarAnalise();
     carregarBase().catch(function(err){
       console.error('Custos: falha a carregar as fontes', err);
       document.getElementById('cuLista').innerHTML = '<div class="cu-vazio">Não foi possível carregar as fontes: ' + escapeHtml(err && err.message ? err.message : err) + '</div>';

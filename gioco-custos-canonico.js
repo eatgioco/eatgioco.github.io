@@ -45,7 +45,21 @@
      dataPagamento?, inferido? (true quando a ligação veio da cascata de
      fallback e não de reconciliacaoBancaria), nivel? (1–4) }, validacao { estado ('auto'|'porValidar'|'validado'),
      validadoPor?, validadoEm?, motivo? }, duplicaDe?, anulado?, anuladoEm?,
-     criadoEm, atualizadoEm }
+     criadoEm, atualizadoEm, valorFonte }
+   valorFonte (Set/2026) diz DE ONDE vem o número em valor — é o que a vista
+   "Analisar" da custos.html usa para a barra de fiabilidade:
+     'documento'   — lido de um documento: fatura, fatura da caixa (gasto
+                     real do movimento de caixa conferido pela fatura),
+                     recibo, e a TSU (calculada sobre os recibos lidos);
+     'movimento'   — lido de um movimento real: banco:, compromisso com
+                     movimento ligado (real ou inferido) e saída de caixa
+                     semFatura (o valor é o do dinheiro que saiu, sem documento);
+     'orcamentado' — compromisso sem movimento: valor ou valorDiario × dias
+                     úteis. É uma estimativa, não um custo lido.
+   Não mexe em valor nem em rubrica. Num registo validado vem sempre do
+   motor (acompanha o valor, que também é sempre do motor). Registos gravados
+   antes do campo não o têm: a 1.ª regeneração depois reescreve-os uma vez
+   (conteúdo diferente) e daí em diante continua idempotente.
    custos/{AAAA-MM}/_resumo = { porRubrica:{}, total, porValidar, geradoEm }
    ('_resumo' não é um id de registo — quem lê o mês salta chaves que
    comecem por '_').
@@ -532,6 +546,7 @@ function giocoCustosCanonicoEngine(deps){
       rubrica: rubricaValida(o.rubrica), despesa: o.despesa || null,
       entidade: { tipo: o.entidade.tipo, id: o.entidade.id || null, nome: o.entidade.nome || '—' },
       pagamento: o.pagamento,
+      valorFonte: o.valorFonte,
       validacao: o.motivo ? { estado: 'porValidar', motivo: o.motivo } : (o.rasto ? { estado: 'auto', motivo: o.rasto } : { estado: 'auto' })
     };
   }
@@ -558,6 +573,7 @@ function giocoCustosCanonicoEngine(deps){
         rubrica: cat.rubrica, despesa: cat.despesa,
         entidade: { tipo: 'fornecedor', id: f.fornecedorIdEncontrado || null, nome: nome },
         pagamento: f.paymentRequestId ? pagamentoDePayReq(f.paymentRequestId, montante, mes) : { estado: 'pendente', movimentoIds: [] },
+        valorFonte: 'documento',
         motivo: motivos.join('; ') || null, rasto: cat.rasto || null
       }));
     });
@@ -594,6 +610,7 @@ function giocoCustosCanonicoEngine(deps){
         rubrica: cat.rubrica, despesa: cat.despesa,
         entidade: { tipo: 'fornecedor', id: fidE || null, nome: nome },
         pagamento: { estado: 'pago', movimentoIds: [], dataPagamento: diaMov || data },
+        valorFonte: m.fatura ? 'documento' : 'movimento',
         motivo: motivos.join('; ') || null, rasto: cat.rasto || null
       }));
     });
@@ -633,6 +650,7 @@ function giocoCustosCanonicoEngine(deps){
         valor: suj + nsuj, rubrica: 'pessoal', despesa: nome,
         entidade: { tipo: 'pessoa', id: pid, nome: nome },
         pagamento: pag,
+        valorFonte: 'documento',
         motivo: (suj + nsuj) > 0 ? null : 'recibo sem totais',
         rasto: semParcelas ? 'recibo sem parcelas conta/cartão nem líquido — o banco não consegue ligar-se a ele' : null
       }));
@@ -645,7 +663,7 @@ function giocoCustosCanonicoEngine(deps){
         id: 'tsu', origem: 'tsu', origemRef: 'recibos/*/' + mes, mes: mes, data: ultimoDia(mes),
         valor: arred(baseTsu * TSU_TAXA_PATRONAL), rubrica: 'pessoal', despesa: 'TSU patronal',
         entidade: { tipo: 'entidade', id: null, nome: 'Segurança Social' },
-        pagamento: pag, motivo: null
+        pagamento: pag, valorFonte: 'documento', motivo: null
       }));
     }
     return out;
@@ -660,10 +678,11 @@ function giocoCustosCanonicoEngine(deps){
       var orcado = (c.valorDiario !== null && c.valorDiario !== undefined && c.valorDiario !== '')
         ? diasUteis(mes) * (num(c.valorDiario) || 0) : (num(c.valor) || 0);
       var pag = pagamentoDeOcorrencia(id, mes);
-      var valor = (pag.valorMovimento !== undefined && pag.valorMovimento > 0) ? pag.valorMovimento : orcado;
+      var doMovimento = pag.valorMovimento !== undefined && pag.valorMovimento > 0;
+      var valor = doMovimento ? pag.valorMovimento : orcado;
       delete pag.valorMovimento;
       var infC = inferir(mes).alvos['fixo:' + id];
-      if (!pag.movimentoIds.length && aplicarInferido(pag, infC)){ pag.estado = 'pago'; if (infC.cents) valor = infC.cents / 100; }
+      if (!pag.movimentoIds.length && aplicarInferido(pag, infC)){ pag.estado = 'pago'; if (infC.cents){ valor = infC.cents / 100; doMovimento = true; } }
       if (!(valor > 0)) return;   // 0 € não é custo do mês
       var dia = parseInt(c.dia, 10);
       var ud = ultimoDia(mes), nd = parseInt(ud.slice(8), 10);
@@ -673,6 +692,7 @@ function giocoCustosCanonicoEngine(deps){
         valor: valor, rubrica: 'fixos', despesa: c.nome || id,
         entidade: { tipo: 'fornecedor', id: null, nome: c.fornecedor || c.nome || id },
         pagamento: pag,
+        valorFonte: doMovimento ? 'movimento' : 'orcamentado',
         motivo: (c.valorVariavel === true && !pag.movimentoIds.length) ? 'valor variável sem movimento bancário' : null
       }));
     });
@@ -741,6 +761,7 @@ function giocoCustosCanonicoEngine(deps){
         id: 'banco:' + id, origem: 'banco', origemRef: 'contasBancarias/' + e.conta + '/movimentos/' + e.ref, mes: mes, data: data,
         valor: Math.abs(v), rubrica: cls ? cls.rubrica : null, despesa: despesa, entidade: ent,
         pagamento: { estado: 'pago', movimentoIds: [id], dataPagamento: data },
+        valorFonte: 'movimento',
         motivo: motivo, rasto: rasto
       }));
     });
@@ -796,7 +817,7 @@ function giocoCustosCanonicoEngine(deps){
       if (ex && ex.validacao && ex.validacao.estado === 'validado'){
         novo = { id: r.id, origem: r.origem, origemRef: r.origemRef, mesCompetencia: r.mesCompetencia, data: r.data,
                  valor: r.valor, rubrica: ex.rubrica || null, despesa: ex.despesa || null, entidade: ex.entidade || r.entidade,
-                 pagamento: r.pagamento, validacao: ex.validacao };
+                 pagamento: r.pagamento, valorFonte: r.valorFonte, validacao: ex.validacao };
       }
       if (ex && ex.duplicaDe) novo.duplicaDe = ex.duplicaDe;
       novo.criadoEm = (ex && ex.criadoEm) || ts;
