@@ -50,17 +50,19 @@ espelhados para uma futura passagem a Spotify Connect.
   que ia falhar.
 - `lojas/sb154/sonos/fila/{n}` — `titulo, artista, posicao` (posição REAL na
   fila, 1-based, que é o valor que o comando `saltarPara` aceita). Até
-  `FILA_MAX` (30) itens **a partir da faixa a tocar**. PUT no nó `fila` a cada
+  `FILA_MAX` (30) itens **a partir da faixa a tocar**. Lida a cada
   30 s e logo a seguir a uma mudança de faixa ou a um `saltarPara` /
   `tocarFavorito` / `proximo` / `anterior`. Em AirPlay a fila costuma vir vazia
-  (vive no telemóvel) — escreve-se `null`, nunca conteúdo inventado.
+  (vive no telemóvel) — escreve-se `null`, nunca conteúdo inventado. PUT no nó
+  `fila` **só quando mudou** desde o último PUT (a primeira leitura de cada
+  arranque escreve sempre).
 - `lojas/sb154/sonos/config/predefinicoes` — `{abertura, normal, cheio}`, níveis
   de volume 0–60 que a página oferece como atalhos. O serviço **lê**; só o cria
   uma vez com `25/38/50` se o nó não existir, e nunca mais escreve lá (é
   configuração do utilizador). O caminho para mudar o volume continua a ser o
   comando `volume` — as predefinições são só valores que a página envia.
-- `lojas/sb154/sonos/diario/{AAAA-MM-DD}` — acumulador do dia, PATCH raso uma
-  vez por minuto com os totais **absolutos** (nunca incrementos, para um PATCH
+- `lojas/sb154/sonos/diario/{AAAA-MM-DD}` — acumulador do dia, PATCH raso a
+  cada 5 min com os totais **absolutos** (nunca incrementos, para um PATCH
   repetido ou perdido não estragar a conta): `minutosATocar, minutosParado,
   minutosParadoHorarioLoja` (12h–23h locais, a mesma janela do alerta do
   cartão), `maiorPausa` (minutos, com a pausa em curso incluída), `nrPausas`,
@@ -86,7 +88,7 @@ espelhados para uma futura passagem a Spotify Connect.
   `play_mode`: cada comando muda só a sua e preserva a outra; mexer no `repetir`
   colapsa um `REPEAT_ONE` em `REPEAT_ALL` (repetir uma só faixa não tem
   interruptor no cartão e não se inventa um estado intermédio).
-  Consultados a cada 3 s; nunca apagados, só marcados folha a
+  Consultados a cada 5 s (só os pendentes, pela query com o índice); nunca apagados, só marcados folha a
   folha (executadoEm, erro?, estado por último). Comandos com mais de 10 min são
   `falhou` / `expirado`. Depois de cada comando o estado é relido de imediato.
 
@@ -134,11 +136,18 @@ ZoneSoft em primeiro plano as linhas `volume up/down/mute/play-pause` aparecem,
 o knob funciona; se só aparecem com o cmd em primeiro plano, o ZoneSoft está a
 capturar o teclado em exclusivo e o knob não serve.
 
+## Consumo do Firebase
+
+- O `".indexOn": ["estado"]` em `lojas/sb154/sonos/comandos` está em
+  `database.rules.json` na raiz do repo. Com ele a consulta de 5 em 5 s só
+  descarrega os comandos pendentes; sem ele (400) entra o plano B (últimos 50,
+  filtro local) com `WARNING … plano B` no log e nova tentativa de 10 em 10 min.
+- Uma única `requests.Session`; escritas com `?print=silent`; a fila só é
+  escrita quando muda e o diário de 5 em 5 min.
+
 ## Pendente quando as Rules fecharem
 
 - Fechar `lojas/$loja/sonos/diario` e `lojas/$loja/sonos/fila` à escrita de
   qualquer cliente que não o serviço (a página só os lê).
-- Adicionar `".indexOn": ["estado"]` em `lojas/$loja/sonos/comandos` — até lá o
-  serviço detecta o 400 do `orderBy="estado"` e filtra localmente os últimos 50.
 - Passar um token ao serviço na variável de ambiente `FIREBASE_AUTH` (vai em
   `?auth=` em todos os pedidos REST). Hoje é opcional.

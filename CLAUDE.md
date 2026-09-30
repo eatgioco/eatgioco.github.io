@@ -1374,9 +1374,18 @@ lojas/sb154/ac/comandos/{pushId}   — escrito pela centro-de-controlo.html com 
   `gioco-ac-bridge` (SYSTEM, ao arranque): reiniciar com
   `schtasks /End /TN gioco-ac-bridge` + `schtasks /Run /TN gioco-ac-bridge`.
   Log em `C:\gioco\ac\ac_bridge.log`.
-- **Pendente quando as Rules fecharem:** `".indexOn": ["estado"]` em
-  `lojas/$loja/ac/comandos` (hoje o serviço apanha o 400 e filtra localmente) e token do
-  serviço na variável de ambiente `FIREBASE_AUTH` da tarefa.
+- **Regras do RTDB versionadas no repo** (30 Set/2026): `database.rules.json` + `firebase.json`,
+  publicadas com `firebase deploy --only database --project gioco-fornecedores` — o que está
+  no ficheiro SUBSTITUI as regras da consola, por isso qualquer mudança às Rules passa a ser
+  feita aqui. Têm o `".indexOn": ["estado"]` em `lojas/sb154/ac/comandos` e
+  `lojas/sb154/sonos/comandos`.
+- **Downloads do RTDB** (30 Set/2026): o serviço consulta só os comandos pendentes (query
+  `orderBy="estado"&equalTo="pendente"` com o índice) a cada **5 s**, usa uma única
+  `requests.Session` e escreve sempre com `?print=silent`. Sem o índice (400) cai no plano B
+  antigo (últimos 50, filtro local) com `WARNING … plano B` no log a cada consulta e volta a
+  tentar o índice de 10 em 10 min. Esse aviso no log = regras publicadas sem o índice.
+- **Pendente quando as Rules fecharem:** token do serviço na variável de ambiente
+  `FIREBASE_AUTH` da tarefa.
 
 ### Loja SB154 — música / Sonos (`lojas/sb154/sonos`)
 
@@ -1422,9 +1431,11 @@ lojas/sb154/sonos/favoritos/{n}     — espelho de get_sonos_favorites (titulo, 
                                       oferecer um botão que ia falhar.
 lojas/sb154/sonos/fila/{n}          — titulo, artista, posicao (posição REAL na fila, 1-based — é o valor
                                       que o comando saltarPara aceita). Até 30 itens A PARTIR da faixa a
-                                      tocar (o item 0 é a actual). PUT no nó fila a cada 30 s e logo a
+                                      tocar (o item 0 é a actual). Lida a cada 30 s e logo a
                                       seguir a mudança de faixa / saltarPara / tocarFavorito / proximo /
-                                      anterior. Em AirPlay costuma vir vazia (a fila vive no telemóvel):
+                                      anterior; PUT no nó fila SÓ quando mudou desde o último PUT (a 1.ª
+                                      leitura de cada arranque escreve sempre). Em AirPlay costuma vir
+                                      vazia (a fila vive no telemóvel):
                                       escreve-se null, nunca conteúdo inventado.
 lojas/sb154/sonos/config/predefinicoes — { abertura, normal, cheio }, níveis de volume 0–60 que o cartão
                                       oferece como atalhos. O serviço LÊ; só cria o nó UMA vez com
@@ -1433,7 +1444,7 @@ lojas/sb154/sonos/config/predefinicoes — { abertura, normal, cheio }, níveis 
                                       caminho para mudar o volume continua a ser o comando 'volume', as
                                       predefinições são só valores que a página envia. Sem o nó, a linha
                                       de atalhos desaparece do cartão.
-lojas/sb154/sonos/diario/{AAAA-MM-DD} — acumulador do dia, PATCH raso do serviço uma vez por minuto com os
+lojas/sb154/sonos/diario/{AAAA-MM-DD} — acumulador do dia, PATCH raso do serviço a cada 5 min com os
                                       totais ABSOLUTOS (nunca incrementos — um PATCH repetido ou perdido
                                       não estraga a conta): minutosATocar, minutosParado,
                                       minutosParadoHorarioLoja (12h–23h locais, a mesma janela do alerta do
@@ -1495,9 +1506,11 @@ lojas/sb154/sonos/comandos/{pushId} — escrito pela centro-de-controlo.html com
   volume** (teclas VK_VOLUME_*/VK_MEDIA_PLAY_PAUSE) no POS — o
   `servicos/sonos/teste_teclas.py` é o teste de 2 min para saber se as teclas chegam por
   cima do ZoneSoft em ecrã inteiro (correr à mão na sessão do utilizador, nunca SYSTEM).
-- **Pendente quando as Rules fecharem:** `".indexOn": ["estado"]` em
-  `lojas/$loja/sonos/comandos` (hoje o serviço apanha o 400 e filtra localmente),
-  `FIREBASE_AUTH` na tarefa, e fechar `lojas/$loja/sonos/{fila,diario}` à escrita de
+- **Downloads do RTDB** (30 Set/2026): igual ao A/C — comandos pendentes pelo índice de
+  `database.rules.json` a cada 5 s, uma `requests.Session`, escritas com `?print=silent`, e o
+  mesmo plano B com aviso no log. O diário perde no máximo os últimos 5 min se o serviço
+  parar (ao arrancar continua do último PATCH).
+- **Pendente quando as Rules fecharem:** `FIREBASE_AUTH` na tarefa, e fechar `lojas/$loja/sonos/{fila,diario}` à escrita de
   qualquer cliente que não o serviço (a página só os lê).
 
 ## Restrições críticas (não ignorar)

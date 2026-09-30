@@ -9,8 +9,12 @@ local (por omissão C:\\gioco\\ac\\ac-sb154-midea.json).
 Ciclo:
   - a cada 30 s lê o A/C por LAN (msmart-ng) e faz PATCH em
     lojas/{loja}/ac/estado (só se algo mudou ou se passaram 5 min — heartbeat);
-  - a cada 3 s consulta lojas/{loja}/ac/comandos com estado 'pendente',
-    executa por ordem de pedidoEm e marca 'executado' / 'falhou'.
+  - a cada 5 s consulta lojas/{loja}/ac/comandos com estado 'pendente'
+    (query com o .indexOn de database.rules.json — só descarrega os
+    pendentes), executa por ordem de pedidoEm e marca 'executado' / 'falhou'.
+
+Todas as escritas levam ?print=silent e todos os pedidos usam uma única
+requests.Session (poupa downloads do RTDB).
 
 Tipos de comando: ligar, desligar, tempAlvo (16–30), modo (cool|heat|fan|dry|
 auto), ventilacao (1–100), ventilacaoPreset (silencioso|baixo|medio|alto|max|
@@ -48,7 +52,8 @@ FIREBASE_URL = os.environ.get(
 FIREBASE_AUTH = os.environ.get("FIREBASE_AUTH", "").strip()
 
 INTERVALO_ESTADO = 30        # s entre leituras do A/C
-INTERVALO_COMANDOS = 3       # s entre consultas de comandos pendentes
+INTERVALO_COMANDOS = 5       # s entre consultas de comandos pendentes
+INDICE_RETENTAR = 10 * 60    # s: sem índice, volta a tentar a query filtrada
 HEARTBEAT = 5 * 60           # s: escreve o estado mesmo sem alterações
 COMANDO_VALIDADE = 10 * 60   # s: comandos mais velhos que isto expiram
 FALHAS_PARA_ALERTA = 3       # leituras falhadas seguidas até marcar erro
@@ -123,6 +128,13 @@ def como_bool(v):
 
 # ---------------------------------------------------------------- firebase REST
 
+# Uma só sessão HTTP para todos os pedidos: reaproveita a ligação TLS em vez de
+# abrir uma nova a cada 5 s (menos tráfego e menos latência). Todos os pedidos
+# correm no thread do loop asyncio, por isso não há acesso concorrente.
+SESSAO = requests.Session()
+_JSON = {"Content-Type": "application/json; charset=utf-8"}
+
+
 def _url(path: str, **params) -> str:
     if FIREBASE_AUTH:
         params["auth"] = FIREBASE_AUTH
@@ -131,25 +143,26 @@ def _url(path: str, **params) -> str:
 
 
 def fb_get(path: str, **params):
-    r = requests.get(_url(path, **params), timeout=10)
+    r = SESSAO.get(_url(path, **params), timeout=10)
     r.raise_for_status()
     return r.json()
 
 
 def fb_put(path: str, valor):
-    """Escreve UMA folha (set). Nunca usar num nó pai."""
-    r = requests.put(_url(path), data=json.dumps(valor).encode("utf-8"),
-                     headers={"Content-Type": "application/json; charset=utf-8"}, timeout=10)
+    """Escreve UMA folha (set). Nunca usar num nó pai. print=silent: o RTDB
+    responde 204 sem ecoar o valor escrito (não o usamos)."""
+    r = SESSAO.put(_url(path, print="silent"), data=json.dumps(valor).encode("utf-8"),
+                   headers=_JSON, timeout=10)
     r.raise_for_status()
 
 
 def fb_patch_folhas(path: str, dados: dict):
     """PATCH raso (só chaves de primeiro nível, sem '/' nas chaves) num nó folha
     nosso. É o único PATCH multi-chave permitido: as chaves são todas folhas
-    directas de `path`, não caminhos profundos."""
+    directas de `path`, não caminhos profundos. print=silent como no fb_put."""
     assert all("/" not in k for k in dados), "PATCH só com folhas directas"
-    r = requests.patch(_url(path), data=json.dumps(dados).encode("utf-8"),
-                       headers={"Content-Type": "application/json; charset=utf-8"}, timeout=10)
+    r = SESSAO.patch(_url(path, print="silent"), data=json.dumps(dados).encode("utf-8"),
+                     headers=_JSON, timeout=10)
     r.raise_for_status()
 
 
@@ -225,6 +238,7 @@ class Bridge:
         self.erro_publicado = False
         self.ler_ja = asyncio.Event()
         self.indice_ok = True
+        self.indice_falhou_em = 0.0  # time.monotonic() do último 400
 
     # ---- estado ---------------------------------------------------------
 
@@ -276,19 +290,27 @@ class Bridge:
     # ---- comandos -------------------------------------------------------
 
     def comandos_pendentes(self) -> list:
-        """[(id, comando)] ordenados por pedidoEm. Usa o índice se existir;
-        senão lê os últimos 50 e filtra aqui (ver README → .indexOn)."""
+        """[(id, comando)] ordenados por pedidoEm. Caminho normal: a query com o
+        índice (database.rules.json), que só descarrega os pendentes. Plano B,
+        se o índice faltar (400): lê os últimos 50 e filtra aqui — muito mais
+        downloads, por isso avisa no log a cada vez e volta a tentar o índice
+        a cada INDICE_RETENTAR."""
         dados = None
+        if not self.indice_ok and time.monotonic() - self.indice_falhou_em > INDICE_RETENTAR:
+            self.indice_ok = True
         if self.indice_ok:
             try:
                 dados = fb_get(COMANDOS_PATH, orderBy='"estado"', equalTo='"pendente"')
             except requests.HTTPError as e:
                 if e.response is not None and e.response.status_code == 400:
-                    log.warning("sem índice .indexOn em %s — a filtrar localmente", COMANDOS_PATH)
+                    log.warning("sem índice .indexOn em %s — a filtrar localmente (plano B; "
+                                "publicar database.rules.json)", COMANDOS_PATH)
                     self.indice_ok = False
+                    self.indice_falhou_em = time.monotonic()
                 else:
                     raise
         if dados is None:
+            log.warning("plano B: comandos lidos sem índice (últimos 50) em %s", COMANDOS_PATH)
             dados = fb_get(COMANDOS_PATH, orderBy='"$key"', limitToLast=50) or {}
             dados = {k: v for k, v in dados.items() if isinstance(v, dict) and v.get("estado") == "pendente"}
         itens = [(k, v) for k, v in (dados or {}).items() if isinstance(v, dict)]

@@ -16,17 +16,22 @@ Ciclo:
   - a cada 3 s lê o estado da zona e faz PATCH raso em
     lojas/{loja}/sonos/estado (só se algo mudou ou se passaram 5 min —
     heartbeat);
-  - a cada 3 s consulta lojas/{loja}/sonos/comandos com estado 'pendente',
-    executa por ordem de pedidoEm e marca 'executado' / 'falhou';
+  - a cada 5 s consulta lojas/{loja}/sonos/comandos com estado 'pendente'
+    (query com o .indexOn de database.rules.json — só descarrega os
+    pendentes), executa por ordem de pedidoEm e marca 'executado' / 'falhou';
   - no arranque e a cada 10 min espelha os favoritos Sonos em
     lojas/{loja}/sonos/favoritos e o inventário das unidades em
     lojas/{loja}/sonos/unidades (PUT em cada um destes nós, nunca acima);
-  - a cada 30 s (e logo a seguir a uma mudança de faixa) espelha a fila em
+  - a cada 30 s (e logo a seguir a uma mudança de faixa) lê a fila e, SÓ SE
+    MUDOU desde o último PUT bem sucedido, espelha-a em
     lojas/{loja}/sonos/fila — até FILA_MAX itens a partir da posição actual
     (PUT no nó fila). Em AirPlay a fila pode vir vazia ou ser a do telemóvel:
     escreve-se o que o soco devolver, sem inventar nada;
-  - a cada 60 s faz PATCH raso do acumulador do dia em
+  - a cada 5 min faz PATCH raso do acumulador do dia em
     lojas/{loja}/sonos/diario/{AAAA-MM-DD} (totais absolutos, ver Diario);
+
+Todas as escritas levam ?print=silent e todos os pedidos usam uma única
+requests.Session (poupa downloads do RTDB).
   - no arranque lê lojas/{loja}/sonos/config/predefinicoes (níveis de volume
     da página) e, SÓ se o nó não existir, cria-o uma vez com os defaults —
     nunca mais escreve lá.
@@ -74,10 +79,11 @@ FIREBASE_URL = os.environ.get(
 FIREBASE_AUTH = os.environ.get("FIREBASE_AUTH", "").strip()
 
 INTERVALO_ESTADO = 3         # s entre leituras da zona
-INTERVALO_COMANDOS = 3       # s entre consultas de comandos pendentes
+INTERVALO_COMANDOS = 5       # s entre consultas de comandos pendentes
+INDICE_RETENTAR = 10 * 60    # s: sem índice, volta a tentar a query filtrada
 INTERVALO_INVENTARIO = 600   # s entre espelhos de favoritos/unidades
-INTERVALO_FILA = 30          # s entre espelhos da fila (ou logo após mudar de faixa)
-INTERVALO_DIARIO = 60        # s entre PATCH do acumulador do dia
+INTERVALO_FILA = 30          # s entre leituras da fila (PUT só se mudou)
+INTERVALO_DIARIO = 5 * 60    # s entre PATCH do acumulador do dia
 FILA_MAX = 30                # itens da fila espelhados a partir da posição actual
 HEARTBEAT = 5 * 60           # s: escreve o estado mesmo sem alterações
 COMANDO_VALIDADE = 10 * 60   # s: comandos mais velhos que isto expiram
@@ -142,6 +148,14 @@ def como_bool(v):
 
 # ---------------------------------------------------------------- firebase REST
 
+# Uma só sessão HTTP para todos os pedidos: reaproveita a ligação TLS em vez de
+# abrir uma nova a cada pedido (menos tráfego e menos latência). Os pedidos ao
+# Firebase correm todos no thread do loop asyncio (nunca em to_thread), por
+# isso não há acesso concorrente à sessão.
+SESSAO = requests.Session()
+_JSON = {"Content-Type": "application/json; charset=utf-8"}
+
+
 def _url(path: str, **params) -> str:
     if FIREBASE_AUTH:
         params["auth"] = FIREBASE_AUTH
@@ -150,25 +164,28 @@ def _url(path: str, **params) -> str:
 
 
 def fb_get(path: str, **params):
-    r = requests.get(_url(path, **params), timeout=10)
+    r = SESSAO.get(_url(path, **params), timeout=10)
     r.raise_for_status()
     return r.json()
 
 
 def fb_put(path: str, valor):
-    """Escreve UM nó nosso (set). Nunca usar acima do nó que é nosso."""
-    r = requests.put(_url(path), data=json.dumps(valor, ensure_ascii=False).encode("utf-8"),
-                     headers={"Content-Type": "application/json; charset=utf-8"}, timeout=10)
+    """Escreve UM nó nosso (set). Nunca usar acima do nó que é nosso.
+    print=silent: o RTDB responde 204 sem ecoar o valor escrito (não o usamos)."""
+    r = SESSAO.put(_url(path, print="silent"),
+                   data=json.dumps(valor, ensure_ascii=False).encode("utf-8"),
+                   headers=_JSON, timeout=10)
     r.raise_for_status()
 
 
 def fb_patch_folhas(path: str, dados: dict):
     """PATCH raso (só chaves de primeiro nível, sem '/' nas chaves) num nó
     nosso. As chaves são todas folhas directas de `path`, não caminhos
-    profundos."""
+    profundos. print=silent como no fb_put."""
     assert all("/" not in k for k in dados), "PATCH só com folhas directas"
-    r = requests.patch(_url(path), data=json.dumps(dados, ensure_ascii=False).encode("utf-8"),
-                       headers={"Content-Type": "application/json; charset=utf-8"}, timeout=10)
+    r = SESSAO.patch(_url(path, print="silent"),
+                     data=json.dumps(dados, ensure_ascii=False).encode("utf-8"),
+                     headers=_JSON, timeout=10)
     r.raise_for_status()
 
 
@@ -474,8 +491,8 @@ def tocar_favorito(coord: SoCo, fav: dict):
 class Diario:
     """Acumulador do dia em lojas/{loja}/sonos/diario/{AAAA-MM-DD}.
 
-    Soma segundos a cada leitura do estado (3 em 3 s) e faz PATCH raso uma vez
-    por minuto com os totais ABSOLUTOS do dia — nunca incrementos, para um
+    Soma segundos a cada leitura do estado (3 em 3 s) e faz PATCH raso a cada
+    INTERVALO_DIARIO (5 min) com os totais ABSOLUTOS do dia — nunca incrementos, para um
     PATCH repetido ou perdido não estragar a conta. Ao arrancar (e à
     meia-noite) lê o nó do dia e continua de onde ele estava, para um
     reinício do serviço não pôr o dia a zero.
@@ -605,6 +622,9 @@ class Diario:
 
 # ---------------------------------------------------------------- Bridge
 
+_NADA_ESCRITO = object()   # sentinela: a fila ainda não foi escrita nesta execução
+
+
 class Bridge:
     def __init__(self):
         self.coord = None
@@ -614,6 +634,8 @@ class Bridge:
         self.erro_publicado = False
         self.ler_ja = asyncio.Event()
         self.indice_ok = True
+        self.indice_falhou_em = 0.0      # time.monotonic() do último 400
+        self.fila_escrita = _NADA_ESCRITO  # última fila com PUT bem sucedido
         self.favoritos = []          # lista em memória (com _obj)
         self.toca_desde = None       # ISO: última passagem para PLAYING
         self.parado_desde = None     # ISO: última saída de PLAYING
@@ -746,8 +768,10 @@ class Bridge:
             log.error("PUT do inventário falhou: %s", e)
 
     async def espelhar_fila(self):
-        """PUT do nó fila com o que a Sonos devolver a partir da faixa actual.
-        Fila vazia (o caso normal em AirPlay) escreve null, não um nó vazio."""
+        """PUT do nó fila com o que a Sonos devolver a partir da faixa actual,
+        SÓ quando é diferente da última fila escrita com sucesso (a primeira
+        leitura de cada execução escreve sempre). Fila vazia (o caso normal em
+        AirPlay) escreve null, não um nó vazio."""
         try:
             await self.garantir_coord()
             pos = (self.ultimo_estado or {}).get("filaPosicao") or 1
@@ -755,8 +779,12 @@ class Bridge:
         except Exception as e:
             log.warning("leitura da fila falhou: %s", e)
             return
+        valor = fila if fila else None
+        if valor == self.fila_escrita:
+            return
         try:
-            fb_put(FILA_PATH, fila if fila else None)
+            fb_put(FILA_PATH, valor)
+            self.fila_escrita = valor
         except Exception as e:
             log.error("PUT da fila falhou: %s", e)
 
@@ -782,19 +810,27 @@ class Bridge:
     # ---- comandos -------------------------------------------------------
 
     def comandos_pendentes(self) -> list:
-        """[(id, comando)] ordenados por pedidoEm. Usa o índice se existir;
-        senão lê os últimos 50 e filtra aqui (ver README → .indexOn)."""
+        """[(id, comando)] ordenados por pedidoEm. Caminho normal: a query com o
+        índice (database.rules.json), que só descarrega os pendentes. Plano B,
+        se o índice faltar (400): lê os últimos 50 e filtra aqui — muito mais
+        downloads, por isso avisa no log a cada vez e volta a tentar o índice
+        a cada INDICE_RETENTAR."""
         dados = None
+        if not self.indice_ok and time.monotonic() - self.indice_falhou_em > INDICE_RETENTAR:
+            self.indice_ok = True
         if self.indice_ok:
             try:
                 dados = fb_get(COMANDOS_PATH, orderBy='"estado"', equalTo='"pendente"')
             except requests.HTTPError as e:
                 if e.response is not None and e.response.status_code == 400:
-                    log.warning("sem índice .indexOn em %s — a filtrar localmente", COMANDOS_PATH)
+                    log.warning("sem índice .indexOn em %s — a filtrar localmente (plano B; "
+                                "publicar database.rules.json)", COMANDOS_PATH)
                     self.indice_ok = False
+                    self.indice_falhou_em = time.monotonic()
                 else:
                     raise
         if dados is None:
+            log.warning("plano B: comandos lidos sem índice (últimos 50) em %s", COMANDOS_PATH)
             dados = fb_get(COMANDOS_PATH, orderBy='"$key"', limitToLast=50) or {}
             dados = {k: v for k, v in dados.items() if isinstance(v, dict) and v.get("estado") == "pendente"}
         itens = [(k, v) for k, v in (dados or {}).items() if isinstance(v, dict)]

@@ -21,7 +21,7 @@ automático) — o mesmo padrão do go2rtc.
   (pendente|executado|falhou), executadoEm, erro?`. Tipos: `ligar`, `desligar`,
   `tempAlvo` (16–30), `modo` (cool|heat|fan|dry|auto), `ventilacao` (1–100),
   `ventilacaoPreset` (silencioso|baixo|medio|alto|max|auto → FanSpeed 20/40/60/80/100/102),
-  `eco` / `turbo` / `sleep` (bool). Consultados a cada 3 s; nunca apagados, só marcados. Comandos com
+  `eco` / `turbo` / `sleep` (bool). Consultados a cada 5 s (só os pendentes, pela query com o índice); nunca apagados, só marcados. Comandos com
   mais de 10 min são marcados `falhou` / `expirado`.
 
 ## Instalar / operar no POS (SSH: `ssh POS@100.97.211.74`, shell cmd.exe)
@@ -39,9 +39,18 @@ schtasks /Run /TN gioco-ac-bridge
 Reiniciar: `schtasks /End /TN gioco-ac-bridge` e `schtasks /Run /TN gioco-ac-bridge`.
 Log: `C:\gioco\ac\ac_bridge.log` (rotativo, 5 MB). Nunca contém token/key.
 
+## Consumo do Firebase
+
+- O `".indexOn": ["estado"]` em `lojas/sb154/ac/comandos` está em
+  `database.rules.json` na raiz do repo (publicar com
+  `firebase deploy --only database --project gioco-fornecedores`). Com ele a
+  consulta de 5 em 5 s só descarrega os comandos pendentes.
+- Plano B: se a query der 400 (índice em falta), o serviço lê os últimos 50 e
+  filtra localmente, escreve `WARNING … plano B` no log a cada consulta e volta a
+  tentar o índice de 10 em 10 min.
+- Uma única `requests.Session` para todos os pedidos; escritas com `?print=silent`.
+
 ## Pendente quando as Rules fecharem
 
-- Adicionar `".indexOn": ["estado"]` em `lojas/$loja/ac/comandos` — até lá o
-  serviço detecta o 400 do `orderBy="estado"` e filtra localmente os últimos 50.
 - Passar um token ao serviço na variável de ambiente `FIREBASE_AUTH` (vai em
   `?auth=` em todos os pedidos REST). Hoje é opcional.
