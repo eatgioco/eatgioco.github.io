@@ -357,11 +357,7 @@
       { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
       /* Gestão: folha de cálculo de ingredientes e produtos (edição em massa). */
-      { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' },
-      /* Centro de controlo: câmaras, A/C, música, HACCP. 'video' (câmara)
-         entrou no sprite depois do 'scan' que aqui se usava; na nav em grupo
-         o 'scan' ficou para a leitura de faturas. */
-      { href: 'centro-de-controlo.html', icone: 'video',    label: 'Centro de controlo' }
+      { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' }
     ]},
     { id: 'produto', label: 'Produto', icone: 'chef-hat', paginas: [
       { href: 'receitas.html',   icone: 'chef-hat',         label: 'Receitas' },
@@ -375,7 +371,12 @@
     /* Loja em último (decisão do Manel, Set/2026). */
     { id: 'loja', label: 'Loja', icone: 'store', paginas: [
       { href: 'loja-sao-bento.html', icone: 'store',        label: 'Loja São Bento' },
-      { href: 'caixa.html',      icone: 'coins',            label: 'Caixa' }
+      { href: 'caixa.html',      icone: 'coins',            label: 'Caixa' },
+      /* Centro de controlo: câmaras, A/C, música, HACCP — da loja, por isso
+         aqui e não em Operações (decisão do Manel, Set/2026). 'video' (câmara)
+         entrou no sprite depois do 'scan' que aqui se usava; na nav em grupo
+         o 'scan' ficou para a leitura de faturas. */
+      { href: 'centro-de-controlo.html', icone: 'video',    label: 'Centro de controlo' }
     ]}
   ];
 

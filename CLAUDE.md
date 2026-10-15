@@ -1760,9 +1760,10 @@ lista plana derivada):
   sempre visível, sem chevron nem maiúsculas.
 - **GERAL** — contactos · **ANÁLISE** — vendas · padroes · resultados ·
   reconciliacao · custos · tesouraria · **OPERAÇÕES** — compras · pagamentos ·
-  leitura-faturas · contagens · equipa · gestao · centro-de-controlo ·
+  leitura-faturas · contagens · equipa · gestao ·
   **PRODUTO** — receitas · foodcost · **MARCA** — social · **LOJA** —
-  loja-sao-bento · caixa (Loja em último, decisão do Manel).
+  loja-sao-bento · caixa · centro-de-controlo (Loja em último, decisão do
+  Manel; o centro de controlo passou de Operações para Loja em Set/2026).
 
 Acordeão **estrito** (abrir um grupo fecha os outros). Ao carregar uma página
 abre o grupo dela; na Home não abre nenhum; o grupo aberto fica em
