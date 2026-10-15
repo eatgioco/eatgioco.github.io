@@ -736,6 +736,14 @@ compromissosFixos     — custos recorrentes (renda, NOS, EPAL, salários…): r
                          'ultimo' é sempre o último dia. Não passa para o mês seguinte.
                          Desativar = ativo:false no editor (o «Apagar» do editor faz
                          remove() — não usar em testes).
+                         ESCRITAS (Out/2026): criar = push().set() do registo completo
+                         (editor, «Recorrente» do novo pagamento, equipa.html). EDITAR
+                         nunca é set() no registo: o editor da tesouraria faz update()
+                         só dos campos que gere (CAMPOS_EDITOR_COMPROMISSO) e remove()
+                         na FOLHA dos que ficaram vazios — os campos que não conhece
+                         (historicoDescritivos, valorVariavel, …) ficam intactos.
+                         A reconciliação só escreve a folha historicoDescritivos; a
+                         equipa.html só update({ativo:false}).
                          ATENÇÃO: esta lógica está duplicada em tesouraria.html e em
                          mrn-dashboard.html e tem de ser igual nos dois ficheiros; a
                          equipa.html tem uma versão REDUZIDA (valorCompromissoDaPessoa)

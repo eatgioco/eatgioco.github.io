@@ -4486,6 +4486,11 @@ window.addEventListener('load', function () {
   var cfMesesGrid = document.getElementById('cfMesesGrid');
   var btnApagarCompromisso = document.getElementById('btnApagarCompromisso');
   var compromissoEmEdicao = null;
+  // Os campos que o editor mostra e grava. Tudo o resto do registo
+  // (historicoDescritivos, valorVariavel…) não é dele e nunca é tocado.
+  var CAMPOS_EDITOR_COMPROMISSO = ['nome', 'categoria', 'valor', 'periodicidade', 'tipo', 'dia',
+    'meses', 'metodoPagamento', 'ativo', 'notas', 'iban', 'inicio', 'valorDiario', 'derivaDe',
+    'pessoaId', 'parteRecibo', 'diaCartao'];
 
   cfMesesGrid.innerHTML = MESES_PT.map(function(m, idx){
     return '<label class="mes-check"><input type="checkbox" class="cf-mes" value="' + (idx + 1) + '">' + m.slice(0, 3) + '</label>';
@@ -4678,9 +4683,31 @@ window.addEventListener('load', function () {
     if (registo.categoria === 'Pessoal' && diaCartao !== null && String(diaCartao) !== String(dia)){
       registo.diaCartao = diaCartao;
     }
-    var ref = compromissoEmEdicao ? compromissosRef.child(compromissoEmEdicao) : compromissosRef.push();
+    // Criar: um registo novo com push().set(), como sempre.
+    // Editar (Out/2026): NUNCA set() no registo — apagava os campos que o
+    // editor não conhece (historicoDescritivos e valorVariavel da
+    // reconciliação, e o que vier depois). Só os campos que o editor gere:
+    // update() nos preenchidos e remove() na FOLHA dos que ficaram vazios
+    // (o padrão do gioco-eventos.js); nunca remove() no registo.
+    var gravacao;
+    if (!compromissoEmEdicao){
+      gravacao = compromissosRef.push().set(registo);
+    } else {
+      var refC = compromissosRef.child(compromissoEmEdicao);
+      var atual = allCompromissos[compromissoEmEdicao] || {};
+      var alterar = {}, apagar = [];
+      CAMPOS_EDITOR_COMPROMISSO.forEach(function(k){
+        var v = registo[k];
+        var vazio = v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+        if (!vazio) alterar[k] = v;
+        else if (atual[k] !== undefined) apagar.push(k);
+      });
+      gravacao = refC.update(alterar).then(function(){
+        return Promise.all(apagar.map(function(k){ return refC.child(k).remove(); }));
+      });
+    }
 
-    ref.set(registo).then(fecharCompromissoModal).catch(function(err){
+    gravacao.then(fecharCompromissoModal).catch(function(err){
       alert('Erro ao guardar: ' + err.message);
     });
   });
