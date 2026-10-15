@@ -181,6 +181,9 @@
     display:flex;
     gap:6px;
   }
+  /* Notas da linha (gioco-pagamento-novo.js): só leitura, quebras de linha
+     preservadas. */
+  .card-row-notas{ white-space:pre-line; font-style:italic; }
 
   .card-row strong{
     color:var(--ink);
@@ -1587,6 +1590,10 @@ window.addEventListener('load', function () {
         html += '<div class="card-row"><span>Referência: ' + escapeHtml(l.referencia);
         if (showCopyButtons) html += '<button type="button" class="copy-icon-btn btn-copy-ref" data-line="' + idx + '" title="Copiar referência">📋</button>';
         html += '</span></div>';
+      }
+
+      if (l.notas) {
+        html += '<div class="card-row card-row-notas"><span>Notas: ' + escapeHtml(l.notas) + '</span></div>';
       }
 
       if (isPending && !linhaPaga) {

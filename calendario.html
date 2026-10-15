@@ -1121,7 +1121,7 @@
         categoria: 'prazo',
         notas: 'Pedido #' + l.ticketNumero + (l.referencia ? ' · Ref. ' + l.referencia : ''),
         origem: 'pagamentos', editavel: false,
-        extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'pedido', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate }
+        extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'pedido', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate, notasPagamento: l.notas }
       });
     });
     mesesVisiveis.forEach(function (am) {
@@ -1135,7 +1135,7 @@
           categoria: 'prazo',
           notas: rotulo + (l.nota ? (rotulo ? ' — ' : '') + l.nota : ''),
           origem: 'pagamentos', editavel: false,
-          extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'compromisso', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate }
+          extra: { valor: l.montante, estado: l.pago ? 'pago' : 'pendente', tipo: 'compromisso', chaveTesouraria: PG.chaveLinha(l), prazoDate: l.prazoDate, notasPagamento: l.notas }
         });
       });
     });
@@ -2101,7 +2101,11 @@
     kv('Estado', el('span', { 'class': 'status ' + (pago ? 'ok' : 'warn'), text: pago ? 'Pago' : 'Pendente' }));
     kv('Tipo', el('span', { text: x.tipo === 'pedido' ? item.notas.split(' · ')[0] : 'Compromisso fixo' }));
     kv('Data', el('span', { 'class': 'num', text: diaSemanaLongo(item.data) + ', ' + diaDe(item.data) + ' ' + mesCurto(item.data) + ' ' + anoDe(item.data) }));
-    if (item.notas) kv('Notas', el('span', { 'class': 'pag-notas', text: item.notas }));
+    // item.notas é o resumo derivado (pedido/ref. ou origem do número); as
+    // notas que o utilizador escreveu vêm em extra.notasPagamento e juntam-se
+    // na mesma linha, por baixo. Sem nenhuma das duas, não há linha.
+    var notasTxt = [item.notas, x.notasPagamento].filter(Boolean).join('\n');
+    if (notasTxt) kv('Notas', el('span', { 'class': 'pag-notas', text: notasTxt }));
     var href = 'tesouraria.html?dia=' + encodeURIComponent(item.data) + '&chave=' + encodeURIComponent(x.chaveTesouraria || '');
     var abrir = el('a', { 'class': 'btn-add', href: href, text: 'Abrir na Tesouraria' });
     var fechar = el('button', { type: 'button', 'class': 'ev-btn-outline', text: 'Fechar' });

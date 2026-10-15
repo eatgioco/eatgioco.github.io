@@ -548,6 +548,8 @@
     color:var(--muted);
     font-style:italic;
   }
+  /* Notas do utilizador (pedido ou compromisso): mantêm as quebras de linha. */
+  .pay-detalhe-notas{ white-space:pre-line; }
 
   /* Discriminação da TSU dentro do bloco de detalhe. Sem @media: a tabela
      tem scroll horizontal próprio, como o resto do OS. */
@@ -2903,6 +2905,11 @@ window.addEventListener('load', function () {
     if (l.referencia){
       h += '<div class="card-row"><span>Referência: ' + escapeHtml(l.referencia) +
            '<button type="button" class="copy-icon-btn" data-copiar="referencia" title="Copiar referência">📋</button></span></div>';
+    }
+
+    // Notas do utilizador (Out/2026), só leitura; sem notas não há linha.
+    if (l.notas){
+      h += '<div class="card-row"><span class="pay-detalhe-nota pay-detalhe-notas">Notas: ' + escapeHtml(l.notas) + '</span></div>';
     }
 
     if (incluirPedido && l.ticketNumero){

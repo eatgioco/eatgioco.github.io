@@ -29,13 +29,16 @@
                  fornecedor, montante (número), prazo ('DD/MM/AAAA' ou ''),
                  prazoDate (Date | null — linhas sem prazo NÃO são removidas
                  aqui, quem consome decide), dia (número | null),
-                 referencia, iban, pago (bool) }
+                 referencia, iban, notas, pago (bool) }
      fixo:     { tipo:'fixo', tipoCusto, compromissoId (com sufixo ~cartao
                  quando é a saída do cartão), fornecedor (nome), montante,
                  estado ('confirmado'|'estimado'|'estimado-base'|
                  'estimado-semente'|null), nota, derivaDe, prazo, prazoDate,
                  dia, categoria, referencia:'', metodoPagamento, iban,
-                 pago (bool) }
+                 notas, pago (bool) }
+     notas (Out/2026) = as notas do utilizador (lines[i].notas do pedido ou
+     notas do compromisso), '' quando não há — NÃO confundir com 'nota' do
+     fixo, que é a origem do número calculada pelo motor (recibo/estimativa).
 
    CHAVES:
      chaveLinha(l)         — identidade estável de UI:
@@ -120,6 +123,7 @@ function giocoPagamentosEngine(deps){
           dia: prazoDate ? prazoDate.getDate() : null,
           referencia: l.referencia || '',
           iban: l.iban || '',
+          notas: l.notas || '',
           pago: lineStatus(p, l) === 'concluido'
         });
       });
@@ -163,6 +167,7 @@ function giocoPagamentosEngine(deps){
         referencia: '',
         metodoPagamento: c.metodoPagamento || 'iban',
         iban: c.iban || '',
+        notas: c.notas || '',
         pago: compromissoPago(o.id, d)
       });
     });
