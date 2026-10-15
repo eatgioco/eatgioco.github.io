@@ -438,6 +438,8 @@ function giocoReconciliacaoEngine(deps){
         if (ocorrenciaPaga(pc[chaveConcluido])) return;
         var dia = CE.resolveDia(CE.diaDaSaida(c, ''), per.ano, per.mes);
         if (dia === null) return;
+        // Antes da primeira ocorrência ('inicio') não há débito a esperar.
+        if (CE.antesDoInicio && CE.antesDoInicio(c, per.ano, per.mes, dia)) return;
         var cents = centimos(CE.valorOcorrencia(id, per.ano, per.mes));
         if (!c.valorVariavel && !cents) return; // valor fixo sem valor definido: nada a comparar
         out.push({

@@ -532,9 +532,20 @@ function giocoCompromissosEngine(deps){
     return c.dia;
   }
 
+  // 'inicio' (opcional, 'AAAA-MM-DD', Out/2026): data da PRIMEIRA ocorrência
+  // de um compromisso criado a partir de um dia da tesouraria — nenhuma
+  // ocorrência anterior a ela é gerada. Sem o campo (todos os registos
+  // anteriores a Out/2026) nada muda. Compara a data da ocorrência JÁ
+  // resolvida (dias 29–31 limitados ao fim do mês) com a do início.
+  function antesDoInicio(c, ano, mes, dia){
+    var ini = c && c.inicio;
+    if (!ini || !/^\d{4}-\d{2}-\d{2}$/.test(ini)) return false;
+    return ano + '-' + (mes < 10 ? '0' : '') + mes + '-' + (dia < 10 ? '0' : '') + dia < ini;
+  }
+
   // Gera as ocorrências dos compromissos fixos ativos que caem no mês
   // pedido. 'meses' vazio = todos os meses; 'dia' em falta = por confirmar,
-  // não gera ocorrência.
+  // não gera ocorrência; antes de 'inicio' também não.
   function ocorrenciasCompromissos(ano, mes){
     var out = [];
     idsCompromissos().forEach(function(id){
@@ -547,6 +558,7 @@ function giocoCompromissosEngine(deps){
       saidasCompromisso(c, ano, mes).forEach(function(s){
         var dia = resolveDia(diaDaSaida(c, s.sufixo), ano, mes);
         if (dia === null) return;
+        if (antesDoInicio(c, ano, mes, dia)) return;
         // A TSU sem base nenhuma não é um pagamento: não gera ocorrência.
         if (derivaTSU(c) && s.valor <= 0) return;
 
@@ -590,7 +602,7 @@ function giocoCompromissosEngine(deps){
     saidasCompromisso: saidasCompromisso, nomeOcorrencia: nomeOcorrencia,
     valorOcorrencia: valorOcorrencia, mesesArray: mesesArray,
     rotuloEstado: rotuloEstado, resolveDia: resolveDia,
-    diaDaSaida: diaDaSaida, tipoDe: tipoDe,
+    diaDaSaida: diaDaSaida, tipoDe: tipoDe, antesDoInicio: antesDoInicio,
     ocorrenciasCompromissos: ocorrenciasCompromissos
   };
 }

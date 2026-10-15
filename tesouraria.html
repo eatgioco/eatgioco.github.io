@@ -2156,6 +2156,13 @@
         <input type="text" id="cfDia" placeholder="1-31 ou «ultimo»">
         <span class="field-hint">Vazio = dia por confirmar</span>
       </div>
+      <!-- 'inicio' (Out/2026): gravado pelo «Recorrente» do novo pagamento.
+           Antes desta data o gerador não cria ocorrências. -->
+      <div class="field">
+        <label class="field-label">Primeira ocorrência</label>
+        <input type="date" id="cfInicio">
+        <span class="field-hint">Opcional. Vazio = sem data de início</span>
+      </div>
       <div class="field" id="cfDiaCartaoField" style="display:none;">
         <label class="field-label">Dia do carregamento do cartão</label>
         <input type="text" id="cfDiaCartao" placeholder="igual ao dia da transferência">
@@ -3922,18 +3929,21 @@ window.addEventListener('load', function () {
     var autor = criadorTesouraria();
     GiocoNovoPagamento.abrir({
       ref: paymentRequestsRef,
+      // «Recorrente» grava um compromisso fixo novo (push) com a mesma forma
+      // do editor; o listener de compromissosFixos desenha o resto.
+      refCompromissos: compromissosRef,
       data: diaIso,
       getSuppliers: function(){ return allSuppliers; },
       getPaymentRequests: function(){ return allPaymentRequests; },
       criadoPor: autor.criadoPor,
       criadoPorId: autor.criadoPorId,
-      onGravado: function(id, dataIso){
+      onGravado: function(id, dataIso, modo){
         anoAtivo = parseInt(dataIso.slice(0, 4), 10);
         mesAtivo = parseInt(dataIso.slice(5, 7), 10);
         diaSelecionado = dataIso;
         tesDiaLinhaAberta = null;
         renderTesouraria();
-        GiocoNovoPagamento.toast('Pagamento criado');
+        GiocoNovoPagamento.toast(modo === 'recorrente' ? 'Pagamento recorrente criado' : 'Pagamento criado');
       }
     });
   }
@@ -4390,6 +4400,8 @@ window.addEventListener('load', function () {
       partes.push(meses.map(function(m){ return MESES_PT[m - 1].slice(0, 3); }).join('/'));
     }
 
+    if (c.inicio) partes.push('desde ' + c.inicio.split('-').reverse().join('/'));
+
     return partes.join(' · ');
   }
 
@@ -4489,6 +4501,7 @@ window.addEventListener('load', function () {
     document.getElementById('cfTipo').value = tipoDe(c);
     document.getElementById('cfDia').value = (c.dia === undefined || c.dia === null) ? '' : c.dia;
     document.getElementById('cfDiaCartao').value = (c.diaCartao === undefined || c.diaCartao === null) ? '' : c.diaCartao;
+    document.getElementById('cfInicio').value = c.inicio || '';
     document.getElementById('cfMetodoPagamento').value = c.metodoPagamento || 'iban';
     document.getElementById('cfIban').value = c.iban || '';
     atualizarVisibilidadeIbanCompromisso();
@@ -4616,7 +4629,10 @@ window.addEventListener('load', function () {
     var metodoPagamento = document.getElementById('cfMetodoPagamento').value;
     var ibanRaw = document.getElementById('cfIban').value.trim();
 
-    var registo = {
+    // A forma base do registo é a do gioco-pagamento-novo.js (a mesma que o
+    // «Recorrente» do novo pagamento grava); notas, iban e inicio só entram
+    // quando preenchidos.
+    var registo = GiocoNovoPagamento.compromissoFixo({
       nome: nome,
       categoria: document.getElementById('cfCategoria').value,
       valor: valorRaw === '' ? 0 : Math.round(parseValor(valorRaw) * 100) / 100,
@@ -4625,8 +4641,11 @@ window.addEventListener('load', function () {
       dia: dia,
       meses: meses,
       metodoPagamento: metodoPagamento,
-      ativo: document.getElementById('cfAtivo').checked
-    };
+      iban: ibanRaw,
+      notas: notas,
+      ativo: document.getElementById('cfAtivo').checked,
+      inicio: document.getElementById('cfInicio').value
+    });
     // Só grava 'valorDiario' quando tem valor útil — assim os compromissos
     // normais mantêm exactamente a forma que já tinham no nó.
     if (valorDiarioRaw !== '' && parseValor(valorDiarioRaw) > 0){
@@ -4650,9 +4669,6 @@ window.addEventListener('load', function () {
     if (registo.categoria === 'Pessoal' && diaCartao !== null && String(diaCartao) !== String(dia)){
       registo.diaCartao = diaCartao;
     }
-    if (notas) registo.notas = notas;
-    if (metodoPagamento === 'iban' && ibanRaw) registo.iban = ibanRaw;
-
     var ref = compromissoEmEdicao ? compromissosRef.child(compromissoEmEdicao) : compromissosRef.push();
 
     ref.set(registo).then(fecharCompromissoModal).catch(function(err){

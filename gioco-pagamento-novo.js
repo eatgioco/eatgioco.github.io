@@ -19,12 +19,30 @@
            hoje; lines[0] = { fornecedor, montante, prazo DD/MM/AAAA,
            referencia, iban, banco [, notas] }). notas só existe quando
            preenchida — os leitores de sempre ignoram-na.
-     abrir({ ref, data, getSuppliers, getPaymentRequests, criadoPor,
-         criadoPorId, onGravado(id, dataIso) }) — formulário no giocoModal do
-         shell, com data pré-preenchida (editável). Grava com
-         ref.push().set(pedido) — um registo novo, nunca set()/update() no nó
-         pai, nunca remove(). Sem email: o mailto da pagamentos.html é do
-         fluxo da equipa; quem cria aqui é quem paga.
+     compromissoFixo({ nome, categoria, valor, periodicidade, tipo, dia,
+         meses, metodoPagamento, iban, notas, ativo, inicio })
+         → a forma de um registo de compromissosFixos/ (Out/2026): a MESMA que
+           o editor de compromissos da tesouraria.html grava (o editor
+           acrescenta por cima valorDiario / derivaDe / pessoaId /
+           parteRecibo / diaCartao). notas, iban (só com método 'iban') e
+           inicio só existem quando preenchidos.
+     compromissoRecorrente({ nome, categoria, valor, periodicidade, tipo,
+         inicioIso, metodoPagamento, iban, notas }) → compromissoFixo com o
+         dia do mês e a âncora de meses derivados da data da primeira
+         ocorrência: dia = dia dessa data (29–31 nos meses mais curtos caem no
+         último dia — resolveDia do gioco-compromissos.js); meses = [] na
+         mensal, senão os meses a partir do da primeira ocorrência de 2 em 2
+         (bimestral), 3 em 3 (trimestral) ou só esse (anual); inicio =
+         inicioIso, para o gerador não criar ocorrências antes dela.
+     abrir({ ref, refCompromissos, data, getSuppliers, getPaymentRequests,
+         criadoPor, criadoPorId, onGravado(id, dataIso, modo) }) — formulário
+         no giocoModal do shell, com data pré-preenchida (editável). Com
+         refCompromissos aparece «Pontual | Recorrente» no topo (Pontual por
+         omissão = o pedido de sempre em ref; Recorrente = um compromisso em
+         refCompromissos). Grava com push().set() — um registo novo, nunca
+         set()/update() no nó pai, nunca remove(). Sem email: o mailto da
+         pagamentos.html é do fluxo da equipa; quem cria aqui é quem paga.
+         modo = 'pontual' | 'recorrente'.
 
    Precisa do gioco-shell.js (giocoModal, parseValor, giocoValorErro) e do
    gioco-pagamento-novo.css. Não lê nem escreve mais nada no Firebase. */
@@ -101,6 +119,60 @@
     };
   }
 
+  /* ---------- compromissos fixos (recorrentes) ---------- */
+  // Só as periodicidades do editor com âncora de meses definida; a
+  // «Variável» do editor não diz em que meses cai e fica só lá.
+  var PERIODICIDADES = [['mensal', 'Mensal', 1], ['bimestral', 'Bimestral', 2],
+    ['trimestral', 'Trimestral', 3], ['anual', 'Anual', 12]];
+  var CATEGORIAS = ['Pessoal', 'Espaço', 'Utilities', 'Serviços', 'Estado', 'Outros'];
+  var MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+  function passoDe(periodicidade){
+    var p = PERIODICIDADES.filter(function(x){ return x[0] === periodicidade; })[0];
+    return p ? p[2] : 1;
+  }
+
+  // Meses ativos a partir do mês da primeira ocorrência. [] = todos (mensal),
+  // que é como o editor grava «nenhum selecionado».
+  function mesesDaPeriodicidade(periodicidade, mes){
+    var passo = passoDe(periodicidade);
+    if (passo === 1) return [];
+    var out = [];
+    for (var m = 1; m <= 12; m++){
+      if (((m - mes) % passo + passo) % passo === 0) out.push(m);
+    }
+    return out;
+  }
+
+  function compromissoFixo(o){
+    var r = {
+      nome: o.nome,
+      categoria: o.categoria || 'Outros',
+      valor: o.valor,
+      periodicidade: o.periodicidade,
+      tipo: o.tipo,
+      dia: o.dia,
+      meses: o.meses || [],
+      metodoPagamento: o.metodoPagamento,
+      ativo: o.ativo !== false
+    };
+    if (o.notas) r.notas = o.notas;
+    if (o.metodoPagamento === 'iban' && o.iban) r.iban = o.iban;
+    if (o.inicio) r.inicio = o.inicio;
+    return r;
+  }
+
+  function compromissoRecorrente(o){
+    return compromissoFixo({
+      nome: o.nome, categoria: o.categoria, valor: o.valor,
+      periodicidade: o.periodicidade, tipo: o.tipo,
+      dia: +o.inicioIso.slice(8, 10),
+      meses: mesesDaPeriodicidade(o.periodicidade, +o.inicioIso.slice(5, 7)),
+      metodoPagamento: o.metodoPagamento, iban: o.iban, notas: o.notas,
+      ativo: true, inicio: o.inicioIso
+    });
+  }
+
   /* ---------- formulário ---------- */
   var aGravar = false;
 
@@ -114,7 +186,13 @@
     var f = document.createElement('form');
     f.className = 'pn-form';
     f.noValidate = true;
+    var comRecorrente = !!opts.refCompromissos;
     f.innerHTML =
+      (comRecorrente ?
+        '<div class="pn-seg" role="radiogroup" aria-label="Pontual ou recorrente">' +
+          '<button type="button" role="radio" data-modo="pontual" aria-checked="true">Pontual</button>' +
+          '<button type="button" role="radio" data-modo="recorrente" aria-checked="false">Recorrente</button>' +
+        '</div>' : '') +
       '<div class="pn-seg" role="radiogroup" aria-label="Tipo de pagamento">' +
         '<button type="button" role="radio" data-tipo="fornecedor" aria-checked="true">Fornecedor</button>' +
         '<button type="button" role="radio" data-tipo="avulso" aria-checked="false">Sem fornecedor</button>' +
@@ -126,16 +204,33 @@
       '<label class="pn-field" data-so="avulso" hidden><span class="pn-label">Descrição</span>' +
         '<input type="text" name="descricao" maxlength="120" autocomplete="off" placeholder="Ex.: Multa, Reparação">' +
         '<span class="pn-erro" data-erro="descricao"></span></label>' +
+      '<div class="pn-linha" data-modo-so="recorrente" hidden>' +
+        '<label class="pn-field"><span class="pn-label">Periodicidade</span>' +
+          '<select name="periodicidade">' + PERIODICIDADES.map(function(p){
+            return '<option value="' + p[0] + '">' + p[1] + '</option>';
+          }).join('') + '</select></label>' +
+        '<label class="pn-field"><span class="pn-label">Tipo</span>' +
+          '<select name="tipoCusto"><option value="fixo">Fixo</option><option value="variavel">Variável</option></select></label>' +
+      '</div>' +
       '<div class="pn-linha">' +
-        '<label class="pn-field"><span class="pn-label">Valor (€)</span>' +
+        '<label class="pn-field"><span class="pn-label" data-rotulo="valor">Valor (€)</span>' +
           '<input type="text" name="valor" inputmode="decimal" autocomplete="off" data-valor placeholder="0,00"></label>' +
-        '<label class="pn-field"><span class="pn-label">Data</span>' +
+        '<label class="pn-field"><span class="pn-label" data-rotulo="data">Data</span>' +
           '<input type="date" name="data" value="' + esc(opts.data || '') + '">' +
           '<span class="pn-erro" data-erro="data"></span></label>' +
       '</div>' +
-      '<label class="pn-field"><span class="pn-label">Referência <i>opcional</i></span>' +
+      '<p class="pn-nota" data-modo-so="recorrente" data-nota="repete" hidden></p>' +
+      '<div class="pn-linha" data-modo-so="recorrente" hidden>' +
+        '<label class="pn-field"><span class="pn-label">Método</span>' +
+          '<select name="metodo"><option value="iban">Transferência (IBAN)</option><option value="debito">Débito direto</option></select></label>' +
+        '<label class="pn-field"><span class="pn-label">Categoria</span>' +
+          '<select name="categoria">' + CATEGORIAS.map(function(c){
+            return '<option value="' + esc(c) + '"' + (c === 'Outros' ? ' selected' : '') + '>' + esc(c) + '</option>';
+          }).join('') + '</select></label>' +
+      '</div>' +
+      '<label class="pn-field" data-modo-so="pontual"><span class="pn-label">Referência <i>opcional</i></span>' +
         '<input type="text" name="referencia" autocomplete="off" placeholder="Fatura, entidade/referência MB…"></label>' +
-      '<label class="pn-field"><span class="pn-label">IBAN <i>opcional</i></span>' +
+      '<label class="pn-field" data-campo="iban"><span class="pn-label">IBAN <i>opcional</i></span>' +
         '<input type="text" name="iban" autocomplete="off" placeholder="PT50…"></label>' +
       '<label class="pn-field"><span class="pn-label">Notas <i>opcional</i></span>' +
         '<textarea name="notas" rows="2" maxlength="500"></textarea></label>' +
@@ -146,6 +241,7 @@
       '</div>';
 
     var tipo = 'fornecedor';
+    var modo = 'pontual';
     var el = function(n){ return f.elements[n]; };
     function erro(chave, msg){
       var e = f.querySelector('[data-erro="' + chave + '"]');
@@ -158,17 +254,49 @@
     }
     var ibanDoSupplier = '';
 
-    f.querySelector('.pn-seg').addEventListener('click', function(ev){
-      var b = ev.target.closest('[data-tipo]');
-      if (!b) return;
-      tipo = b.getAttribute('data-tipo');
-      f.querySelectorAll('.pn-seg [data-tipo]').forEach(function(x){
-        x.setAttribute('aria-checked', x === b ? 'true' : 'false');
-      });
+    // Visibilidade e rótulos dependem de três escolhas: fornecedor/sem,
+    // pontual/recorrente e (no recorrente) o método e o tipo de custo.
+    function sincronizar(){
+      var rec = modo === 'recorrente';
       f.querySelectorAll('[data-so]').forEach(function(x){ x.hidden = x.getAttribute('data-so') !== tipo; });
-      erro('fornecedor'); erro('descricao');
-      (tipo === 'fornecedor' ? el('fornecedor') : el('descricao')).focus();
+      f.querySelectorAll('[data-modo-so]').forEach(function(x){ x.hidden = x.getAttribute('data-modo-so') !== modo; });
+      f.querySelector('[data-campo="iban"]').hidden = rec && el('metodo').value !== 'iban';
+      f.querySelector('[data-rotulo="valor"]').textContent =
+        rec && el('tipoCusto').value === 'variavel' ? 'Valor estimado (€)' : 'Valor (€)';
+      f.querySelector('[data-rotulo="data"]').textContent = rec ? 'Primeira ocorrência' : 'Data';
+      f.querySelector('[type="submit"]').textContent = rec ? 'Criar pagamento recorrente' : 'Criar pagamento';
+      notaRepete();
+    }
+    // «Repete …» por baixo da data: o dia e os meses que vão ser gravados,
+    // para a âncora derivada da data não ser uma surpresa.
+    function notaRepete(){
+      var n = f.querySelector('[data-nota="repete"]');
+      var iso = el('data').value;
+      if (modo !== 'recorrente' || !isoValida(iso)){ n.textContent = ''; return; }
+      var dia = +iso.slice(8, 10);
+      var meses = mesesDaPeriodicidade(el('periodicidade').value, +iso.slice(5, 7));
+      n.textContent = 'Repete ao dia ' + dia +
+        (meses.length ? ' em ' + meses.map(function(m){ return MESES_CURTOS[m - 1]; }).join(' · ') : ' de cada mês') +
+        (dia >= 29 ? ' (no último dia nos meses mais curtos)' : '') + ', a partir de ' + isoToDDMMYYYY(iso) + '.';
+    }
+
+    f.querySelectorAll('.pn-seg').forEach(function(seg){
+      seg.addEventListener('click', function(ev){
+        var b = ev.target.closest('[data-tipo], [data-modo]');
+        if (!b) return;
+        seg.querySelectorAll('[role="radio"]').forEach(function(x){
+          x.setAttribute('aria-checked', x === b ? 'true' : 'false');
+        });
+        if (b.hasAttribute('data-modo')){ modo = b.getAttribute('data-modo'); sincronizar(); return; }
+        tipo = b.getAttribute('data-tipo');
+        sincronizar();
+        erro('fornecedor'); erro('descricao');
+        (tipo === 'fornecedor' ? el('fornecedor') : el('descricao')).focus();
+      });
     });
+    ['periodicidade', 'tipoCusto', 'metodo'].forEach(function(n){ el(n).addEventListener('change', sincronizar); });
+    el('data').addEventListener('input', notaRepete);
+    el('data').addEventListener('change', notaRepete);
 
     // Fornecedor escolhido → IBAN da ficha (editável). Só substitui o IBAN se
     // o campo estiver vazio ou ainda com o da ficha anterior.
@@ -203,6 +331,21 @@
       if (!isoValida(dataIso)){ erro('data', 'Escolhe a data.'); ok = false; } else erro('data');
       if (!ok) return;
 
+      if (modo === 'recorrente'){
+        gravar(opts.refCompromissos, compromissoRecorrente({
+          nome: tipo === 'fornecedor' ? s.dados.nome : descricao,
+          categoria: el('categoria').value,
+          valor: v.cents / 100,
+          periodicidade: el('periodicidade').value,
+          tipo: el('tipoCusto').value,
+          inicioIso: dataIso,
+          metodoPagamento: el('metodo').value,
+          iban: el('iban').value.trim(),
+          notas: el('notas').value.trim()
+        }), dataIso);
+        return;
+      }
+
       var base = {
         montante: v.montante,
         prazoIso: dataIso,
@@ -222,21 +365,26 @@
         pedido = pedidoAvulso(base);
       }
 
+      gravar(opts.ref, pedido, dataIso);
+    });
+
+    function gravar(ref, registo, dataIso){
       aGravar = true;
       var btn = f.querySelector('[type="submit"]');
       btn.disabled = true;
-      var novo = opts.ref.push();
-      novo.set(pedido).then(function(){
+      var novo = ref.push();
+      novo.set(registo).then(function(){
         aGravar = false;
         window.giocoModal.close();
-        if (opts.onGravado) opts.onGravado(novo.key, dataIso);
+        if (opts.onGravado) opts.onGravado(novo.key, dataIso, modo);
       }).catch(function(e){
         aGravar = false;
         btn.disabled = false;
         erro('geral', 'Não foi possível gravar: ' + ((e && e.message) || 'erro desconhecido') + '. Tenta de novo.');
       });
-    });
+    }
 
+    sincronizar();
     window.giocoModal.open({ titulo: 'Novo pagamento', conteudo: f });
     el('fornecedor').focus();
   }
@@ -261,6 +409,9 @@
     montanteCanonico: montanteCanonico,
     pedidoFornecedor: pedidoFornecedor,
     pedidoAvulso: pedidoAvulso,
+    compromissoFixo: compromissoFixo,
+    compromissoRecorrente: compromissoRecorrente,
+    mesesDaPeriodicidade: mesesDaPeriodicidade,
     abrir: abrir,
     toast: toast
   };
