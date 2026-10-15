@@ -23,6 +23,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="gioco-shell.css">
+<link rel="stylesheet" href="gioco-pagamento-novo.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -938,8 +939,58 @@
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:1px;
+  }
+
+  /* Out/2026: título do dia + "+ Novo pagamento" na mesma linha. */
+  .tes-daydetail-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
     margin-bottom:10px;
   }
+
+  .tes-dia-novo{
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink);
+    background:var(--white);
+    border:1.5px solid var(--line);
+    border-radius:100px;
+    padding:6px 14px;
+    cursor:pointer;
+  }
+  .tes-dia-novo:hover{ border-color:var(--red); }
+  body.shell-touch .tes-dia-novo{ min-height:44px; padding:10px 18px; font-size:13px; }
+
+  /* "+" no canto da célula: só aparece com o rato por cima (com rato). Ao
+     toque não há hover — o caminho é o botão no detalhe do dia. */
+  .tes-cal-cell{ position:relative; cursor:pointer; }
+  .tes-cal-add{
+    position:absolute;
+    top:4px;
+    right:4px;
+    width:22px;
+    height:22px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    border:none;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--dough);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+  }
+  .tes-cal-add:hover{ background:var(--red); color:var(--on-red); }
+  body:not(.shell-touch) .tes-cal-cell:hover .tes-cal-add,
+  .tes-cal-add:focus-visible{ display:flex; }
 
   .tes-table{
     width:100%;
@@ -1801,6 +1852,7 @@
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-correspondencia.js"></script>
 <script src="gioco-pagamentos.js"></script>
+<script src="gioco-pagamento-novo.js"></script>
 <script src="gioco-reconciliacao.js"></script>
 
 <div class="shell">
@@ -1881,7 +1933,10 @@
     <p class="tes-block-title">Calendário</p>
     <div class="tes-scroll"><div class="tes-cal" id="tesCalendario"></div></div>
     <div class="tes-daydetail" id="tesDiaDetalhe" style="display:none;">
-      <div class="tes-daydetail-title" id="tesDiaTitulo">—</div>
+      <div class="tes-daydetail-head">
+        <div class="tes-daydetail-title" id="tesDiaTitulo">—</div>
+        <button type="button" class="tes-dia-novo" id="tesDiaNovo">+ Novo pagamento</button>
+      </div>
       <div id="tesDiaLista"></div>
     </div>
   </div>
@@ -3761,6 +3816,7 @@ window.addEventListener('load', function () {
       html += '<div class="' + classes + '" data-dia="' + k + '"' + style + '>' +
         '<span class="tes-cal-day">' + d.getDate() + '</span>' +
         (temItens ? '<span class="tes-cal-amount">' + (tudoPago ? '✓ ' : '') + formatEuro(valorMostrado) + '</span>' : '') +
+        '<button type="button" class="tes-cal-add" data-novo="' + k + '" title="Novo pagamento neste dia" aria-label="Novo pagamento a ' + d.getDate() + '">+</button>' +
         '</div>';
     }
 
@@ -3849,7 +3905,46 @@ window.addEventListener('load', function () {
       '</div>';
   }
 
+  /* ---------- Novo pagamento num dia (Out/2026) ----------
+     O "+" da célula e o "+ Novo pagamento" do detalhe abrem o formulário do
+     gioco-pagamento-novo.js com a data pré-preenchida. Grava um registo novo
+     em paymentRequests/ (push), que o listener de sempre volta a desenhar;
+     aqui só se leva o calendário para o dia GRAVADO (pode não ser o clicado)
+     e se abre o detalhe dele. */
+  function criadorTesouraria(){
+    var id = Object.keys(allPessoas).filter(function(k){
+      return allPessoas[k] && /^manel(\s|$)/i.test(allPessoas[k].nome || '');
+    })[0];
+    return id ? { criadoPor: allPessoas[id].nome, criadoPorId: id } : { criadoPor: 'Manel', criadoPorId: null };
+  }
+
+  function novoPagamentoNoDia(diaIso){
+    var autor = criadorTesouraria();
+    GiocoNovoPagamento.abrir({
+      ref: paymentRequestsRef,
+      data: diaIso,
+      getSuppliers: function(){ return allSuppliers; },
+      getPaymentRequests: function(){ return allPaymentRequests; },
+      criadoPor: autor.criadoPor,
+      criadoPorId: autor.criadoPorId,
+      onGravado: function(id, dataIso){
+        anoAtivo = parseInt(dataIso.slice(0, 4), 10);
+        mesAtivo = parseInt(dataIso.slice(5, 7), 10);
+        diaSelecionado = dataIso;
+        tesDiaLinhaAberta = null;
+        renderTesouraria();
+        GiocoNovoPagamento.toast('Pagamento criado');
+      }
+    });
+  }
+
+  document.getElementById('tesDiaNovo').addEventListener('click', function(){
+    if (diaSelecionado) novoPagamentoNoDia(diaSelecionado);
+  });
+
   tesCalendarioEl.addEventListener('click', function(e){
+    var add = e.target.closest('.tes-cal-add');
+    if (add){ novoPagamentoNoDia(add.getAttribute('data-novo')); return; }
     var cell = e.target.closest('.tes-cal-cell');
     if (!cell) return;
     var dia = cell.getAttribute('data-dia');

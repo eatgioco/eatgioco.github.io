@@ -582,6 +582,7 @@
 </head>
 <body>
 <script src="gioco-shell.js"></script>
+<script src="gioco-pagamento-novo.js"></script>
 
 <div class="shell">
 
@@ -919,17 +920,9 @@ window.addEventListener('load', function () {
     return parts[2] + "-" + parts[1] + "-" + parts[0];
   }
 
+  // Contador N/MM/AA partilhado com a tesouraria (gioco-pagamento-novo.js).
   function nextNumeroReferencia(d) {
-    var mm = pad2(d.getMonth() + 1);
-    var aa = String(d.getFullYear()).slice(-2);
-    var count = 0;
-    Object.keys(allPaymentRequests).forEach(function (id) {
-      var nr = allPaymentRequests[id].numeroReferencia;
-      if (!nr) return;
-      var parts = String(nr).split("/");
-      if (parts.length === 3 && parts[1] === mm && parts[2] === aa) count++;
-    });
-    return (count + 1) + "/" + mm + "/" + aa;
+    return GiocoNovoPagamento.nextNumeroReferencia(allPaymentRequests, d);
   }
 
   function parsePrazoDays(text) {

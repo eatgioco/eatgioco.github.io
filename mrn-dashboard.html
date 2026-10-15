@@ -2136,6 +2136,7 @@
 <script src="gioco-shell.js"></script>
 <script src="gioco-compromissos.js"></script>
 <script src="gioco-pagamentos.js"></script>
+<script src="gioco-pagamento-novo.js"></script>
 <script src="gioco-caixa.js"></script>
 <script src="gioco-obrigacoes.js"></script>
 <script src="gioco-correspondencia.js"></script>
@@ -3780,21 +3781,14 @@ window.addEventListener('load', function () {
       return;
     }
 
-    var line = {
-      fornecedor: descricao,
+    // A forma do registo vive no gioco-pagamento-novo.js (a mesma da tesouraria).
+    paymentRequestsRef.push(GiocoNovoPagamento.pedidoAvulso({
+      descricao: descricao,
       montante: montante,
-      prazo: isoToDDMMYYYY(prazoIso),
+      prazoIso: prazoIso,
       referencia: referencia,
-      iban: iban,
-      banco: ""
-    };
-
-    paymentRequestsRef.push({
-      date: formatDateDDMMYYYY(new Date()),
-      status: "pendente",
-      origem: "avulso",
-      lines: [line]
-    });
+      iban: iban
+    }));
 
     closeNovoPagamentoModal();
   });
