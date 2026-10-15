@@ -1941,10 +1941,15 @@
     </div>
   </div>
 
-  <div class="tes-block">
-    <p class="tes-block-title">Pagamentos pendentes — todos os prazos</p>
-    <div class="tes-scroll" id="tesPendentes"></div>
-  </div>
+  <!-- Colapsável como as outras secções (<details class="tes-details">,
+       fechada por omissão, sem estado guardado); o contador no cabeçalho
+       segue o das Receitas. -->
+  <details class="tes-details" id="tesPendentesDetails">
+    <summary>Pagamentos pendentes — todos os prazos <span class="rec-sum-contador" id="tesPendentesContador"></span></summary>
+    <div class="tes-details-body">
+      <div class="tes-scroll" id="tesPendentes"></div>
+    </div>
+  </details>
 
   <details class="tes-details" id="tesPedidosDetails">
     <summary>Pedidos de pagamento — gestão</summary>
@@ -3980,13 +3985,17 @@ window.addEventListener('load', function () {
   function renderTesPendentes(){
     var linhas = linhasCombinadas();
     var hoje = hojeMeiaNoite();
+    var contadorEl = document.getElementById('tesPendentesContador');
 
     if (linhas.length === 0){
+      contadorEl.textContent = '';
       tesPendentesEl.innerHTML = '<p class="tes-empty">Sem pagamentos pendentes ✓</p>';
       return;
     }
 
     var total = linhas.reduce(function(acc, l){ return acc + l.montante; }, 0);
+    // Resumo no cabeçalho, para se ler com a secção fechada.
+    contadorEl.textContent = linhas.length + ' pagamento' + (linhas.length === 1 ? '' : 's') + ' · ' + formatEuro(total);
 
     tesPendentesEl.innerHTML = '<table class="tes-table"><thead><tr>' +
       '<th>Prazo</th><th>Fornecedor / descrição</th><th>Referência</th><th>Pedido</th>' +
