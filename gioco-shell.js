@@ -402,6 +402,9 @@
       /* Obrigações: motor de obrigações/projetos do Manel (Fase 1, Set/2026).
          Página pessoal — só no conjunto privado, nunca no público nem no index. */
       { href: 'obrigacoes.html', icone: 'clipboard-check',  label: 'Obrigações' },
+      /* Jarvis: assistente pessoal do Manel (Nov/2026) — caderno, lembretes e
+         conversa, o mesmo fio do Telegram. Fala com o Worker, não com o Firebase. */
+      { href: 'jarvis.html',     icone: 'message-square',   label: 'Jarvis' },
       /* conta-bancaria.html sem ?conta= mostra "Nenhuma conta indicada". O slug
          é o mesmo CONTA_RECONCILIACAO usado pelo card de Depósitos. */
       { href: 'conta-bancaria.html?conta=abanca', icone: 'trending-up', label: 'Conta bancária' }
