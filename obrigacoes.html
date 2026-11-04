@@ -29,6 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="gioco-obrigacoes.js"></script>
 <script src="gioco-sugestoes.js"></script>
+<script src="gioco-jarvis.js"></script>
 
 <style>
   body{ -webkit-font-smoothing:antialiased; }
@@ -428,6 +429,58 @@
   /* Selo de estado calculado — o texto nunca é a única pista: cada estado tem
      também a sua superfície. Todas as superfícies de selo do shell invertem mal
      no escuro, por isso o texto por cima é literal fixo com par [data-theme]. */
+  /* ---------- Campos que o Jarvis escreve (quem / situação / notas / origem) ---------- */
+  .pill.quem{ background:var(--sky); color:#141414; border-color:transparent; }
+  [data-theme="dark"] .pill.quem{ color:#FFFFFF; }
+  .pill.jarvis{ border-style:dotted; color:var(--muted); }
+  .pill.nota{ max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-weight:500; }
+  body.shell-touch .pill.nota{ max-width:100%; white-space:normal; }
+
+  /* ---------- Jarvis (conversa + lembretes, dentro desta página) ---------- */
+  .jv-card{ margin-top:18px; color:var(--ink); }
+  .jv-card > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size:14px; font-weight:700; }
+  .jv-card > summary::-webkit-details-marker{ display:none; }
+  .jv-card > summary .chev{ transition:transform .15s ease; }
+  .jv-card[open] > summary .chev{ transform:rotate(90deg); }
+  .jv-card > summary .sub{ font-weight:500; color:var(--muted); font-size:12.5px; }
+  .jv-card .jv-wrap{ margin-top:14px; }
+  .jv-corpo{ display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:22px; align-items:start; }
+  body.shell-touch .jv-corpo{ grid-template-columns:minmax(0,1fr); }
+  .jv-corpo[hidden], .jv-ligar[hidden]{ display:none; }
+  .jv-in{ padding:10px 12px; border:2px solid var(--line); border-radius:12px; background:var(--dough); font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); min-width:0; }
+  .jv-in:focus{ outline:none; border-color:var(--ink); }
+  .jv-ligar p{ margin:0 0 10px; font-size:13px; color:var(--muted); }
+  .jv-ligar-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .jv-ligar-row .jv-in{ flex:1 1 220px; }
+  .jv-msgs{ display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; padding:2px 2px 8px; overscroll-behavior:contain; }
+  .jv-msg{ max-width:88%; padding:8px 12px; border-radius:16px; font-size:13.5px; line-height:1.45; white-space:pre-line; word-wrap:break-word; }
+  .jv-msg.jarvis{ align-self:flex-start; background:var(--dough); border:1px solid var(--line); border-bottom-left-radius:5px; }
+  .jv-msg.manel{ align-self:flex-end; background:var(--ink); color:var(--white); border-bottom-right-radius:5px; }
+  .jv-msg .h{ display:block; font-size:10.5px; margin-top:3px; opacity:.6; }
+  .jv-msg.pendente{ opacity:.6; }
+  .jv-pensar{ display:none; font-size:12.5px; color:var(--muted); padding:2px 4px; }
+  .jv-pensar.on{ display:block; }
+  .jv-escrever{ display:flex; gap:8px; align-items:flex-end; margin-top:8px; }
+  .jv-escrever textarea{ flex:1; resize:none; min-height:44px; max-height:160px; line-height:1.4; }
+  .jv-erro{ display:none; margin-top:8px; font-size:12.5px; color:var(--red-ink); }
+  .jv-erro.on{ display:block; }
+  .jv-sub{ font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:2px 0 6px; }
+  .jv-sub .n{ font-weight:500; }
+  .jv-lem{ display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; padding:9px 0; border-top:1px solid var(--line); }
+  .jv-lem:first-child{ border-top:none; }
+  .jv-lem-q{ flex:0 0 86px; font-size:12px; font-weight:700; }
+  .jv-lem.alerta .jv-lem-q{ color:var(--red-ink); }
+  .jv-lem-t{ flex:1 1 140px; min-width:0; font-size:13px; line-height:1.4; word-wrap:break-word; }
+  .jv-lem-o{ display:block; font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .jv-lem-a{ display:flex; gap:6px; align-items:center; }
+  .jv-lnk{ border:none; background:transparent; color:var(--muted); font-family:'Inter',sans-serif; font-size:12px; font-weight:600; cursor:pointer; padding:4px 2px; }
+  .jv-lnk:hover{ color:var(--red-ink); }
+  .jv-vazio{ font-size:13px; color:var(--muted); padding:6px 0; }
+  .jv-estado{ font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .jv-estado .dot{ width:7px; height:7px; border-radius:50%; background:var(--line); }
+  .jv-estado .dot.ok{ background:var(--green); }
+  .jv-estado .dot.erro{ background:var(--red); }
+
   .pill-estado{ border:none; cursor:default; font-weight:700; letter-spacing:.2px; }
   .est-emCurso{ background:var(--lime); color:#141414; }
   .est-vencido{ background:var(--red); color:var(--on-red); }
@@ -639,6 +692,12 @@
 
   <!-- Barra fina com o título: só aparece ao fazer scroll -->
   <div class="topo-fino" id="topoFino" aria-hidden="true"><svg class="icon" width="14" height="14"><use href="#i-clipboard-check"/></svg> GIOCO · <b>Obrigações</b> <span class="n num" id="topoFinoN"></span></div>
+
+  <!-- Jarvis: a mesma lista (as obrigações abaixo são o caderno dele) + a conversa e os lembretes. -->
+  <details class="card glass-light jv-card" id="jarvisCard" open>
+    <summary><svg class="icon chev" width="14" height="14"><use href="#i-chevron-right"/></svg><svg class="icon" width="16" height="16"><use href="#i-message-square"/></svg>Jarvis <span class="sub">— diz-lhe o que há para fazer; ele organiza aqui em baixo</span></summary>
+    <div class="jv-wrap" id="jarvisPainel"></div>
+  </details>
 
   <div class="card glass-light">
     <p class="cap-titulo"><b>Novo projeto</b></p>
@@ -867,6 +926,26 @@
   //
   // O callback fica guardado à primeira chamada para o retry o poder repetir
   // sem obrigar cada página a dar-lhe um nome.
+  /* Jarvis: arranca FORA da autenticação do Firebase — fala com o Worker, não
+     com o Firebase, e não pode ficar à espera dele. O aberto/fechado do cartão é
+     só conveniência deste browser. */
+  var jarvisPainel = null;
+  var jarvisTitulo = null;
+  (function () {
+    var card = document.getElementById('jarvisCard');
+    try { if (localStorage.getItem('obrigacoes.jarvis.aberto') === '0') card.removeAttribute('open'); } catch (e) {}
+    card.addEventListener('toggle', function () {
+      try { localStorage.setItem('obrigacoes.jarvis.aberto', card.open ? '1' : '0'); } catch (e) {}
+    });
+    if (location.hash === '#jarvis') card.setAttribute('open', '');
+    if (window.GiocoJarvis) {
+      jarvisPainel = GiocoJarvis.montar(document.getElementById('jarvisPainel'), {
+        // Os registos só existem depois da sessão do Firebase; até lá, sem título.
+        tituloItem: function (id) { return jarvisTitulo ? jarvisTitulo(id) : ''; }
+      });
+    }
+  })();
+
   var authArrancou = false;
   var authCallback = null;
 
@@ -943,6 +1022,11 @@
 
   var obrs = {};
   var projs = {};
+  jarvisTitulo = function (id) {
+    if (obrs[id]) return obrs[id].titulo || '';
+    if (projs[id]) return projs[id].nome || '';
+    return '';
+  };
   var obrsCarregadas = false, projsCarregados = false;
   var projetoAberto = null;      // id do projeto na página lateral
   var concluirEmCurso = null;    // id da obrigação com a pergunta do tempo aberta
@@ -1426,16 +1510,27 @@
     return '<button type="button" class="' + cls + '" data-pill="local" data-alvo="' + escapeHtml(o.id) + '" title="Onde se faz' + (o.localManual === true ? ' (escolhido à mão)' : '') + '">' +
       icone(tem ? ICONE_LOCAL[o.local] : 'map-pin', 12) + txt + '</button>';
   }
+  /* Campos que o Jarvis escreve numa obrigação (todos opcionais; ver o nó
+     obrigacoes no CLAUDE.md): quem (a pessoa a quem se cobra — follow-up),
+     situacao (o ponto de situação curto), notas (detalhe) e origem 'jarvis'. */
+  function pillsJarvis(o) {
+    var p = [];
+    if (o.quem) p.push('<span class="pill estatica quem" title="A cobrar a esta pessoa">' + icone('users', 12) + escapeHtml(o.quem) + '</span>');
+    if (o.situacao) p.push('<span class="pill estatica nota" title="' + escapeHtml(o.situacao) + '">' + escapeHtml(o.situacao) + '</span>');
+    if (o.notas) p.push('<span class="pill estatica nota" title="' + escapeHtml(o.notas) + '">' + icone('list', 12) + escapeHtml(o.notas) + '</span>');
+    if (o.origem === 'jarvis') p.push('<span class="pill estatica jarvis" title="Anotado pelo Jarvis">' + icone('message-square', 12) + 'Jarvis</span>');
+    return p.join('');
+  }
   function pillsAcao(o, hoje, editavel) {
     if (!editavel) {
       var p = [];
       p.push('<span class="pill estatica num">' + icone('clock', 12) + G.fmtDuracaoMin(o.duracaoPrevista || G.DURACAO_DEFAULT) + '</span>');
       if (o.duracaoReal) p.push('<span class="pill estatica num" title="Duração real">' + o.duracaoReal + ' min reais</span>');
       if (o.local && G.ROTULO_LOCAL[o.local]) p.push('<span class="pill estatica">' + icone(ICONE_LOCAL[o.local], 12) + G.ROTULO_LOCAL[o.local] + '</span>');
-      return '<span class="pills">' + p.join('') + '</span>';
+      return '<span class="pills">' + p.join('') + pillsJarvis(o) + '</span>';
     }
     return '<span class="pills">' + pillDuracao(o) + pillPrazo('obr', o.id, o.prazo, hoje, true) + pillLocal(o) +
-      (o.adiada > 0 ? '<span class="pill estatica aviso num" title="Vezes que foi adiada">adiada ' + o.adiada + '×</span>' : '') + '</span>';
+      (o.adiada > 0 ? '<span class="pill estatica aviso num" title="Vezes que foi adiada">adiada ' + o.adiada + '×</span>' : '') + pillsJarvis(o) + '</span>';
   }
 
   function seletorDuracao(btn, id) {
@@ -1550,7 +1645,11 @@
     }
     return true;
   }
-  function acaoCasaProcura(o) { return !procura || normTexto(o.titulo).indexOf(normTexto(procura)) >= 0; }
+  function acaoCasaProcura(o) {
+    if (!procura) return true;
+    var q = normTexto(procura);
+    return [o.titulo, o.quem, o.situacao, o.notas].some(function (t) { return t && normTexto(t).indexOf(q) >= 0; });
+  }
   function casaProcura(u) {
     if (!procura) return true;
     var q = normTexto(procura);
@@ -3109,6 +3208,7 @@
     obrs = snap.val() || {};
     obrsCarregadas = true;
     render();
+    if (jarvisPainel) jarvisPainel.atualizar();
   });
   projetosRef.on('value', function (snap) {
     projs = snap.val() || {};
