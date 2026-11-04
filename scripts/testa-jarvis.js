@@ -32,12 +32,7 @@ function hoje(d) {
       lembretes: [
         { id: 10, texto: 'Cobrar horário ao Alfredo', quando: hoje(0) + 'T10:00', estado: 'sem_resposta' },
         { id: 11, texto: 'IVA trimestral', quando: hoje(3) + 'T09:00', estado: 'agendado' }
-      ],
-      conversa: [
-        { id: 1, de: 'manel', texto: 'o que importa hoje?', quando: hoje(0) + 'T08:40', canal: 'telegram' },
-        { id: 2, de: 'jarvis', texto: 'Bom dia, doutor. Três coisas.', quando: hoje(0) + 'T08:41' }
-      ],
-      a_pensar: false
+      ]
     };
     const pedidos = [];
     let chaveValida = 'segredo-teste';
@@ -59,12 +54,6 @@ function hoje(d) {
         if (nome === 'resolver_lembrete' || nome === 'cancelar_lembrete') db.lembretes = db.lembretes.filter(l => String(l.id) !== String(input.id));
         return route.fulfill({ status: 200, headers: cors, body: '{"ok":true}' });
       }
-      if (u.pathname === '/api/os/mensagem') {
-        db.conversa.push({ id: 3, de: 'manel', texto: corpo.texto, quando: hoje(0) + 'T09:00', canal: 'os' });
-        db.a_pensar = true;
-        setTimeout(() => { db.conversa.push({ id: 4, de: 'jarvis', texto: 'Com certeza, doutor.', quando: hoje(0) + 'T09:01' }); db.a_pensar = false; }, 1500);
-        return route.fulfill({ status: 200, headers: cors, body: '{"ok":true}' });
-      }
       return route.fulfill({ status: 404, headers: cors, body: '{}' });
     });
 
@@ -80,7 +69,7 @@ function hoje(d) {
     await page.click('#jvGuardarChave');
     await page.waitForFunction(() => document.getElementById('jvEstadoTxt').textContent.includes('recusada'));
 
-    // 3. Chave certa → caderno, lembretes, conversa.
+    // 3. Chave certa → caderno e lembretes, sem conversa.
     await page.fill('#jvChaveIn', chaveValida);
     await page.click('#jvGuardarChave');
     await page.waitForSelector('#jvGrid:not([hidden])');
@@ -89,7 +78,7 @@ function hoje(d) {
     assert(grupos.some(g => g.startsWith('Hoje')), 'falta grupo hoje');
     assert(grupos.some(g => g.startsWith('Sem prazo')), 'falta grupo sem prazo');
     assert(grupos.some(g => g.startsWith('À espera de resposta')), 'falta lembrete sem resposta');
-    assert.strictEqual(await page.$$eval('.jv-msg', e => e.length), 2);
+    assert.strictEqual(await page.$$eval('#jvMsgs, #jvTexto, #jvEnviar, .jv-conversa-card', e => e.length), 0, 'a conversa continua na página');
 
     // 4. Concluir um item → acao concluir_item.
     await page.click('.jv-item[data-id="2"] [data-acao="concluir"]');
@@ -113,13 +102,8 @@ function hoje(d) {
     await page.waitForFunction(() => !document.querySelector('.jv-lem[data-id="10"]'));
     assert(pedidos.some(p => p.corpo && p.corpo.nome === 'resolver_lembrete' && p.corpo.input.acao === 'feito'));
 
-    // 8. Conversa: enviar e receber resposta pelo polling rápido.
-    await page.fill('#jvTexto', 'marca-me o dentista sexta');
-    await page.click('#jvEnviar');
-    await page.waitForFunction(() => document.getElementById('jvPensar').classList.contains('on'));
-    await page.waitForFunction(() => [...document.querySelectorAll('.jv-msg.jarvis')].some(e => e.textContent.includes('Com certeza')), null, { timeout: 15000 });
-    assert(!(await page.$eval('#jvPensar', e => e.classList.contains('on'))), '"a tratar" ficou ligado');
-    assert.strictEqual(await page.$$eval('.jv-msg.pendente', e => e.length), 0);
+    // 8. Nunca pede nem envia conversa.
+    assert(!pedidos.some(p => p.caminho === '/api/os/mensagem'), 'enviou uma mensagem');
 
     // 9. Sem transbordo horizontal ao telemóvel.
     if (modo === 'telemovel') {

@@ -27,14 +27,13 @@
   JARVIS NO GIOCO OS (Nov/2026)
   O Jarvis (assistente pessoal do Manel) vive num Cloudflare Worker
   (secretaria.eatgioco.workers.dev, base D1 "secretaria") e fala pelo Telegram.
-  Esta página é uma SEGUNDA janela para o MESMO fio: lê o caderno, os lembretes
-  e a conversa, e escreve-lhe — a resposta chega aqui e no Telegram.
+  Esta página mostra o caderno e os lembretes dele. A conversa saiu da página
+  a 2026-11-04, a pedido do Manel: fala-se com o Jarvis só no Telegram.
 
   NÃO toca no Firebase. Fala só com a API /api/os/* do Worker:
-    GET  /api/os/estado?conversa=N → { agora, itens[], lembretes[], conversa[], a_pensar }
+    GET  /api/os/estado → { agora, itens[], lembretes[] }
     POST /api/os/acao     { nome, input }  (concluir_item, anular_item, adicionar_item,
                                              atualizar_item, cancelar_lembrete, resolver_lembrete)
-    POST /api/os/mensagem { texto }        (entra no fio como se viesse do Telegram)
   Autenticação: cabeçalho X-Chave-OS. A chave NUNCA está no repo (é público): vive
   só no localStorage deste browser ('jarvis.os.chave'), colada uma vez.
 -->
@@ -48,10 +47,8 @@
   .card h2 .n{ color:var(--muted); font-weight:500; }
   .card h2 .spacer{ flex:1; }
 
-  .jv-grid{ display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:18px; align-items:start; }
-  body.shell-touch .jv-grid{ grid-template-columns:minmax(0,1fr); }
+  .jv-grid{ display:grid; grid-template-columns:minmax(0,1fr); gap:18px; align-items:start; }
   .jv-grid[hidden], .jv-aviso[hidden]{ display:none; }
-  body.shell-touch .jv-conversa-card{ order:-1; }
 
   /* ---------- Ligação ---------- */
   .jv-aviso{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:18px 20px; margin-top:18px; color:var(--ink); }
@@ -118,27 +115,6 @@
   .jv-lem .quando.alerta{ color:var(--red-ink); }
   .jv-lem .txt{ flex:1; min-width:0; font-size:13.5px; line-height:1.4; word-wrap:break-word; }
 
-  /* ---------- Conversa ---------- */
-  .jv-conversa-card{ display:flex; flex-direction:column; }
-  .jv-msgs{
-    display:flex; flex-direction:column; gap:8px; max-height:62vh; overflow-y:auto; padding:4px 2px 8px;
-    overscroll-behavior:contain;
-  }
-  body.shell-touch .jv-msgs{ max-height:55vh; }
-  .jv-msg{ max-width:88%; padding:9px 13px; border-radius:16px; font-size:14px; line-height:1.45; white-space:pre-line; word-wrap:break-word; }
-  .jv-msg.jarvis{ align-self:flex-start; background:var(--dough); border:1px solid var(--line); border-bottom-left-radius:5px; }
-  .jv-msg.manel{ align-self:flex-end; background:var(--ink); color:var(--white); border-bottom-right-radius:5px; }
-  .jv-msg .h{ display:block; font-size:10.5px; margin-top:4px; opacity:.6; }
-  .jv-msg.pendente{ opacity:.6; }
-  .jv-pensar{ align-self:flex-start; font-size:12.5px; color:var(--muted); padding:4px 4px; display:none; }
-  .jv-pensar.on{ display:block; }
-  .jv-escrever{ display:flex; gap:8px; align-items:flex-end; margin-top:10px; }
-  .jv-escrever textarea{ flex:1; resize:none; min-height:46px; max-height:160px; line-height:1.4; }
-  .jv-escrever .btn-add{ flex:0 0 auto; }
-
-  .jv-erro{ display:none; margin-top:10px; font-size:12.5px; color:var(--red-ink); }
-  .jv-erro.on{ display:block; }
-
   .jv-toast{
     position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); opacity:0;
     background:var(--ink); color:var(--white); padding:10px 16px; border-radius:100px; font-size:13px; font-weight:600;
@@ -185,7 +161,7 @@
         </div>
       </div>
 
-      <p class="page-subtitle">O caderno, os lembretes e a conversa com o Jarvis — o mesmo fio do Telegram</p>
+      <p class="page-subtitle">O caderno e os lembretes do Jarvis</p>
       <div class="jv-estado" id="jvEstado"><span class="dot" id="jvDot"></span><span id="jvEstadoTxt">A ligar…</span>
         <button type="button" class="jv-btn txt" id="jvAtualizar" title="Atualizar agora"><svg class="icon" width="13" height="13"><use href="#i-refresh-cw"/></svg>Atualizar</button>
         <button type="button" class="jv-btn txt" id="jvMudarChave">Chave de acesso</button>
@@ -228,17 +204,6 @@
           </div>
         </div>
 
-        <div class="card glass-light jv-conversa-card">
-          <h2><svg class="icon" width="16" height="16"><use href="#i-message-square"/></svg>Conversa<span class="spacer"></span></h2>
-          <div class="jv-msgs" id="jvMsgs"></div>
-          <div class="jv-pensar" id="jvPensar">O Jarvis está a tratar disso…</div>
-          <form class="jv-escrever" id="jvEscrever" autocomplete="off">
-            <textarea class="jv-in" id="jvTexto" rows="1" placeholder="Escrever ao Jarvis…" maxlength="4000"></textarea>
-            <button type="submit" class="btn-add" id="jvEnviar">Enviar</button>
-          </form>
-          <div class="jv-erro" id="jvErroConversa"></div>
-        </div>
-
       </div>
     </div>
   </div>
@@ -253,9 +218,7 @@
   var ENDERECO_PADRAO = 'https://secretaria.eatgioco.workers.dev';
   var K_CHAVE = 'jarvis.os.chave';
   var K_ENDERECO = 'jarvis.os.endereco';
-  var INTERVALO_NORMAL = 30000;   // sem conversa a decorrer
-  var INTERVALO_ATIVO = 4000;     // depois de lhe escrever, até ele responder
-  var TECTO_ATIVO = 5 * 60000;    // a espera rápida dura no máximo 5 min
+  var INTERVALO = 30000;
 
   function ls(k, v) {
     try {
@@ -271,11 +234,8 @@
   }
 
   var estado = null;          // última resposta de /api/os/estado
-  var pendentes = [];         // mensagens enviadas daqui ainda não vistas na conversa
-  var esperaAte = 0;          // até quando se faz polling rápido
   var timer = null;
   var aCarregar = false;
-  var ultimoIdMsg = null;     // para só fazer scroll quando chega mensagem nova
 
   function endereco() { return (ls(K_ENDERECO) || ENDERECO_PADRAO).replace(/\/+$/, ''); }
   function chave() { return ls(K_CHAVE) || ''; }
@@ -427,34 +387,7 @@
     $('jvLembretes').innerHTML = html;
   }
 
-  // ---------- Render: conversa ----------
-  function renderConversa() {
-    var conv = ((estado && estado.conversa) || []).slice();
-    // Pendentes enviados daqui que a API ainda não devolve: mostram-se esbatidos.
-    var textosVistos = {};
-    conv.forEach(function (m) { if (m.de === 'manel') textosVistos[String(m.texto).trim()] = true; });
-    pendentes = pendentes.filter(function (p) { return !textosVistos[p.texto.trim()]; });
-    var box = $('jvMsgs');
-    var perto = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    var html = conv.map(function (m) {
-      var de = m.de === 'manel' ? 'manel' : 'jarvis';
-      var h = rotuloQuando(m.quando);
-      var canal = m.canal === 'os' ? ' · OS' : '';
-      return '<div class="jv-msg ' + de + '">' + esc(m.texto) +
-        (h ? '<span class="h">' + esc(h) + canal + '</span>' : '') + '</div>';
-    }).join('') + pendentes.map(function (p) {
-      return '<div class="jv-msg manel pendente">' + esc(p.texto) + '<span class="h">a enviar…</span></div>';
-    }).join('');
-    if (!conv.length && !pendentes.length) html = '<div class="jv-vazio">Ainda sem conversa.</div>';
-    box.innerHTML = html;
-    var ultimo = conv.length ? String(conv[conv.length - 1].id || conv.length) + pendentes.length : 'p' + pendentes.length;
-    if (perto || ultimo !== ultimoIdMsg) box.scrollTop = box.scrollHeight;
-    ultimoIdMsg = ultimo;
-    var aPensar = !!(estado && estado.a_pensar) || pendentes.length > 0;
-    $('jvPensar').classList.toggle('on', aPensar);
-  }
-
-  function renderTudo() { renderCaderno(); renderLembretes(); renderConversa(); }
+  function renderTudo() { renderCaderno(); renderLembretes(); }
 
   // ---------- Estado da ligação ----------
   function marcarEstado(tipo, txt) {
@@ -477,12 +410,10 @@
     }
     if (aCarregar) return Promise.resolve();
     aCarregar = true;
-    return api('GET', '/api/os/estado?conversa=60').then(function (j) {
+    return api('GET', '/api/os/estado').then(function (j) {
       estado = {
         itens: Array.isArray(j.itens) ? j.itens : [],
-        lembretes: Array.isArray(j.lembretes) ? j.lembretes : [],
-        conversa: Array.isArray(j.conversa) ? j.conversa : [],
-        a_pensar: !!j.a_pensar
+        lembretes: Array.isArray(j.lembretes) ? j.lembretes : []
       };
       $('jvLigar').hidden = true;
       $('jvGrid').hidden = false;
@@ -507,9 +438,7 @@
 
   function agendar() {
     clearTimeout(timer);
-    var rapido = Date.now() < esperaAte && ((estado && estado.a_pensar) || pendentes.length);
-    timer = setTimeout(function () { if (document.hidden) { agendar(); return; } carregar().then(agendar); },
-      rapido ? INTERVALO_ATIVO : INTERVALO_NORMAL);
+    timer = setTimeout(function () { if (document.hidden) { agendar(); return; } carregar().then(agendar); }, INTERVALO);
   }
 
   // ---------- Toast com Desfazer ----------
@@ -588,40 +517,6 @@
       carregar();
     }, function (e) { alert('Não foi possível anotar: ' + e.message); });
   });
-
-  function enviar() {
-    var txt = $('jvTexto').value.trim();
-    if (!txt) return;
-    $('jvErroConversa').classList.remove('on');
-    pendentes.push({ texto: txt });
-    $('jvTexto').value = ''; ajustarAltura();
-    renderConversa();
-    $('jvEnviar').disabled = true;
-    api('POST', '/api/os/mensagem', { texto: txt }).then(function () {
-      esperaAte = Date.now() + TECTO_ATIVO;
-      carregar().then(agendar);
-    }, function (e) {
-      pendentes = pendentes.filter(function (p) { return p.texto !== txt; });
-      $('jvTexto').value = txt; ajustarAltura();
-      renderConversa();
-      var el = $('jvErroConversa');
-      el.textContent = 'Não foi entregue ao Jarvis (' + e.message + '). O texto voltou para a caixa.';
-      el.classList.add('on');
-    }).then(function () { $('jvEnviar').disabled = false; });
-  }
-  $('jvEscrever').addEventListener('submit', function (ev) { ev.preventDefault(); enviar(); });
-  $('jvTexto').addEventListener('keydown', function (ev) {
-    // Enter envia com rato e teclado físico; ao toque o Enter é mudança de linha.
-    if (ev.key === 'Enter' && !ev.shiftKey && !document.body.classList.contains('shell-touch')) {
-      ev.preventDefault(); enviar();
-    }
-  });
-  function ajustarAltura() {
-    var t = $('jvTexto');
-    t.style.height = 'auto';
-    t.style.height = Math.min(t.scrollHeight + 4, 160) + 'px';
-  }
-  $('jvTexto').addEventListener('input', ajustarAltura);
 
   $('jvGuardarChave').addEventListener('click', function () {
     var k = $('jvChaveIn').value.trim();
