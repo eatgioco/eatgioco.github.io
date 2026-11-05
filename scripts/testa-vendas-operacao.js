@@ -111,7 +111,11 @@ function DOMParserShim(){}
 DOMParserShim.prototype.parseFromString = function(txt){ return montarXml(txt); };
 
 /* ---------- sandbox com a página dentro ---------- */
-const fonteVendas = fs.readFileSync(path.join(RAIZ, 'vendas.html'), 'utf8');
+/* Desde Nov/2026 a lógica da importação vive em gioco-saft.js (a mesma que o
+   Worker do Jarvis usa); a página só lhe dá nomes (`var x = GiocoSaft.x;`). O
+   sandbox recebe o GiocoSaft a sério, por isso estes testes exercitam o código
+   que corre em produção. O .replace trata dos clones com CRLF (Windows). */
+const fonteVendas = fs.readFileSync(path.join(RAIZ, 'vendas.html'), 'utf8').replace(/\r\n/g, '\n');
 const NOMES = [
   'TAXONOMIA', 'ERRO_FICHEIRO_INVALIDO', 'REGRAS_SUGESTAO', 'PARES_POR_DIA',
   'CORTE_DIA_OPERACAO_H', 'LIMIAR_SUSPEITA', 'HORA_CORTE_TURNO',
@@ -126,7 +130,8 @@ const NOMES = [
   'planearImportOperacao', 'payloadDoMes',
   'giocoAcumuladoHoras', 'giocoTurnos'
 ];
-const sandbox = { console: console, DOMParser: DOMParserShim, Date: Date, Math: Math, JSON: JSON };
+const sandbox = { console: console, DOMParser: DOMParserShim, Date: Date, Math: Math, JSON: JSON,
+                  GiocoSaft: require(path.join(RAIZ, 'gioco-saft.js')) };
 vm.createContext(sandbox);
 vm.runInContext(extrair(fonteVendas, NOMES) + '\nvar API = {' +
   NOMES.map(function(n){ return n + ':' + n; }).join(',') + '};', sandbox);
@@ -272,7 +277,7 @@ perto(t.t1.bruto, 100, 'o 1.º turno só tem as 12h');
 perto(t.t2.bruto, 100, 'a madrugada conta para o 2.º turno, não para o 1.º');
 
 /* A cópia do centro-de-controlo.html tem de dar exactamente o mesmo. */
-const fonteCC = fs.readFileSync(path.join(RAIZ, 'centro-de-controlo.html'), 'utf8');
+const fonteCC = fs.readFileSync(path.join(RAIZ, 'centro-de-controlo.html'), 'utf8').replace(/\r\n/g, '\n');
 const sandboxCC = { console: console, Date: Date, Math: Math };
 vm.createContext(sandboxCC);
 vm.runInContext(extrair(fonteCC, ['CORTE_DIA_OPERACAO_H', 'horasOperacao', 'posOperacao', 'giocoAcumuladoHoras'], '    ') +
