@@ -129,6 +129,43 @@
   body.shell-touch .btn-sec, body.shell-touch .btn-add{ min-height:44px; }
 
   .nota{ font-size:11.5px; color:var(--muted); margin:8px 0 0; }
+
+  /* ---------- Impressão: só as grelhas, sem totais nem coluna H ----------
+     Mesmo truque da loja-sao-bento.html (visibility + área absoluta no topo).
+     Cores a literal claro, para o tema escuro não ir para o papel. */
+  .print-cab{ display:none; }
+  @media print{
+    @page{ size:A4 portrait; margin:10mm; }
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; top:0; left:0; width:100%; color:#141414; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .print-cab{ display:block; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; margin:0 0 4px; color:#141414; }
+    #printArea .card{ background:none; box-shadow:none; backdrop-filter:none; border:none; border-radius:0; padding:0; }
+    #printArea .card::before, #printArea .card::after{ display:none; }
+    .dia{ margin:0 0 7px; break-inside:avoid; page-break-inside:avoid; }
+    .dia-cab{ margin-bottom:2px; }
+    .dia-cab h2{ font-size:11px; color:#141414; }
+    .dia-cab .h, td.horas, th.h, .fbtn{ display:none !important; }
+    .scroll{ overflow:visible; }
+    table.grelha{ border-spacing:1px; }
+    /* Prefixo #printArea de propósito: ganha às regras body.shell-touch (ao
+       telemóvel as células são de 38px e o papel não tem de o ser). */
+    #printArea table.grelha th{ height:11px; font-size:8px; color:#555; }
+    #printArea table.grelha th.nome, #printArea table.grelha td.nome{ position:static; width:64px; min-width:64px; background:none; font-size:9px; color:#141414; }
+    #printArea td.cel, #printArea td.fechado, #printArea td.cov{ width:30px; min-width:30px; height:15px; font-size:9px; border-radius:2px; line-height:1; }
+    #printArea td.cel{ background:#FFFFFF; border:1px solid #BBBBBB; }
+    #printArea td.cel.s1{ background:#92D050; border-color:#92D050; color:#141414; }
+    #printArea td.cel.s2{ background:#FFD966; border-color:#FFD966; color:#141414; }
+    #printArea td.cel.s3{ background:#F8C9D0; border-color:#F8C9D0; color:#8A1C27; }
+    #printArea td.fechado{ background:#141414; }
+    #printArea tr.pessoas td{ height:13px; }
+    #printArea tr.pessoas td.nome{ color:#555; }
+    #printArea td.cov.c0{ color:#777; border:1px dashed #BBBBBB; }
+    #printArea td.cov.c1{ background:#E0453F; color:#FFFFFF; }
+    #printArea td.cov.c2{ background:#E2EFDA; color:#141414; }
+    #printArea td.cov.c3, #printArea td.cov.c4{ background:#548235; color:#FFFFFF; }
+    #printArea .bloco{ padding:0; margin:0 0 6px; }
+  }
 </style>
 </head>
 
@@ -198,18 +235,24 @@
       </div>
       <div class="acoes">
         <span class="estado" id="estado">A ligar…</span>
+        <button type="button" class="btn-sec" id="btnImprimir">Imprimir</button>
         <button type="button" class="btn-sec" id="btnRepor" disabled>Repor versão aprovada</button>
         <button type="button" class="btn-add" id="btnAprovar" disabled>Fixar como aprovada</button>
       </div>
     </div>
-    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Fixar como aprovada» guarda a grelha atual como a versão a que «Repor» volta.</p>
+    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Fixar como aprovada» guarda a grelha atual como a versão a que «Repor» volta. «Imprimir» sai só com as grelhas, sem horas totais.</p>
   </div>
 
   <div id="avisos" class="card glass-light bloco" style="display:none"></div>
 
   <div class="totais" id="totais"></div>
 
-  <div id="grelhas"></div>
+  <!-- Área de impressão: só as grelhas, sem totais nem coluna H (pedido do Manel,
+       10 Nov/2026 — o papel na loja é para ver quem está a que horas, não horas). -->
+  <div id="printArea">
+    <div class="print-cab">Horário da loja · semana tipo</div>
+    <div id="grelhas"></div>
+  </div>
 
 </main>
 
@@ -379,7 +422,7 @@
       var totalDia = horasDia.reduce(function (a, b) { return a + b; }, 0);
       html += '<div class="dia card glass-light bloco"><div class="dia-cab"><h2>' + DIAS_LONGO[d] + '</h2><span class="h">' + totalDia + 'h de equipa</span></div>' +
         '<div class="scroll"><table class="grelha"><thead><tr><th class="nome"></th>' +
-        HORAS.map(function (h) { return '<th>' + h + 'h</th>'; }).join('') + '<th>H</th></tr></thead><tbody>' +
+        HORAS.map(function (h) { return '<th>' + h + 'h</th>'; }).join('') + '<th class="h">H</th></tr></thead><tbody>' +
         linhas + '<tr class="pessoas"><td class="nome">Pessoas</td>' + covHtml + '<td></td></tr></tbody></table></div></div>';
     });
     grelhasEl.innerHTML = html;
@@ -528,6 +571,8 @@
       var u = {}; u['grid/' + d + '/' + s] = linha;
       marcarAtualizado(u);
     });
+
+    document.getElementById('btnImprimir').addEventListener('click', function () { window.print(); });
 
     btnRepor.addEventListener('click', function () {
       if (!aprovado) return;
