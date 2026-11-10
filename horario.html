@@ -90,9 +90,12 @@
   .tot.alerta .v{ color:var(--red-ink); }
 
   /* ---------- Grelha por dia ---------- */
-  .dia{ margin-top:16px; }
-  .dia-cab{ display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
-  .dia-cab h2{ font-size:15px; }
+  /* Os 7 dias vivem num só cartão (.semana), separados por uma risca fina — em
+     cartões separados ficavam demasiado afastados (Manel, 10 Nov/2026). */
+  .dia{ margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .dia:first-child{ margin-top:0; padding-top:0; border-top:none; }
+  .dia-cab{ display:flex; align-items:baseline; gap:10px; margin-bottom:4px; position:sticky; left:0; width:max-content; }
+  .dia-cab h2{ font-size:13.5px; }
   .dia-cab .h{ font-size:11.5px; color:var(--muted); }
   .scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; }
   table.grelha{ width:auto; border-collapse:separate; border-spacing:2px; table-layout:fixed; user-select:none; -webkit-user-select:none; }
@@ -146,7 +149,8 @@
     .print-cab{ display:block; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; margin:0 0 4px; color:#141414; }
     #printArea .card{ background:none; box-shadow:none; backdrop-filter:none; border:none; border-radius:0; padding:0; }
     #printArea .card::before, #printArea .card::after{ display:none; }
-    .dia{ margin:0 0 7px; break-inside:avoid; page-break-inside:avoid; }
+    .dia{ margin:0 0 3px; padding-top:3px; border-top:1px solid #DDDDDD; break-inside:avoid; page-break-inside:avoid; }
+    .dia:first-child{ border-top:none; padding-top:0; }
     .dia-cab{ margin-bottom:2px; }
     .dia-cab h2{ font-size:11px; color:#141414; }
     .dia-cab .h, td.horas, th.h, .fbtn{ display:none !important; }
@@ -442,12 +446,13 @@
         return fechado(d, k) ? '<td class="fechado" data-d="' + d + '" data-k="' + k + '"></td>' : '<td class="cov c' + Math.min(cov[k], 4) + '">' + cov[k] + '</td>';
       }).join('');
       var totalDia = horasDia.reduce(function (a, b) { return a + b; }, 0);
-      html += '<div class="dia card glass-light bloco"><div class="dia-cab"><h2>' + DIAS_LONGO[d] + '</h2><span class="h">' + totalDia + 'h de equipa</span></div>' +
-        '<div class="scroll"><table class="grelha"><thead><tr><th class="nome"></th>' +
+      html += '<div class="dia"><div class="dia-cab"><h2>' + DIAS_LONGO[d] + '</h2><span class="h">' + totalDia + 'h de equipa</span></div>' +
+        '<table class="grelha"><thead><tr><th class="nome"></th>' +
         HORAS.map(function (h) { return '<th>' + h + 'h</th>'; }).join('') + '<th class="h">H</th></tr></thead><tbody>' +
-        linhas + '<tr class="pessoas"><td class="nome">Pessoas</td>' + covHtml + '<td></td></tr></tbody></table></div></div>';
+        linhas + '<tr class="pessoas"><td class="nome">Pessoas</td>' + covHtml + '<td></td></tr></tbody></table></div>';
     });
-    grelhasEl.innerHTML = html;
+    // Um só scroll horizontal para a semana inteira (um por dia eram 7 barras).
+    grelhasEl.innerHTML = '<div class="card glass-light bloco semana"><div class="scroll">' + html + '</div></div>';
 
     var R = STAFF.indexOf('Rodrigo');
     totaisEl.innerHTML = STAFF.map(function (n, s) {
