@@ -85,12 +85,19 @@
      alterando a grelha e ver os totais a mexer. Sticky dentro do <main>, que
      contém as grelhas todas; a faixa leva o fundo da página para tapar o que
      passa por baixo. Compactos, 4 em linha mesmo ao telemóvel. */
-  .totais{ display:flex; gap:8px; margin-top:14px; position:sticky; top:0; z-index:5; background:var(--dough); padding:8px 0; }
-  .tot{ flex:1 1 0; min-width:0; border-radius:12px; padding:8px 12px; background:var(--white); border:1px solid var(--line); }
+  .corpo{ display:flex; gap:16px; align-items:flex-start; }
+  #printArea{ flex:1 1 auto; min-width:0; }
+  .totais{ flex:0 0 172px; display:flex; flex-direction:column; gap:8px; margin-top:16px; position:sticky; top:16px; z-index:5; }
+  .tot{ min-width:0; border-radius:12px; padding:10px 14px; background:var(--white); border:1px solid var(--line); }
   .tot .n{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tot .v{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:20px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:1px; }
+  .tot .v{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:24px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:1px; }
   .tot .v small{ font-size:11px; font-weight:500; color:var(--muted); }
-  body.shell-touch .tot{ padding:6px 8px; }
+  /* Ao toque: faixa de 4 em linha, fixa no topo, com o fundo da página a tapar o
+     que passa por baixo. O order põe-na antes das grelhas. */
+  body.shell-touch .corpo{ display:flex; flex-direction:column; align-items:stretch; gap:0; }
+  body.shell-touch .totais{ order:-1; flex:none; flex-direction:row; gap:8px; margin-top:14px; top:0; padding:8px 0; background:var(--dough); }
+  body.shell-touch .tot{ flex:1 1 0; padding:6px 8px; }
+  body.shell-touch .tot .v{ font-size:20px; }
   body.shell-touch .tot .v small{ display:none; }
   .tot.alerta{ border-color:var(--red); }
   .tot.alerta .v{ color:var(--red-ink); }
@@ -265,13 +272,16 @@
 
   <div id="avisos" class="card glass-light bloco" style="display:none"></div>
 
-  <div class="totais" id="totais"></div>
-
+  <div class="corpo">
   <!-- Área de impressão: só as grelhas, sem totais nem coluna H (pedido do Manel,
        10 Nov/2026 — o papel na loja é para ver quem está a que horas, não horas). -->
   <div id="printArea">
     <div class="print-cab">Horário da loja · semana tipo</div>
     <div id="grelhas"></div>
+  </div>
+  <!-- No computador os totais são uma coluna à direita, fixa ao fazer scroll
+       (Manel, 10 Nov/2026); ao toque (shell-touch) voltam a ser a faixa de cima. -->
+  <div class="totais" id="totais"></div>
   </div>
 
 </main>
