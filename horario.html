@@ -117,9 +117,11 @@
      (background:transparent) é mais específica do que um td.classe sozinho e
      apagava o branco do vazio e o PRETO do fechado. */
   table.grelha td.cel{ width:34px; min-width:34px; height:30px; border-radius:6px; cursor:pointer; background:var(--h-vazio); border:1px solid var(--line); font-weight:700; }
-  td.cel.s1{ background:var(--h-trab); color:#141414; border-color:transparent; }
-  td.cel.s2{ background:var(--h-pausa); color:#141414; border-color:transparent; }
-  td.cel.s3{ background:var(--h-folga); color:#8A1C27; border-color:transparent; font-style:italic; }
+  /* …e os estados têm de levar o MESMO prefixo, senão «table.grelha td.cel»
+     (duas classes) ganha a «td.cel.s1» (duas classes, menos um elemento). */
+  table.grelha td.cel.s1{ background:var(--h-trab); color:#141414; border-color:transparent; }
+  table.grelha td.cel.s2{ background:var(--h-pausa); color:#141414; border-color:transparent; }
+  table.grelha td.cel.s3{ background:var(--h-folga); color:#8A1C27; border-color:transparent; font-style:italic; }
   table.grelha td.fechado{ width:34px; min-width:34px; height:30px; border-radius:6px; background:var(--h-fechado); }
   td.horas{ width:36px; min-width:36px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink); }
   tr.pessoas td{ height:26px; }
@@ -134,7 +136,7 @@
   .fbtn:hover{ border-color:var(--ink); }
 
   /* Alvos maiores ao toque (critério do hover, nunca a largura — ver CLAUDE.md). */
-  body.shell-touch td.cel, body.shell-touch td.fechado, body.shell-touch td.cov{ height:38px; width:38px; min-width:38px; }
+  body.shell-touch table.grelha td.cel, body.shell-touch table.grelha td.fechado, body.shell-touch table.grelha td.cov{ height:38px; width:38px; min-width:38px; }
   body.shell-touch .fbtn{ width:30px; height:30px; }
   body.shell-touch .bloco{ padding:14px 12px; }
   body.shell-touch .acoes{ margin-left:0; width:100%; }
