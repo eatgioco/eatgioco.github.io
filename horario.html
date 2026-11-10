@@ -40,7 +40,9 @@
   .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
   .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
 
-  main{ padding:18px 0 80px; color:var(--ink); }
+  /* Largura de leitura da página: a grelha (~620px) + a coluna dos totais. O
+     cartão da grelha não estica — fica à largura da tabela (Manel, 10 Nov/2026). */
+  main{ padding:18px 0 80px; color:var(--ink); max-width:840px; }
   .card > *{ position:relative; z-index:1; }
   .bloco{ padding:18px 20px; margin-top:16px; }
   .bloco h2{ margin:0; font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600; color:var(--ink); }
@@ -86,7 +88,9 @@
      contém as grelhas todas; a faixa leva o fundo da página para tapar o que
      passa por baixo. Compactos, 4 em linha mesmo ao telemóvel. */
   .corpo{ display:flex; gap:16px; align-items:flex-start; }
-  #printArea{ flex:1 1 auto; min-width:0; }
+  #printArea{ flex:0 1 auto; min-width:0; }
+  .semana{ width:max-content; max-width:100%; }
+  body.shell-touch .semana{ width:auto; }
   .totais{ flex:0 0 172px; display:flex; flex-direction:column; gap:8px; margin-top:16px; position:sticky; top:16px; z-index:5; }
   .tot{ min-width:0; border-radius:12px; padding:10px 14px; background:var(--white); border:1px solid var(--line); }
   .tot .n{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
