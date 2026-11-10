@@ -81,11 +81,17 @@
   body.shell-touch #avisos ul{ columns:1; }
 
   /* ---------- Totais semanais ---------- */
-  .totais{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-  .tot{ flex:1 1 140px; border-radius:12px; padding:12px 14px; background:var(--white); border:1px solid var(--line); }
-  .tot .n{ font-size:11.5px; color:var(--muted); }
-  .tot .v{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:24px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:2px; }
-  .tot .v small{ font-size:12px; font-weight:500; color:var(--muted); }
+  /* Totais FIXOS no topo ao fazer scroll (Manel, 10 Nov/2026): a ideia é ir
+     alterando a grelha e ver os totais a mexer. Sticky dentro do <main>, que
+     contém as grelhas todas; a faixa leva o fundo da página para tapar o que
+     passa por baixo. Compactos, 4 em linha mesmo ao telemóvel. */
+  .totais{ display:flex; gap:8px; margin-top:14px; position:sticky; top:0; z-index:5; background:var(--dough); padding:8px 0; }
+  .tot{ flex:1 1 0; min-width:0; border-radius:12px; padding:8px 12px; background:var(--white); border:1px solid var(--line); }
+  .tot .n{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tot .v{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:20px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:1px; }
+  .tot .v small{ font-size:11px; font-weight:500; color:var(--muted); }
+  body.shell-touch .tot{ padding:6px 8px; }
+  body.shell-touch .tot .v small{ display:none; }
   .tot.alerta{ border-color:var(--red); }
   .tot.alerta .v{ color:var(--red-ink); }
 
