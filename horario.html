@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#FFEDDA">
+<meta name="apple-mobile-web-app-title" content="GIOCO Horário">
+<!-- Horário semanal da equipa da loja. Uso móvel real (o Alfredo e a equipa
+     consultam e alteram ao telemóvel): viewport device-width + opt-in shell-mobile,
+     como a equipa.html. Sem @media próprios — a grelha adapta-se com overflow-x:auto
+     e coluna sticky, e as regras body.shell-touch alargam os alvos ao toque. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO OS · Horário</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="gioco-shell.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  body{ -webkit-font-smoothing:antialiased; }
+  .page-subtitle{ margin:0 0 4px; font-size:13px; color:var(--muted); }
+
+  /* ---------- Erro de autenticação (padrão do OS) ---------- */
+  #authErro{ display:none; margin:18px 0 0; }
+  #authErro.on{ display:block; }
+  .auth-box{ border-left:4px solid var(--red); background:var(--white); border-radius:12px; padding:20px 22px; }
+  .auth-box h2{ margin:0 0 8px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; color:var(--red-ink); }
+  .auth-box p{ margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
+
+  main{ padding:18px 0 80px; color:var(--ink); }
+  .card > *{ position:relative; z-index:1; }
+  .bloco{ padding:18px 20px; margin-top:16px; }
+  .bloco h2{ margin:0; font-family:'Inter',sans-serif; font-size:14.5px; font-weight:600; color:var(--ink); }
+
+  /* ---------- Cores dos estados das células (locais à página) ----------
+     Superfícies de selo: continuam claras no escuro, texto literal fixo por cima
+     (o mesmo padrão dos .status.ok/.warn do shell). */
+  :root{
+    --h-trab:#92D050; --h-pausa:#FFD966; --h-folga:#F8C9D0; --h-fechado:#141414;
+    --h-cov1:#E0453F; --h-cov2:#E2EFDA; --h-cov3:#548235;
+    --h-vazio:var(--white);
+  }
+  [data-theme="dark"]{
+    --h-trab:#7FBF3F; --h-pausa:#E0B93A; --h-folga:#C97D7D; --h-fechado:#000000;
+    --h-cov1:#C93A35; --h-cov2:#4F6B45; --h-cov3:#6FA35A;
+  }
+
+  /* ---------- Barra de topo: legenda + ações + estado ---------- */
+  .barra{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .legenda{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:11.5px; color:var(--ink); }
+  .legenda span{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:100px; border:1px solid var(--line); background:var(--white); }
+  .legenda i{ display:inline-block; width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,.15); }
+  .acoes{ display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap; }
+  .btn-sec{ font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:9px 14px; border-radius:100px; border:1.5px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; }
+  .btn-sec:hover{ border-color:var(--ink); }
+  .btn-sec:disabled{ opacity:.45; cursor:not-allowed; }
+  .estado{ font-size:11.5px; color:var(--muted); white-space:nowrap; }
+  .estado.ok{ color:var(--green); }
+  .estado.off{ color:var(--amber); font-weight:600; }
+
+  /* ---------- Avisos de regras ---------- */
+  #avisos{ margin-top:14px; border-left:4px solid var(--red); border-radius:12px; padding:12px 16px; background:var(--white); }
+  #avisos.ok{ border-left-color:var(--green); }
+  #avisos h2{ font-size:12.5px; margin:0 0 6px; color:var(--red-ink); }
+  #avisos.ok h2{ color:var(--green); }
+  #avisos ul{ margin:0; padding-left:18px; font-size:12.5px; line-height:1.6; color:var(--ink); columns:2; column-gap:28px; }
+  #avisos li{ break-inside:avoid; }
+  body.shell-touch #avisos ul{ columns:1; }
+
+  /* ---------- Totais semanais ---------- */
+  .totais{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+  .tot{ flex:1 1 140px; border-radius:12px; padding:12px 14px; background:var(--white); border:1px solid var(--line); }
+  .tot .n{ font-size:11.5px; color:var(--muted); }
+  .tot .v{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:24px; font-weight:700; color:var(--ink); line-height:1.1; margin-top:2px; }
+  .tot .v small{ font-size:12px; font-weight:500; color:var(--muted); }
+  .tot.alerta{ border-color:var(--red); }
+  .tot.alerta .v{ color:var(--red-ink); }
+
+  /* ---------- Grelha por dia ---------- */
+  .dia{ margin-top:16px; }
+  .dia-cab{ display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+  .dia-cab h2{ font-size:15px; }
+  .dia-cab .h{ font-size:11.5px; color:var(--muted); }
+  .scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; }
+  table.grelha{ width:auto; border-collapse:separate; border-spacing:2px; table-layout:fixed; user-select:none; -webkit-user-select:none; }
+  table.grelha th, table.grelha td{ padding:0; text-align:center; font-family:'Inter',sans-serif; font-size:12px; color:var(--ink); border:none; background:transparent; }
+  table.grelha th{ height:22px; font-weight:600; color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; }
+  table.grelha th.nome, table.grelha td.nome{
+    position:sticky; left:0; z-index:2; text-align:left; width:112px; min-width:112px; padding-left:4px;
+    background:var(--dough); font-weight:600; white-space:nowrap;
+  }
+  table.grelha td.nome{ display:table-cell; }
+  .nome-in{ display:flex; align-items:center; gap:6px; }
+  td.cel{ width:34px; min-width:34px; height:30px; border-radius:6px; cursor:pointer; background:var(--h-vazio); border:1px solid var(--line); font-weight:700; }
+  td.cel.s1{ background:var(--h-trab); color:#141414; border-color:transparent; }
+  td.cel.s2{ background:var(--h-pausa); color:#141414; border-color:transparent; }
+  td.cel.s3{ background:var(--h-folga); color:#8A1C27; border-color:transparent; font-style:italic; }
+  td.fechado{ width:34px; min-width:34px; height:30px; border-radius:6px; background:var(--h-fechado); }
+  td.horas{ width:36px; min-width:36px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink); }
+  tr.pessoas td{ height:26px; }
+  tr.pessoas td.nome{ color:var(--muted); font-weight:500; }
+  td.cov{ width:34px; min-width:34px; border-radius:6px; font-weight:700; font-variant-numeric:tabular-nums; }
+  td.cov.c0{ color:var(--muted); border:1px dashed var(--line); }
+  td.cov.c1{ background:var(--h-cov1); color:#FFFFFF; }
+  td.cov.c2{ background:var(--h-cov2); color:#141414; }
+  td.cov.c3, td.cov.c4{ background:var(--h-cov3); color:#FFFFFF; }
+  .fbtn{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700; width:22px; height:22px; border-radius:6px; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; padding:0; line-height:1; }
+  .fbtn.on{ background:var(--h-folga); color:#8A1C27; border-color:transparent; }
+  .fbtn:hover{ border-color:var(--ink); }
+
+  /* Alvos maiores ao toque (critério do hover, nunca a largura — ver CLAUDE.md). */
+  body.shell-touch td.cel, body.shell-touch td.fechado, body.shell-touch td.cov{ height:38px; width:38px; min-width:38px; }
+  body.shell-touch .fbtn{ width:30px; height:30px; }
+  body.shell-touch .bloco{ padding:14px 12px; }
+  body.shell-touch .acoes{ margin-left:0; width:100%; }
+  body.shell-touch .btn-sec, body.shell-touch .btn-add{ min-height:44px; }
+
+  .nota{ font-size:11.5px; color:var(--muted); margin:8px 0 0; }
+</style>
+</head>
+
+<body class="shell-mobile">
+<div class="nav-overlay" id="navOverlay"></div>
+<script src="gioco-shell.js"></script>
+
+<div class="shell">
+
+  <div class="sidebar glass collapsed" id="sidebarEl">
+    <div class="glass-bend"></div>
+    <div class="brand">
+      <div class="mark-collapsed"><svg class="icon" width="18" height="18"><use href="#i-menu"/></svg></div>
+      <img src="Logo_Tomato_5x.png" alt="GIOCO" class="mark-logo">
+      <div class="word">GIOCO OS<span>painel interno</span></div>
+    </div>
+    <nav id="giocoNav"></nav>
+    <script>giocoNav('horario.html');</script>
+    <div class="sidebar-foot">
+      <!-- Sem sessões no GIOCO OS: utilizador fixo, sem dropdown nem logout. -->
+      <div class="foot-user">
+        <div class="foot-avatar"><svg class="icon" width="14" height="14"><use href="#i-settings"/></svg></div>
+        <span>Administrador</span><div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page">
+
+      <div class="greet-row">
+        <button class="sidebar-pin-btn glass-light" id="sidebarPinBtn" onclick="giocoToggleMenu()" title="Fixar a barra lateral fechada">
+          <svg class="icon" width="16" height="16"><use href="#i-panel-left"/></svg>
+        </button>
+        <h1><svg class="icon" width="24" height="24" style="vertical-align:-3px;margin-right:8px"><use href="#i-clock"/></svg>Horário <b>da loja</b></h1>
+        <div class="spacer"></div>
+        <div class="toggle-track is-light" id="toggleTrack" onclick="toggleThemeSwitch()">
+          <div class="toggle-knob" id="toggleKnob"><svg class="icon" width="14" height="14" id="knobIcon"><use href="#i-sun"/></svg></div>
+          <div class="toggle-ghost" id="toggleGhost"><svg class="icon" width="13" height="13" id="ghostIcon"><use href="#i-moon"/></svg></div>
+        </div>
+      </div>
+
+      <p class="page-subtitle">Semana tipo da equipa da loja · toca numa célula para alternar vazio → trabalha → pausa · as alterações ficam guardadas para todos</p>
+
+      <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+           falhar; ver autenticarEContinuar() mais abaixo. -->
+      <div id="authErro">
+        <div class="auth-box card glass-light">
+          <h2>Sem ligação ao Firebase</h2>
+          <p id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</p>
+          <button type="button" class="btn-add" id="authRetryBtn">Tentar de novo</button>
+        </div>
+      </div>
+
+<main>
+
+  <div class="card glass-light bloco">
+    <div class="barra">
+      <div class="legenda">
+        <span><i style="background:var(--h-trab)"></i>trabalha</span>
+        <span><i style="background:var(--h-pausa)"></i><b>P</b> pausa</span>
+        <span><i style="background:var(--h-folga)"></i><b>F</b> folga</span>
+        <span><i style="background:var(--h-fechado)"></i>fechado</span>
+        <span><i style="background:var(--h-cov1)"></i>1 pessoa</span>
+        <span><i style="background:var(--h-cov2)"></i>2 pessoas</span>
+        <span><i style="background:var(--h-cov3)"></i>3 pessoas</span>
+      </div>
+      <div class="acoes">
+        <span class="estado" id="estado">A ligar…</span>
+        <button type="button" class="btn-sec" id="btnRepor" disabled>Repor versão aprovada</button>
+        <button type="button" class="btn-add" id="btnAprovar" disabled>Fixar como aprovada</button>
+      </div>
+    </div>
+    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Fixar como aprovada» guarda a grelha atual como a versão a que «Repor» volta.</p>
+  </div>
+
+  <div id="avisos" class="card glass-light bloco" style="display:none"></div>
+
+  <div class="totais" id="totais"></div>
+
+  <div id="grelhas"></div>
+
+</main>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  /* ============================================================
+     Dados fixos da grelha (estrutura) e versão aprovada de arranque.
+     Estados por célula: 0 vazio · 1 trabalha · 2 pausa · 3 folga.
+     Células fechadas (não editáveis): Seg/Ter/Qua 16h e 22h; Qui 22h; Dom 22h.
+     ============================================================ */
+  var DIAS   = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'];
+  var DIAS_LONGO = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+  var STAFF  = ['Diego', 'Prabin', 'Alfredo', 'Rodrigo'];
+  var HORAS  = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+  var FECHADO = [[16, 22], [16, 22], [16, 22], [22], [], [], [22]];
+
+  /* «Opção 5», aprovada pelo Manel a 10 Nov/2026 (Diego 42h · Prabin 40h ·
+     Alfredo 35h · Rodrigo 40h). Semeia horarioLoja/aprovado e horarioLoja/atual
+     na PRIMEIRA abertura, se o nó não existir — nunca sobrepõe o que lá estiver. */
+  var GRELHA_OPCAO_5 = [
+    [[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0],[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0]],
+    [[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0],[1,1,1,1,1,0,1,1,1,1,1,0],[3,3,3,3,3,3,3,3,3,3,3,3]],
+    [[1,1,1,1,1,0,1,1,1,1,1,0],[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0],[3,3,3,3,3,3,3,3,3,3,3,3]],
+    [[0,0,0,1,1,1,1,1,1,1,1,0],[1,1,1,0,0,0,0,0,0,0,0,0],[1,1,1,1,1,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,1,1,1,1,0]],
+    [[0,0,1,1,1,1,0,0,1,1,1,1],[1,1,1,1,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0,1,1,1,1]],
+    [[0,0,1,1,1,1,0,0,1,1,1,1],[1,1,1,1,0,0,1,1,0,0,0,0],[0,0,0,0,0,0,1,1,1,1,1,1],[1,1,1,1,1,1,0,0,0,0,0,0]],
+    [[0,0,1,1,1,1,2,1,1,1,1,0],[1,1,1,1,0,0,1,0,0,0,0,0],[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,2,1,1,1,1,1,0]]
+  ];
+
+  function fechado(d, k) { return FECHADO[d].indexOf(HORAS[k]) >= 0; }
+  function clonar(g) { return JSON.parse(JSON.stringify(g)); }
+
+  /* O RTDB devolve arrays densos como arrays, mas uma folha a 0 pode vir como
+     objeto {0:..} se alguma chave faltar. Normaliza sempre para 7×4×12 de inteiros. */
+  function normalizarGrelha(raw) {
+    if (!raw) return null;
+    var g = [];
+    for (var d = 0; d < DIAS.length; d++) {
+      var dia = raw[d] || {};
+      g.push([]);
+      for (var s = 0; s < STAFF.length; s++) {
+        var linha = dia[s] || {};
+        var arr = [];
+        for (var k = 0; k < HORAS.length; k++) {
+          var v = parseInt(linha[k], 10);
+          arr.push(v >= 0 && v <= 3 ? v : 0);
+        }
+        g[d].push(arr);
+      }
+    }
+    return g;
+  }
+
+  var grelhasEl = document.getElementById('grelhas');
+  var avisosEl  = document.getElementById('avisos');
+  var totaisEl  = document.getElementById('totais');
+  var estadoEl  = document.getElementById('estado');
+  var btnRepor  = document.getElementById('btnRepor');
+  var btnAprovar = document.getElementById('btnAprovar');
+
+  function fmtHora(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  /* ---------- Render ---------- */
+  function render(M) {
+    var html = '';
+    var tot = STAFF.map(function () { return 0; });
+    DIAS.forEach(function (dia, d) {
+      var cov = HORAS.map(function () { return 0; });
+      var horasDia = STAFF.map(function () { return 0; });
+      var linhas = '';
+      STAFF.forEach(function (nome, s) {
+        var cnt = 0, cels = '';
+        HORAS.forEach(function (h, k) {
+          if (fechado(d, k)) { cels += '<td class="fechado" title="fechado"></td>'; return; }
+          var v = M[d][s][k];
+          if (v === 1) { cnt++; cov[k]++; }
+          cels += '<td class="cel s' + v + '" data-d="' + d + '" data-s="' + s + '" data-k="' + k + '">' + (v === 2 ? 'P' : v === 3 ? 'F' : '') + '</td>';
+        });
+        tot[s] += cnt; horasDia[s] = cnt;
+        var isF = M[d][s].every(function (v, k) { return v === 3 || fechado(d, k); });
+        linhas += '<tr><td class="nome"><div class="nome-in"><button type="button" class="fbtn' + (isF ? ' on' : '') + '" data-d="' + d + '" data-s="' + s + '" title="' + (isF ? 'Tirar folga' : 'Marcar folga') + '">F</button><span>' + nome + '</span></div></td>' + cels + '<td class="horas">' + cnt + '</td></tr>';
+      });
+      var covHtml = HORAS.map(function (h, k) {
+        return fechado(d, k) ? '<td class="fechado"></td>' : '<td class="cov c' + Math.min(cov[k], 4) + '">' + cov[k] + '</td>';
+      }).join('');
+      var totalDia = horasDia.reduce(function (a, b) { return a + b; }, 0);
+      html += '<div class="dia card glass-light bloco"><div class="dia-cab"><h2>' + DIAS_LONGO[d] + '</h2><span class="h">' + totalDia + 'h de equipa</span></div>' +
+        '<div class="scroll"><table class="grelha"><thead><tr><th class="nome"></th>' +
+        HORAS.map(function (h) { return '<th>' + h + 'h</th>'; }).join('') + '<th>H</th></tr></thead><tbody>' +
+        linhas + '<tr class="pessoas"><td class="nome">Pessoas</td>' + covHtml + '<td></td></tr></tbody></table></div></div>';
+    });
+    grelhasEl.innerHTML = html;
+
+    var R = STAFF.indexOf('Rodrigo');
+    totaisEl.innerHTML = STAFF.map(function (n, s) {
+      var alerta = (s === R && tot[s] !== 40) || tot[s] > 45;
+      var meta = s === R ? '40h fixas' : 'até 45h';
+      return '<div class="tot' + (alerta ? ' alerta' : '') + '"><div class="n">' + n + ' · ' + meta + '</div><div class="v">' + tot[s] + '<small> h/semana</small></div></div>';
+    }).join('');
+
+    avisos(M, tot);
+  }
+
+  function avisos(M, tot) {
+    var w = [];
+    var D = STAFF.indexOf('Diego'), P = STAFF.indexOf('Prabin'), A = STAFF.indexOf('Alfredo'), R = STAFF.indexOf('Rodrigo');
+    DIAS.forEach(function (dia, d) {
+      HORAS.forEach(function (h, k) {
+        if (fechado(d, k)) return;
+        var on = function (s) { return M[d][s][k] === 1; };
+        var n = STAFF.filter(function (_, s) { return on(s); }).length;
+        if (n === 0) { w.push(dia + ' ' + h + 'h: ninguém'); return; }
+        if (!on(D) && !on(P)) w.push(dia + ' ' + h + 'h: sem Diego nem Prabin');
+        if (n === 1 && on(P)) w.push(dia + ' ' + h + 'h: Prabin sozinho');
+        if (!on(A) && !on(R)) w.push(dia + ' ' + h + 'h: sem Alfredo nem Rodrigo');
+        if (n > 3) w.push(dia + ' ' + h + 'h: ' + n + ' pessoas (máx 3)');
+        // Pico = 13h e 14h de Sex a Dom; à quinta nunca são precisas 3 pessoas.
+        if (n === 3 && (h < 13 || h > 14 || dia === 'QUI')) w.push(dia + ' ' + h + 'h: 3 pessoas fora do pico');
+      });
+    });
+    if (tot[R] !== 40) w.push('Rodrigo com ' + tot[R] + 'h (tem de ser 40)');
+    tot.forEach(function (t, s) { if (t > 45) w.push(STAFF[s] + ' com ' + t + 'h (máx 45)'); });
+
+    avisosEl.style.display = '';
+    if (w.length) {
+      avisosEl.className = 'card glass-light bloco';
+      avisosEl.innerHTML = '<h2>' + w.length + ' aviso' + (w.length === 1 ? '' : 's') + ' de regras</h2><ul>' +
+        w.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>';
+    } else {
+      avisosEl.className = 'card glass-light bloco ok';
+      avisosEl.innerHTML = '<h2>Sem avisos: todas as regras cumpridas.</h2>';
+    }
+  }
+
+  /* ============================================================
+     Firebase: horarioLoja/atual (a grelha viva, lida com on('value') para
+     ficar igual em todos os dispositivos) e horarioLoja/aprovado (a versão a
+     que «Repor» volta). Cada toque escreve SÓ a folha da célula; o botão F e o
+     Repor escrevem a linha / a grelha inteira. Nunca se escreve a partir do
+     listener — a UI é sempre o reflexo do snapshot.
+     ============================================================ */
+  autenticarEContinuar(function () {
+    var db = firebase.database();
+    var refAtual = db.ref('horarioLoja/atual');
+    var refAprovado = db.ref('horarioLoja/aprovado');
+    var M = null;         // última grelha recebida do RTDB
+    var aprovado = null;  // última versão aprovada recebida
+
+    // Semeia os dois nós UMA vez, se não existirem. Transaction: dois
+    // dispositivos a abrir ao mesmo tempo não se pisam.
+    refAprovado.child('grid').transaction(function (cur) {
+      return cur === null ? GRELHA_OPCAO_5 : undefined;
+    });
+    refAtual.child('grid').transaction(function (cur) {
+      return cur === null ? GRELHA_OPCAO_5 : undefined;
+    });
+
+    refAprovado.on('value', function (snap) {
+      var v = snap.val() || {};
+      aprovado = normalizarGrelha(v.grid);
+      btnRepor.disabled = !aprovado || !M;
+    });
+
+    refAtual.on('value', function (snap) {
+      var v = snap.val() || {};
+      var g = normalizarGrelha(v.grid);
+      if (!g) return;  // ainda a semear
+      M = g;
+      render(M);
+      btnAprovar.disabled = false;
+      btnRepor.disabled = !aprovado;
+      estadoEl.className = 'estado ok';
+      estadoEl.textContent = v.atualizadoEm ? 'Guardado ✓ · ' + fmtHora(v.atualizadoEm) : 'Guardado ✓';
+    });
+
+    db.ref('.info/connected').on('value', function (snap) {
+      if (snap.val() === true) return;
+      estadoEl.className = 'estado off';
+      estadoEl.textContent = 'Sem ligação — as alterações sobem quando voltar';
+    });
+
+    function marcarAtualizado(updates) {
+      updates['atualizadoEm'] = firebase.database.ServerValue.TIMESTAMP;
+      return refAtual.update(updates).catch(function (e) {
+        console.error('Falha a gravar o horário:', e);
+        estadoEl.className = 'estado off';
+        estadoEl.textContent = 'Falha a gravar — tenta de novo';
+      });
+    }
+
+    function setCelula(d, s, k, v) {
+      if (!M || fechado(d, k) || M[d][s][k] === v) return;
+      // Reflexo local imediato (o RTDB dispara o listener em seguida com o mesmo valor).
+      M[d][s][k] = v;
+      render(M);
+      var u = {}; u['grid/' + d + '/' + s + '/' + k] = v;
+      marcarAtualizado(u);
+    }
+
+    /* ---------- Pintura: pointer events (rato e toque) ----------
+       Rato: carregar e arrastar pinta várias células com o estado da primeira.
+       Toque: um toque alterna a célula; arrastar continua a fazer scroll à
+       grelha (não se rouba o gesto — ao telemóvel a grelha é mais larga do que
+       o ecrã e o scroll horizontal é a forma de ver as horas da noite). */
+    var pintando = false, estadoPintura = 0;
+    grelhasEl.addEventListener('pointerdown', function (e) {
+      var td = e.target.closest('td.cel');
+      if (!td || !M) return;
+      var d = +td.dataset.d, s = +td.dataset.s, k = +td.dataset.k;
+      var cur = M[d][s][k];
+      estadoPintura = cur === 0 ? 1 : cur === 1 ? 2 : 0;
+      if (e.pointerType === 'mouse') {
+        e.preventDefault();
+        pintando = true;
+      }
+      setCelula(d, s, k, estadoPintura);
+    });
+    grelhasEl.addEventListener('pointerover', function (e) {
+      if (!pintando) return;
+      var td = e.target.closest('td.cel');
+      if (td) setCelula(+td.dataset.d, +td.dataset.s, +td.dataset.k, estadoPintura);
+    });
+    document.addEventListener('pointerup', function () { pintando = false; });
+    document.addEventListener('pointercancel', function () { pintando = false; });
+
+    // Botão F: folga no dia inteiro (ou tirar a folga → dia vazio).
+    grelhasEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button.fbtn');
+      if (!b || !M) return;
+      var d = +b.dataset.d, s = +b.dataset.s;
+      var isF = M[d][s].every(function (v, k) { return v === 3 || fechado(d, k); });
+      var linha = HORAS.map(function (h, k) { return fechado(d, k) ? 0 : (isF ? 0 : 3); });
+      M[d][s] = linha;
+      render(M);
+      var u = {}; u['grid/' + d + '/' + s] = linha;
+      marcarAtualizado(u);
+    });
+
+    btnRepor.addEventListener('click', function () {
+      if (!aprovado) return;
+      if (!confirm('Repor a versão aprovada? As alterações feitas desde então perdem-se em todos os dispositivos.')) return;
+      marcarAtualizado({ grid: clonar(aprovado) });
+    });
+
+    btnAprovar.addEventListener('click', function () {
+      if (!M) return;
+      if (!confirm('Fixar a grelha atual como a versão aprovada? Passa a ser a versão a que o «Repor» volta.')) return;
+      refAprovado.update({ grid: clonar(M), aprovadoEm: firebase.database.ServerValue.TIMESTAMP })
+        .catch(function (e) { console.error('Falha a fixar a versão aprovada:', e); alert('Não foi possível guardar. Tenta de novo.'); });
+    });
+  });
+</script>
+</body>
+</html>

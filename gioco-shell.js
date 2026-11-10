@@ -356,6 +356,9 @@
       { href: 'leitura-faturas.html', icone: 'scan',        label: 'Leitura de faturas' },
       { href: 'contagens.html',  icone: 'clipboard-check',  label: 'Contagens' },
       { href: 'equipa.html',     icone: 'users',            label: 'Equipa' },
+      /* Horário: semana tipo da equipa da loja, grelha hora a hora editável ao
+         vivo (horarioLoja/). Ao lado da Equipa, de onde saem as pessoas. */
+      { href: 'horario.html',    icone: 'clock',            label: 'Horário' },
       /* Gestão: folha de cálculo de ingredientes e produtos (edição em massa). */
       { href: 'gestao.html',     icone: 'pencil',           label: 'Gestão' }
     ]},
