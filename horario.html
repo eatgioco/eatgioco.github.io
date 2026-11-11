@@ -60,18 +60,65 @@
     --h-cov1:#C93A35; --h-cov2:#4F6B45; --h-cov3:#6FA35A;
   }
 
-  /* ---------- Barra de topo: legenda + ações + estado ---------- */
-  .barra{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
-  .legenda{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:11.5px; color:var(--ink); }
-  .legenda span{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:100px; border:1px solid var(--line); background:var(--white); }
-  .legenda i{ display:inline-block; width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,.15); }
-  .acoes{ display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap; }
+  /* ---------- Topo tipo «ficheiro» (11 Nov/2026, 2.ª versão) ----------
+     Nome da versão aberta sempre à vista, com a lista de versões num painel
+     por baixo (não um modal); Guardar / Guardar como; Horas fechadas e
+     Imprimir à direita. Legenda e ajuda saíram daqui para o fundo da grelha. */
+  .ficheiro{ display:flex; align-items:flex-start; gap:12px 16px; flex-wrap:wrap; }
+  .topo.glass-light:hover{ transform:none; }
+  .fich-wrap{ position:relative; flex:1 1 260px; min-width:0; }
+  .fich-btn{ display:inline-flex; align-items:center; gap:8px; max-width:100%; padding:6px 10px 6px 8px; border-radius:10px; border:1.5px solid transparent; background:transparent; color:var(--ink); cursor:pointer; font-family:'Inter',sans-serif; text-align:left; }
+  .fich-btn:hover, .fich-btn[aria-expanded="true"]{ border-color:var(--line); background:var(--white); }
+  .fich-btn:disabled{ cursor:default; }
+  .fich-btn > .icon{ color:var(--red); flex:none; }
+  .fich-nome{ font-size:18px; font-weight:700; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fich-btn .chev{ color:var(--muted); flex:none; }
+  .fich-meta{ font-size:11.5px; color:var(--muted); margin:2px 0 0 10px; }
+  .fich-meta.suja, .fich-meta.off{ color:var(--amber); font-weight:600; }
+  .acoes{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+  .acoes .sep{ width:1px; height:22px; background:var(--line); margin:0 4px; }
   .btn-sec{ font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:9px 14px; border-radius:100px; border:1.5px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; }
   .btn-sec:hover{ border-color:var(--ink); }
-  .btn-sec:disabled{ opacity:.45; cursor:not-allowed; }
-  .estado{ font-size:11.5px; color:var(--muted); white-space:nowrap; }
-  .estado.ok{ color:var(--green); }
-  .estado.off{ color:var(--amber); font-weight:600; }
+  .btn-sec:disabled, .btn-add:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn-sec[aria-pressed="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+
+  /* Painel de versões, por baixo do nome */
+  /* O painel é MOVIDO para o body no arranque e posicionado em fixed por baixo do
+     botão (como o #giocoNavFlyout): dentro do cartão, o backdrop-filter do
+     .glass-light cria um stacking context e os cartões seguintes tapavam-no. */
+  .ver-panel{ position:fixed; z-index:120; width:min(560px, 92vw); background:var(--white); border:1px solid var(--line); border-radius:14px; box-shadow:0 12px 32px rgba(0,0,0,.14); padding:8px; color:var(--ink); font-family:'Inter',sans-serif; }
+  .ver-panel[hidden]{ display:none; }
+  .ver-lista{ display:flex; flex-direction:column; gap:2px; max-height:50vh; overflow:auto; }
+  .ver-item{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; }
+  .ver-item:hover, .ver-item.atual{ background:var(--dough); }
+  .ver-main{ flex:1; min-width:0; cursor:pointer; display:flex; flex-direction:column; gap:1px; }
+  .ver-item.atual .ver-main{ cursor:default; }
+  .ver-nome{ font-weight:700; font-size:13.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ver-item.atual .ver-nome::after{ content:' · aberta'; color:var(--red-ink); font-weight:600; }
+  .ver-data{ font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ver-btns{ display:flex; gap:2px; flex:none; }
+  .ver-btns button{ width:32px; height:32px; border-radius:8px; border:1px solid transparent; background:transparent; color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+  .ver-btns button:hover{ border-color:var(--line); color:var(--ink); background:var(--white); }
+  .ver-nova{ width:100%; margin-top:6px; padding:10px; border-radius:10px; border:1.5px dashed var(--line); background:transparent; color:var(--ink); font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .ver-nova:hover{ border-color:var(--ink); }
+  .ver-vazio{ font-size:12.5px; color:var(--muted); padding:10px; }
+  body.shell-touch .acoes{ margin-left:0; width:100%; }
+  body.shell-touch .acoes .sep{ display:none; }
+  body.shell-touch .ver-panel{ width:calc(100vw - 32px); left:16px !important; }
+
+  /* Formulário «Guardar como» (no modal do shell) */
+  .ver-form{ display:flex; flex-direction:column; gap:10px; min-width:min(360px, 80vw); }
+  .ver-form label{ font-size:12px; color:var(--muted); }
+  .ver-form input{ width:100%; box-sizing:border-box; padding:11px 13px; border:1.5px solid var(--line); border-radius:12px; background:var(--dough); font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); }
+  .ver-form input:focus{ outline:none; border-color:var(--ink); }
+  .ver-form .ver-resumo{ font-size:12px; color:var(--muted); }
+  .ver-form .ver-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+
+  /* Legenda e ajuda: no fundo do cartão da grelha, discretas */
+  .legenda{ display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; font-size:11px; color:var(--muted); margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+  .legenda span{ display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:100px; border:1px solid var(--line); background:var(--white); color:var(--ink); }
+  .legenda i{ display:inline-block; width:10px; height:10px; border-radius:3px; border:1px solid rgba(0,0,0,.15); }
+  .legenda .dica{ flex:1 1 100%; border:none; background:none; padding:0; color:var(--muted); }
 
   /* ---------- Avisos de regras ---------- */
   #avisos{ margin-top:14px; border-left:4px solid var(--red); border-radius:12px; padding:12px 16px; background:var(--white); }
@@ -153,34 +200,6 @@
   body.shell-touch .acoes{ margin-left:0; width:100%; }
   body.shell-touch .btn-sec, body.shell-touch .btn-add{ min-height:44px; }
 
-  .nota{ font-size:11.5px; color:var(--muted); margin:8px 0 0; }
-  .estado b{ font-weight:600; color:var(--ink); }
-
-  /* ---------- Versões (modal do shell) ---------- */
-  .ver-form{ display:flex; flex-direction:column; gap:10px; min-width:min(360px, 80vw); }
-  .ver-form label{ font-size:12px; color:var(--muted); }
-  .ver-form input{ width:100%; box-sizing:border-box; padding:11px 13px; border:1.5px solid var(--line); border-radius:12px; background:var(--dough); font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); }
-  .ver-form input:focus{ outline:none; border-color:var(--ink); }
-  .ver-form .ver-resumo{ font-size:12px; color:var(--muted); }
-  .ver-form .ver-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
-  .ver-lista{ display:flex; flex-direction:column; gap:8px; min-width:min(520px, 84vw); max-height:60vh; overflow:auto; }
-  .ver-item{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
-  .ver-item.atual{ border-color:var(--red); }
-  .ver-item .ver-nome{ font-weight:700; font-size:13.5px; color:var(--ink); flex:1 1 180px; min-width:0; }
-  .ver-item .ver-tag{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:100px; background:var(--red); color:var(--on-red); }
-  .ver-item .ver-meta{ flex:1 1 100%; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
-  .ver-item .ver-btns{ display:flex; gap:6px; flex-wrap:wrap; }
-  .ver-item button{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:6px 11px; border-radius:100px; border:1.5px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; }
-  .ver-item button:hover{ border-color:var(--ink); }
-  .ver-item button.abrir{ background:var(--ink); color:var(--white); border-color:var(--ink); }
-  .ver-item button.apagar{ color:var(--red-ink); }
-  .ver-vazio{ font-size:12.5px; color:var(--muted); padding:8px 0; }
-  body.shell-touch .ver-item button{ min-height:40px; }
-  .btn-sec[aria-pressed="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
-  /* Modo «Horas fechadas»: as células deixam de pintar; tocar fecha/abre a hora do dia. */
-  #grelhas.modo-fechado td.cel, #grelhas.modo-fechado td.fechado{ cursor:cell; outline:1px dashed var(--red); outline-offset:-1px; }
-  #grelhas.modo-fechado td.cel{ opacity:.55; }
-
   /* ---------- Impressão: só as grelhas, sem totais nem coluna H ----------
      Mesmo truque da loja-sao-bento.html (visibility + área absoluta no topo).
      Cores a literal claro, para o tema escuro não ir para o papel. */
@@ -197,7 +216,7 @@
     .dia:first-child{ border-top:none; padding-top:0; }
     .dia-cab{ margin-bottom:2px; }
     .dia-cab h2{ font-size:11px; color:#141414; }
-    .dia-cab .h, td.horas, th.h, .fbtn{ display:none !important; }
+    .dia-cab .h, td.horas, th.h, .fbtn, #printArea .legenda{ display:none !important; }
     .scroll{ overflow:visible; }
     table.grelha{ border-spacing:1px; }
     /* Prefixo #printArea de propósito: ganha às regras body.shell-touch (ao
@@ -274,26 +293,28 @@
 
 <main>
 
-  <div class="card glass-light bloco">
-    <div class="barra">
-      <div class="legenda">
-        <span><i style="background:var(--h-trab)"></i>trabalha</span>
-        <span><i style="background:var(--h-pausa)"></i><b>P</b> pausa</span>
-        <span><i style="background:var(--h-folga)"></i><b>F</b> folga</span>
-        <span><i style="background:var(--h-fechado)"></i>fechado</span>
-        <span><i style="background:var(--h-cov1)"></i>1 pessoa</span>
-        <span><i style="background:var(--h-cov2)"></i>2 pessoas</span>
-        <span><i style="background:var(--h-cov3)"></i>3 pessoas</span>
+  <div class="card glass-light bloco topo">
+    <div class="ficheiro">
+      <div class="fich-wrap">
+        <button type="button" class="fich-btn" id="btnVersoes" aria-expanded="false" aria-haspopup="true" disabled title="Versões guardadas">
+          <svg class="icon" width="20" height="20"><use href="#i-calendar"/></svg>
+          <span class="fich-nome" id="fichNome">A ligar…</span>
+          <svg class="icon chev" width="14" height="14"><use href="#i-chevron-down"/></svg>
+        </button>
+        <div class="fich-meta" id="estado"></div>
+        <div class="ver-panel" id="verPanel" hidden>
+          <div class="ver-lista" id="verLista"></div>
+          <button type="button" class="ver-nova" id="btnNovaVersao">+ Guardar a grelha atual como nova versão</button>
+        </div>
       </div>
       <div class="acoes">
-        <span class="estado" id="estado">A ligar…</span>
+        <button type="button" class="btn-add" id="btnGuardar" disabled>Guardar</button>
+        <button type="button" class="btn-sec" id="btnGuardarComo" disabled>Guardar como…</button>
+        <span class="sep"></span>
         <button type="button" class="btn-sec" id="btnFechado" disabled aria-pressed="false">Horas fechadas</button>
         <button type="button" class="btn-sec" id="btnImprimir">Imprimir</button>
-        <button type="button" class="btn-sec" id="btnVersoes" disabled>Versões</button>
-        <button type="button" class="btn-add" id="btnGuardar" disabled>Guardar versão</button>
       </div>
     </div>
-    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Guardar versão» guarda a grelha atual com um nome e a data, como um ficheiro; em «Versões» abres, renomeias ou apagas cada uma. «Horas fechadas» liga um modo em que tocar numa hora a fecha (preto) ou volta a abrir, nesse dia. «Imprimir» sai só com as grelhas, sem horas totais.</p>
   </div>
 
   <div id="avisos" class="card glass-light bloco" style="display:none"></div>
@@ -462,6 +483,11 @@
   var estadoEl  = document.getElementById('estado');
   var btnVersoes = document.getElementById('btnVersoes');
   var btnGuardar = document.getElementById('btnGuardar');
+  var btnGuardarComo = document.getElementById('btnGuardarComo');
+  var btnNovaVersao = document.getElementById('btnNovaVersao');
+  var fichNome = document.getElementById('fichNome');
+  var verPanel = document.getElementById('verPanel');
+  var verLista = document.getElementById('verLista');
 
   function fmtHora(ts) {
     if (!ts) return '';
@@ -518,7 +544,17 @@
         linhas + '<tr class="pessoas"><td class="nome">Pessoas</td>' + covHtml + '<td></td></tr></tbody></table></div>';
     });
     // Um só scroll horizontal para a semana inteira (um por dia eram 7 barras).
-    grelhasEl.innerHTML = '<div class="card glass-light bloco semana"><div class="scroll">' + html + '</div></div>';
+    var legenda = '<div class="legenda">' +
+      '<span><i style="background:var(--h-trab)"></i>trabalha</span>' +
+      '<span><i style="background:var(--h-pausa)"></i><b>P</b> pausa</span>' +
+      '<span><i style="background:var(--h-folga)"></i><b>F</b> folga</span>' +
+      '<span><i style="background:var(--h-fechado)"></i>fechado</span>' +
+      '<span><i style="background:var(--h-cov1)"></i>1 pessoa</span>' +
+      '<span><i style="background:var(--h-cov2)"></i>2 pessoas</span>' +
+      '<span><i style="background:var(--h-cov3)"></i>3 pessoas</span>' +
+      '<span class="dica">Toca numa célula para alternar vazio → trabalha → pausa; com o rato, arrasta para pintar várias. O botão F ao lado do nome marca a folga do dia.</span>' +
+      '</div>';
+    grelhasEl.innerHTML = '<div class="card glass-light bloco semana"><div class="scroll">' + html + '</div>' + legenda + '</div>';
 
     var R = STAFF.indexOf('Rodrigo');
     totaisEl.innerHTML = STAFF.map(function (n, s) {
@@ -596,27 +632,75 @@
       return cur === null ? FECHADO_DEFAULT : undefined;
     });
 
-    // A versão «aberta» é a que tem grelha e horas fechadas IGUAIS à atual —
-    // sem estado guardado: se alguém mexer numa célula, deixa de coincidir.
-    function versaoAtual() {
-      if (!M) return null;
-      var g = JSON.stringify(M), f = JSON.stringify(FECHADO);
-      for (var i = 0; i < versoes.length; i++) {
-        if (JSON.stringify(versoes[i].grid) === g && JSON.stringify(versoes[i].fechado) === f) return versoes[i];
-      }
+    // Versão ABERTA = atual/versaoId (estado partilhado, como o ficheiro que
+    // está aberto). «Alterações por guardar» = grelha/fechado diferentes dos
+    // dessa versão. Sem versaoId (ou versão apagada) = «Sem versão guardada».
+    var versaoId = null;
+    function versaoAberta() {
+      for (var i = 0; i < versoes.length; i++) if (versoes[i].id === versaoId) return versoes[i];
       return null;
+    }
+    function iguais(v) {
+      return !!v && JSON.stringify(v.grid) === JSON.stringify(M) && JSON.stringify(v.fechado) === JSON.stringify(FECHADO);
     }
 
     function atualizarEstado() {
       if (!M) return;
-      var va = versaoAtual();
-      estadoEl.className = 'estado ok';
-      estadoEl.innerHTML = (atualizadoEm ? 'Guardado ✓ · ' + fmtHora(atualizadoEm) : 'Guardado ✓') +
-        (va ? ' · versão <b>' + escapeHtml(va.nome) + '</b>' : (versoes.length ? ' · <b>sem versão guardada</b>' : ''));
+      var va = versaoAberta();
+      var suja = va ? !iguais(va) : false;
+      fichNome.textContent = va ? va.nome : 'Sem versão guardada';
+      estadoEl.className = 'fich-meta' + (suja ? ' suja' : '');
+      estadoEl.textContent = va
+        ? (suja ? 'Alterações por guardar · gravado às ' + fmtHora(atualizadoEm) : 'Versão de ' + fmtData(va.criadoEm) + ' · tudo guardado')
+        : (versoes.length ? 'Gravado às ' + fmtHora(atualizadoEm) + ' · guarda como versão para ficar com nome e data' : 'Gravado às ' + fmtHora(atualizadoEm));
+      btnGuardar.disabled = !!va && !suja;
+      btnGuardar.textContent = va ? 'Guardar' : 'Guardar versão';
       document.querySelector('.print-cab').textContent = 'Horário da loja · ' +
-        (va ? va.nome + ' · ' + fmtData(va.criadoEm) : 'semana tipo · ' + fmtData(Date.now()));
-      btnVersoes.textContent = versoes.length ? 'Versões · ' + versoes.length : 'Versões';
+        (va ? va.nome + (suja ? ' (com alterações)' : '') + ' · ' + fmtData(Date.now()) : 'semana tipo · ' + fmtData(Date.now()));
+      if (!verPanel.hidden) desenharLista();
     }
+
+    function desenharLista() {
+      var va = versaoAberta();
+      if (!versoes.length) {
+        verLista.innerHTML = '<div class="ver-vazio">Ainda não há versões guardadas.</div>';
+        return;
+      }
+      verLista.innerHTML = versoes.map(function (v) {
+        var ehAtual = va && va.id === v.id;
+        return '<div class="ver-item' + (ehAtual ? ' atual' : '') + '" data-id="' + v.id + '">' +
+          '<div class="ver-main" data-acao="abrir" title="' + (ehAtual ? '' : 'Abrir esta versão') + '">' +
+            '<span class="ver-nome">' + escapeHtml(v.nome) + '</span>' +
+            '<span class="ver-data">' + escapeHtml(fmtData(v.criadoEm)) + ' · ' + escapeHtml(fmtHora(v.criadoEm)) + ' · ' + escapeHtml(resumoTotais(totaisDe(v.grid, v.fechado))) + '</span>' +
+          '</div>' +
+          '<div class="ver-btns">' +
+            '<button type="button" data-acao="renomear" title="Renomear"><svg class="icon" width="14" height="14"><use href="#i-pencil"/></svg></button>' +
+            '<button type="button" data-acao="apagar" title="Apagar"><svg class="icon" width="14" height="14"><use href="#i-trash-2"/></svg></button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    document.body.appendChild(verPanel);  // fora dos cartões (ver CSS .ver-panel)
+    function posicionarPainel() {
+      var r = btnVersoes.getBoundingClientRect();
+      verPanel.style.top = Math.round(r.bottom + 6) + 'px';
+      verPanel.style.left = Math.max(8, Math.min(Math.round(r.left), window.innerWidth - verPanel.offsetWidth - 8)) + 'px';
+    }
+    function abrirPainel(aberto) {
+      verPanel.hidden = !aberto;
+      btnVersoes.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+      if (aberto) { desenharLista(); posicionarPainel(); }
+    }
+    btnVersoes.addEventListener('click', function () { abrirPainel(verPanel.hidden); });
+    document.addEventListener('click', function (e) {
+      if (verPanel.hidden) return;
+      if (e.target.closest('.fich-wrap') || e.target.closest('#verPanel')) return;
+      abrirPainel(false);
+    });
+    window.addEventListener('resize', function () { if (!verPanel.hidden) posicionarPainel(); });
+    window.addEventListener('scroll', function () { if (!verPanel.hidden) abrirPainel(false); }, { passive: true });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !verPanel.hidden) abrirPainel(false); });
 
     refVersoes.on('value', function (snap) {
       versoes = [];
@@ -630,7 +714,6 @@
       versoes.sort(function (a, b) { return b.criadoEm - a.criadoEm; });
       btnVersoes.disabled = false;
       atualizarEstado();
-      if (giocoModal.isOpen() && document.getElementById('verLista')) mostrarVersoes();
     });
 
     refAtual.on('value', function (snap) {
@@ -640,15 +723,16 @@
       M = g;
       FECHADO = normalizarFechado(v.fechado);
       atualizadoEm = v.atualizadoEm || 0;
+      versaoId = v.versaoId || null;
       render(M);
-      btnGuardar.disabled = false;
+      btnGuardarComo.disabled = false;
       btnFechado.disabled = false;
       atualizarEstado();
     });
 
     db.ref('.info/connected').on('value', function (snap) {
       if (snap.val() === true) return;
-      estadoEl.className = 'estado off';
+      estadoEl.className = 'fich-meta off';
       estadoEl.textContent = 'Sem ligação — as alterações sobem quando voltar';
     });
 
@@ -656,7 +740,7 @@
       updates['atualizadoEm'] = firebase.database.ServerValue.TIMESTAMP;
       return refAtual.update(updates).catch(function (e) {
         console.error('Falha a gravar o horário:', e);
-        estadoEl.className = 'estado off';
+        estadoEl.className = 'fich-meta off';
         estadoEl.textContent = 'Falha a gravar — tenta de novo';
       });
     }
@@ -741,11 +825,12 @@
 
     document.getElementById('btnImprimir').addEventListener('click', function () { window.print(); });
 
-    /* ---------- Guardar versão: nome + data, como um ficheiro ---------- */
-    btnGuardar.addEventListener('click', function () {
+    /* ---------- Guardar (na versão aberta) / Guardar como (nova) ---------- */
+    function guardarComo() {
       if (!M) return;
+      abrirPainel(false);
       var tot = totaisDe(M, FECHADO);
-      var body = giocoModal.open({ titulo: 'Guardar versão', conteudo:
+      var body = giocoModal.open({ titulo: 'Guardar como nova versão', conteudo:
         '<form class="ver-form" id="verForm">' +
           '<label for="verNome">Nome da versão</label>' +
           '<input id="verNome" type="text" maxlength="60" autocomplete="off" placeholder="ex.: Horário de inverno">' +
@@ -759,61 +844,52 @@
         e.preventDefault();
         var nome = input.value.trim();
         if (!nome) { input.focus(); return; }
-        refVersoes.push({ nome: nome, criadoEm: firebase.database.ServerValue.TIMESTAMP, grid: clonar(M), fechado: clonar(FECHADO), totais: tot })
+        var nova = refVersoes.push();
+        nova.set({ nome: nome, criadoEm: firebase.database.ServerValue.TIMESTAMP, grid: clonar(M), fechado: clonar(FECHADO), totais: tot })
+          .then(function () { return refAtual.update({ versaoId: nova.key }); })
           .then(function () { giocoModal.close(); })
           .catch(function (err) { console.error('Falha a guardar a versão:', err); alert('Não foi possível guardar. Tenta de novo.'); });
       });
+    }
+    btnGuardarComo.addEventListener('click', guardarComo);
+    btnNovaVersao.addEventListener('click', guardarComo);
+
+    btnGuardar.addEventListener('click', function () {
+      if (!M) return;
+      var va = versaoAberta();
+      if (!va) { guardarComo(); return; }
+      refVersoes.child(va.id).update({ grid: clonar(M), fechado: clonar(FECHADO), totais: totaisDe(M, FECHADO), guardadoEm: firebase.database.ServerValue.TIMESTAMP })
+        .catch(function (err) { console.error('Falha a guardar:', err); alert('Não foi possível guardar. Tenta de novo.'); });
     });
 
-    /* ---------- Lista de versões: abrir, renomear, apagar ---------- */
-    function mostrarVersoes() {
-      var va = versaoAtual();
-      var html;
-      if (!versoes.length) {
-        html = '<div class="ver-vazio">Ainda não há versões guardadas. Usa «Guardar versão» para guardar a grelha atual com um nome.</div>';
-      } else {
-        html = versoes.map(function (v) {
-          var ehAtual = va && va.id === v.id;
-          return '<div class="ver-item' + (ehAtual ? ' atual' : '') + '" data-id="' + v.id + '">' +
-            '<span class="ver-nome">' + escapeHtml(v.nome) + '</span>' +
-            (ehAtual ? '<span class="ver-tag">aberta</span>' : '') +
-            '<span class="ver-btns">' +
-              (ehAtual ? '' : '<button type="button" class="abrir" data-acao="abrir">Abrir</button>') +
-              '<button type="button" data-acao="renomear">Renomear</button>' +
-              '<button type="button" class="apagar" data-acao="apagar">Apagar</button>' +
-            '</span>' +
-            '<span class="ver-meta">' + escapeHtml(fmtData(v.criadoEm)) + ' ' + escapeHtml(fmtHora(v.criadoEm)) + ' · ' + escapeHtml(resumoTotais(totaisDe(v.grid, v.fechado))) + '</span>' +
-          '</div>';
-        }).join('');
+    /* ---------- Painel: abrir, renomear, apagar ---------- */
+    verLista.addEventListener('click', function (e) {
+      var alvo = e.target.closest('[data-acao]');
+      if (!alvo) return;
+      var item = alvo.closest('.ver-item');
+      var v = null;
+      for (var i = 0; i < versoes.length; i++) if (versoes[i].id === item.dataset.id) v = versoes[i];
+      if (!v) return;
+      var va = versaoAberta();
+      if (alvo.dataset.acao === 'abrir') {
+        if (va && va.id === v.id) return;
+        var suja = va ? !iguais(va) : !iguais(v);
+        if (suja && !confirm('Abrir «' + v.nome + '»? A grelha atual tem alterações que não estão guardadas em nenhuma versão e perdem-se em todos os dispositivos.')) return;
+        marcarAtualizado({ grid: clonar(v.grid), fechado: clonar(v.fechado), versaoId: v.id });
+        abrirPainel(false);
+      } else if (alvo.dataset.acao === 'renomear') {
+        var novo = prompt('Novo nome da versão:', v.nome);
+        if (novo === null) return;
+        novo = novo.trim();
+        if (!novo) return;
+        refVersoes.child(v.id).update({ nome: novo });
+      } else if (alvo.dataset.acao === 'apagar') {
+        if (!confirm('Apagar a versão «' + v.nome + '»?')) return;
+        // Anular é uma flag, nunca remove() (regra do repo): sai da lista, fica no nó.
+        refVersoes.child(v.id).update({ apagadaEm: firebase.database.ServerValue.TIMESTAMP });
+        if (va && va.id === v.id) refAtual.update({ versaoId: null });
       }
-      var lista = document.getElementById('verLista');
-      if (lista) { lista.innerHTML = html; return; }
-      var body = giocoModal.open({ titulo: 'Versões guardadas', conteudo: '<div class="ver-lista" id="verLista">' + html + '</div>' });
-      body.addEventListener('click', function (e) {
-        var b = e.target.closest('button[data-acao]');
-        if (!b) return;
-        var item = b.closest('.ver-item');
-        var v = null;
-        for (var i = 0; i < versoes.length; i++) if (versoes[i].id === item.dataset.id) v = versoes[i];
-        if (!v) return;
-        if (b.dataset.acao === 'abrir') {
-          if (!confirm('Abrir a versão «' + v.nome + '»? Substitui a grelha atual em todos os dispositivos. Se quiseres guardar a atual, cancela e usa «Guardar versão» primeiro.')) return;
-          marcarAtualizado({ grid: clonar(v.grid), fechado: clonar(v.fechado) });
-          giocoModal.close();
-        } else if (b.dataset.acao === 'renomear') {
-          var novo = prompt('Novo nome da versão:', v.nome);
-          if (novo === null) return;
-          novo = novo.trim();
-          if (!novo) return;
-          refVersoes.child(v.id).update({ nome: novo });
-        } else if (b.dataset.acao === 'apagar') {
-          if (!confirm('Apagar a versão «' + v.nome + '»?')) return;
-          // Anular é uma flag, nunca remove() (regra do repo): sai da lista, fica no nó.
-          refVersoes.child(v.id).update({ apagadaEm: firebase.database.ServerValue.TIMESTAMP });
-        }
-      });
-    }
-    btnVersoes.addEventListener('click', mostrarVersoes);
+    });
   });
 </script>
 </body>
