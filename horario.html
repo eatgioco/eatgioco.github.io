@@ -507,6 +507,16 @@
       });
     });
     if (tot[R] !== 40) w.push('Rodrigo com ' + tot[R] + 'h (tem de ser 40)');
+    // Dois dias de folga por pessoa (Manel, 11 Nov/2026). Dia de folga = dia sem
+    // nenhuma hora a trabalhar (F ou vazio), fora as horas fechadas.
+    STAFF.forEach(function (n, s) {
+      var folgas = 0;
+      DIAS.forEach(function (_, d) {
+        var trabalha = M[d][s].some(function (v, k) { return v === 1 && !fechado(d, k); });
+        if (!trabalha) folgas++;
+      });
+      if (folgas < 2) w.push(n + ' com ' + folgas + ' dia' + (folgas === 1 ? '' : 's') + ' de folga (tem de ter 2)');
+    });
     tot.forEach(function (t, s) { if (t > 45) w.push(STAFF[s] + ' com ' + t + 'h (máx 45)'); });
 
     avisosEl.style.display = '';
