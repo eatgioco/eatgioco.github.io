@@ -154,6 +154,28 @@
   body.shell-touch .btn-sec, body.shell-touch .btn-add{ min-height:44px; }
 
   .nota{ font-size:11.5px; color:var(--muted); margin:8px 0 0; }
+  .estado b{ font-weight:600; color:var(--ink); }
+
+  /* ---------- Versões (modal do shell) ---------- */
+  .ver-form{ display:flex; flex-direction:column; gap:10px; min-width:min(360px, 80vw); }
+  .ver-form label{ font-size:12px; color:var(--muted); }
+  .ver-form input{ width:100%; box-sizing:border-box; padding:11px 13px; border:1.5px solid var(--line); border-radius:12px; background:var(--dough); font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); }
+  .ver-form input:focus{ outline:none; border-color:var(--ink); }
+  .ver-form .ver-resumo{ font-size:12px; color:var(--muted); }
+  .ver-form .ver-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+  .ver-lista{ display:flex; flex-direction:column; gap:8px; min-width:min(520px, 84vw); max-height:60vh; overflow:auto; }
+  .ver-item{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--white); }
+  .ver-item.atual{ border-color:var(--red); }
+  .ver-item .ver-nome{ font-weight:700; font-size:13.5px; color:var(--ink); flex:1 1 180px; min-width:0; }
+  .ver-item .ver-tag{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:100px; background:var(--red); color:var(--on-red); }
+  .ver-item .ver-meta{ flex:1 1 100%; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ver-item .ver-btns{ display:flex; gap:6px; flex-wrap:wrap; }
+  .ver-item button{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:6px 11px; border-radius:100px; border:1.5px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer; }
+  .ver-item button:hover{ border-color:var(--ink); }
+  .ver-item button.abrir{ background:var(--ink); color:var(--white); border-color:var(--ink); }
+  .ver-item button.apagar{ color:var(--red-ink); }
+  .ver-vazio{ font-size:12.5px; color:var(--muted); padding:8px 0; }
+  body.shell-touch .ver-item button{ min-height:40px; }
   .btn-sec[aria-pressed="true"]{ background:var(--ink); color:var(--white); border-color:var(--ink); }
   /* Modo «Horas fechadas»: as células deixam de pintar; tocar fecha/abre a hora do dia. */
   #grelhas.modo-fechado td.cel, #grelhas.modo-fechado td.fechado{ cursor:cell; outline:1px dashed var(--red); outline-offset:-1px; }
@@ -267,11 +289,11 @@
         <span class="estado" id="estado">A ligar…</span>
         <button type="button" class="btn-sec" id="btnFechado" disabled aria-pressed="false">Horas fechadas</button>
         <button type="button" class="btn-sec" id="btnImprimir">Imprimir</button>
-        <button type="button" class="btn-sec" id="btnRepor" disabled>Repor versão aprovada</button>
-        <button type="button" class="btn-add" id="btnAprovar" disabled>Fixar como aprovada</button>
+        <button type="button" class="btn-sec" id="btnVersoes" disabled>Versões</button>
+        <button type="button" class="btn-add" id="btnGuardar" disabled>Guardar versão</button>
       </div>
     </div>
-    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Fixar como aprovada» guarda a grelha atual como a versão a que «Repor» volta. «Horas fechadas» liga um modo em que tocar numa hora a fecha (preto) ou volta a abrir, nesse dia. «Imprimir» sai só com as grelhas, sem horas totais.</p>
+    <p class="nota">No computador, clica e arrasta para pintar várias horas. O botão <b>F</b> ao lado do nome marca ou desmarca o dia de folga. «Guardar versão» guarda a grelha atual com um nome e a data, como um ficheiro; em «Versões» abres, renomeias ou apagas cada uma. «Horas fechadas» liga um modo em que tocar numa hora a fecha (preto) ou volta a abrir, nesse dia. «Imprimir» sai só com as grelhas, sem horas totais.</p>
   </div>
 
   <div id="avisos" class="card glass-light bloco" style="display:none"></div>
@@ -379,12 +401,12 @@
   var STAFF  = ['Diego', 'Prabin', 'Alfredo', 'Rodrigo'];
   var HORAS  = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
   /* Horas fechadas por omissão (semente). Desde 10 Nov/2026 vivem no RTDB
-     (horarioLoja/{atual|aprovado}/fechado) e editam-se no modo «Horas fechadas». */
+     (horarioLoja/{atual|versoes}/fechado) e editam-se no modo «Horas fechadas». */
   var FECHADO_DEFAULT = [[16, 22], [16, 22], [16, 22], [22], [], [], [22]];
   var FECHADO = clonar(FECHADO_DEFAULT);
 
   /* «Opção 5», aprovada pelo Manel a 10 Nov/2026 (Diego 42h · Prabin 40h ·
-     Alfredo 35h · Rodrigo 40h). Semeia horarioLoja/aprovado e horarioLoja/atual
+     Alfredo 35h · Rodrigo 40h). Semeia horarioLoja/atual
      na PRIMEIRA abertura, se o nó não existir — nunca sobrepõe o que lá estiver. */
   var GRELHA_OPCAO_5 = [
     [[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0],[3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,0,1,1,1,1,1,0]],
@@ -438,14 +460,33 @@
   var avisosEl  = document.getElementById('avisos');
   var totaisEl  = document.getElementById('totais');
   var estadoEl  = document.getElementById('estado');
-  var btnRepor  = document.getElementById('btnRepor');
-  var btnAprovar = document.getElementById('btnAprovar');
+  var btnVersoes = document.getElementById('btnVersoes');
+  var btnGuardar = document.getElementById('btnGuardar');
 
   function fmtHora(ts) {
     if (!ts) return '';
     var d = new Date(ts);
     return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
   }
+  var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  function fmtData(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function escapeHtml(t) {
+    return String(t).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function totaisDe(g, f) {
+    return STAFF.map(function (_, s) {
+      var t = 0;
+      for (var d = 0; d < DIAS.length; d++) for (var k = 0; k < HORAS.length; k++) if (g[d][s][k] === 1 && f[d].indexOf(HORAS[k]) < 0) t++;
+      return t;
+    });
+  }
+  function resumoTotais(tot) { return STAFF.map(function (n, s) { return n + ' ' + tot[s] + 'h'; }).join(' · '); }
 
   /* ---------- Render ---------- */
   function render(M) {
@@ -532,38 +573,64 @@
 
   /* ============================================================
      Firebase: horarioLoja/atual (a grelha viva, lida com on('value') para
-     ficar igual em todos os dispositivos) e horarioLoja/aprovado (a versão a
-     que «Repor» volta). Cada toque escreve SÓ a folha da célula; o botão F e o
-     Repor escrevem a linha / a grelha inteira. Nunca se escreve a partir do
-     listener — a UI é sempre o reflexo do snapshot.
+     ficar igual em todos os dispositivos) e horarioLoja/versoes/{pushId}
+     (versões guardadas com nome e data, como ficheiros — abrir uma copia-a
+     para atual). Cada toque escreve SÓ a folha da célula; o botão F escreve a
+     linha; abrir uma versão escreve a grelha inteira. Nunca se escreve a
+     partir do listener — a UI é sempre o reflexo do snapshot.
      ============================================================ */
   autenticarEContinuar(function () {
     var db = firebase.database();
     var refAtual = db.ref('horarioLoja/atual');
-    var refAprovado = db.ref('horarioLoja/aprovado');
-    var M = null;         // última grelha recebida do RTDB
-    var aprovado = null;  // última versão aprovada recebida
+    var refVersoes = db.ref('horarioLoja/versoes');
+    var M = null;           // última grelha recebida do RTDB
+    var atualizadoEm = 0;
+    var versoes = [];       // versões guardadas, mais recente primeiro
 
-    // Semeia os dois nós UMA vez, se não existirem. Transaction: dois
+    // Semeia o nó atual UMA vez, se não existir. Transaction: dois
     // dispositivos a abrir ao mesmo tempo não se pisam.
-    refAprovado.child('grid').transaction(function (cur) {
-      return cur === null ? GRELHA_OPCAO_5 : undefined;
-    });
     refAtual.child('grid').transaction(function (cur) {
       return cur === null ? GRELHA_OPCAO_5 : undefined;
-    });
-    refAprovado.child('fechado').transaction(function (cur) {
-      return cur === null ? FECHADO_DEFAULT : undefined;
     });
     refAtual.child('fechado').transaction(function (cur) {
       return cur === null ? FECHADO_DEFAULT : undefined;
     });
 
-    refAprovado.on('value', function (snap) {
-      var v = snap.val() || {};
-      var g = normalizarGrelha(v.grid);
-      aprovado = g ? { grid: g, fechado: normalizarFechado(v.fechado) } : null;
-      btnRepor.disabled = !aprovado || !M;
+    // A versão «aberta» é a que tem grelha e horas fechadas IGUAIS à atual —
+    // sem estado guardado: se alguém mexer numa célula, deixa de coincidir.
+    function versaoAtual() {
+      if (!M) return null;
+      var g = JSON.stringify(M), f = JSON.stringify(FECHADO);
+      for (var i = 0; i < versoes.length; i++) {
+        if (JSON.stringify(versoes[i].grid) === g && JSON.stringify(versoes[i].fechado) === f) return versoes[i];
+      }
+      return null;
+    }
+
+    function atualizarEstado() {
+      if (!M) return;
+      var va = versaoAtual();
+      estadoEl.className = 'estado ok';
+      estadoEl.innerHTML = (atualizadoEm ? 'Guardado ✓ · ' + fmtHora(atualizadoEm) : 'Guardado ✓') +
+        (va ? ' · versão <b>' + escapeHtml(va.nome) + '</b>' : (versoes.length ? ' · <b>sem versão guardada</b>' : ''));
+      document.querySelector('.print-cab').textContent = 'Horário da loja · ' +
+        (va ? va.nome + ' · ' + fmtData(va.criadoEm) : 'semana tipo · ' + fmtData(Date.now()));
+      btnVersoes.textContent = versoes.length ? 'Versões · ' + versoes.length : 'Versões';
+    }
+
+    refVersoes.on('value', function (snap) {
+      versoes = [];
+      snap.forEach(function (ch) {
+        var v = ch.val();
+        if (!v || v.apagadaEm) return;
+        var g = normalizarGrelha(v.grid);
+        if (!g) return;
+        versoes.push({ id: ch.key, nome: v.nome || 'Sem nome', criadoEm: v.criadoEm || 0, grid: g, fechado: normalizarFechado(v.fechado) });
+      });
+      versoes.sort(function (a, b) { return b.criadoEm - a.criadoEm; });
+      btnVersoes.disabled = false;
+      atualizarEstado();
+      if (giocoModal.isOpen() && document.getElementById('verLista')) mostrarVersoes();
     });
 
     refAtual.on('value', function (snap) {
@@ -572,12 +639,11 @@
       if (!g) return;  // ainda a semear
       M = g;
       FECHADO = normalizarFechado(v.fechado);
+      atualizadoEm = v.atualizadoEm || 0;
       render(M);
-      btnAprovar.disabled = false;
+      btnGuardar.disabled = false;
       btnFechado.disabled = false;
-      btnRepor.disabled = !aprovado;
-      estadoEl.className = 'estado ok';
-      estadoEl.textContent = v.atualizadoEm ? 'Guardado ✓ · ' + fmtHora(v.atualizadoEm) : 'Guardado ✓';
+      atualizarEstado();
     });
 
     db.ref('.info/connected').on('value', function (snap) {
@@ -675,18 +741,79 @@
 
     document.getElementById('btnImprimir').addEventListener('click', function () { window.print(); });
 
-    btnRepor.addEventListener('click', function () {
-      if (!aprovado) return;
-      if (!confirm('Repor a versão aprovada? As alterações feitas desde então perdem-se em todos os dispositivos.')) return;
-      marcarAtualizado({ grid: clonar(aprovado.grid), fechado: clonar(aprovado.fechado) });
+    /* ---------- Guardar versão: nome + data, como um ficheiro ---------- */
+    btnGuardar.addEventListener('click', function () {
+      if (!M) return;
+      var tot = totaisDe(M, FECHADO);
+      var body = giocoModal.open({ titulo: 'Guardar versão', conteudo:
+        '<form class="ver-form" id="verForm">' +
+          '<label for="verNome">Nome da versão</label>' +
+          '<input id="verNome" type="text" maxlength="60" autocomplete="off" placeholder="ex.: Horário de inverno">' +
+          '<div class="ver-resumo">' + escapeHtml(fmtData(Date.now())) + ' · ' + escapeHtml(resumoTotais(tot)) + '</div>' +
+          '<div class="ver-acoes"><button type="button" class="btn-sec" id="verCancelar">Cancelar</button><button type="submit" class="btn-add">Guardar</button></div>' +
+        '</form>' });
+      var input = body.querySelector('#verNome');
+      setTimeout(function () { input.focus(); }, 50);
+      body.querySelector('#verCancelar').addEventListener('click', function () { giocoModal.close(); });
+      body.querySelector('#verForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var nome = input.value.trim();
+        if (!nome) { input.focus(); return; }
+        refVersoes.push({ nome: nome, criadoEm: firebase.database.ServerValue.TIMESTAMP, grid: clonar(M), fechado: clonar(FECHADO), totais: tot })
+          .then(function () { giocoModal.close(); })
+          .catch(function (err) { console.error('Falha a guardar a versão:', err); alert('Não foi possível guardar. Tenta de novo.'); });
+      });
     });
 
-    btnAprovar.addEventListener('click', function () {
-      if (!M) return;
-      if (!confirm('Fixar a grelha atual como a versão aprovada? Passa a ser a versão a que o «Repor» volta.')) return;
-      refAprovado.update({ grid: clonar(M), fechado: clonar(FECHADO), aprovadoEm: firebase.database.ServerValue.TIMESTAMP })
-        .catch(function (e) { console.error('Falha a fixar a versão aprovada:', e); alert('Não foi possível guardar. Tenta de novo.'); });
-    });
+    /* ---------- Lista de versões: abrir, renomear, apagar ---------- */
+    function mostrarVersoes() {
+      var va = versaoAtual();
+      var html;
+      if (!versoes.length) {
+        html = '<div class="ver-vazio">Ainda não há versões guardadas. Usa «Guardar versão» para guardar a grelha atual com um nome.</div>';
+      } else {
+        html = versoes.map(function (v) {
+          var ehAtual = va && va.id === v.id;
+          return '<div class="ver-item' + (ehAtual ? ' atual' : '') + '" data-id="' + v.id + '">' +
+            '<span class="ver-nome">' + escapeHtml(v.nome) + '</span>' +
+            (ehAtual ? '<span class="ver-tag">aberta</span>' : '') +
+            '<span class="ver-btns">' +
+              (ehAtual ? '' : '<button type="button" class="abrir" data-acao="abrir">Abrir</button>') +
+              '<button type="button" data-acao="renomear">Renomear</button>' +
+              '<button type="button" class="apagar" data-acao="apagar">Apagar</button>' +
+            '</span>' +
+            '<span class="ver-meta">' + escapeHtml(fmtData(v.criadoEm)) + ' ' + escapeHtml(fmtHora(v.criadoEm)) + ' · ' + escapeHtml(resumoTotais(totaisDe(v.grid, v.fechado))) + '</span>' +
+          '</div>';
+        }).join('');
+      }
+      var lista = document.getElementById('verLista');
+      if (lista) { lista.innerHTML = html; return; }
+      var body = giocoModal.open({ titulo: 'Versões guardadas', conteudo: '<div class="ver-lista" id="verLista">' + html + '</div>' });
+      body.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-acao]');
+        if (!b) return;
+        var item = b.closest('.ver-item');
+        var v = null;
+        for (var i = 0; i < versoes.length; i++) if (versoes[i].id === item.dataset.id) v = versoes[i];
+        if (!v) return;
+        if (b.dataset.acao === 'abrir') {
+          if (!confirm('Abrir a versão «' + v.nome + '»? Substitui a grelha atual em todos os dispositivos. Se quiseres guardar a atual, cancela e usa «Guardar versão» primeiro.')) return;
+          marcarAtualizado({ grid: clonar(v.grid), fechado: clonar(v.fechado) });
+          giocoModal.close();
+        } else if (b.dataset.acao === 'renomear') {
+          var novo = prompt('Novo nome da versão:', v.nome);
+          if (novo === null) return;
+          novo = novo.trim();
+          if (!novo) return;
+          refVersoes.child(v.id).update({ nome: novo });
+        } else if (b.dataset.acao === 'apagar') {
+          if (!confirm('Apagar a versão «' + v.nome + '»?')) return;
+          // Anular é uma flag, nunca remove() (regra do repo): sai da lista, fica no nó.
+          refVersoes.child(v.id).update({ apagadaEm: firebase.database.ServerValue.TIMESTAMP });
+        }
+      });
+    }
+    btnVersoes.addEventListener('click', mostrarVersoes);
   });
 </script>
 </body>
