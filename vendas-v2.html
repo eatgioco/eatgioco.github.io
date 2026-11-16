@@ -1396,7 +1396,7 @@
      as duas páginas não se pisarem. Nada disto toca nos dados. */
   var LS_V2 = 'gioco.vendasV2.ui';
   var v2 = (function(){
-    var base = { tab:'dia', vista:{ dia:'barras', hora:'lista', sem:'barras', semanas:'barras', meses:'barras' },
+    var base = { tab:'dia', vista:{ dia:'barras', hora:'barras', sem:'barras', semanas:'barras', meses:'barras' },
                  mix:'barras', pag:'barras', top:'subcategorias', gaveta:null, abridor:null };
     var guardado = lerPrefs(LS_V2);
     if (guardado.tab) base.tab = guardado.tab;
@@ -1404,13 +1404,14 @@
     if (guardado.mix) base.mix = guardado.mix;
     if (guardado.pag) base.pag = guardado.pag;
     if (guardado.top) base.top = guardado.top;
-    // ver 2 (16 Nov/2026): o Por hora abre em Lista e o Top em Subcategorias,
+    // ver 3 (16 Nov/2026, decisão do Manel): Barras é a vista por omissão em todos os
+    // separadores (a Lista fica a um clique) e o Top abre em Subcategorias,
     // como na vendas.html — preferências gravadas antes disso não mandam nestes dois.
-    if (guardado.ver !== 2){ base.vista.hora = 'lista'; base.top = 'subcategorias'; }
+    if (guardado.ver !== 3){ base.vista.hora = 'barras'; if (guardado.ver !== 2) base.top = 'subcategorias'; }
     return base;
   })();
   function guardarV2(){
-    escreverPrefs(LS_V2, { ver:2, tab:v2.tab, vista:v2.vista, mix:v2.mix, pag:v2.pag, top:v2.top });
+    escreverPrefs(LS_V2, { ver:3, tab:v2.tab, vista:v2.vista, mix:v2.mix, pag:v2.pag, top:v2.top });
   }
   estado.vistasGrafico.topProdutos = v2.top;
 
