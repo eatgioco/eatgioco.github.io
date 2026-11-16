@@ -464,3 +464,75 @@ button.v2-col:hover .v2-col-v{ color:var(--v2-texto); }
   .v2-barras, .v2-eixo{ gap:6px; }
   .v2-col-v{ font-size:10px; letter-spacing:-.01em; }
 }
+
+/* =====================================================================
+   3.ª passagem (16 Nov/2026): o que a vendas.html fazia melhor, de volta.
+   ===================================================================== */
+/* Mesma fonte da página atual: Antonio 700 em maiúsculas no título e na
+   marca; números a 700. */
+.v2-cab h1{ font-family:'Antonio',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.01em; }
+.v2-marca b{ font-weight:700; }
+.v2-kpi-valor, .v2-grande{ font-weight:700; }
+
+/* Lista: barras horizontais com valor, talões, variação e nota na linha. */
+.v2-lista{ display:flex; flex-direction:column; gap:2px; }
+.v2-li{
+  display:grid; grid-template-columns:var(--li-rot,88px) minmax(60px,1fr) minmax(170px,auto) 200px;
+  align-items:center; gap:12px; width:100%; min-height:30px; padding:3px 6px; border:0; border-radius:6px;
+  background:transparent; font:inherit; color:inherit; text-align:left;
+}
+.v2-lista.semx .v2-li{ grid-template-columns:var(--li-rot,88px) minmax(60px,1fr) minmax(170px,auto); }
+.v2-lista.semd .v2-li{ grid-template-columns:var(--li-rot,88px) minmax(60px,1fr) minmax(170px,auto) 140px; }
+button.v2-li{ cursor:pointer; }
+button.v2-li:hover{ background:color-mix(in srgb, var(--v2-primaria) 6%, transparent); }
+.v2-li-r{ font-size:13px; color:var(--v2-sec); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.v2-li-r b{ font-size:11px; font-weight:600; color:var(--v2-texto); margin-left:4px; }
+.v2-li-t{ height:14px; display:block; }
+.v2-li-b{ display:block; height:100%; min-width:2px; border-radius:0 4px 4px 0; background:var(--v2-barra); }
+.v2-li.destaque .v2-li-b{ background:var(--v2-barra-destaque); }
+.v2-li.destaque .v2-li-r{ color:var(--v2-texto); font-weight:600; }
+.v2-li.t1 .v2-li-b{ background:var(--v2-s1); }
+.v2-li.t2 .v2-li-b{ background:var(--v2-s2); }
+.v2-li.agora .v2-li-b{ outline:2px solid var(--v2-texto); outline-offset:1px; }
+.v2-li-v{ text-align:right; font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.v2-li-v b{ font-weight:600; }
+.v2-li-v i{ font-style:normal; color:var(--v2-sec); }
+.v2-li-x{ display:flex; justify-content:flex-end; gap:12px; font-size:12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.v2-li-d{ width:48px; text-align:right; font-weight:600; }
+.v2-li-n{ min-width:120px; text-align:right; color:var(--v2-sec); }
+.v2-lista.semd .v2-li-n{ min-width:0; }
+.v2-li-sep{ display:flex; align-items:center; gap:10px; margin:6px 0 2px; font-size:11px; color:var(--v2-apagado); }
+.v2-li-sep::after{ content:''; flex:1; border-top:1px dashed var(--v2-contorno); }
+
+/* Bloco "agora" (ritmo) por cima do gráfico por hora: três números numa linha. */
+.v2-agora{ display:flex; flex-wrap:wrap; gap:8px 0; margin:4px 0 18px; padding:12px 0; border-top:1px solid var(--v2-divisoria); border-bottom:1px solid var(--v2-divisoria); }
+.v2-agora-i{ flex:1 1 160px; display:flex; flex-direction:column; gap:2px; padding:0 16px; border-left:1px solid var(--v2-divisoria); }
+.v2-agora-i:first-child{ padding-left:0; border-left:0; }
+.v2-agora-i span{ font-size:12px; font-weight:500; color:var(--v2-sec); }
+.v2-agora-i strong{ font-size:20px; font-weight:700; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+.v2-agora-i small{ font-size:12px; color:var(--v2-apagado); }
+.v2-graf-pe .v2-chip{ white-space:normal; }
+
+/* Base da comparação + última importação, por baixo dos KPIs. */
+.v2-kpis-grupo{ display:flex; flex-direction:column; gap:10px; }
+.v2-base{ margin:0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 16px; font-size:12px; color:var(--v2-sec); }
+.v2-base span:last-child{ color:var(--v2-apagado); }
+
+/* Top produtos completo na página. */
+.v2-titulo-fixo{ font:600 16px 'Inter',sans-serif; min-height:32px; align-items:center; }
+.v2-top-corpo{ padding-bottom:12px; }
+.v2-top-corpo > .v2-seg{ margin:0 20px; }
+.v2-top-corpo > .v2-nota{ margin:10px 20px 6px; }
+
+@media (max-width:790px){
+  .v2-li, .v2-lista.semd .v2-li{ grid-template-columns:var(--li-rot-m,64px) minmax(40px,1fr) auto; gap:4px 8px; }
+  .v2-lista.semx .v2-li{ grid-template-columns:var(--li-rot-m,64px) minmax(40px,1fr) auto; }
+  .v2-li-r{ white-space:normal; font-size:12px; line-height:1.2; }
+  .v2-li-v{ font-size:12px; }
+  .v2-li-x{ grid-column:2 / -1; justify-content:flex-end; font-size:11px; margin-top:-2px; }
+  .v2-li-n{ min-width:0; }
+  .v2-li-d{ width:auto; }
+  .v2-agora-i{ flex:1 1 30%; padding:0 10px; }
+  .v2-agora-i strong{ font-size:16px; }
+  .v2-top-corpo > .v2-seg{ margin:0 16px; max-width:calc(100% - 32px); flex-wrap:nowrap; overflow-x:auto; }
+}

@@ -25,7 +25,7 @@
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="gioco-v2.css">
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1396,7 +1396,7 @@
      as duas páginas não se pisarem. Nada disto toca nos dados. */
   var LS_V2 = 'gioco.vendasV2.ui';
   var v2 = (function(){
-    var base = { tab:'dia', vista:{ dia:'barras', hora:'barras', sem:'barras', semanas:'barras', meses:'barras' },
+    var base = { tab:'dia', vista:{ dia:'barras', hora:'lista', sem:'barras', semanas:'barras', meses:'barras' },
                  mix:'barras', pag:'barras', top:'subcategorias', gaveta:null, abridor:null };
     var guardado = lerPrefs(LS_V2);
     if (guardado.tab) base.tab = guardado.tab;
@@ -1404,10 +1404,13 @@
     if (guardado.mix) base.mix = guardado.mix;
     if (guardado.pag) base.pag = guardado.pag;
     if (guardado.top) base.top = guardado.top;
+    // ver 2 (16 Nov/2026): o Por hora abre em Lista e o Top em Subcategorias,
+    // como na vendas.html — preferências gravadas antes disso não mandam nestes dois.
+    if (guardado.ver !== 2){ base.vista.hora = 'lista'; base.top = 'subcategorias'; }
     return base;
   })();
   function guardarV2(){
-    escreverPrefs(LS_V2, { tab:v2.tab, vista:v2.vista, mix:v2.mix, pag:v2.pag, top:v2.top });
+    escreverPrefs(LS_V2, { ver:2, tab:v2.tab, vista:v2.vista, mix:v2.mix, pag:v2.pag, top:v2.top });
   }
   estado.vistasGrafico.topProdutos = v2.top;
 
@@ -2016,6 +2019,54 @@
       grelha + linhas + eixo + alvos + '</svg></div>' + leg;
   }
 
+  /* Lista: barras horizontais com TUDO na linha (valor, talões, variação,
+     nota) — a leitura da vendas.html, sem passar o rato. linhas:
+     { rot, valor, txt (html), delta (html), nota, cls, periodo, periodoDica, sep } */
+  function listaHTML(linhas, opts){
+    opts = opts || {};
+    var max = 0;
+    linhas.forEach(function(x){ max = Math.max(max, x.valor || 0); });
+    var temX = linhas.some(function(x){ return x.delta || x.nota; });
+    var temD = linhas.some(function(x){ return x.delta; });
+    return '<div class="v2-lista' + (temX ? '' : ' semx') + (temD ? '' : ' semd') + '" style="--li-rot:' + (opts.larg || 88) + 'px">' + linhas.map(function(x){
+      var w = max > 0 ? Math.max(0, (x.valor || 0) / max * 100) : 0;
+      var miolo = '<span class="v2-li-r">' + x.rot + '</span>' +
+        '<span class="v2-li-t"><span class="v2-li-b" style="width:' + w.toFixed(1) + '%"></span></span>' +
+        '<span class="v2-li-v">' + x.txt + '</span>' +
+        (temX ? '<span class="v2-li-x">' + (temD ? '<span class="v2-li-d">' + (x.delta || '') + '</span>' : '') +
+          '<span class="v2-li-n">' + esc(x.nota || '') + '</span></span>' : '');
+      var sep = x.sep ? '<div class="v2-li-sep"><span>' + esc(x.sep) + '</span></div>' : '';
+      if (x.periodo){
+        return sep + '<button type="button" class="v2-li ' + (x.cls || '') + '" data-periodo="' + attr(x.periodo) + '" title="' + attr(x.periodoDica || '') + '">' + miolo + '</button>';
+      }
+      return sep + '<div class="v2-li ' + (x.cls || '') + '">' + miolo + '</div>';
+    }).join('') + '</div>';
+  }
+  function liTxt(valor, extra){
+    return '<b>' + valor + '</b>' + (extra ? ' <i>· ' + extra + '</i>' : '');
+  }
+
+  /* Bloco "agora" por cima do gráfico por hora — sempre à vista, como na
+     vendas.html (o mesmo cálculo do painel Ritmo do dia). */
+  function agoraHTML(p, c){
+    if (!(c.dias > 0)) return '';
+    var a = giocoAcumuladoHoras(p.porHora, c.dias, agoraVendas());
+    if (a.primeira === null) return '';
+    var individual = !!estado.diaActivo;
+    var hhmm = pad2(a.hora) + ':' + pad2(a.minuto);
+    var pctDia = a.total > 0 ? a.ateAgora / a.total * 100 : 0;
+    function st(rot, val, sub){
+      return '<div class="v2-agora-i"><span>' + esc(rot) + '</span><strong>' + val + '</strong><small>' + sub + '</small></div>';
+    }
+    return '<div class="v2-agora">' +
+      st(a.completo ? 'Dia completo' : ('Até ' + hhmm + (individual ? ' nesse dia' : '')), eurV(a.ateAgora),
+         individual ? 'valor real de ' + esc(rotuloDia(estado.diaActivo)) : 'dia médio ' + esc(c.conjunto) + ': ' + intV(c.dias) + (c.dias === 1 ? ' dia' : ' dias')) +
+      st('Hora atual ' + pad2(a.hora) + 'h–' + pad2((a.hora + 1) % 24) + 'h', a.horaAtual === null ? '—' : eurV(a.horaAtual),
+         a.horaAtual === null ? 'fora do horário com vendas' : (individual ? 'nessa hora' : 'média nessa hora')) +
+      st('% do dia', decV(pctDia, 0) + '%', individual ? 'do total desse dia' : 'do dia médio completo') +
+    '</div>';
+  }
+
   function tabelaHTML(cab, linhas, classesLinha){
     return '<div class="v2-tabela-wrap"><table class="v2-tabela"><thead><tr>' +
       cab.map(function(c){ return '<th scope="col"' + (c.num ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') +
@@ -2177,7 +2228,7 @@
     var tab = v2.tab;
     var vista = v2.vista[tab] || 'barras';
     var ctrl = '';
-    var legenda = '', corpo = '', pe = '';
+    var legenda = '', corpo = '', pe = '', topoGraf = '';
 
     if (tab === 'dia'){
       var dias = p.porDia || {};
@@ -2197,7 +2248,12 @@
                  dica: longo + '\n' + eurV(v.bruto) + ' · ' + intV(v.docs) + ' talões\nticket médio ' + eurV(ticket) };
       });
       legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') + (itens[0] && itens[0].periodo ? ' Clica numa barra para abrir esse dia.' : '') : 'Sem dias neste período.';
-      if (vista === 'tabela'){
+      if (vista === 'lista'){
+        corpo = listaHTML(itens.map(function(x){
+          return { rot:esc(x.longo), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.docs) + ' talões'), nota:'ticket ' + eurV(x.ticket),
+                   cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
+        }));
+      } else if (vista === 'tabela'){
         corpo = tabelaHTML([{t:'Dia'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1}],
           itens.map(function(x){ return [esc(x.longo), eurV(x.valor), intV(x.docs), eurV(x.ticket)]; }),
           itens.map(function(x){ return x.cls; }));
@@ -2235,7 +2291,14 @@
           x:x, delta: x.anterior === null ? '—' : deltaCelula(x.valor, x.anterior)
         };
       });
-      if (vista === 'tabela'){
+      if (vista === 'lista'){
+        corpo = listaHTML(hItens.map(function(it, i){
+          return { rot:esc(pad2(it.x.h) + ':00') + (it.x.h === hAgora ? ' <b>agora</b>' : ''), valor:it.valor,
+                   txt:liTxt(eurV(it.valor), intV(it.x.docs) + ' talões'), delta:it.delta,
+                   nota: c.temMedia ? 'acum. ' + eurV(it.x.acum) : '', cls:it.cls,
+                   sep: (i === sepIdx && i > 0) ? '2.º turno' : '' };
+        }));
+      } else if (vista === 'tabela'){
         var cab = [{t:'Hora'},{t:'Turno'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Δ hora anterior',num:1}];
         if (c.temMedia) cab.push({t:'Acumulado (média)',num:1});
         corpo = tabelaHTML(cab, hItens.map(function(it){
@@ -2255,10 +2318,11 @@
         var f1 = t.t1.bruto / t.total.bruto * 100;
         var p1 = Math.round(f1);
         pe = '<div class="v2-graf-pe">' +
-          '<span class="v2-chip info"><i style="background:var(--v2-s1)"></i>1.º turno · até ' + HORA_CORTE_TURNO + 'h: ' + eurV(t.t1.bruto) + ' · ' + p1 + '%</span>' +
-          '<span class="v2-chip"><i style="background:var(--v2-s2)"></i>2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho: ' + eurV(t.t2.bruto) + ' · ' + (100 - p1) + '%</span>' +
+          '<span class="v2-chip info"><i style="background:var(--v2-s1)"></i>1.º turno · até ' + HORA_CORTE_TURNO + 'h: ' + eurV(t.t1.bruto) + ' · ' + p1 + '% · ' + intV(Math.round(t.t1.docs)) + ' talões' + (t.t1.ticket !== null ? ' · ticket ' + eurV(t.t1.ticket) : '') + '</span>' +
+          '<span class="v2-chip"><i style="background:var(--v2-s2)"></i>2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho: ' + eurV(t.t2.bruto) + ' · ' + (100 - p1) + '% · ' + intV(Math.round(t.t2.docs)) + ' talões' + (t.t2.ticket !== null ? ' · ticket ' + eurV(t.t2.ticket) : '') + '</span>' +
           '</div>';
       }
+      topoGraf = agoraHTML(p, c);
       LEITURA.hora = c.sub;
     }
 
@@ -2277,7 +2341,13 @@
                  dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') + (v.docs ? '\nticket médio ' + eurV(v.bruto / v.docs) : '') : 'fechado') };
       });
       legenda = 'Média por dia aberto, não a soma. ' + DIAS_SEMANA[hoje] + ' (hoje) em destaque.';
-      if (vista === 'tabela'){
+      if (vista === 'lista'){
+        corpo = listaHTML(sItens.map(function(x){
+          return { rot:esc(x.nome), valor:x.valor, txt: x.diasN ? liTxt(eurV(x.valor), '') : '<i>fechado</i>',
+                   nota: x.diasN ? x.diasN + (x.diasN === 1 ? ' dia aberto' : ' dias abertos') : '',
+                   cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
+        }));
+      } else if (vista === 'tabela'){
         corpo = tabelaHTML([{t:'Dia da semana'},{t:'Média por dia',num:1},{t:'Dias abertos',num:1}],
           sItens.map(function(x){ return [esc(x.nome), x.diasN ? eurV(x.valor) : '<span style="color:var(--v2-apagado)">fechado</span>', intV(x.diasN)]; }),
           sItens.map(function(x){ return x.cls; }));
@@ -2308,7 +2378,12 @@
                  dica: rotuloSemana(seg) + (s.dias < 7 ? ' · ' + s.dias + '/7 dias abertos' : '') + '\n' + eurV(s.bruto) + ' · ' + intV(s.docs) + ' talões' + (s.docs ? '\nticket médio ' + eurV(s.bruto / s.docs) : '') };
       });
       legenda = 'Bruto por semana, de segunda a domingo; (n/7) = semana com menos de 7 dias abertos.';
-      if (vista === 'tabela'){
+      if (vista === 'lista'){
+        corpo = listaHTML(wItens.map(function(x){
+          return { rot:esc(x.rot), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.s.docs) + ' talões'),
+                   nota: x.s.docs ? 'ticket ' + eurV(x.valor / x.s.docs) : '', cls:x.cls };
+        }), { larg:150 });
+      } else if (vista === 'tabela'){
         corpo = tabelaHTML([{t:'Semana'},{t:'Dias abertos',num:1},{t:'Bruto',num:1},{t:'Talões',num:1}],
           wItens.map(function(x){ return [esc(x.rot), x.s.dias + '/7', eurV(x.valor), intV(x.s.docs)]; }),
           wItens.map(function(x){ return x.cls; }));
@@ -2338,7 +2413,14 @@
                    intV(dias) + (dias === 1 ? ' dia aberto' : ' dias abertos') + ' · média ' + eurV(media) + '/dia' };
       });
       legenda = 'Bruto de cada mês importado.' + (mItens.some(function(x){ return x.emCurso; }) ? ' O mês em curso ainda não está completo.' : '') + ' Clica numa barra para abrir esse mês.';
-      if (vista === 'tabela'){
+      if (vista === 'lista'){
+        corpo = listaHTML(mItens.map(function(x, i){
+          return { rot:esc(x.nome), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.docs) + ' talões'),
+                   delta: (i && !x.emCurso) ? deltaCelula(x.valor, mItens[i - 1].valor) : '',
+                   nota: intV(x.dias) + ' dias' + (x.emCurso ? ' · parcial' : ''),
+                   cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
+        }), { larg:130 });
+      } else if (vista === 'tabela'){
         corpo = tabelaHTML([{t:'Mês'},{t:'Bruto',num:1},{t:'Δ mês anterior',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1},{t:'Dias abertos',num:1},{t:'Média por dia',num:1}],
           mItens.map(function(x, i){
             return [esc(x.nome) + (x.emCurso ? ' <span class="tag">em curso</span>' : ''), eurV(x.valor),
@@ -2351,7 +2433,7 @@
       } else corpo = barrasHTML(mItens);
     }
 
-    ctrl += segHTML('vista', [['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
+    ctrl += segHTML('vista', [['lista','Lista'], ['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
 
     return '<section class="v2-cartao" aria-label="Faturação">' +
       '<h2 class="v2-sr">Faturação por período</h2>' +
@@ -2360,7 +2442,7 @@
         '<div class="v2-ctrls">' + ctrl + '</div>' +
       '</div>' +
       '<div class="v2-legenda">' + esc(legenda) + ' <button type="button" class="v2-link" data-gaveta="ler">Como ler</button></div>' +
-      '<div class="v2-graf">' + corpo + pe + '</div>' +
+      '<div class="v2-graf">' + topoGraf + corpo + pe + '</div>' +
     '</section>';
   }
 
@@ -2410,12 +2492,33 @@
         semAnt, semAnt
       ];
     }
-    return '<div class="v2-kpis">' +
+    // Base da comparação, escrita — nunca um "−27%" sem dizer contra quê.
+    var base = '';
+    if (hom && !hom.semDados){
+      base = 'Variações: primeiros ' + intV(hom.n) + ' dias abertos de ' + nomeMes(estado.mesActivo) +
+        ' contra os primeiros ' + intV(hom.nAnt) + ' de ' + nomeMes(hom.anterior) + '.' +
+        (hom.nAnt < hom.n ? ' Comparação parcial.' : '');
+    } else if (calcSemanaAnterior(p)){
+      base = 'Variações: face a ' + calcSemanaAnterior(p).rotulo + ', o mesmo dia da semana na semana anterior.';
+    }
+    // Última importação do mês à vista (em "Todos os meses", a mais recente).
+    var imp = null;
+    if (estado.mesActivo !== '__todos'){
+      imp = (estado.dados[estado.mesActivo] || {}).resumo || null;
+    } else {
+      Object.keys(estado.dados).forEach(function(m){
+        var rr = estado.dados[m].resumo;
+        if (rr && rr.importadoEm && (!imp || rr.importadoEm > imp.importadoEm)) imp = rr;
+      });
+    }
+    var impTxt = (imp && imp.importadoEm)
+      ? '<span title="' + attr(imp.ficheiro || '') + '">Importado a ' + esc(dataHora(imp.importadoEm)) + '</span>' : '';
+    return '<div class="v2-kpis-grupo"><div class="v2-kpis">' +
       kpiV2('Faturação (c/ IVA)', eurV(r.bruto), pe[0]) +
       kpiV2('Talões', intV(r.docs), pe[1]) +
       kpiV2('Ticket médio', eurV(r.ticket), pe[2]) +
       kpiV2('Média por dia', eurV(mediaDia), pe[3], diasTxt) +
-    '</div>';
+    '</div>' + ((base || impTxt) ? '<p class="v2-base"><span>' + esc(base) + '</span>' + impTxt + '</p>' : '') + '</div>';
   }
 
   function concentracao(p){
@@ -2514,20 +2617,12 @@
      do que os pares, que passaram para o rodapé "Mais análise"). Os 5
      primeiros por valor; o painel tem as três vistas e a lista completa. */
   function cartaoTop(p){
-    var prods = p.produtos || {};
-    var lista = Object.keys(prods).map(function(k){
-      return { desc:prods[k].desc || k, sub:prods[k].subcategoria || prods[k].categoria || '',
-               qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0 };
-    }).filter(function(x){ return x.valor > 0 || x.qtd > 0; })
-      .sort(function(a, b){ return b.valor - a.valor; });
-    if (!lista.length) return '';
-    var total = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
-    return '<section class="v2-cartao">' +
-      cartaoTitulo('Top produtos', 'top', '<button type="button" class="v2-link" data-gaveta="top" data-abrir-top="produtos">Ver todos (' + lista.length + ')</button>') +
-      tabelaHTML([{t:'Produto'},{t:'Subcategoria'},{t:'Qtd.',num:1},{t:'Valor',num:1},{t:'% do total',num:1}], lista.slice(0, 5).map(function(x){
-        return [esc(x.desc), '<span style="color:var(--v2-sec)">' + esc(x.sub || '—') + '</span>', decV(x.qtd, 0), eurV(x.valor),
-                total ? decV(x.valor / total * 100, 1) + '%' : '—'];
-      })) + '<div style="height:8px"></div></section>';
+    if (!Object.keys(p.produtos || {}).length) return '';
+    // A MESMA tabela do painel (três vistas, ordenável, grupos que abrem) — agora na página.
+    var d = GAVETAS.top(p);
+    return '<section class="v2-cartao v2-top">' +
+      '<div class="v2-cartao-cab"><h2 class="v2-h2 v2-titulo-fixo">Top produtos</h2></div>' +
+      '<div class="v2-top-corpo">' + d.corpo + '</div></section>';
   }
 
   function rodapeMais(){
@@ -2998,9 +3093,9 @@
     if ((b = t.closest('button[data-mix]'))){ v2.mix = b.getAttribute('data-mix'); guardarV2(); renderGaveta(payloadActivo()); return; }
     if ((b = t.closest('button[data-pag]'))){ v2.pag = b.getAttribute('data-pag'); guardarV2(); renderGaveta(payloadActivo()); return; }
     if ((b = t.closest('button[data-top]'))){
-      v2.top = b.getAttribute('data-top'); estado.vistasGrafico.topProdutos = v2.top; guardarV2(); renderGaveta(payloadActivo()); return;
+      v2.top = b.getAttribute('data-top'); estado.vistasGrafico.topProdutos = v2.top; guardarV2(); renderVistas(); return;
     }
-    if ((b = t.closest('th[data-ordem]'))){ estado.ordemProdutos = b.getAttribute('data-ordem'); renderGaveta(payloadActivo()); return; }
+    if ((b = t.closest('th[data-ordem]'))){ estado.ordemProdutos = b.getAttribute('data-ordem'); renderVistas(); return; }
     if ((b = t.closest('tr.cat-expansivel[data-cat]'))){
       var caixa = b.closest('table');
       var cat = b.getAttribute('data-cat');
