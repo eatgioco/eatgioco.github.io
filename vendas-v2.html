@@ -2468,9 +2468,29 @@
       })) + '<div style="height:8px"></div></section>';
   }
 
+  /* Top produtos no ecrã (decisão do Manel, 16 Nov/2026: é mais importante
+     do que os pares, que passaram para o rodapé "Mais análise"). Os 5
+     primeiros por valor; o painel tem as três vistas e a lista completa. */
+  function cartaoTop(p){
+    var prods = p.produtos || {};
+    var lista = Object.keys(prods).map(function(k){
+      return { desc:prods[k].desc || k, sub:prods[k].subcategoria || prods[k].categoria || '',
+               qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0 };
+    }).filter(function(x){ return x.valor > 0 || x.qtd > 0; })
+      .sort(function(a, b){ return b.valor - a.valor; });
+    if (!lista.length) return '';
+    var total = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
+    return '<section class="v2-cartao">' +
+      cartaoTitulo('Top produtos', 'top', '<button type="button" class="v2-link" data-gaveta="top" data-abrir-top="produtos">Ver todos (' + lista.length + ')</button>') +
+      tabelaHTML([{t:'Produto'},{t:'Subcategoria'},{t:'Qtd.',num:1},{t:'Valor',num:1},{t:'% do total',num:1}], lista.slice(0, 5).map(function(x){
+        return [esc(x.desc), '<span style="color:var(--v2-sec)">' + esc(x.sub || '—') + '</span>', decV(x.qtd, 0), eurV(x.valor),
+                total ? decV(x.valor / total * 100, 1) + '%' : '—'];
+      })) + '<div style="height:8px"></div></section>';
+  }
+
   function rodapeMais(){
     return '<nav class="v2-mais" aria-label="Mais análise"><span>Mais análise:</span>' +
-      '<button type="button" class="v2-link" data-gaveta="top">Top produtos</button>' +
+      '<button type="button" class="v2-link" data-gaveta="pares">Pares de produtos</button>' +
       '<button type="button" class="v2-link" data-gaveta="ticket">Ticket decomposto</button>' +
       '<button type="button" class="v2-link" data-gaveta="fs">FS vs FR</button>' +
       '<button type="button" class="v2-link" data-gaveta="ritmo">Ritmo do dia</button>' +
@@ -2876,7 +2896,7 @@
       cartaoGrafico(p) +
       cartoesLinha3(p) +
       cartoesLinha2(p) +
-      cartaoPares(p) +
+      cartaoTop(p) +
       rodapeMais();
     renderGaveta(p);
   }
@@ -2895,7 +2915,11 @@
   document.addEventListener('click', function(ev){
     var t = ev.target;
     var b;
-    if ((b = t.closest('[data-gaveta]'))){ abrirGaveta(b.getAttribute('data-gaveta'), b); return; }
+    if ((b = t.closest('[data-gaveta]'))){
+      // "Ver todos (N)" do cartão Top produtos abre na vista Produtos (os N que anuncia).
+      if (b.getAttribute('data-abrir-top')){ v2.top = b.getAttribute('data-abrir-top'); estado.vistasGrafico.topProdutos = v2.top; guardarV2(); }
+      abrirGaveta(b.getAttribute('data-gaveta'), b); return;
+    }
     if ((b = t.closest('[data-fechar-gaveta]')) || t.id === 'gavetaOv'){ fecharGaveta(); return; }
     if ((b = t.closest('[data-voltar-mes]'))){ voltarAoMes(); return; }
     if ((b = t.closest('[data-periodo]'))){
