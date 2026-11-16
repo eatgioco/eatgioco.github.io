@@ -1396,7 +1396,7 @@
      as duas páginas não se pisarem. Nada disto toca nos dados. */
   var LS_V2 = 'gioco.vendasV2.ui';
   var v2 = (function(){
-    var base = { tab:'dia', vista:{ dia:'barras', hora:'barras', sem:'barras', semanas:'barras' },
+    var base = { tab:'dia', vista:{ dia:'barras', hora:'barras', sem:'barras', semanas:'barras', meses:'barras' },
                  mix:'barras', pag:'barras', top:'subcategorias', gaveta:null, abridor:null };
     var guardado = lerPrefs(LS_V2);
     if (guardado.tab) base.tab = guardado.tab;
@@ -2147,10 +2147,11 @@
   /* =========================================================
      Cartão do gráfico
      ========================================================= */
-  var TABS = [['dia','Por dia'], ['hora','Por hora'], ['sem','Dia da semana'], ['semanas','Semanas']];
+  var TABS = [['dia','Por dia'], ['hora','Por hora'], ['sem','Dia da semana'], ['semanas','Semanas'], ['meses','Por mês']];
   var LEITURA = {
     dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. Na tabela e na dica de cada barra estão os talões e o ticket desse dia.',
     sem: 'Média por dia aberto (não a soma) — para não penalizar semanas com feriados. "fechado" = nenhum dia aberto desse dia da semana no período. A barra de hoje fica em destaque.',
+    meses: 'Bruto de cada mês importado, lado a lado. Não depende do período escolhido: mostra sempre todos os meses. O mês em curso ainda não está completo — compara-o pelos dias abertos e pela média por dia (na tabela e na dica de cada barra), não pelo total. Clica numa barra para abrir esse mês.',
     semanas: 'Bruto e nº de talões por semana (segunda a domingo). Semanas com menos de 7 dias abertos vêm assinaladas com (n/7) — não se inventam zeros que puxariam a barra para baixo sem razão.'
   };
 
@@ -2307,6 +2308,39 @@
         corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:wItens.map(function(x){ return x.valor; }) }],
           wItens.map(function(x){ return x.rot; }), wItens.map(function(x){ return x.dica; }), { aria:'Vendas por semana' });
       } else corpo = barrasHTML(wItens);
+    }
+
+    else if (tab === 'meses'){
+      /* Vendas por mês: sai dos resumos dos meses já em memória (a leitura
+         única de vendas/) — nenhuma leitura nova. Mostra SEMPRE todos os
+         meses, qualquer que seja o período escolhido. */
+      var mesHoje = isoDeData(agoraVendas()).slice(0, 7);
+      var mItens = Object.keys(estado.dados).sort().map(function(m){
+        var rr = estado.dados[m].resumo || {};
+        var bruto = Number(rr.bruto) || 0, docs = Number(rr.docs) || 0, dias = Number(rr.dias) || 0;
+        var media = dias ? bruto / dias : 0;
+        var emCurso = m === mesHoje;
+        return { m:m, valor:bruto, docs:docs, dias:dias, media:media, ticket:Number(rr.ticket) || 0, emCurso:emCurso,
+                 nome: nomeMes(m),
+                 eixo: esc(mesCurto(m.slice(5, 7))) + '<br>' + esc(m.slice(0, 4)) + (emCurso ? '<br>em curso' : ''),
+                 valorTxt: decV(bruto, 0),
+                 cls: m === estado.mesActivo ? 'destaque' : '',
+                 periodo: 'm:' + m, periodoDica: 'Clica para abrir este mês',
+                 dica: nomeMes(m) + (emCurso ? ' (em curso)' : '') + '\n' + eurV(bruto) + ' · ' + intV(docs) + ' talões\n' +
+                   intV(dias) + (dias === 1 ? ' dia aberto' : ' dias abertos') + ' · média ' + eurV(media) + '/dia · ticket ' + eurV(rr.ticket) };
+      });
+      legenda = 'Bruto de cada mês importado.' + (mItens.some(function(x){ return x.emCurso; }) ? ' O mês em curso ainda não está completo.' : '') + ' Clica numa barra para abrir esse mês.';
+      if (vista === 'tabela'){
+        corpo = tabelaHTML([{t:'Mês'},{t:'Bruto',num:1},{t:'Δ mês anterior',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1},{t:'Dias abertos',num:1},{t:'Média por dia',num:1}],
+          mItens.map(function(x, i){
+            return [esc(x.nome) + (x.emCurso ? ' <span class="tag">em curso</span>' : ''), eurV(x.valor),
+                    (i && !x.emCurso) ? deltaCelula(x.valor, mItens[i - 1].valor) : '—',
+                    intV(x.docs), eurV(x.ticket), intV(x.dias), eurV(x.media)];
+          }), mItens.map(function(x){ return x.cls; }));
+      } else if (vista === 'linha'){
+        corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:mItens.map(function(x){ return x.valor; }) }],
+          mItens.map(function(x){ return mesCurto(x.m.slice(5, 7)); }), mItens.map(function(x){ return x.dica; }), { aria:'Vendas por mês' });
+      } else corpo = barrasHTML(mItens);
     }
 
     ctrl += segHTML('vista', [['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
