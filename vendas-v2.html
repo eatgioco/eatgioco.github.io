@@ -1460,7 +1460,7 @@
      (ticket, variação, acumulado, dias abertos) está na vista Tabela e no
      rótulo para leitores de ecrã. */
   function dicaCurta(t){
-    // Duas linhas, mais a do ticket médio quando existe (dica do dia — pedido do Manel).
+    // Duas linhas, mais a do ticket médio quando existe (dia, hora, semana e mês — pedido do Manel).
     return String(t || '').split('\n').filter(function(l, i){ return i < 2 || l.indexOf('ticket médio') === 0; }).join('\n');
   }
 
@@ -2230,7 +2230,7 @@
           eixo: esc(rot) + (x.h === hAgora ? '<br><b>agora</b>' : ''),
           valorTxt: c.itens.length > 16 ? decV(x.valor, 0) : eurCurto(x.valor),
           cls: (x.t2 ? 't2' : 't1') + (x.h === hAgora ? ' agora' : ''),
-          dica: pad2(x.h) + ':00–' + pad2((x.h + 1) % 24) + ':00\n' + eurV(x.valor) + ' · ' + intV(x.docs) + ' talões\n' + (x.t2 ? '2.º' : '1.º') + ' turno' +
+          dica: pad2(x.h) + ':00–' + pad2((x.h + 1) % 24) + ':00\n' + eurV(x.valor) + ' · ' + intV(x.docs) + ' talões' + (x.docs ? '\nticket médio ' + eurV(x.valor / x.docs) : '') + '\n' + (x.t2 ? '2.º' : '1.º') + ' turno' +
             (delta ? '\n' + delta : '') + (x.acum !== null ? '\nacumulado (média) ' + eurV(x.acum) : ''),
           x:x, delta: x.anterior === null ? '—' : deltaCelula(x.valor, x.anterior)
         };
@@ -2274,7 +2274,7 @@
                  cls: d === hoje ? 'destaque' : '',
                  periodo: (v && v.dias && !estado.diaActivo) ? 'w:' + d : '',
                  periodoDica: 'Clica para ver só ' + ROTULO_TODOS_V2[d],
-                 dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') : 'fechado') };
+                 dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') + (v.docs ? '\nticket médio ' + eurV(v.bruto / v.docs) : '') : 'fechado') };
       });
       legenda = 'Média por dia aberto, não a soma. ' + DIAS_SEMANA[hoje] + ' (hoje) em destaque.';
       if (vista === 'tabela'){
@@ -2305,7 +2305,7 @@
                  eixo: esc(rotuloSemana(seg)) + (nota ? '<br>' + esc(nota.trim()) : ''),
                  valorTxt: eurCurto(s.bruto),
                  cls: i === ordem.length - 1 ? 'destaque' : '',
-                 dica: rotuloSemana(seg) + (s.dias < 7 ? ' · ' + s.dias + '/7 dias abertos' : '') + '\n' + eurV(s.bruto) + ' · ' + intV(s.docs) + ' talões' };
+                 dica: rotuloSemana(seg) + (s.dias < 7 ? ' · ' + s.dias + '/7 dias abertos' : '') + '\n' + eurV(s.bruto) + ' · ' + intV(s.docs) + ' talões' + (s.docs ? '\nticket médio ' + eurV(s.bruto / s.docs) : '') };
       });
       legenda = 'Bruto por semana, de segunda a domingo; (n/7) = semana com menos de 7 dias abertos.';
       if (vista === 'tabela'){
@@ -2334,8 +2334,8 @@
                  valorTxt: decV(bruto, 0),
                  cls: m === estado.mesActivo ? 'destaque' : '',
                  periodo: 'm:' + m, periodoDica: 'Clica para abrir este mês',
-                 dica: nomeMes(m) + (emCurso ? ' (em curso)' : '') + '\n' + eurV(bruto) + ' · ' + intV(docs) + ' talões\n' +
-                   intV(dias) + (dias === 1 ? ' dia aberto' : ' dias abertos') + ' · média ' + eurV(media) + '/dia · ticket ' + eurV(rr.ticket) };
+                 dica: nomeMes(m) + (emCurso ? ' (em curso)' : '') + '\n' + eurV(bruto) + ' · ' + intV(docs) + ' talões\nticket médio ' + eurV(rr.ticket) + '\n' +
+                   intV(dias) + (dias === 1 ? ' dia aberto' : ' dias abertos') + ' · média ' + eurV(media) + '/dia' };
       });
       legenda = 'Bruto de cada mês importado.' + (mItens.some(function(x){ return x.emCurso; }) ? ' O mês em curso ainda não está completo.' : '') + ' Clica numa barra para abrir esse mês.';
       if (vista === 'tabela'){
