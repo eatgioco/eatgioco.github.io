@@ -1455,6 +1455,11 @@
     return '<svg class="v2-ico"' + (extra ? ' style="' + extra + '"' : '') + ' aria-hidden="true"><use href="#i-' + nome + '"/></svg>';
   }
   function attr(s){ return esc(s).replace(/\n/g, '&#10;'); }
+  /* A dica flutuante leva só duas linhas — o quê, e o valor com os talões
+     (pedido do Manel, 16 Nov/2026: tinha informação a mais). O resto
+     (ticket, variação, acumulado, dias abertos) está na vista Tabela e no
+     rótulo para leitores de ecrã. */
+  function dicaCurta(t){ return String(t || '').split('\n').slice(0, 2).join('\n'); }
 
   /* =========================================================
      Leitura dos dados gravados (mesma leitura da vendas.html)
@@ -1954,14 +1959,14 @@
       // Com `periodo`, a barra é um botão: abre esse dia (ou esse dia da semana).
       if (x.periodo){
         return '<button type="button" class="v2-col ' + (x.cls || '') + '" data-periodo="' + attr(x.periodo) + '"' +
-          ' data-dica="' + attr((x.dica || '') + '\n' + x.periodoDica) + '" aria-label="' + rotulo + '. ' + attr(x.periodoDica) + '">' + miolo + '</button>';
+          ' data-dica="' + attr(dicaCurta(x.dica)) + '" aria-label="' + rotulo + '. ' + attr(x.periodoDica) + '">' + miolo + '</button>';
       }
-      return '<div class="v2-col ' + (x.cls || '') + '" tabindex="0" role="img" aria-label="' + rotulo + '" data-dica="' + attr(x.dica || '') + '">' + miolo + '</div>';
+      return '<div class="v2-col ' + (x.cls || '') + '" tabindex="0" role="img" aria-label="' + rotulo + '" data-dica="' + attr(dicaCurta(x.dica)) + '">' + miolo + '</div>';
     }).join('');
     var eixo = itens.map(function(x){
       return '<span class="' + ((x.cls || '').indexOf('destaque') >= 0 || (x.cls || '').indexOf('agora') >= 0 ? 'destaque' : '') + '">' + x.eixo + '</span>';
     }).join('');
-    var minW = Math.max(520, itens.length * 38);
+    var minW = itens.length * 38;   // poucas barras cabem no telemóvel sem deslizar
     return '<div class="v2-graf-scroll"><div class="v2-barras" style="min-width:' + minW + 'px">' + cols + '</div>' +
       '<div class="v2-eixo" style="min-width:' + minW + 'px">' + eixo + '</div></div>';
   }
@@ -1999,7 +2004,7 @@
     // Alvos de hover maiores do que a marca: uma faixa por coluna.
     var larg = n > 1 ? (W - ESQ - DIR) / (n - 1) : W;
     var alvos = rotulos.map(function(r, i){
-      return '<rect x="' + (x(i) - larg / 2).toFixed(1) + '" y="0" width="' + larg.toFixed(1) + '" height="' + (H - PE) + '" fill="transparent" data-dica="' + attr(dicas[i] || '') + '" tabindex="0"/>';
+      return '<rect x="' + (x(i) - larg / 2).toFixed(1) + '" y="0" width="' + larg.toFixed(1) + '" height="' + (H - PE) + '" fill="transparent" data-dica="' + attr(dicaCurta(dicas[i])) + '" tabindex="0"/>';
     }).join('');
     var leg = series.length > 1 ? '<div class="v2-serie-leg">' + series.map(function(s){
       return '<span><i style="background:' + s.cor + '"></i>' + esc(s.nome) + '</span>';
@@ -2123,8 +2128,8 @@
 
     // Texto completo da vendas.html — vai para "Como ler".
     var nDias = intV(dias) + (dias === 1 ? ' dia' : ' dias');
-    var frase = 'a variação face à hora anterior mostra onde o serviço acelera e onde colapsa.';
-    var fraseAcum = ' O acumulado (coluna da tabela, linha tracejada no gráfico de linha e na dica de cada barra) é a soma das médias até cada hora';
+    var frase = 'a variação face à hora anterior (coluna da vista Tabela) mostra onde o serviço acelera e onde colapsa.';
+    var fraseAcum = ' O acumulado (coluna da vista Tabela e linha tracejada no gráfico de linha) é a soma das médias até cada hora';
     var sub;
     if (individual){
       sub = 'Bruto e nº de documentos por hora desse dia; ' + frase + ' O acumulado é a soma ao longo do dia.';
@@ -2149,9 +2154,9 @@
      ========================================================= */
   var TABS = [['dia','Por dia'], ['hora','Por hora'], ['sem','Dia da semana'], ['semanas','Semanas'], ['meses','Por mês']];
   var LEITURA = {
-    dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. Na tabela e na dica de cada barra estão os talões e o ticket desse dia.',
+    dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. A dica de cada barra dá o valor e os talões; o ticket de cada dia está na vista Tabela.',
     sem: 'Média por dia aberto (não a soma) — para não penalizar semanas com feriados. "fechado" = nenhum dia aberto desse dia da semana no período. A barra de hoje fica em destaque.',
-    meses: 'Bruto de cada mês importado, lado a lado. Não depende do período escolhido: mostra sempre todos os meses. O mês em curso ainda não está completo — compara-o pelos dias abertos e pela média por dia (na tabela e na dica de cada barra), não pelo total. Clica numa barra para abrir esse mês.',
+    meses: 'Bruto de cada mês importado, lado a lado. Não depende do período escolhido: mostra sempre todos os meses. O mês em curso ainda não está completo — compara-o pelos dias abertos e pela média por dia (na vista Tabela), não pelo total. Clica numa barra para abrir esse mês.',
     semanas: 'Bruto e nº de talões por semana (segunda a domingo). Semanas com menos de 7 dias abertos vêm assinaladas com (n/7) — não se inventam zeros que puxariam a barra para baixo sem razão.'
   };
 
@@ -2186,7 +2191,7 @@
                  cls: d === ultimo ? 'destaque' : '',
                  periodo: (estado.mesActivo !== '__todos' && !estado.diaActivo && !estado.diaSemanaActivo) ? 'd:' + d : '',
                  periodoDica: 'Clica para ver só este dia',
-                 dica: longo + '\n' + eurV(v.bruto) + '\n' + intV(v.docs) + ' talões · ticket ' + eurV(ticket) };
+                 dica: longo + '\n' + eurV(v.bruto) + ' · ' + intV(v.docs) + ' talões\nticket ' + eurV(ticket) };
       });
       legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') + (itens[0] && itens[0].periodo ? ' Clica numa barra para abrir esse dia.' : '') : 'Sem dias neste período.';
       if (vista === 'tabela'){
@@ -2222,7 +2227,7 @@
           eixo: esc(rot) + (x.h === hAgora ? '<br><b>agora</b>' : ''),
           valorTxt: c.itens.length > 16 ? decV(x.valor, 0) : eurCurto(x.valor),
           cls: (x.t2 ? 't2' : 't1') + (x.h === hAgora ? ' agora' : ''),
-          dica: pad2(x.h) + ':00–' + pad2((x.h + 1) % 24) + ':00 · ' + (x.t2 ? '2.º' : '1.º') + ' turno\n' + eurV(x.valor) + ' · ' + intV(x.docs) + ' talões' +
+          dica: pad2(x.h) + ':00–' + pad2((x.h + 1) % 24) + ':00\n' + eurV(x.valor) + ' · ' + intV(x.docs) + ' talões\n' + (x.t2 ? '2.º' : '1.º') + ' turno' +
             (delta ? '\n' + delta : '') + (x.acum !== null ? '\nacumulado (média) ' + eurV(x.acum) : ''),
           x:x, delta: x.anterior === null ? '—' : deltaCelula(x.valor, x.anterior)
         };
@@ -2322,7 +2327,7 @@
         var emCurso = m === mesHoje;
         return { m:m, valor:bruto, docs:docs, dias:dias, media:media, ticket:Number(rr.ticket) || 0, emCurso:emCurso,
                  nome: nomeMes(m),
-                 eixo: esc(mesCurto(m.slice(5, 7))) + '<br>' + esc(m.slice(0, 4)) + (emCurso ? '<br>em curso' : ''),
+                 eixo: esc(mesCurto(m.slice(5, 7))) + '<br>' + esc(m.slice(0, 4)) + (emCurso ? '<br>parcial' : ''),
                  valorTxt: decV(bruto, 0),
                  cls: m === estado.mesActivo ? 'destaque' : '',
                  periodo: 'm:' + m, periodoDica: 'Clica para abrir este mês',
@@ -2905,6 +2910,24 @@
     else renderVistas();
   });
 
+  /* Telemóvel: o que está ativo ou em destaque nunca fica fora do ecrã —
+     o separador escolhido e a barra em destaque (o dia mais recente, a hora
+     atual) são trazidos para dentro da zona visível das suas faixas. */
+  function ajustarScroll(alvo){
+    var pares = [['.v2-cartao-cab .v2-seg', 'button[aria-pressed="true"]'], ['.v2-graf-scroll', '.v2-col.destaque, .v2-col.agora']];
+    pares.forEach(function(par){
+      var caixas = alvo.querySelectorAll(par[0]);
+      for (var i = 0; i < caixas.length; i++){
+        var cx = caixas[i];
+        if (cx.scrollWidth <= cx.clientWidth) continue;
+        var el2 = cx.querySelector(par[1]);
+        if (!el2) continue;
+        var a = el2.getBoundingClientRect(), c = cx.getBoundingClientRect();
+        cx.scrollLeft += (a.left + a.width / 2) - (c.left + c.width / 2);
+      }
+    });
+  }
+
   function renderVistas(){
     escreverHash();
     var p = payloadActivo();
@@ -2932,6 +2955,7 @@
       cartoesLinha2(p) +
       cartaoTop(p) +
       rodapeMais();
+    ajustarScroll(alvo);
     renderGaveta(p);
   }
 
