@@ -907,10 +907,13 @@ social                — Instagram + calendário de publicações (social.html,
                          NUNCA é critério. Nenhuma destas camadas é arrastável nem
                          editável, e a página não escreve uma única vez em eventos/ nem em
                          social/instagram/
-vendas / vendasDiario — vendas importadas do SAF-T. Só DOIS escrevem aqui, e ambos pela
-                         mesma lógica (gioco-saft.js): a vendas.html e, desde Nov/2026, o
+vendas / vendasDiario — vendas importadas do SAF-T. Só TRÊS escrevem aqui, todos pela
+                         mesma lógica (gioco-saft.js): a vendas.html; desde Nov/2026 o
                          Worker do Jarvis (ficheiro enviado no Telegram; só os nós do dia e
-                         do mês, nunca o catálogo). Todas as outras páginas são leitura pura.
+                         do mês, nunca o catálogo); e desde 16/11/2026 o SAF-T automático
+                         (Google Apps Script, minuto a minuto; dia, mês e, para produtos
+                         novos, vendas/catalogo/{produto} com a categoria sugerida — ver
+                         "Importação do SAF-T"). Todas as outras páginas são leitura pura.
                          vendasDiario/{AAAA-MM}/{AAAA-MM-DD} = payload de UM dia
                          (resumo, produtos, porDia, porHora, porDiaSemana, porTipo,
                          porPagamento, porCategoria, porSubcategoria, attach, pares);
@@ -1684,6 +1687,21 @@ mesma idempotência, mesmo mês recomposto. Por isso há UMA implementação, nu
   e manda importar na página; não grava sem o botão "Gravar" (o pedido expira em 15 min); não
   oferece "Gravar" se a verificação falhar ou se o mês encolhesse. Nenhum modelo (Haiku/Claude)
   toca nestes números.
+- **TERCEIRO consumidor desde 16/11/2026: o SAF-T automático** (Google Apps Script, projeto
+  "GIOCO SAF-T" da conta `manel.reymao@eatgioco.com`; fonte em `secretaria/appsscript/
+  gioco-saft-auto.gs`). De minuto a minuto, das 11:00 às 23:30 e às 23:45 (Lisboa), exporta o
+  SAF-T do dia do backoffice ZSBMS (utilizador próprio, só "SAFT-PT → Exportação") e, se os
+  documentos mudaram, grava com `GiocoSaft.construirPayload` em `vendasDiario/{mês}/{dia}` e
+  `vendas/{mês}` **sem confirmação** (decisão do Manel). **Carrega este `gioco-saft.js` do site
+  publicado** (`https://eatgioco.github.io/gioco-saft.js`, cache de 1 h) — não há cópia: um
+  push aqui muda o que corre lá. Partir este ficheiro parte a gravação automática.
+  - Não grava (e manda email ao Manel) se a verificação falhar ou se o mês encolhesse.
+  - **Escreve `vendas/catalogo/{produto}`** para produtos novos, com `GiocoSaft.sugerirCategoria`
+    (sem regra → "Outro"), e avisa no tópico Loja do Jarvis (`/api/saft-auto/aviso`) para o
+    Manel corrigir. Isto muda, só para este consumidor, a regra antiga "o catálogo é só da
+    página" — decisão do Manel, 16/11/2026. Melhorar `REGRAS_SUGESTAO` melhora estas sugestões.
+  - Falhas seguidas durante 10 min → email ao Manel. Detalhes e medições: `secretaria/testes/
+    ZONESOFT-SAFT-PASSO1.md`.
 - **Ler por REST exige `GiocoSaft.normalizarLido()`.** Um mapa com chaves numéricas (`porHora`,
   `porDiaSemana`, `produtos` com código numérico) chega por REST como LISTA com `null` nos
   buracos; o SDK do browser entrega a mesma lista sem esses índices. Com os `null`, a soma dos
