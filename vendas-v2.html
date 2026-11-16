@@ -2020,32 +2020,33 @@
       grelha + linhas + eixo + alvos + '</svg></div>' + leg;
   }
 
-  /* Lista: barras horizontais com TUDO na linha (valor, talões, variação,
-     nota) — a leitura da vendas.html, sem passar o rato. linhas:
-     { rot, valor, txt (html), delta (html), nota, cls, periodo, periodoDica, sep } */
-  function listaHTML(linhas, opts){
+  /* Tabela com barras: UMA vista para ler números e proporções (decisão do
+     Manel, 16 Nov/2026: Lista e Tabela eram a mesma coisa). Cada linha tem o
+     rótulo (cabeçalho de linha; botão quando abre esse período), uma barra
+     proporcional ao valor e as colunas numéricas; `total` é a linha de rodapé.
+     linhas: { rot (html), valor, cells[], cls, periodo, periodoDica, sep } */
+  function tabelaBarras(cols, linhas, opts){
     opts = opts || {};
     var max = 0;
     linhas.forEach(function(x){ max = Math.max(max, x.valor || 0); });
-    var temX = linhas.some(function(x){ return x.delta || x.nota; });
-    var temD = linhas.some(function(x){ return x.delta; });
-    return '<div class="v2-lista' + (temX ? '' : ' semx') + (temD ? '' : ' semd') + '" style="--li-rot:' + (opts.larg || 88) + 'px">' + linhas.map(function(x){
+    var n = cols.length + 1;
+    var cab = '<th scope="col">' + esc(cols[0].t) + '</th><th scope="col" class="v2-tb-barc"><span class="v2-sr">Proporção</span></th>' +
+      cols.slice(1).map(function(c){ return '<th scope="col" class="num">' + esc(c.t) + '</th>'; }).join('');
+    var corpo = linhas.map(function(x){
       var w = max > 0 ? Math.max(0, (x.valor || 0) / max * 100) : 0;
-      var miolo = '<span class="v2-li-r">' + x.rot + '</span>' +
-        '<span class="v2-li-t"><span class="v2-li-b" style="width:' + w.toFixed(1) + '%"></span></span>' +
-        '<span class="v2-li-v">' + x.txt + '</span>' +
-        (temX ? '<span class="v2-li-x">' + (temD ? '<span class="v2-li-d">' + (x.delta || '') + '</span>' : '') +
-          '<span class="v2-li-n">' + esc(x.nota || '') + '</span></span>' : '');
-      var sep = x.sep ? '<div class="v2-li-sep"><span>' + esc(x.sep) + '</span></div>' : '';
-      if (x.periodo){
-        return sep + '<button type="button" class="v2-li ' + (x.cls || '') + '" data-periodo="' + attr(x.periodo) + '" title="' + attr(x.periodoDica || '') + '">' + miolo + '</button>';
-      }
-      return sep + '<div class="v2-li ' + (x.cls || '') + '">' + miolo + '</div>';
-    }).join('') + '</div>';
+      var rot = x.periodo
+        ? '<button type="button" class="v2-tb-btn" data-periodo="' + attr(x.periodo) + '" title="' + attr(x.periodoDica || '') + '">' + x.rot + '</button>'
+        : x.rot;
+      return (x.sep ? '<tr class="v2-tb-sep"><th colspan="' + n + '" scope="rowgroup">' + esc(x.sep) + '</th></tr>' : '') +
+        '<tr class="' + (x.cls || '') + '"><th scope="row">' + rot + '</th>' +
+        '<td class="v2-tb-barc"><span class="v2-tb-bar" style="width:' + w.toFixed(1) + '%"></span></td>' +
+        x.cells.map(function(c){ return '<td class="num">' + c + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    var pe = opts.total ? '<tfoot><tr><th scope="row">' + esc(opts.totalRot || 'Total') + '</th><td></td>' +
+      opts.total.map(function(c){ return '<td class="num">' + c + '</td>'; }).join('') + '</tr></tfoot>' : '';
+    return '<div class="v2-tabela-wrap"><table class="v2-tabela v2-tb"><thead><tr>' + cab + '</tr></thead><tbody>' + corpo + '</tbody>' + pe + '</table></div>';
   }
-  function liTxt(valor, extra){
-    return '<b>' + valor + '</b>' + (extra ? ' <i>· ' + extra + '</i>' : '');
-  }
+  function somar(lista, f){ return lista.reduce(function(a, x){ return a + (Number(f(x)) || 0); }, 0); }
 
   /* Bloco "agora" por cima do gráfico por hora — sempre à vista, como na
      vendas.html (o mesmo cálculo do painel Ritmo do dia). */
@@ -2228,6 +2229,7 @@
     if (!tabs.some(function(t){ return t[0] === v2.tab; })) v2.tab = 'dia';
     var tab = v2.tab;
     var vista = v2.vista[tab] || 'barras';
+    if (vista === 'lista') vista = v2.vista[tab] = 'tabela';   // a Lista fundiu-se na Tabela
     var ctrl = '';
     var legenda = '', corpo = '', pe = '', topoGraf = '';
 
@@ -2249,15 +2251,12 @@
                  dica: longo + '\n' + eurV(v.bruto) + ' · ' + intV(v.docs) + ' talões\nticket médio ' + eurV(ticket) };
       });
       legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') + (itens[0] && itens[0].periodo ? ' Clica numa barra para abrir esse dia.' : '') : 'Sem dias neste período.';
-      if (vista === 'lista'){
-        corpo = listaHTML(itens.map(function(x){
-          return { rot:esc(x.longo), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.docs) + ' talões'), nota:'ticket ' + eurV(x.ticket),
+      if (vista === 'tabela'){
+        var dB = somar(itens, function(x){ return x.valor; }), dD = somar(itens, function(x){ return x.docs; });
+        corpo = tabelaBarras([{t:'Dia'},{t:'Bruto'},{t:'Talões'},{t:'Ticket médio'}], itens.map(function(x){
+          return { rot:esc(x.longo), valor:x.valor, cells:[eurV(x.valor), intV(x.docs), eurV(x.ticket)],
                    cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
-        }));
-      } else if (vista === 'tabela'){
-        corpo = tabelaHTML([{t:'Dia'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1}],
-          itens.map(function(x){ return [esc(x.longo), eurV(x.valor), intV(x.docs), eurV(x.ticket)]; }),
-          itens.map(function(x){ return x.cls; }));
+        }), itens.length > 1 ? { total:[eurV(dB), intV(dD), dD ? eurV(dB / dD) : '—'] } : null);
       } else if (vista === 'linha'){
         corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:itens.map(function(x){ return x.valor; }) }],
           itens.map(function(x){ return x.longo.slice(0, 2); }), itens.map(function(x){ return x.dica; }), { aria:'Vendas por dia' });
@@ -2292,21 +2291,18 @@
           x:x, delta: x.anterior === null ? '—' : deltaCelula(x.valor, x.anterior)
         };
       });
-      if (vista === 'lista'){
-        corpo = listaHTML(hItens.map(function(it, i){
-          return { rot:esc(pad2(it.x.h) + ':00') + (it.x.h === hAgora ? ' <b>agora</b>' : ''), valor:it.valor,
-                   txt:liTxt(eurV(it.valor), intV(it.x.docs) + ' talões'), delta:it.delta,
-                   nota: c.temMedia ? 'acum. ' + eurV(it.x.acum) : '', cls:it.cls,
-                   sep: (i === sepIdx && i > 0) ? '2.º turno' : '' };
-        }));
-      } else if (vista === 'tabela'){
-        var cab = [{t:'Hora'},{t:'Turno'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Δ hora anterior',num:1}];
-        if (c.temMedia) cab.push({t:'Acumulado (média)',num:1});
-        corpo = tabelaHTML(cab, hItens.map(function(it){
-          var l = [esc(pad2(it.x.h) + ':00') + (it.x.h === hAgora ? ' · agora' : ''), it.x.t2 ? '2.º' : '1.º', eurV(it.valor), intV(it.x.docs), it.delta];
-          if (c.temMedia) l.push(eurV(it.x.acum));
-          return l;
-        }), hItens.map(function(it){ return it.x.h === hAgora ? 'destaque' : ''; }));
+      if (vista === 'tabela'){
+        var hCols = [{t:'Hora'},{t:'Bruto'},{t:'Talões'},{t:'Ticket médio'},{t:'Δ hora anterior'}];
+        if (c.temMedia) hCols.push({t:'Acumulado (média)'});
+        var hB = somar(hItens, function(x){ return x.valor; }), hD = somar(hItens, function(x){ return x.x.docs; });
+        var hTot = [eurV(hB), intV(hD), hD ? eurV(hB / hD) : '—', ''];
+        if (c.temMedia) hTot.push('');
+        corpo = tabelaBarras(hCols, hItens.map(function(it, i){
+          var cells = [eurV(it.valor), intV(it.x.docs), it.x.docs ? eurV(it.valor / it.x.docs) : '—', it.delta];
+          if (c.temMedia) cells.push(eurV(it.x.acum));
+          return { rot:esc(pad2(it.x.h) + ':00') + (it.x.h === hAgora ? ' <span class="tag novo">agora</span>' : ''), valor:it.valor,
+                   cells:cells, cls:it.cls, sep: (i === sepIdx && i > 0) ? '2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho' : '' };
+        }), { total:hTot, totalRot: c.modo === 'media' ? 'Dia médio' : 'Total' });
       } else if (vista === 'linha'){
         var series = [{ nome: c.modo === 'media' ? 'Por hora (média)' : 'Por hora', cor:'var(--v2-s1)', valores: hItens.map(function(x){ return x.valor; }) }];
         if (c.temMedia) series.push({ nome:'Acumulado (média)', cor:'var(--v2-apagado)', tracejado:true, valores: hItens.map(function(x){ return x.x.acum; }) });
@@ -2323,7 +2319,6 @@
           '<span class="v2-chip"><i style="background:var(--v2-s2)"></i>2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho: ' + eurV(t.t2.bruto) + ' · ' + (100 - p1) + '% · ' + intV(Math.round(t.t2.docs)) + ' talões' + (t.t2.ticket !== null ? ' · ticket ' + eurV(t.t2.ticket) : '') + '</span>' +
           '</div>';
       }
-      topoGraf = agoraHTML(p, c);
       LEITURA.hora = c.sub;
     }
 
@@ -2342,16 +2337,14 @@
                  dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') + (v.docs ? '\nticket médio ' + eurV(v.bruto / v.docs) : '') : 'fechado') };
       });
       legenda = 'Média por dia aberto, não a soma. ' + DIAS_SEMANA[hoje] + ' (hoje) em destaque.';
-      if (vista === 'lista'){
-        corpo = listaHTML(sItens.map(function(x){
-          return { rot:esc(x.nome), valor:x.valor, txt: x.diasN ? liTxt(eurV(x.valor), '') : '<i>fechado</i>',
-                   nota: x.diasN ? x.diasN + (x.diasN === 1 ? ' dia aberto' : ' dias abertos') : '',
+      if (vista === 'tabela'){
+        corpo = tabelaBarras([{t:'Dia da semana'},{t:'Média por dia'},{t:'Dias abertos'},{t:'Ticket médio'}], sItens.map(function(x){
+          var v = ds[x.d];
+          return { rot:esc(x.nome), valor:x.valor,
+                   cells:[x.diasN ? eurV(x.valor) : '<span style="color:var(--v2-apagado)">fechado</span>', intV(x.diasN),
+                          (v && v.docs) ? eurV(v.bruto / v.docs) : '—'],
                    cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
         }));
-      } else if (vista === 'tabela'){
-        corpo = tabelaHTML([{t:'Dia da semana'},{t:'Média por dia',num:1},{t:'Dias abertos',num:1}],
-          sItens.map(function(x){ return [esc(x.nome), x.diasN ? eurV(x.valor) : '<span style="color:var(--v2-apagado)">fechado</span>', intV(x.diasN)]; }),
-          sItens.map(function(x){ return x.cls; }));
       } else if (vista === 'linha'){
         corpo = linhaSVG([{ nome:'Média', cor:'var(--v2-s1)', valores:sItens.map(function(x){ return x.valor; }) }],
           sItens.map(function(x){ return x.nome.slice(0, 3); }), sItens.map(function(x){ return x.dica; }), { aria:'Vendas por dia da semana' });
@@ -2379,15 +2372,12 @@
                  dica: rotuloSemana(seg) + (s.dias < 7 ? ' · ' + s.dias + '/7 dias abertos' : '') + '\n' + eurV(s.bruto) + ' · ' + intV(s.docs) + ' talões' + (s.docs ? '\nticket médio ' + eurV(s.bruto / s.docs) : '') };
       });
       legenda = 'Bruto por semana, de segunda a domingo; (n/7) = semana com menos de 7 dias abertos.';
-      if (vista === 'lista'){
-        corpo = listaHTML(wItens.map(function(x){
-          return { rot:esc(x.rot), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.s.docs) + ' talões'),
-                   nota: x.s.docs ? 'ticket ' + eurV(x.valor / x.s.docs) : '', cls:x.cls };
-        }), { larg:150 });
-      } else if (vista === 'tabela'){
-        corpo = tabelaHTML([{t:'Semana'},{t:'Dias abertos',num:1},{t:'Bruto',num:1},{t:'Talões',num:1}],
-          wItens.map(function(x){ return [esc(x.rot), x.s.dias + '/7', eurV(x.valor), intV(x.s.docs)]; }),
-          wItens.map(function(x){ return x.cls; }));
+      if (vista === 'tabela'){
+        var wB = somar(wItens, function(x){ return x.valor; }), wD = somar(wItens, function(x){ return x.s.docs; });
+        corpo = tabelaBarras([{t:'Semana'},{t:'Bruto'},{t:'Talões'},{t:'Ticket médio'},{t:'Dias abertos'}], wItens.map(function(x){
+          return { rot:esc(x.rot), valor:x.valor,
+                   cells:[eurV(x.valor), intV(x.s.docs), x.s.docs ? eurV(x.valor / x.s.docs) : '—', x.s.dias + '/7'], cls:x.cls };
+        }), { total:[eurV(wB), intV(wD), wD ? eurV(wB / wD) : '—', intV(somar(wItens, function(x){ return x.s.dias; }))] });
       } else if (vista === 'linha'){
         corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:wItens.map(function(x){ return x.valor; }) }],
           wItens.map(function(x){ return x.rot; }), wItens.map(function(x){ return x.dica; }), { aria:'Vendas por semana' });
@@ -2414,27 +2404,26 @@
                    intV(dias) + (dias === 1 ? ' dia aberto' : ' dias abertos') + ' · média ' + eurV(media) + '/dia' };
       });
       legenda = 'Bruto de cada mês importado.' + (mItens.some(function(x){ return x.emCurso; }) ? ' O mês em curso ainda não está completo.' : '') + ' Clica numa barra para abrir esse mês.';
-      if (vista === 'lista'){
-        corpo = listaHTML(mItens.map(function(x, i){
-          return { rot:esc(x.nome), valor:x.valor, txt:liTxt(eurV(x.valor), intV(x.docs) + ' talões'),
-                   delta: (i && !x.emCurso) ? deltaCelula(x.valor, mItens[i - 1].valor) : '',
-                   nota: intV(x.dias) + ' dias' + (x.emCurso ? ' · parcial' : ''),
-                   cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
-        }), { larg:130 });
-      } else if (vista === 'tabela'){
-        corpo = tabelaHTML([{t:'Mês'},{t:'Bruto',num:1},{t:'Δ mês anterior',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1},{t:'Dias abertos',num:1},{t:'Média por dia',num:1}],
+      if (vista === 'tabela'){
+        var mB = somar(mItens, function(x){ return x.valor; }), mD = somar(mItens, function(x){ return x.docs; }),
+            mDias = somar(mItens, function(x){ return x.dias; });
+        corpo = tabelaBarras([{t:'Mês'},{t:'Bruto'},{t:'Δ mês anterior'},{t:'Talões'},{t:'Ticket médio'},{t:'Dias abertos'},{t:'Média por dia'}],
           mItens.map(function(x, i){
-            return [esc(x.nome) + (x.emCurso ? ' <span class="tag">em curso</span>' : ''), eurV(x.valor),
-                    (i && !x.emCurso) ? deltaCelula(x.valor, mItens[i - 1].valor) : '—',
-                    intV(x.docs), eurV(x.ticket), intV(x.dias), eurV(x.media)];
-          }), mItens.map(function(x){ return x.cls; }));
+            return { rot:esc(x.nome) + (x.emCurso ? ' <span class="tag novo">em curso</span>' : ''), valor:x.valor,
+                     cells:[eurV(x.valor), (i && !x.emCurso) ? deltaCelula(x.valor, mItens[i - 1].valor) : '—',
+                            intV(x.docs), eurV(x.ticket), intV(x.dias), eurV(x.media)],
+                     cls:x.cls, periodo:x.periodo, periodoDica:x.periodoDica };
+          }), { total:[eurV(mB), '', intV(mD), mD ? eurV(mB / mD) : '—', intV(mDias), mDias ? eurV(mB / mDias) : '—'] });
       } else if (vista === 'linha'){
         corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:mItens.map(function(x){ return x.valor; }) }],
           mItens.map(function(x){ return mesCurto(x.m.slice(5, 7)); }), mItens.map(function(x){ return x.dica; }), { aria:'Vendas por mês' });
       } else corpo = barrasHTML(mItens);
     }
 
-    ctrl += segHTML('vista', [['lista','Lista'], ['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
+    // Bloco "agora": sempre à vista, qualquer que seja o separador.
+    topoGraf = '<div id="v2Agora">' + agoraHTML(p, contextoHoras(p)) + '</div>';
+
+    ctrl += segHTML('vista', [['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
 
     return '<section class="v2-cartao" aria-label="Faturação">' +
       '<h2 class="v2-sr">Faturação por período</h2>' +
@@ -3063,7 +3052,11 @@
      gráfico por hora e o painel do ritmo. */
   setInterval(function(){
     if (!estado.dados || !Object.keys(estado.dados).length) return;
-    if (v2.tab === 'hora' || v2.gaveta === 'ritmo') renderVistas();
+    if (v2.tab === 'hora' || v2.gaveta === 'ritmo'){ renderVistas(); return; }
+    // Nos outros separadores só o bloco "agora" muda com o relógio: reescreve-se
+    // sozinho, sem redesenhar a página (o que estiver aberto fica aberto).
+    var bloco = el('v2Agora'), pl = payloadActivo();
+    if (bloco && pl) bloco.innerHTML = agoraHTML(pl, contextoHoras(pl));
   }, 60000);
 
   /* =========================================================
