@@ -1,0 +1,3343 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#D8E3F8">
+<meta name="apple-mobile-web-app-title" content="Vendas v2">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIOCO · Vendas (v2)</title>
+<!--
+  vendas-v2.html — REDESENHO "Material azul" da vendas.html (Nov/2026).
+  Página ISOLADA: fora da nav partilhada, sem gioco-shell.css (usa o
+  gioco-v2.css), na lista de excepções do scripts/verifica-shell.sh.
+  Lê EXACTAMENTE o que a vendas.html lê (vendas/ uma vez; vendasDiario/{mês}/{dia}
+  só quando se escolhe um dia ou um dia da semana). A importação do SAF-T é o
+  MESMO código da vendas.html, copiado sem alterações, e usa o gioco-saft.js:
+  grava só nos três caminhos-folha de sempre. Só a camada de desenho é nova.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gioco-v2.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+<!-- O gioco-shell.js dá o sprite de ícones, o tema (data-theme + localStorage
+     'gioco-theme', o mesmo das outras páginas) e a lista de grupos da nav. A
+     sidebar é desenhada aqui a partir de GIOCO_NAV_GRUPOS, sem giocoNav(). -->
+<script src="gioco-shell.js"></script>
+<script src="gioco-saft.js"></script>
+
+<div class="v2-shell">
+
+  <nav class="v2-side" aria-label="Navegação" id="v2Side">
+    <a class="v2-marca" href="index.html"><b>GIOCO</b><span>OS</span></a>
+    <div id="v2Nav"></div>
+    <div class="v2-side-pe">
+      <span>Painel interno</span>
+      <strong>Administrador</strong>
+    </div>
+  </nav>
+
+  <main class="v2-main">
+
+    <div class="v2-topo">
+      <label class="v2-pesquisa">
+        <svg class="v2-ico" aria-hidden="true" style="width:18px;height:18px"><use href="#i-search"/></svg>
+        <span class="v2-sr">Pesquisar</span>
+        <input type="search" id="v2Pesquisa" placeholder="Pesquisar no OS" list="v2PesquisaLista" autocomplete="off">
+        <datalist id="v2PesquisaLista"></datalist>
+      </label>
+      <div class="v2-topo-dir">
+        <button type="button" class="v2-redondo" id="v2Tema" aria-label="Mudar para tema escuro">
+          <svg class="v2-ico" aria-hidden="true" id="v2TemaIco"><use href="#i-sun"/></svg>
+        </button>
+        <div class="v2-avatar" aria-label="Manel" title="Manel">M</div>
+      </div>
+    </div>
+
+    <div class="v2-cab">
+      <h1>Vendas</h1>
+      <div class="v2-cab-acoes">
+        <label class="v2-seletor">
+          <span class="v2-sr">Período</span>
+          <select id="periodoSel"><option value="">A carregar…</option></select>
+        </label>
+        <button type="button" class="v2-btn v2-btn-p" id="btnAbrirImport">
+          <svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+          Importar SAF-T
+        </button>
+      </div>
+    </div>
+
+    <!-- Sem sessão anónima a página não lê nem escreve nada. Escondido até
+         falhar; ver autenticarEContinuar() mais abaixo. -->
+    <div id="authErro">
+      <div class="v2-faixa v2-faixa-erro">
+        <strong>Sem ligação ao Firebase.</strong>
+        <span id="authErroDetalhe">A autenticação anónima não respondeu. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.</span>
+        <button type="button" class="v2-link" id="authRetryBtn">Tentar de novo</button>
+      </div>
+    </div>
+
+    <div id="vistas"></div>
+    <div class="v2-cartao v2-vazio hidden" id="semDados">Sem meses importados. Começa por importar um SAF-T.</div>
+
+  </main>
+</div>
+
+<!-- ============ Gaveta (painel lateral) ============ -->
+<div class="v2-overlay hidden" id="gavetaOv"></div>
+<aside class="v2-gaveta hidden" id="gaveta" role="dialog" aria-modal="true" aria-labelledby="gavetaTitulo"></aside>
+
+<!-- ============ Modal: Importar SAF-T ============
+     Os ids são os da vendas.html — o código de importação é o mesmo. -->
+<div class="v2-overlay v2-modal-ov hidden" id="importOv"></div>
+<div class="v2-modal hidden" id="importModal" role="dialog" aria-modal="true" aria-labelledby="importTitulo">
+  <div class="v2-gaveta-cab">
+    <h2 id="importTitulo">Importar SAF-T</h2>
+    <button type="button" class="v2-fechar" id="btnFecharImport" aria-label="Fechar">×</button>
+  </div>
+  <p class="v2-texto" style="font-size:13px">
+    ZIP mensal exportado do ZoneSoft (ou o XML directo). O ficheiro é lido no browser —
+    só os agregados são gravados no Firebase, nunca as linhas de fatura.
+  </p>
+
+  <label class="v2-drop" id="dropzone" for="fileInput">
+    <span class="v2-drop-ico"><svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;stroke-width:2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></span>
+    <span>
+      <span class="v2-drop-t dropzone-title">Arraste o ficheiro .zip ou .xml aqui</span>
+      <span class="v2-drop-s"><span class="dropzone-sub" style="color:var(--v2-primaria);font-weight:600">ou clique para escolher</span> · <span class="file-name" id="fileName">Nenhum ficheiro escolhido</span></span>
+    </span>
+  </label>
+  <input type="file" id="fileInput" accept=".zip,.xml">
+
+  <div class="v2-modal-acoes">
+    <button type="button" class="v2-btn v2-btn-p" id="btnPasta">
+      <svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Importar mais recente da pasta
+    </button>
+    <button type="button" class="v2-btn v2-btn-s" id="btnZoneSoft">
+      <svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+      Exportar do ZoneSoft
+    </button>
+    <button type="button" class="v2-link" id="btnMudarPasta">mudar pasta</button>
+  </div>
+
+  <div class="v2-meta">
+    <span class="pasta-nome" id="zsIntervalo"></span>
+    <span class="pasta-nome" id="pastaNome"></span>
+    <span id="ultimaImportacao">Última importação: a carregar…</span>
+    <span><button type="button" class="v2-link" id="btnRecarregar" style="min-height:28px;font-size:12px">Recarregar dados</button></span>
+  </div>
+
+  <div class="v2-prog" id="progressWrap">
+    <div class="v2-prog-barra"><div class="v2-prog-fill" id="progressFill"></div></div>
+    <p id="progressText">A ler…</p>
+  </div>
+
+  <div class="msg erro" id="msgErro"></div>
+  <div class="msg aviso" id="msgAviso"></div>
+  <div class="msg aviso" id="msgDrop"></div>
+  <div class="msg ok" id="msgOk"></div>
+
+  <!-- ============ MIGRAÇÃO DO CATÁLOGO ============ -->
+  <div class="v2-passo hidden" id="migracaoCard">
+    <h3>Migrar catálogo para categoria + subcategoria</h3>
+    <p class="card-note">
+      O catálogo tem produtos classificados no esquema antigo (lista plana). Isto mostra
+      exactamente o que vai mudar. Nada é gravado até carregares em Migrar.
+    </p>
+    <div id="migracaoResumo"></div>
+    <div class="v2-tabela-wrap">
+      <table class="v2-tabela">
+        <thead><tr><th>Código</th><th>Descrição</th><th>Antiga</th><th>Categoria</th><th>Subcategoria</th><th>Nota</th></tr></thead>
+        <tbody id="migracaoDetalhe"></tbody>
+      </table>
+    </div>
+    <div class="v2-modal-acoes">
+      <button class="v2-btn v2-btn-p" id="btnMigrar">Migrar catálogo</button>
+      <button class="v2-btn v2-btn-s" id="btnMigrarDepois">Agora não</button>
+    </div>
+  </div>
+
+  <!-- ============ CATÁLOGO ============ -->
+  <div class="v2-passo hidden" id="catalogoCard">
+    <h3>Classificar produtos novos</h3>
+    <p class="card-note">
+      O IVA não distingue comida de bebida (água e cafés estão a 13% tal como as focaccias),
+      por isso a categoria é explícita. Confirma as sugestões abaixo — os produtos já
+      classificados não voltam a aparecer. A seguir vês o resumo do import, e só aí é que
+      alguma coisa é gravada (podes voltar aqui, mudar uma categoria e confirmar outra vez).
+    </p>
+    <div class="v2-tabela-wrap">
+      <table class="v2-tabela cat-grid">
+        <thead><tr><th>Código</th><th>Descrição</th><th class="num">Qtd</th><th class="num">Valor</th><th>Categoria</th><th>Subcategoria</th></tr></thead>
+        <tbody id="catalogoBody"></tbody>
+      </table>
+    </div>
+    <div class="v2-modal-acoes">
+      <button class="v2-btn v2-btn-p" id="btnGravar">Confirmar categorias</button>
+      <button class="v2-btn v2-btn-s" id="btnCancelar">Cancelar import</button>
+    </div>
+  </div>
+
+  <!-- ============ RESUMO DO IMPORT (antes de gravar) ============ -->
+  <div class="v2-passo hidden" id="resumoCard">
+    <h3>O que este import vai fazer</h3>
+    <p class="card-note">
+      Cada documento conta para o <strong>dia de operação</strong>: o que é fechado antes
+      das 5h pertence ao dia anterior. Um dia que o ficheiro cobre por inteiro é
+      substituído; um dia que o ficheiro só toca em parte recebe apenas os documentos
+      novos, sem perder os que já lá estão. Nada é gravado até confirmares.
+    </p>
+    <div class="v2-tabela-wrap">
+      <table class="v2-tabela">
+        <thead><tr><th>Dia de operação</th><th>Acção</th><th class="num">Total antes</th><th class="num">Total depois</th><th class="num">Variação</th><th class="num">Docs da madrugada</th></tr></thead>
+        <tbody id="resumoBody"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="resumoCheck"></div>
+    <div id="resumoAvisos"></div>
+    <div class="hidden" id="resumoForcar">
+      <label class="forcar-linha">
+        <input type="checkbox" id="resumoForcarCheck">
+        Sei o que estou a fazer: os valores mudaram de propósito (ficheiro corrigido) — gravar na mesma.
+      </label>
+    </div>
+    <div class="v2-modal-acoes">
+      <button class="v2-btn v2-btn-p" id="btnConfirmarImport">Gravar</button>
+      <button class="v2-btn v2-btn-s" id="btnCancelarResumo">Cancelar import</button>
+    </div>
+  </div>
+
+  <!-- ============ RELATÓRIO DO IMPORT, DIA A DIA ============ -->
+  <div class="v2-passo hidden" id="relatorioCard">
+    <h3>O que este import gravou</h3>
+    <p class="card-note">
+      Cada dia do ficheiro é gravado à parte e o mês é recalculado a partir de
+      todos os dias que existem — os deste import e os anteriores. Substituir um
+      dia não toca nos outros.
+    </p>
+    <div class="v2-tabela-wrap">
+      <table class="v2-tabela">
+        <thead><tr><th>Dia</th><th>Estado</th><th class="num">Bruto anterior</th><th class="num">Bruto novo</th><th class="num">Diferença</th></tr></thead>
+        <tbody id="relatorioBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="v2-dica" id="v2Dica" role="tooltip"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* =========================================================
+     Firebase
+     ========================================================= */
+  var firebaseConfig = {
+    apiKey: "AIzaSyDxjZXA3wp4sgxMxmiuOQDomx9GJgt3puE",
+    authDomain: "gioco-fornecedores.firebaseapp.com",
+    databaseURL: "https://gioco-fornecedores-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gioco-fornecedores",
+    storageBucket: "gioco-fornecedores.firebasestorage.app",
+    messagingSenderId: "441783294427",
+    appId: "1:441783294427:web:51a362d4f91d0e2149effe"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  // NÃO ALTERAR: autenticação anónima obrigatória antes de qualquer
+  // leitura/escrita no Firebase. Ver decisão de segurança de Ago/2026.
+  // Timeout de 8s de propósito: sem rede o signInAnonymously fica pendurado
+  // indefinidamente e NUNCA rejeita — sem isto a página ficava em branco e muda
+  // para quem está ao balcão. O #authErro aparece com um botão que volta a
+  // tentar sem recarregar. Padrão único do OS: se mudar aqui, muda em todas.
+  //
+  // O callback fica guardado à primeira chamada para o retry o poder repetir
+  // sem obrigar cada página a dar-lhe um nome.
+  var authArrancou = false;
+  var authCallback = null;
+
+  function autenticarEContinuar(callback) {
+    if (callback) authCallback = callback;
+
+    var resolvido = false;
+    var caixaErro = document.getElementById('authErro');
+    var detalhe = document.getElementById('authErroDetalhe');
+
+    if (caixaErro) caixaErro.classList.remove('on');
+
+    function falhar(msg) {
+      if (resolvido) return;
+      resolvido = true;
+      if (detalhe) detalhe.textContent = msg;
+      if (caixaErro) caixaErro.classList.add('on');
+    }
+
+    var timer = setTimeout(function () {
+      falhar('A autenticação anónima não respondeu em 8 segundos. Verifica a ligação à rede e tenta de novo — a página não lê nem escreve nada sem sessão.');
+    }, 8000);
+
+    firebase.auth().signInAnonymously()
+      .then(function () {
+        if (resolvido) return;
+        resolvido = true;
+        clearTimeout(timer);
+        if (caixaErro) caixaErro.classList.remove('on');
+        // Sem isto, um retry bem sucedido depois de um timeout voltava a montar
+        // a página inteira por cima da que já lá estava.
+        if (authArrancou) return;
+        authArrancou = true;
+        if (authCallback) authCallback();
+      })
+      .catch(function (erro) {
+        clearTimeout(timer);
+        console.error('Falha na autenticação anónima:', erro);
+        // Não continuar sem sessão — evita escritas/leituras que vão
+        // falhar de qualquer forma quando as rules apertarem.
+        falhar('Falha na autenticação anónima (' + (erro && erro.code ? erro.code : 'erro desconhecido') + '). Verifica a ligação à rede e tenta de novo.');
+      });
+  }
+
+  (function () {
+    var btn = document.getElementById('authRetryBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var detalhe = document.getElementById('authErroDetalhe');
+      if (detalhe) detalhe.textContent = 'A ligar…';
+      autenticarEContinuar(null);
+    });
+  })();
+
+  autenticarEContinuar(function () {
+  var db = firebase.database();
+  var vendasRef = db.ref('vendas');
+  var catalogoRef = db.ref('vendas/catalogo');
+
+  /* Granularidade diária do import. Nó irmão de vendas/, não filho: o
+     carregarDados() lê vendas/ inteiro em cada abertura da página, e pendurar
+     aqui um payload por dia duplicaria essa leitura sem que nenhuma vista
+     precisasse dele. vendas/{mes} passa a ser sempre derivado destes dias. */
+  var diarioRef = db.ref('vendasDiario');
+
+  /* =========================================================
+     Importação do SAF-T — vive em gioco-saft.js
+     =========================================================
+     A leitura do ficheiro (ZIP, Windows-1252, XML), a regra do dia de
+     operação, a idempotência por documento e os payloads do dia e do mês
+     estão TODOS no gioco-saft.js, que é o mesmo ficheiro que o Worker do
+     Jarvis usa (cópia byte a byte). Aqui ficam só os nomes, para o resto
+     da página e os testes continuarem a chamá-los como sempre. Mudar a
+     lógica é mudar o gioco-saft.js e correr node testes/saft-paridade.js. */
+  var ERRO_FICHEIRO_INVALIDO = GiocoSaft.ERRO_FICHEIRO_INVALIDO;
+  var PARES_POR_DIA = GiocoSaft.PARES_POR_DIA;
+  var keyFor = GiocoSaft.keyFor;
+  var semAcentos = GiocoSaft.semAcentos;
+  var REGRAS_SUGESTAO = GiocoSaft.REGRAS_SUGESTAO;
+  var sugerirCategoria = GiocoSaft.sugerirCategoria;
+  var kids = GiocoSaft.kids;
+  var kid = GiocoSaft.kid;
+  var txt = GiocoSaft.txt;
+  var numTxt = GiocoSaft.numTxt;
+  var CORTE_DIA_OPERACAO_H = GiocoSaft.CORTE_DIA_OPERACAO_H;
+  var somaDias = GiocoSaft.somaDias;
+  var horaDoSistema = GiocoSaft.horaDoSistema;
+  var diaOperacao = GiocoSaft.diaOperacao;
+  var diaFiscal = GiocoSaft.diaFiscal;
+  var novoDia = GiocoSaft.novoDia;
+  var lerDocumento = GiocoSaft.lerDocumento;
+  var agregarDocs = GiocoSaft.agregarDocs;
+  var parseSaft = GiocoSaft.parse;
+  var round = GiocoSaft.round;
+  var ordemPares = GiocoSaft.ordemPares;
+  var topPares = GiocoSaft.topPares;
+  var construirPayload = GiocoSaft.construirPayloadDia;
+  var somaMapa = GiocoSaft.somaMapa;
+  var mergePayloads = GiocoSaft.mergePayloads;
+  var arredondarMapa = GiocoSaft.arredondarMapa;
+  var arredondarPayload = GiocoSaft.arredondarPayload;
+  var variacaoBruto = GiocoSaft.variacaoBruto;
+  var LIMIAR_SUSPEITA = GiocoSaft.LIMIAR_SUSPEITA;
+  var fundirDiaPayloads = GiocoSaft.fundirDiaPayloads;
+  var dentroDoIntervalo = GiocoSaft.dentroDoIntervalo;
+  var brutoDe = GiocoSaft.brutoDe;
+  var planearImportOperacao = GiocoSaft.planearImportOperacao;
+  var payloadDoMes = GiocoSaft.payloadDoMes;
+  var descodificar = GiocoSaft.descodificar;
+
+  /* =========================================================
+     Utilitários
+     ========================================================= */
+  /* Taxonomia de dois níveis, alinhada com as secções dos menus oficiais.
+     'Outro' é o balde de revisão manual e por isso não tem subcategorias. */
+  var TAXONOMIA = {
+    'Comida': ['Focaccia', 'Maritozzo Salgado', 'Maritozzo Doce', 'Side', 'Extra'],
+    'Bebida': ['Soft', 'Cerveja e Cidra', 'Vinho', 'Aperitif', 'Hot'],
+    'Outro':  []
+  };
+  var CATEGORIAS = Object.keys(TAXONOMIA);
+
+  // Padrão dos SAF-T exportados do ZoneSoft: começam pelo NIF da GIOCO.
+  var RE_SAFT_ZIP = /^518717186.*\.zip$/i;
+  var RE_EXT_ACEITE = /\.(zip|xml)$/i;
+
+  var DIAS_SEMANA =['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  var MEIOS_PAGAMENTO = {
+    NU:'Numerário', CD:'Cartão débito', CC:'Cartão crédito', MB:'Multibanco',
+    TB:'Transferência', CH:'Cheque', TR:'Ticket refeição', DE:'Dinheiro electrónico',
+    CS:'Compensação de contas', LC:'Letra comercial', PR:'Permuta', OU:'Outro'
+  };
+
+  function el(id){ return document.getElementById(id); }
+
+  function eur(n){
+    n = Number(n) || 0;
+    return n.toLocaleString('pt-PT', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+  }
+
+  function dec(n, casas){
+    n = Number(n) || 0;
+    if (casas === undefined) casas = 2;
+    return n.toLocaleString('pt-PT', { minimumFractionDigits:casas, maximumFractionDigits:casas });
+  }
+
+  function intFmt(n){
+    return (Number(n) || 0).toLocaleString('pt-PT');
+  }
+
+  function pct(n, casas){
+    if (casas === undefined) casas = 1;
+    return dec((Number(n) || 0) * 100, casas) + '%';
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function nomeMes(mes){
+    if (!mes) return '';
+    var partes = mes.split('-');
+    var nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
+                 'Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var i = parseInt(partes[1], 10) - 1;
+    return (nomes[i] || partes[1]) + ' ' + partes[0];
+  }
+
+  var MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  function mesCurto(mm){
+    return MESES_CURTOS[parseInt(mm, 10) - 1] || mm;
+  }
+
+  // '2026-08-27' -> '27 Ago (Qui)' — usado nas opções do selector de dia.
+  function rotuloDia(iso){
+    var dow = new Date(iso + 'T12:00:00').getDay();
+    return parseInt(iso.slice(8), 10) + ' ' + mesCurto(iso.slice(5, 7)) +
+      ' (' + DIAS_SEMANA[dow].slice(0, 3) + ')';
+  }
+
+  // '2026-08-27' -> 'Quinta, 27 de Agosto 2026' — para o aviso de topo.
+  function dataExtenso(iso){
+    var dow = new Date(iso + 'T12:00:00').getDay();
+    return DIAS_SEMANA[dow] + ', ' + parseInt(iso.slice(8), 10) + ' de ' + nomeMes(iso.slice(0, 7));
+  }
+
+  function isoDeData(dt){
+    var m = dt.getMonth() + 1, d = dt.getDate();
+    return dt.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  /* Chave da semana a que um dia pertence = data da segunda-feira dessa semana.
+     getDay() dá 0 ao domingo, por isso o recuo é (dow + 6) % 7. */
+  function segundaDe(iso){
+    var dt = new Date(iso + 'T12:00:00');
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return isoDeData(dt);
+  }
+
+  // Segunda '2026-08-18' -> '18–24 Ago'; a cavalo de dois meses -> '28 Jul–3 Ago'.
+  function rotuloSemana(seg){
+    var ini = new Date(seg + 'T12:00:00');
+    var fim = new Date(ini.getTime());
+    fim.setDate(fim.getDate() + 6);
+    if (ini.getMonth() === fim.getMonth()){
+      return ini.getDate() + '–' + fim.getDate() + ' ' + MESES_CURTOS[ini.getMonth()];
+    }
+    return ini.getDate() + ' ' + MESES_CURTOS[ini.getMonth()] + '–' +
+      fim.getDate() + ' ' + MESES_CURTOS[fim.getMonth()];
+  }
+
+  // '2026-01' -> '2025-12'
+  function mesAnteriorDe(mes){
+    var ano = parseInt(mes.slice(0, 4), 10);
+    var m = parseInt(mes.slice(5, 7), 10) - 1;
+    if (m < 1){ m = 12; ano -= 1; }
+    return ano + '-' + (m < 10 ? '0' : '') + m;
+  }
+
+  function dataHora(ts){
+    if (!ts) return '—';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  // Como dataHora(), mas com "às" entre a data e a hora — para o indicador de topo.
+  function dataHoraExtenso(ts){
+    if (!ts) return '—';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleDateString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+      ' às ' + d.toLocaleTimeString('pt-PT', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  /* =========================================================
+     Sugestão de categoria pelo nome do produto
+     ========================================================= */
+  /* =========================================================
+     XML — helpers de travessia (ignora prefixos de namespace)
+     ========================================================= */
+  /* =========================================================
+     Descompressão + descodificação
+     ========================================================= */
+  function lerFicheiro(file, onProgress){
+    return file.arrayBuffer().then(function(buf){
+      var nome = file.name || '';
+      var head = new Uint8Array(buf.slice(0, 2));
+      if (/\.zip$/i.test(nome) || (head[0] === 0x50 && head[1] === 0x4B)){
+        onProgress(0.05, 'A descomprimir o ZIP…');
+      }
+      return GiocoSaft.extrairXml(buf, nome);   // { buffer, xmlNome }
+    });
+  }
+
+  /* =========================================================
+     Parse do SAF-T → agregados intermédios (um por dia)
+     ========================================================= */
+  /* =========================================================
+     Dia de operação
+     =========================================================
+     Um serviço que fecha depois da meia-noite pertence ao dia em que abriu:
+     todo o documento fechado ANTES das CORTE_DIA_OPERACAO_H conta para o dia
+     anterior. É uma regra de GESTÃO e só vale dentro da OS — o ficheiro SAF-T
+     e a data fiscal (InvoiceDate) não se alteram, e a contabilidade continua
+     a ser feita pela data do documento. Mudar este número muda a atribuição
+     de todos os imports SEGUINTES; os dias já gravados ficam como estão. */
+  /* Ordem das horas DENTRO do dia de operação: começa no corte e dá a volta
+     (5, 6, …, 23, 0, …, 4). É esta ordem que põe a madrugada a seguir às 23h
+     e não no início do dia. */
+  function horasOperacao(){
+    var out = [];
+    for (var i = 0; i < 24; i++) out.push((CORTE_DIA_OPERACAO_H + i) % 24);
+    return out;
+  }
+  function posOperacao(h){
+    return (((Number(h) || 0) - CORTE_DIA_OPERACAO_H) + 24) % 24;
+  }
+
+  /* =========================================================
+     Parse do SAF-T → documentos e agregados intermédios (um por dia)
+     ========================================================= */
+  /* =========================================================
+     Agregados intermédios + catálogo -> payload do Firebase
+     ========================================================= */
+  /* =========================================================
+     Merge de meses (opcao "todos os meses")
+     ========================================================= */
+  /* =========================================================
+     Estado da pagina
+     ========================================================= */
+  /* =========================================================
+     Preferências de visualização (localStorage)
+     Só afectam o desenho — nada disto toca nos dados nem no Firebase.
+     ========================================================= */
+  var LS_SECCOES = 'gioco.vendas.seccoes';        // { slug: true|false }  (ausente = aberta)
+  var LS_VISTAS  = 'gioco.vendas.vistasGrafico';  // { horas:'linha', ... } (ausente = horizontal)
+
+  function lerPrefs(chave){
+    try {
+      var txt = localStorage.getItem(chave);
+      var obj = txt ? JSON.parse(txt) : null;
+      return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e){
+      return {};
+    }
+  }
+
+  function escreverPrefs(chave, obj){
+    try { localStorage.setItem(chave, JSON.stringify(obj)); } catch (e){}
+  }
+
+  var estado = {
+    catalogo: {},          // key -> { desc, categoria, subcategoria }
+    catalogoCarregado: false,
+    pendente: null,        // { dias, anuladas, header, ficheiro, novos:[] }
+    dados: {},             // mes -> payload lido do Firebase
+    mesActivo: '',
+    diaActivo: '',         // '' = mês inteiro; senão 'YYYY-MM-DD' dentro de mesActivo
+    diaSemanaActivo: '',   // '' ou '0'..'6' (domingo=0, como getDay()) — exclusivo com diaActivo
+    horasModo: '',         // "Vendas por hora": 'media' | 'total'; '' = omissão do modo
+                           // (média em dia-da-semana, total em mês — ver vistaHoras)
+    agoraTeste: null,      // só testes: Date fixa para o bloco "Agora" (null = new Date())
+    diasCache: {},         // 'mes/dia' -> payload de vendasDiario/ (null = não existe)
+    ordemProdutos: 'valor',
+    planoMigracao: null,   // plano calculado por verificarMigracao()
+    planoImport: null,     // { res, novasEntradas, meta, catalogo } — o import à espera de confirmação
+    escritorCatalogo: null, // só os testes preenchem, para simular falhas de escrita
+    seccoes: lerPrefs(LS_SECCOES),        // estado aberto/fechado por secção
+    vistasGrafico: lerPrefs(LS_VISTAS)    // tipo de gráfico escolhido por secção
+  };
+
+  /* =========================================================
+     Mensagens e progresso
+     ========================================================= */
+  function limparMensagens(){
+    ['msgErro','msgAviso','msgOk','msgDrop'].forEach(function(id){
+      var n = el(id);
+      n.classList.remove('on');
+      n.textContent = '';
+    });
+  }
+
+  function mostrarMsg(id, texto){
+    var n = el(id);
+    n.textContent = texto;
+    n.classList.add('on');
+  }
+
+  function progresso(fraccao, texto){
+    el('progressWrap').classList.add('on');
+    el('progressFill').style.width = Math.max(0, Math.min(1, fraccao)) * 100 + '%';
+    el('progressText').textContent = texto || '';
+  }
+
+  function esconderProgresso(){
+    el('progressWrap').classList.remove('on');
+    el('progressFill').style.width = '0%';
+  }
+
+  function proximoFrame(){
+    return new Promise(function(resolve){ setTimeout(resolve, 0); });
+  }
+
+  /* =========================================================
+     Catalogo
+     ========================================================= */
+  /* =========================================================
+     Migração do catálogo plano (Focaccia/Bebida/Café/Extra/Doce/Outro)
+     para o esquema de dois níveis. Corre uma vez; entradas que já estão
+     no esquema novo são deixadas em paz.
+     ========================================================= */
+
+  // Mapa directo das categorias antigas que não dependem do nome do produto.
+  var MIGRACAO_DIRECTA = {
+    'Extra': { categoria:'Comida', subcategoria:'Extra' },
+    'Outro': { categoria:'Outro',  subcategoria:null },
+    // 'Salgado' nunca chegou a existir no código — a correcção anterior pôs os
+    // dois maritozzi salgados em 'Focaccia'. Fica mapeado à mesma, para o caso
+    // de alguma entrada ter sido gravada à mão com este valor.
+    'Salgado': { categoria:'Comida', subcategoria:'Maritozzo Salgado' }
+  };
+
+  function migrarEntrada(entrada){
+    var antiga = entrada && entrada.categoria;
+    var desc = semAcentos(entrada && entrada.desc);
+    var ehMaritozzo = desc.indexOf('maritozzo') !== -1;
+
+    if (MIGRACAO_DIRECTA[antiga]) {
+      return { nova: MIGRACAO_DIRECTA[antiga], rever:false, nota:'' };
+    }
+
+    if (antiga === 'Focaccia') {
+      // A regra anterior metia os maritozzi salgados em Focaccia. Separá-los.
+      return ehMaritozzo
+        ? { nova:{ categoria:'Comida', subcategoria:'Maritozzo Salgado' }, rever:false, nota:'' }
+        : { nova:{ categoria:'Comida', subcategoria:'Focaccia' }, rever:false, nota:'' };
+    }
+
+    if (antiga === 'Doce') {
+      if (ehMaritozzo) return { nova:{ categoria:'Comida', subcategoria:'Maritozzo Doce' }, rever:false, nota:'' };
+      // Doce que não é maritozzo: pode ser qualquer coisa. Vai para Side, mas
+      // sinalizado — é um palpite, não uma certeza.
+      return { nova:{ categoria:'Comida', subcategoria:'Side' }, rever:true,
+               nota:'Era "Doce" mas não tem "maritozzo" no nome — confirmar se é mesmo Side.' };
+    }
+
+    /* 'Café' antiga NÃO é sempre Hot: a regra antiga metia o "Chá da Casa" em
+       Café, e chá é bebida fria (secção SOFTS do menu). Re-derivar pelo nome e
+       só cair em Hot quando o nome não diz nada — assim a migração não
+       reintroduz o bug que a correcção anterior tirou. */
+    if (antiga === 'Café' || antiga === 'Cafe') {
+      var sugC = sugerirCategoria(entrada.desc);
+      if (sugC.categoria === 'Bebida') return { nova:sugC, rever:false, nota:'' };
+      return { nova:{ categoria:'Bebida', subcategoria:'Hot' }, rever:false, nota:'' };
+    }
+
+    if (antiga === 'Bebida') {
+      var sug = sugerirCategoria(entrada.desc);
+      if (sug.categoria === 'Bebida') return { nova:sug, rever:false, nota:'' };
+      // O nome não resolve para nenhuma subcategoria de bebida. Mantém-se
+      // Bebida (é o que o attach rate lê) mas sem subcategoria, e sinalizado.
+      return { nova:{ categoria:'Bebida', subcategoria:null }, rever:true,
+               nota:'Bebida sem subcategoria dedutível do nome — escolher à mão.' };
+    }
+
+    // Categoria desconhecida (ou entrada sem categoria): não inventar.
+    return { nova:{ categoria:'Outro', subcategoria:null }, rever:true,
+             nota:'Categoria antiga não reconhecida (' + (antiga || '—') + ').' };
+  }
+
+  // Uma entrada já está migrada se a categoria é uma das três novas e, quando
+  // a categoria tem subcategorias, o campo está preenchido e é válido.
+  function jaMigrada(entrada){
+    var c = entrada && entrada.categoria;
+    if (!TAXONOMIA.hasOwnProperty(c)) return false;
+    var subs = TAXONOMIA[c];
+    if (!subs.length) return true;
+    return !!entrada.subcategoria && subs.indexOf(entrada.subcategoria) !== -1;
+  }
+
+  function planearMigracao(catalogo){
+    var plano = { mudancas:[], rever:[], jaOk:0, total:0 };
+    Object.keys(catalogo || {}).forEach(function(k){
+      var entrada = catalogo[k];
+      plano.total++;
+      if (jaMigrada(entrada)){ plano.jaOk++; return; }
+      var r = migrarEntrada(entrada);
+      var linha = {
+        key: k,
+        desc: entrada && entrada.desc ? entrada.desc : '(sem descrição)',
+        antiga: (entrada && entrada.categoria) || '—',
+        categoria: r.nova.categoria,
+        subcategoria: r.nova.subcategoria,
+        nota: r.nota
+      };
+      plano.mudancas.push(linha);
+      if (r.rever) plano.rever.push(linha);
+    });
+    return plano;
+  }
+
+  function mostrarRelatorioMigracao(plano){
+    var destino = {};
+    plano.mudancas.forEach(function(x){
+      var alvo = x.categoria + (x.subcategoria ? ' / ' + x.subcategoria : '');
+      var de = x.antiga + ' → ' + alvo;
+      destino[de] = (destino[de] || 0) + 1;
+    });
+
+    var resumo = Object.keys(destino).sort().map(function(de){
+      return '<tr><td>' + esc(de) + '</td><td class="num">' + intFmt(destino[de]) + '</td></tr>';
+    }).join('');
+
+    var detalhe = plano.mudancas.map(function(x){
+      return '<tr>' +
+        '<td class="mono" style="font-size:11px;">' + esc(x.key) + '</td>' +
+        '<td>' + esc(x.desc) + '</td>' +
+        '<td><span class="tag">' + esc(x.antiga) + '</span></td>' +
+        '<td><span class="tag">' + esc(x.categoria) + '</span></td>' +
+        '<td>' + (x.subcategoria ? esc(x.subcategoria) : '<span style="color:var(--muted);">—</span>') + '</td>' +
+        '<td style="color:var(--red);font-size:12px;">' + esc(x.nota) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    el('migracaoResumo').innerHTML =
+      '<p class="card-note">' +
+        intFmt(plano.mudancas.length) + ' de ' + intFmt(plano.total) + ' produtos vão mudar de classificação. ' +
+        intFmt(plano.jaOk) + (plano.jaOk === 1 ? ' já está' : ' já estão') +
+        ' no esquema novo e não ' + (plano.jaOk === 1 ? 'é tocado' : 'são tocados') + '.' +
+        (plano.rever.length
+          ? ' <strong style="color:var(--red);">' + intFmt(plano.rever.length) +
+            ' precisam de revisão manual depois (marcados a vermelho).</strong>'
+          : '') +
+      '</p>' +
+      '<div class="table-wrap"><table><thead><tr><th>Mudança</th><th class="num">Produtos</th></tr></thead><tbody>' +
+      resumo + '</tbody></table></div>';
+
+    el('migracaoDetalhe').innerHTML = detalhe;
+    el('migracaoCard').classList.remove('hidden');
+  }
+
+  // Escrita registo a registo. Um update() multi-chave neste RTDB já substituiu
+  // registos em vez de fazer merge — nunca agrupar escritas aqui.
+  function aplicarMigracao(plano){
+    el('btnMigrar').disabled = true;
+    progresso(0.05, 'A migrar catálogo…');
+
+    var i = 0;
+    return plano.mudancas.reduce(function(cadeia, x){
+      return cadeia.then(function(){
+        var entrada = {
+          desc: estado.catalogo[x.key] ? estado.catalogo[x.key].desc : x.desc,
+          categoria: x.categoria,
+          subcategoria: x.subcategoria || null
+        };
+        return catalogoRef.child(x.key).set(entrada).then(function(){
+          estado.catalogo[x.key] = entrada;
+          i++;
+          progresso(0.05 + 0.9 * (i / plano.mudancas.length),
+                    'A migrar catálogo… ' + i + '/' + plano.mudancas.length);
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      esconderProgresso();
+      el('migracaoCard').classList.add('hidden');
+      mostrarMsg('msgOk', 'Catálogo migrado: ' + intFmt(plano.mudancas.length) +
+        ' produto' + (plano.mudancas.length === 1 ? '' : 's') + ' reclassificado' +
+        (plano.mudancas.length === 1 ? '' : 's') + '.' +
+        (plano.rever.length ? ' ' + intFmt(plano.rever.length) + ' ficaram marcados para revisão manual.' : ''));
+    }).catch(function(err){
+      esconderProgresso();
+      el('btnMigrar').disabled = false;
+      mostrarMsg('msgErro', 'Migração interrompida: ' + (err && err.message ? err.message : err) +
+        ' — os produtos já escritos ficaram migrados, os restantes não.');
+    });
+  }
+
+  function verificarMigracao(){
+    return carregarCatalogo().then(function(catalogo){
+      var plano = planearMigracao(catalogo);
+      estado.planoMigracao = plano;
+      if (plano.mudancas.length) mostrarRelatorioMigracao(plano);
+      return plano;
+    });
+  }
+
+  function carregarCatalogo(){
+    return catalogoRef.once('value').then(function(snap){
+      estado.catalogo = snap.val() || {};
+      estado.catalogoCarregado = true;
+      return estado.catalogo;
+    });
+  }
+
+  // Opções do segundo dropdown para uma categoria. 'Outro' não tem nenhuma,
+  // e nesse caso o select fica vazio e desactivado.
+  function opcoesSub(categoria, seleccionada){
+    var subs = TAXONOMIA[categoria] || [];
+    if (!subs.length) return '<option value="">—</option>';
+    return subs.map(function(s){
+      return '<option value="' + esc(s) + '"' + (s === seleccionada ? ' selected' : '') + '>' + esc(s) + '</option>';
+    }).join('');
+  }
+
+  // Mantém o segundo dropdown coerente com o primeiro. Chamado no arranque e
+  // sempre que a categoria muda.
+  function sincronizarSub(selCat, selSub, seleccionada){
+    var cat = selCat.value;
+    var temSubs = (TAXONOMIA[cat] || []).length > 0;
+    selSub.innerHTML = opcoesSub(cat, seleccionada);
+    selSub.disabled = !temSubs;
+  }
+
+  function mostrarCatalogo(novos){
+    var body = el('catalogoBody');
+    body.innerHTML = novos.map(function(p){
+      var opcoesCat = CATEGORIAS.map(function(c){
+        return '<option value="' + c + '"' + (c === p.sugestao.categoria ? ' selected' : '') + '>' + c + '</option>';
+      }).join('');
+      var k = esc(p.key);
+      return '<tr>' +
+        '<td class="mono" style="font-size:11px;">' + esc(p.codigo) + '</td>' +
+        '<td>' + esc(p.desc) + '</td>' +
+        '<td class="num">' + dec(p.qtd, 0) + '</td>' +
+        '<td class="num">' + eur(p.valor) + '</td>' +
+        '<td><select class="sel-cat" data-key="' + k + '">' + opcoesCat + '</select></td>' +
+        '<td><select class="sel-sub" data-key="' + k + '"></select></td>' +
+        '</tr>';
+    }).join('');
+
+    // Preencher as subcategorias depois de o HTML existir, para que cada linha
+    // arranque já na sugestão automática.
+    novos.forEach(function(p){
+      var selCat = body.querySelector('select.sel-cat[data-key="' + p.key.replace(/"/g, '\\"') + '"]');
+      var selSub = body.querySelector('select.sel-sub[data-key="' + p.key.replace(/"/g, '\\"') + '"]');
+      if (!selCat || !selSub) return;
+      sincronizarSub(selCat, selSub, p.sugestao.subcategoria);
+      selCat.addEventListener('change', function(){ sincronizarSub(selCat, selSub, null); });
+    });
+
+    el('catalogoCard').classList.remove('hidden');
+  }
+
+  function esconderCatalogo(){
+    el('catalogoCard').classList.add('hidden');
+    el('catalogoBody').innerHTML = '';
+  }
+
+  function lerCatalogoDoFormulario(){
+    var body = el('catalogoBody');
+    var cats = body.querySelectorAll('select.sel-cat[data-key]');
+    var out = {};
+    for (var i = 0; i < cats.length; i++){
+      var key = cats[i].getAttribute('data-key');
+      var selSub = body.querySelector('select.sel-sub[data-key="' + key.replace(/"/g, '\\"') + '"]');
+      var cat = cats[i].value;
+      var temSubs = (TAXONOMIA[cat] || []).length > 0;
+      out[key] = {
+        categoria: cat,
+        subcategoria: (temSubs && selSub && selSub.value) ? selSub.value : null
+      };
+    }
+    return out;
+  }
+
+  /* =========================================================
+     Fluxo de import
+     ========================================================= */
+  function tratarFicheiro(file){
+    limparMensagens();
+    esconderCatalogo();
+    esconderRelatorio();
+    estado.pendente = null;
+    el('fileName').textContent = file.name;
+
+    // O input tem accept=".zip,.xml", mas o drop e a pasta autorizada não passam
+    // por esse filtro — travar aqui evita ler um ficheiro grande só para o parser
+    // falhar no fim. A mensagem é a mesma que o parser daria.
+    if (!RE_EXT_ACEITE.test(file.name || '')){
+      mostrarMsg('msgErro', ERRO_FICHEIRO_INVALIDO);
+      return;
+    }
+
+    progresso(0.02, 'A ler o ficheiro…');
+
+    var t0 = Date.now();
+
+    Promise.resolve()
+      .then(function(){ return estado.catalogoCarregado ? estado.catalogo : carregarCatalogo(); })
+      .then(function(){ return lerFicheiro(file, progresso); })
+      .then(function(res){
+        progresso(0.12, 'A descodificar (Windows-1252)…');
+        return proximoFrame().then(function(){
+          var texto = descodificar(res.buffer);
+          progresso(0.15, 'A interpretar o XML…');
+          return proximoFrame().then(function(){
+            return { texto: texto, xmlNome: res.xmlNome };
+          });
+        });
+      })
+      .then(function(res){
+        var parsed = parseSaft(res.texto, progresso, intFmt);
+        progresso(0.92, 'A preparar o catálogo…');
+
+        // produtos ainda sem categoria no catalogo
+        var novos = GiocoSaft.produtosNovos(parsed, estado.catalogo);
+
+        estado.pendente = {
+          dias: parsed.dias,
+          docsPorDia: parsed.docsPorDia,
+          anuladosPorDia: parsed.anuladosPorDia,
+          intervalo: parsed.intervalo,
+          diasFiscais: parsed.diasFiscais,
+          anuladas: parsed.anuladas,
+          anuladasPorMes: parsed.anuladasPorMes,
+          totalFaturas: parsed.totalFaturas,
+          header: parsed.header,
+          ficheiro: file.name,
+          novos: novos
+        };
+        estado.planoImport = null;
+
+        esconderProgresso();
+
+        var diasLista = Object.keys(parsed.dias).sort();
+        var mesesLista = [];
+        diasLista.forEach(function(dia){
+          var mes = dia.slice(0, 7);
+          if (mesesLista.indexOf(mes) === -1) mesesLista.push(mes);
+        });
+        mesesLista.sort();
+        var segundos = ((Date.now() - t0) / 1000).toFixed(1);
+        var faturasOk = diasLista.reduce(function(acc, dia){ return acc + parsed.dias[dia].docs; }, 0);
+        mostrarMsg('msgOk',
+          'Lido em ' + segundos + 's: ' + intFmt(faturasOk) + ' faturas válidas em ' +
+          intFmt(diasLista.length) + ' dia' + (diasLista.length === 1 ? '' : 's') +
+          ' de operação (' + mesesLista.map(nomeMes).join(', ') + ').' +
+          ' Um documento fechado antes das ' + CORTE_DIA_OPERACAO_H + 'h conta para o dia anterior.');
+
+        if (parsed.anuladas > 0){
+          var detalhe = Object.keys(parsed.anuladasPorMes).sort().map(function(mes){
+            return nomeMes(mes) + ': ' + intFmt(parsed.anuladasPorMes[mes]);
+          }).join(' · ');
+          mostrarMsg('msgAviso',
+            'Excluídas ' + intFmt(parsed.anuladas) + ' fatura' + (parsed.anuladas === 1 ? '' : 's') +
+            ' anulada' + (parsed.anuladas === 1 ? '' : 's') + ' (InvoiceStatus = A) — ' + detalhe +
+            '. Não contam para nenhum total.');
+        }
+
+        if (novos.length){
+          mostrarCatalogo(novos);
+        } else {
+          mostrarMsg('msgOk',
+            'Lido em ' + segundos + 's: ' + intFmt(faturasOk) + ' faturas válidas. ' +
+            'Todos os produtos já estão no catálogo — a gravar.');
+          gravar();
+        }
+      })
+      .catch(function(err){
+        esconderProgresso();
+        estado.pendente = null;
+        mostrarMsg('msgErro', err && err.message ? err.message : String(err));
+      });
+  }
+
+  /* =========================================================
+     Gravacao no Firebase
+     ========================================================= */
+
+  /* Escreve o catálogo registo a registo, o mesmo padrão da migração.
+
+     Não é atómico e não pretende ser: se falhar a meio, os produtos já
+     escritos ficam escritos. O que garante é que se sabe EXACTAMENTE quais
+     — a promise rejeitada leva `err.escritas` com as chaves confirmadas
+     pelo servidor, e só essas entram no catálogo em memória. O estado
+     parcial fica reportado, nunca silencioso.
+
+     A alternativa seria um único update() multi-chave, esse sim atómico no
+     Realtime Database. Não é o que está aqui porque um update() multi-chave
+     contra a ref de `notificacoes` já deixou a promise pendurada para
+     sempre neste projecto (ver comentário em mrn-dashboard.html), e sem
+     promise não há forma de saber se a escrita passou.
+
+     `escrever` existe só para os testes poderem simular falha a meio. */
+  function escreverCatalogo(entradas, aoProgredir, escrever){
+    var chaves = Object.keys(entradas);
+    var escritas = [];
+    if (!chaves.length) return Promise.resolve(escritas);
+
+    var fn = escrever || function(k, v){ return catalogoRef.child(k).set(v); };
+
+    return chaves.reduce(function(cadeia, k){
+      return cadeia.then(function(){
+        return fn(k, entradas[k]).then(function(){
+          escritas.push(k);
+          if (aoProgredir) aoProgredir(escritas.length, chaves.length);
+        });
+      });
+    }, Promise.resolve())
+      .then(function(){ return escritas; })
+      .catch(function(err){
+        var e = err instanceof Error ? err : new Error(String(err));
+        e.escritas = escritas;
+        e.total = chaves.length;
+        throw e;
+      });
+  }
+
+  /* Lê de vendasDiario/ o estado actual de todos os dias que o import toca —
+     os dias de OPERAÇÃO do ficheiro e também os dias FISCAIS dele (estes só
+     para saber se já existiam). Um dia por leitura, como o resto da página. */
+  function lerEstadoDias(dias){
+    var lista = dias.slice().sort();
+    return lista.reduce(function(cadeia, dia){
+      return cadeia.then(function(mapa){
+        return diarioRef.child(dia.slice(0, 7)).child(dia).once('value').then(function(snap){
+          mapa[dia] = snap.val() || null;
+          return mapa;
+        });
+      });
+    }, Promise.resolve({}));
+  }
+
+  /* Lê o que é preciso para recompor cada mês tocado: TODOS os dias que estão
+     em vendasDiario/{mes} e o resumo que vendas/{mes} tem hoje (este só para o
+     guarda "o mês encolheria"). */
+  function lerEstadoMeses(meses){
+    return meses.reduce(function(cadeia, mes){
+      return cadeia.then(function(mapa){
+        return diarioRef.child(mes).once('value').then(function(snap){
+          return db.ref('vendas/' + mes + '/resumo').once('value').then(function(snapMes){
+            mapa[mes] = { dias: snap.val() || null, resumo: snapMes.val() || null };
+            return mapa;
+          });
+        });
+      });
+    }, Promise.resolve({}));
+  }
+
+  /* Aplica as escritas dos DIAS devolvidas por GiocoSaft.construirPayload().
+     Dia a dia, nunca em lote: no RTDB deste projecto as escritas multi-chave
+     já se mostraram pouco fiáveis (ver escreverCatalogo). O payload de cada
+     dia já vem completo (substituído ou fundido com o que lá estava), por
+     isso o set() do dia nunca perde nada. */
+  function gravarDias(escritas, aoProgredir){
+    var aceites = escritas.filter(function(e){ return e.tipo === 'dia'; });
+    var feitos = 0;
+    return aceites.reduce(function(cadeia, e){
+      return cadeia.then(function(){
+        return db.ref(e.path).set(e.valor)
+          .then(function(){
+            feitos++;
+            if (aoProgredir) aoProgredir(feitos, aceites.length, e.dia);
+          });
+      });
+    }, Promise.resolve()).then(function(){ return aceites; });
+  }
+
+  /* Aplica a escrita de UM mês. O mês é sempre derivado de vendasDiario/ (é o
+     GiocoSaft que o recompõe, com todos os dias do mês). Isso levanta um risco
+     de transição: meses gravados pelo código antigo (que escrevia o mês inteiro
+     de uma vez) não têm dias nenhuns em vendasDiario/, e um import de um único
+     dia recomporia o mês só com esse dia. O guarda abaixo apanha isso — e
+     apanha também, em regime normal, qualquer recálculo que encolha o mês.
+     Recalcular com MAIS dias do que antes é o caso normal e não pergunta nada. */
+  function gravarMes(e){
+    var mes = e.mes, nDias = e.dias, diasAntes = e.diasAntes;
+    if (e.encolhe){
+      var ok = window.confirm(
+        'O mês de ' + nomeMes(mes) + ' tem hoje ' + diasAntes + ' dias, mas só ' +
+        nDias + ' estão gravados dia a dia.\n\n' +
+        'Recalcular agora deixaria o mês só com esses ' + nDias + '.\n' +
+        'Isto é normal na primeira vez que se usa a gravação por dia: a solução é\n' +
+        'importar o SAF-T do período completo, não um dia solto.\n\n' +
+        'Recalcular à mesma? (Cancelar deixa ' + nomeMes(mes) + ' como está —\n' +
+        'os dias já gravados em vendasDiario/ não se perdem.)'
+      );
+      if (!ok) return Promise.resolve({ mes: mes, dias: nDias, saltado: true });
+    }
+    return db.ref(e.path).set(e.valor)
+      .then(function(){ return { mes: mes, dias: nDias, saltado: false }; });
+  }
+
+  /* Quadro dia a dia do que este import fez (depois de gravar). O que se
+     decide vê-se ANTES, no resumo do import; isto é o registo do que ficou. */
+  function relatorioDias(plano){
+    var alvo = el('relatorioBody');
+    if (!alvo) return;
+    alvo.innerHTML = plano.map(function(e){
+      var estadoTxt, cls;
+      if (!e.gravar){ estadoTxt = 'sem alteração'; cls = 'dia-saltado'; }
+      else if (!e.existia){ estadoTxt = 'novo'; cls = 'dia-novo'; }
+      else if (e.acao === 'juntar'){ estadoTxt = 'juntado'; cls = 'dia-substituido'; }
+      else { estadoTxt = 'substituído'; cls = e.suspeito ? 'dia-suspeito' : 'dia-substituido'; }
+      return '<tr class="' + cls + '">' +
+        '<td class="mono">' + esc(e.dia) + '</td>' +
+        '<td>' + estadoTxt + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : eur(e.brutoAntes)) + '</td>' +
+        '<td class="num">' + eur(e.brutoDepois) + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : pct(e.variacao || 0, 1)) + '</td>' +
+        '</tr>';
+    }).join('');
+    el('relatorioCard').classList.remove('hidden');
+  }
+
+  function esconderRelatorio(){
+    var card = el('relatorioCard');
+    if (card) card.classList.add('hidden');
+  }
+
+  function esconderResumoImport(){
+    var card = el('resumoCard');
+    if (card) card.classList.add('hidden');
+  }
+
+  var ROTULO_ACCAO = { substituir:'substituir', juntar:'juntar', semAlteracao:'sem alteração' };
+
+  /* Resumo do import ANTES de gravar: dia a dia, o que estava, o que fica, o
+     que se faz e quantos documentos mudaram de dia. Mais a verificação
+     automática — se a soma das variações não bater certo com o que é novo
+     para a OS, alguma coisa está a ser criada ou destruída pelo caminho e o
+     botão de gravar fica trancado. */
+  function mostrarResumoImport(res){
+    var corpo = el('resumoBody');
+    if (!corpo) return;
+
+    corpo.innerHTML = res.plano.map(function(e){
+      var cls = !e.gravar ? 'dia-saltado' : (!e.existia ? 'dia-novo' : (e.suspeito ? 'dia-suspeito' : 'dia-substituido'));
+      return '<tr class="' + cls + '">' +
+        '<td class="mono">' + esc(e.dia) + '</td>' +
+        '<td>' + ROTULO_ACCAO[e.acao] + (e.tinhaRegisto ? '' : (e.existia ? ' <span class="nota-fina">(dados antigos)</span>' : ' <span class="nota-fina">(dia novo)</span>')) + '</td>' +
+        '<td class="num">' + (e.brutoAntes === null ? '—' : eur(e.brutoAntes)) + '</td>' +
+        '<td class="num">' + eur(e.brutoDepois) + '</td>' +
+        '<td class="num">' + (e.delta > 0 ? '+' : '') + eur(e.delta) + '</td>' +
+        '<td class="num">' + (e.reatribuidos ? intFmt(e.reatribuidos) : '—') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var v = res.verificacao;
+    var linhas = [];
+    linhas.push('Soma das variações: <strong>' + (v.deltaTotal > 0 ? '+' : '') + eur(v.deltaTotal) + '</strong>');
+    linhas.push('Documentos novos para a OS: <strong>' + intFmt(v.novosDocs) + '</strong> (' + eur(v.novosTotal) + ')');
+    if (v.retiradosTotal) linhas.push('Documentos que deixam de contar: <strong>−' + eur(v.retiradosTotal) + '</strong>');
+
+    var caixa = el('resumoCheck');
+    caixa.className = 'msg ' + (v.ok ? 'ok' : 'erro') + ' on';
+    caixa.innerHTML = linhas.join(' · ') +
+      (v.ok
+        ? ' · <strong>verificação OK</strong>' + (v.esperado === 0 ? ' — variação total zero, nada foi criado nem perdido.' : '.')
+        : ' · <strong>VERIFICAÇÃO FALHOU</strong>: esperava ' + eur(v.esperado) + ' e a soma das variações dá ' +
+          eur(v.deltaTotal) + ' (diferença ' + eur(v.diferenca) + '). Isto quer dizer que este import criaria ou destruiria vendas.');
+
+    var avisos = el('resumoAvisos');
+    avisos.innerHTML = res.avisos.length
+      ? '<p class="card-note">⚠ ' + res.avisos.map(esc).join('<br>⚠ ') + '</p>'
+      : '';
+
+    var escape = el('resumoForcar');
+    escape.classList.toggle('hidden', !!v.ok);
+    el('resumoForcarCheck').checked = false;
+    el('btnConfirmarImport').disabled = !v.ok;
+
+    el('resumoCard').classList.remove('hidden');
+  }
+
+  /* --------- Passo 1: preparar (não escreve nada) ---------
+     Lê o estado dos dias afectados, calcula o plano e mostra o resumo. Só o
+     botão do resumo é que grava. */
+  function gravar(){
+    var pend = estado.pendente;
+    if (!pend) return;
+
+    var escolhas = lerCatalogoDoFormulario();
+    var novasEntradas = {};
+    pend.novos.forEach(function(p){
+      var cls = escolhas[p.key] || p.sugestao;
+      novasEntradas[p.key] = {
+        desc: p.desc,
+        categoria: cls.categoria,
+        subcategoria: cls.subcategoria || null
+      };
+    });
+
+    // Catálogo efectivo só em memória: o que está gravado mais o que está a
+    // ser classificado agora. Nada vai para o Firebase antes da confirmação.
+    var catalogo = {};
+    Object.keys(estado.catalogo).forEach(function(k){ catalogo[k] = estado.catalogo[k]; });
+    Object.keys(novasEntradas).forEach(function(k){ catalogo[k] = novasEntradas[k]; });
+
+    var meta = { importadoEm: new Date().toISOString(), ficheiro: pend.ficheiro };
+
+    // O que ler: os dias de operação do ficheiro e os fiscais dele (estes só
+    // para saber se já existiam — é o que diz se um documento já estava na
+    // OS) e os meses que vão ser recompostos.
+    var leituras = GiocoSaft.leiturasNecessarias(pend);
+
+    el('btnGravar').disabled = true;
+    limparMensagens();
+    esconderRelatorio();
+    esconderResumoImport();
+    progresso(0.3, 'A ler os dias já gravados…');
+
+    lerEstadoDias(leituras.dias)
+      .then(function(estadoDias){
+        return lerEstadoMeses(leituras.meses).then(function(estadoMeses){
+          return { catalogo: catalogo, dias: estadoDias, meses: estadoMeses };
+        });
+      })
+      .then(function(estadoAtual){
+        progresso(0.7, 'A preparar os dias…');
+        // Tudo o que vai ser gravado sai daqui, já calculado: os dias e os
+        // meses. O confirmarImport() limita-se a aplicar estas escritas.
+        var r = GiocoSaft.construirPayload(pend, estadoAtual, meta);
+        var res = r.resumo;
+        estado.planoImport = {
+          res: res, escritas: r.escritas, novasEntradas: novasEntradas, meta: meta, catalogo: catalogo
+        };
+        esconderProgresso();
+        el('btnGravar').disabled = false;
+        mostrarResumoImport(res);
+      })
+      .catch(function(err){
+        esconderProgresso();
+        el('btnGravar').disabled = false;
+        mostrarMsg('msgErro', 'Não foi possível preparar o import: ' +
+          (err && err.message ? err.message : String(err)));
+      });
+  }
+
+  /* --------- Passo 2: gravar (depois da confirmação) --------- */
+  function confirmarImport(){
+    var ctx = estado.planoImport;
+    if (!ctx) return;
+    var res = ctx.res;
+    var plano = res.plano;
+    var escritas = ctx.escritas;
+
+    el('btnConfirmarImport').disabled = true;
+    limparMensagens();
+    progresso(0.1, 'A gravar catálogo…');
+
+    escreverCatalogo(ctx.novasEntradas, function(feitas, total){
+        progresso(0.1 + 0.1 * (feitas / total), 'A gravar catálogo… ' + feitas + '/' + total);
+      }, estado.escritorCatalogo)
+      .then(function(escritas){
+        // Só depois de o servidor confirmar é que o catálogo em memória passa a
+        // dar estes produtos como classificados.
+        escritas.forEach(function(k){ estado.catalogo[k] = ctx.novasEntradas[k]; });
+      })
+      .then(function(){
+        var aGravar = plano.filter(function(e){ return e.gravar; }).length;
+        if (!aGravar){
+          esconderProgresso();
+          mostrarMsg('msgAviso', 'Nada gravado — nenhum dia mudou.');
+          return null;
+        }
+        return gravarDias(escritas, function(feitos, total, dia){
+          progresso(0.25 + 0.5 * (feitos / total), 'A gravar ' + dia + '… ' + feitos + '/' + total);
+        });
+      })
+      .then(function(aceites){
+        if (!aceites) return null;
+        // Meses tocados por este import — só esses precisam de recálculo. A
+        // madrugada do dia 1 traz o mês anterior para esta lista sozinha: o dia
+        // de operação 30/09 é do mês 2026-09, mesmo vindo de um ficheiro de Outubro.
+        var escritasMes = escritas.filter(function(e){ return e.tipo === 'mes'; });
+        var meses = escritasMes.map(function(e){ return e.mes; });
+        var i = 0;
+        var recalculos = [];
+        return escritasMes.reduce(function(cadeia, e){
+          return cadeia.then(function(){
+            i++;
+            progresso(0.75 + 0.2 * (i / meses.length), 'A recalcular ' + nomeMes(e.mes) + '…');
+            return gravarMes(e).then(function(r){ recalculos.push(r); });
+          });
+        }, Promise.resolve()).then(function(){
+          return { meses: meses, aceites: aceites, recalculos: recalculos };
+        });
+      })
+      .then(function(res2){
+        el('btnConfirmarImport').disabled = false;
+        if (!res2) return;
+        esconderProgresso();
+        esconderCatalogo();
+        esconderResumoImport();
+        estado.pendente = null;
+        estado.planoImport = null;
+        relatorioDias(plano);
+
+        var semAlteracao = plano.length - res2.aceites.length;
+        var mesesFeitos = res2.recalculos.filter(function(r){ return !r.saltado; });
+        var mesesSaltados = res2.recalculos.filter(function(r){ return r.saltado; });
+
+        mostrarMsg('msgOk',
+          'Gravados ' + res2.aceites.length + ' dia' + (res2.aceites.length === 1 ? '' : 's') +
+          ' em vendasDiario/.' +
+          (mesesFeitos.length
+            ? ' Recalculado: ' + mesesFeitos.map(function(r){
+                return nomeMes(r.mes) + ' (' + r.dias + ' dia' + (r.dias === 1 ? '' : 's') + ')';
+              }).join(', ') + '.'
+            : '') +
+          (semAlteracao ? ' ' + semAlteracao + ' dia' + (semAlteracao === 1 ? '' : 's') +
+            ' sem alteração (ver quadro abaixo).' : ''));
+
+        if (mesesSaltados.length){
+          mostrarMsg('msgAviso',
+            'Não recalculado: ' + mesesSaltados.map(function(r){ return nomeMes(r.mes); }).join(', ') +
+            '. Os dias ficaram gravados em vendasDiario/, mas o mês ficou como estava —' +
+            ' importa o SAF-T do período completo para o mês passar a ser somado a partir dos dias.');
+        }
+
+        return carregarDados(res2.meses[res2.meses.length - 1]);
+      })
+      .catch(function(err){
+        esconderProgresso();
+        el('btnConfirmarImport').disabled = false;
+        var base = 'Erro ao gravar: ' + (err && err.message ? err.message : String(err));
+
+        // Falha a meio da escrita do catálogo: dizer exactamente quantos
+        // produtos ficaram gravados, para o estado não ser ambíguo.
+        if (err && err.escritas) {
+          var feitas = err.escritas.length;
+          var falta = err.total - feitas;
+          estado.catalogoCarregado = false;
+          mostrarMsg('msgErro', base +
+            ' — catálogo gravado parcialmente: ' + intFmt(feitas) + ' de ' + intFmt(err.total) +
+            ' produto' + (err.total === 1 ? '' : 's') + ' ficaram gravados, ' + intFmt(falta) +
+            ' não. Nenhum dia foi gravado. Volta a correr o import: os que faltam voltam a aparecer' +
+            ' para classificar, os já gravados não.');
+          return;
+        }
+
+        mostrarMsg('msgErro', base +
+          ' — os dias já gravados ficaram em vendasDiario/; volta a correr o' +
+          ' import para recompor os meses afectados.');
+        if (plano) relatorioDias(plano);
+      });
+  }
+
+
+  /* =====================================================================
+     ======== DAQUI PARA BAIXO: camada de desenho da vendas-v2 ========
+     Tudo o que está acima (até ao fim do confirmarImport) é cópia exacta
+     da vendas.html. Abaixo, as funções PURAS de cálculo (turnos, acumulado
+     por hora, top produtos, leitura de dias) também são cópia exacta; só o
+     desenho é novo.
+     ===================================================================== */
+
+  /* ---------- Estado só desta página (preferências de quem olha) ----------
+     localStorage próprio — nunca o 'gioco.vendas.*' da vendas.html, para
+     as duas páginas não se pisarem. Nada disto toca nos dados. */
+  var LS_V2 = 'gioco.vendasV2.ui';
+  var v2 = (function(){
+    var base = { tab:'dia', vista:{ dia:'barras', hora:'barras', sem:'barras', semanas:'barras' },
+                 mix:'barras', pag:'barras', top:'subcategorias', gaveta:null, abridor:null };
+    var guardado = lerPrefs(LS_V2);
+    if (guardado.tab) base.tab = guardado.tab;
+    if (guardado.vista) Object.keys(base.vista).forEach(function(k){ if (guardado.vista[k]) base.vista[k] = guardado.vista[k]; });
+    if (guardado.mix) base.mix = guardado.mix;
+    if (guardado.pag) base.pag = guardado.pag;
+    if (guardado.top) base.top = guardado.top;
+    return base;
+  })();
+  function guardarV2(){
+    escreverPrefs(LS_V2, { tab:v2.tab, vista:v2.vista, mix:v2.mix, pag:v2.pag, top:v2.top });
+  }
+  estado.vistasGrafico.topProdutos = v2.top;
+
+  /* Formatação só do desenho: agrupa também os milhares de 4 dígitos
+     ("1 046,78 €", como no protótipo aprovado) — o pt-PT por omissão não
+     agrupa abaixo de 10 000. As funções eur/dec/intFmt da importação ficam
+     intactas. */
+  function decV(n, casas){
+    n = Number(n) || 0;
+    if (casas === undefined) casas = 2;
+    try { return n.toLocaleString('pt-PT', { minimumFractionDigits:casas, maximumFractionDigits:casas, useGrouping:'always' }); }
+    catch (e){ return dec(n, casas); }
+  }
+  function eurV(n){ return decV(n, 2) + ' €'; }
+  function intV(n){
+    n = Number(n) || 0;
+    try { return n.toLocaleString('pt-PT', { maximumFractionDigits:3, useGrouping:'always' }); }
+    catch (e){ return intFmt(n); }
+  }
+  function pctV(n, casas){ return decV((Number(n) || 0) * 100, casas === undefined ? 1 : casas) + '%'; }
+
+  var MENOS = '−';
+  function sinalPct(v, casas){
+    var t = decV(Math.abs(v) * 100, casas || 0) + '%';
+    return (v > 0 ? '+' : (v < 0 ? MENOS : '')) + t;
+  }
+  function chipDelta(actual, anterior){
+    if (anterior === null || anterior === undefined) return '';
+    if (!anterior) return actual ? '<span class="v2-chip info">novo</span>' : '';
+    var v = (actual - anterior) / anterior;
+    var cls = v > 0.0005 ? 'pos' : (v < -0.0005 ? 'neg' : '');
+    return '<span class="v2-chip ' + cls + '">' + sinalPct(v, 0) + '</span>';
+  }
+  /* Δ em texto para as tabelas (a vendas.html usava deltaTexto com classes
+     pos/neg; aqui o mesmo cálculo, com o sinal tipográfico). */
+  function deltaCelula(actual, anterior){
+    if (anterior === null || anterior === undefined) return '—';
+    if (!anterior) return actual ? 'novo' : '—';
+    var v = (actual - anterior) / anterior;
+    var cls = v > 0 ? 'pos' : (v < 0 ? 'neg' : '');
+    return '<span class="' + cls + '">' + sinalPct(v, 0) + '</span>';
+  }
+  function eurCurto(n){ return decV(n, 2); }
+  function ico(nome, extra){
+    return '<svg class="v2-ico"' + (extra ? ' style="' + extra + '"' : '') + ' aria-hidden="true"><use href="#i-' + nome + '"/></svg>';
+  }
+  function attr(s){ return esc(s).replace(/\n/g, '&#10;'); }
+
+  /* =========================================================
+     Leitura dos dados gravados (mesma leitura da vendas.html)
+     ========================================================= */
+  function mostrarUltimaImportacao(dados){
+    var alvo = el('ultimaImportacao');
+    if (!alvo) return;
+    var melhorMes = null, melhorTs = 0;
+    Object.keys(dados).forEach(function(mes){
+      var resumo = dados[mes] && dados[mes].resumo;
+      if (!resumo || !resumo.importadoEm) return;
+      var ts = new Date(resumo.importadoEm).getTime();
+      if (isNaN(ts)) return;
+      if (ts < melhorTs) return;
+      if (ts === melhorTs && melhorMes && mes < melhorMes) return;
+      melhorTs = ts;
+      melhorMes = mes;
+    });
+    if (!melhorMes){ alvo.textContent = 'Ainda sem dados importados'; return; }
+    var r = dados[melhorMes].resumo;
+    alvo.textContent = 'Última importação: ' + nomeMes(melhorMes) + ' — ' +
+      dataHoraExtenso(r.importadoEm) + (r.ficheiro ? ' · ' + r.ficheiro : '');
+  }
+
+  /* UMA leitura de vendas/ (a mesma da vendas.html). Os dias de
+     vendasDiario/ só se lêem quando se escolhe um dia ou um dia da semana. */
+  function carregarDados(mesPreferido){
+    return vendasRef.once('value').then(function(snap){
+      var val = snap.val() || {};
+      estado.diasCache = {};
+      estado.catalogo = val.catalogo || estado.catalogo || {};
+      estado.catalogoCarregado = true;
+
+      var dados = {};
+      Object.keys(val).forEach(function(k){
+        if (k === 'catalogo') return;
+        if (!/^\d{4}-\d{2}$/.test(k)) return;
+        dados[k] = val[k];
+      });
+      estado.dados = dados;
+      mostrarUltimaImportacao(dados);
+
+      var meses = Object.keys(dados).sort();
+      if (!meses.length){
+        estado.mesActivo = '';
+        el('vistas').innerHTML = '';
+        el('semDados').classList.remove('hidden');
+        popularPeriodo();
+        actualizarAtalhoZoneSoft();
+        return;
+      }
+      el('semDados').classList.add('hidden');
+      var alvo = mesPreferido && dados[mesPreferido] ? mesPreferido :
+        (estado.mesActivo && (dados[estado.mesActivo] || estado.mesActivo === '__todos') ? estado.mesActivo : meses[meses.length - 1]);
+      estado.mesActivo = alvo;
+      popularPeriodo();
+      // Um dia ou dia da semana já escolhido tem de ser relido (diasCache foi limpo).
+      if (estado.diaActivo) seleccionarDia(estado.diaActivo);
+      else if (estado.diaSemanaActivo) seleccionarDiaSemana(estado.diaSemanaActivo);
+      else renderVistas();
+      actualizarAtalhoZoneSoft();
+    });
+  }
+
+  /* ---------- Cópia exacta da vendas.html: conjunto activo ---------- */
+  function payloadActivo(){
+    if (estado.diaActivo){
+      return estado.diasCache[estado.mesActivo + '/' + estado.diaActivo] || null;
+    }
+    if (estado.diaSemanaActivo){
+      var datas = [];
+      var payloads = [];
+      diasDoDiaSemana(estado.diaSemanaActivo).forEach(function(e){
+        var pl = estado.diasCache[e.mes + '/' + e.dia];
+        if (!pl) return;
+        datas.push(e.dia);
+        payloads.push(pl);
+      });
+      if (!payloads.length) return null;
+      var agregado = mergePayloads(payloads);
+      agregado._diasAgregados = payloads.length;
+      agregado._datas = datas;
+      return agregado;
+    }
+    if (estado.mesActivo === '__todos'){
+      return mergePayloads(Object.keys(estado.dados).sort().map(function(m){ return estado.dados[m]; }));
+    }
+    return estado.dados[estado.mesActivo] || null;
+  }
+
+  function mesesActivos(){
+    if (estado.mesActivo === '__todos') return Object.keys(estado.dados).sort();
+    return estado.dados[estado.mesActivo] ? [estado.mesActivo] : [];
+  }
+
+  function diaSemanaDe(iso){
+    return String(new Date(iso + 'T12:00:00').getDay());
+  }
+
+  function diasDoDiaSemana(dow){
+    var lista = [];
+    mesesActivos().forEach(function(mes){
+      Object.keys(estado.dados[mes].porDia || {}).sort().forEach(function(dia){
+        if (diaSemanaDe(dia) === String(dow)) lista.push({ mes: mes, dia: dia });
+      });
+    });
+    return lista;
+  }
+
+  var ORDEM_DIAS_SEMANA = [1, 2, 3, 4, 5, 6, 0];
+  var NOME_PLURAL_DIA = ['domingos', 'segundas-feiras', 'terças-feiras', 'quartas-feiras',
+                         'quintas-feiras', 'sextas-feiras', 'sábados'];
+  // Rótulos do seletor de período (o protótipo aprovado): "todas as segundas".
+  var ROTULO_TODOS_V2 = ['todos os domingos', 'todas as segundas', 'todas as terças',
+                         'todas as quartas', 'todas as quintas', 'todas as sextas', 'todos os sábados'];
+
+  function aCarregar(texto){
+    el('vistas').innerHTML = '<div class="v2-cartao v2-vazio">' + esc(texto) + '</div>';
+  }
+
+  function seleccionarDia(dia){
+    estado.diaActivo = dia || '';
+    estado.diaSemanaActivo = '';
+    if (!estado.diaActivo){ renderVistas(); return; }
+
+    var mes = estado.mesActivo;
+    var chave = mes + '/' + dia;
+    if (Object.prototype.hasOwnProperty.call(estado.diasCache, chave)){ renderVistas(); return; }
+
+    aCarregar('A carregar dia…');
+    diarioRef.child(mes).child(dia).once('value').then(function(snap){
+      estado.diasCache[chave] = snap.val() || null;
+      if (estado.mesActivo !== mes || estado.diaActivo !== dia) return;
+      renderVistas();
+    }).catch(function(err){
+      if (estado.mesActivo !== mes || estado.diaActivo !== dia) return;
+      el('vistas').innerHTML = '<div class="msg erro on">Não foi possível ler o dia: ' +
+        esc(err && err.message ? err.message : String(err)) + '</div>';
+    });
+  }
+
+  function seleccionarDiaSemana(dow){
+    estado.diaActivo = '';
+    estado.diaSemanaActivo = String(dow);
+    var mes = estado.mesActivo;
+    var lista = diasDoDiaSemana(dow);
+    var emFalta = lista.filter(function(e){
+      return !Object.prototype.hasOwnProperty.call(estado.diasCache, e.mes + '/' + e.dia);
+    });
+    if (!emFalta.length){ renderVistas(); return; }
+
+    aCarregar('A carregar ' + emFalta.length + (emFalta.length === 1 ? ' dia…' : ' dias…'));
+    Promise.all(emFalta.map(function(e){
+      return diarioRef.child(e.mes).child(e.dia).once('value').then(function(snap){
+        estado.diasCache[e.mes + '/' + e.dia] = snap.val() || null;
+      });
+    })).then(function(){
+      if (estado.mesActivo !== mes || estado.diaSemanaActivo !== String(dow)) return;
+      renderVistas();
+    }).catch(function(err){
+      if (estado.mesActivo !== mes || estado.diaSemanaActivo !== String(dow)) return;
+      el('vistas').innerHTML = '<div class="msg erro on">Não foi possível ler os dias: ' +
+        esc(err && err.message ? err.message : String(err)) + '</div>';
+    });
+  }
+
+  function descricaoDiaSemana(p){
+    var dow = parseInt(estado.diaSemanaActivo, 10);
+    var datas = (p && p._datas) || [];
+    var n = datas.length;
+    var texto = 'todas as ' + NOME_PLURAL_DIA[dow] + ' de ' +
+      (estado.mesActivo === '__todos' ? 'todos os meses' : nomeMes(estado.mesActivo));
+    if (!n) return texto;
+    var detalhe = n + (n === 1 ? ' dia' : ' dias');
+    if (estado.mesActivo !== '__todos'){
+      detalhe += ': ' + datas.map(function(d){ return parseInt(d.slice(8), 10); }).join(', ') +
+        ' ' + mesCurto(datas[0].slice(5, 7));
+    }
+    return texto + ' (' + detalhe + ')';
+  }
+
+  function nomeDiaSemanaActivo(){
+    return DIAS_SEMANA[parseInt(estado.diaSemanaActivo, 10)].toLowerCase();
+  }
+
+  /* ---------- Seletor único de período ----------
+     Substitui os dois seletores (Mês + Dia) da vendas.html. Valores:
+       m:AAAA-MM | m:__todos | d:AAAA-MM-DD | w:<dow>   (w = dia da semana,
+     dentro do mês activo ou de todos os meses). */
+  function popularPeriodo(){
+    var sel = el('periodoSel');
+    var meses = Object.keys(estado.dados).sort();
+    if (!meses.length){
+      sel.innerHTML = '<option value="">Sem meses importados</option>';
+      sel.disabled = true;
+      estado.diaActivo = ''; estado.diaSemanaActivo = '';
+      return;
+    }
+    sel.disabled = false;
+    var mes = estado.mesActivo;
+    var nomeAct = mes === '__todos' ? 'Todos os meses' : nomeMes(mes);
+    var dias = mes === '__todos' ? [] : Object.keys((estado.dados[mes] || {}).porDia || {}).sort();
+    var dows = {};
+    mesesActivos().forEach(function(m){
+      Object.keys(estado.dados[m].porDia || {}).forEach(function(d){ dows[diaSemanaDe(d)] = true; });
+    });
+    if (estado.diaActivo && dias.indexOf(estado.diaActivo) < 0) estado.diaActivo = '';
+    if (estado.diaSemanaActivo && !dows[estado.diaSemanaActivo]) estado.diaSemanaActivo = '';
+
+    var h = '<optgroup label="' + esc(nomeAct) + '">';
+    h += '<option value="m:' + esc(mes) + '">' + esc(nomeAct) + (mes === '__todos' ? '' : ' · mês inteiro') + '</option>';
+    dias.forEach(function(d){
+      h += '<option value="d:' + d + '">' + esc(nomeAct + ' · ' + rotuloDia(d)) + '</option>';
+    });
+    ORDEM_DIAS_SEMANA.forEach(function(d){
+      if (!dows[String(d)]) return;
+      h += '<option value="w:' + d + '">' + esc(nomeAct + ' · ' + ROTULO_TODOS_V2[d]) + '</option>';
+    });
+    h += '</optgroup><optgroup label="Outros meses">';
+    meses.slice().reverse().forEach(function(m){
+      if (m === mes) return;
+      h += '<option value="m:' + m + '">' + esc(nomeMes(m)) + '</option>';
+    });
+    if (meses.length > 1 && mes !== '__todos') h += '<option value="m:__todos">Todos os meses</option>';
+    h += '</optgroup>';
+    sel.innerHTML = h;
+    sel.value = estado.diaActivo ? 'd:' + estado.diaActivo :
+      (estado.diaSemanaActivo ? 'w:' + estado.diaSemanaActivo : 'm:' + mes);
+  }
+
+  function aoMudarPeriodo(valor){
+    var tipo = valor.slice(0, 2), resto = valor.slice(2);
+    if (tipo === 'm:'){
+      estado.mesActivo = resto;
+      estado.diaActivo = '';
+      estado.diaSemanaActivo = '';
+      popularPeriodo();
+      renderVistas();
+    } else if (tipo === 'd:'){
+      seleccionarDia(resto);
+    } else if (tipo === 'w:'){
+      seleccionarDiaSemana(resto);
+    }
+  }
+
+  function voltarAoMes(){
+    estado.diaActivo = '';
+    estado.diaSemanaActivo = '';
+    popularPeriodo();
+    renderVistas();
+  }
+
+  /* =========================================================
+     Cálculos (cópia exacta da vendas.html)
+     ========================================================= */
+  /* ---------- Horas: corte dos turnos ----------
+     1.º turno: h < HORA_CORTE_TURNO (0h até às 16h59). 2.º turno:
+     h >= HORA_CORTE_TURNO (17h até ao fecho). Mudar este número muda o corte
+     em TODO O LADO — os dois .kpi do bloco de turnos, os rótulos (construídos
+     a partir dele) e o separador nas barras horizontais. Não há UI para o
+     alterar: é uma decisão de operação, não uma preferência de quem olha. */
+  var HORA_CORTE_TURNO = 17;
+
+  /* ---------- Acumulado até à hora atual ----------
+     Função PURA, sem estado nem DOM: média por hora, acumulado hora a hora e
+     acumulado até ao instante `agora`. EXISTE UMA CÓPIA tal e qual no módulo
+     vendasHoje do centro-de-controlo.html — alterar as duas ao mesmo tempo
+     (decidiu-se não criar um ficheiro partilhado só para isto).
+       porHora: {0..23: {bruto, docs}} (objecto ou array com buracos, como o
+                Firebase devolve); dias: divisor (nº de dias do conjunto);
+                agora: Date.
+     Devolve { mediaHora[24], acumulado[24], ateAgora, horaAtual, total,
+               hora, minuto, primeira, ultima, completo }:
+       mediaHora[h] = porHora[h].bruto / dias (hora sem chave = 0)
+       acumulado[h] = Σ mediaHora[k], k ≤ h;  total = acumulado[23]
+       ateAgora     = acumulado[H-1] + mediaHora[H] × M/60 — aproximação
+                      LINEAR dentro da hora corrente (as vendas não são
+                      uniformes dentro da hora, mas porHora não tem
+                      granularidade ao minuto); depois da última hora com
+                      dados é o total.
+       horaAtual    = mediaHora[H], ou null se porHora não tem a hora H
+                      (fora do horário com dados)
+       primeira/ultima = primeira e última hora com chave (null sem dados)
+       completo     = já passou a última hora com dados (H > ultima)
+     dias ≤ 0 → tudo a zero (o chamador omite o bloco). */
+  function giocoAcumuladoHoras(porHora, dias, agora){
+    porHora = porHora || {};
+    dias = Number(dias) || 0;
+    var mediaHora = [], acumulado = [], soma = 0;
+    var primeira = null, ultima = null;
+    var i, h;
+    for (h = 0; h < 24; h++){ mediaHora.push(0); acumulado.push(0); }
+    /* A ordem é a do DIA DE OPERAÇÃO (começa no corte e dá a volta): a
+       madrugada acumula a seguir às 23h, não antes da abertura. Com o corte a
+       0 esta função é exactamente a de sempre. */
+    var ordem = horasOperacao();
+    for (i = 0; i < 24; i++){
+      h = ordem[i];
+      var tem = !!porHora[h];
+      var m = (tem && dias > 0) ? (Number(porHora[h].bruto) || 0) / dias : 0;
+      if (tem){ if (primeira === null) primeira = h; ultima = h; }
+      mediaHora[h] = m;
+      soma += m;
+      acumulado[h] = soma;
+    }
+    var H = agora.getHours(), M = agora.getMinutes();
+    var completo = ultima !== null && posOperacao(H) > posOperacao(ultima);
+    var anterior = posOperacao(H) === 0 ? 0 : acumulado[(H + 23) % 24];
+    var ateAgora = completo ? soma : (anterior + mediaHora[H] * (M / 60));
+    return {
+      mediaHora: mediaHora, acumulado: acumulado, ateAgora: ateAgora,
+      horaAtual: porHora[H] ? mediaHora[H] : null, total: soma,
+      hora: H, minuto: M, primeira: primeira, ultima: ultima, completo: completo
+    };
+  }
+
+  /* ---------- Repartição por turnos ----------
+     Função PURA, sem estado nem DOM.
+       porHora: {0..23: {bruto, docs}} (objecto ou array com buracos, como o
+                Firebase devolve). Percorrem-se TODAS as chaves, não o
+                intervalo min..fim, para nenhuma hora solta ficar de fora.
+       divisor: o MESMO divisor que a vista usa nas barras (nº de dias em
+                "Média por dia", 1 em "Total"), para os números do bloco
+                baterem certo com o que está no ecrã logo a seguir.
+     Devolve { t1, t2, total }, cada um { bruto, docs, ticket }: bruto e docs
+     já divididos pelo divisor; ticket = bruto/docs (não depende do divisor,
+     que se corta na divisão) e null com 0 docs — um ticket de 0 € não
+     existe, e 0 mentia na comparação entre turnos. */
+  function giocoTurnos(porHora, divisor){
+    porHora = porHora || {};
+    divisor = Number(divisor) > 0 ? Number(divisor) : 1;
+    var t1 = { bruto:0, docs:0 }, t2 = { bruto:0, docs:0 };
+    Object.keys(porHora).forEach(function(k){
+      var h = Number(k);
+      if (!isFinite(h) || !porHora[k]) return;
+      /* A comparação é na ordem do DIA DE OPERAÇÃO: a madrugada (0h–4h) é o
+         fim do 2.º turno, não o princípio do 1.º. */
+      var alvo = posOperacao(h) < posOperacao(HORA_CORTE_TURNO) ? t1 : t2;
+      alvo.bruto += Number(porHora[k].bruto) || 0;
+      alvo.docs  += Number(porHora[k].docs) || 0;
+    });
+    function fechar(t){
+      return {
+        bruto: t.bruto / divisor,
+        docs: t.docs / divisor,
+        ticket: t.docs ? t.bruto / t.docs : null
+      };
+    }
+    return {
+      t1: fechar(t1),
+      t2: fechar(t2),
+      total: fechar({ bruto: t1.bruto + t2.bruto, docs: t1.docs + t2.docs })
+    };
+  }
+
+  /* Verificações do corte (correm uma vez, no arranque): porHora com buracos,
+     a hora 16 no 1.º turno e a 17 no 2.º, com os dois divisores que a vista
+     usa (1 em "Total", nº de dias em "Média por dia"). */
+  (function(){
+    var sintetico = { 9:{bruto:10,docs:1}, 12:{bruto:20,docs:2}, 16:{bruto:30,docs:3},
+                      17:{bruto:40,docs:4}, 20:{bruto:60,docs:5} };
+    [1, 4].forEach(function(div){
+      var t = giocoTurnos(sintetico, div);
+      console.assert(t.t1.bruto === 60 / div,
+        'giocoTurnos: 1.º turno (9+12+16) devia ser ' + (60 / div) + ', deu ' + t.t1.bruto);
+      console.assert(t.t2.bruto === 100 / div,
+        'giocoTurnos: 2.º turno (17+20) devia ser ' + (100 / div) + ', deu ' + t.t2.bruto);
+      console.assert(t.t1.docs === 6 / div && t.t2.docs === 9 / div,
+        'giocoTurnos: docs por turno errados com divisor ' + div);
+      console.assert(t.total.bruto === 160 / div && t.total.docs === 15 / div,
+        'giocoTurnos: total tem de ser t1 + t2 (divisor ' + div + ')');
+      console.assert(t.t1.ticket === 10 && t.t2.ticket === 100 / 9,
+        'giocoTurnos: o ticket não pode depender do divisor (' + div + ')');
+    });
+    console.assert(giocoTurnos({ 9:{bruto:10,docs:0} }, 1).t1.ticket === null,
+      'giocoTurnos: 0 docs tem de dar ticket null, nunca 0');
+  })();
+
+  /* Top produtos: três vistas sobre o MESMO payload (Produtos | Subcategorias
+     | Categorias). A troca não lê o Firebase: agrega em memória as linhas de
+     p.produtos, somando qtd e valor. Os campos são os que construirPayload()
+     grava em cada linha de produto — `categoria` e `subcategoria` (esta pode
+     ser null) — iguais em vendas/{mes} e vendasDiario/{mes}/{dia}. Uma linha
+     sem valor agrupa em "Sem categoria" / "Sem subcategoria": nunca sai do
+     total. Função PURA, exposta em window.__vendas para verificação. */
+  var SEM_CATEGORIA = 'Sem categoria';
+  var SEM_SUBCATEGORIA = 'Sem subcategoria';
+  var VISTAS_TOP = [
+    { id:'subcategorias', icone:'Subcategorias', titulo:'Produtos agregados por subcategoria' },
+    { id:'produtos',      icone:'Produtos',      titulo:'Uma linha por produto' },
+    { id:'categorias',    icone:'Categorias',    titulo:'Produtos agregados por categoria' }
+  ];
+
+  function agregarTopProdutos(prods, nivel){
+    prods = prods || {};
+    var mapa = {};
+    Object.keys(prods).forEach(function(k){
+      var src = prods[k] || {};
+      var cat = src.categoria || SEM_CATEGORIA;
+      var sub = src.subcategoria || SEM_SUBCATEGORIA;
+      var chave, nome;
+      if (nivel === 'categorias'){ chave = cat; nome = cat; }
+      else { chave = cat + '\u00a6' + sub; nome = sub; }
+      var d = mapa[chave] || (mapa[chave] = { key:chave, desc:nome, categoria:cat,
+                                              subcategoria: nivel === 'categorias' ? null : sub,
+                                              qtd:0, valor:0, produtos:0, itens:[] });
+      d.qtd += Number(src.qtd) || 0;
+      d.valor += Number(src.valor) || 0;
+      d.produtos += 1;
+      d.itens.push({ key:k, desc:src.desc || k, qtd:Number(src.qtd) || 0, valor:Number(src.valor) || 0,
+                     pvpMedio:Number(src.pvpMedio) || 0 });
+    });
+    return Object.keys(mapa).map(function(k){
+      var d = mapa[k];
+      d.pvpMedio = d.qtd ? d.valor / d.qtd : 0;
+      return d;
+    });
+  }
+
+  function vistaTopDe(){
+    // Subcategorias por omissão (pedido do Manel, Set/2026); só uma escolha
+    // explícita guardada em vistasGrafico muda para Produtos ou Categorias.
+    var v = estado.vistasGrafico.topProdutos;
+    return (v === 'produtos' || v === 'categorias') ? v : 'subcategorias';
+  }
+
+  function agoraVendas(){ return estado.agoraTeste || new Date(); }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+
+  /* Comparação homóloga — o MESMO cálculo da vistaHomologa() da vendas.html:
+     os N primeiros dias abertos do mês anterior contra os N dias abertos que
+     o mês activo já tem. Só em modo mês. */
+  function calcHomologa(p, mes){
+    if (!mes || mes === '__todos' || estado.diaActivo || estado.diaSemanaActivo) return null;
+    var chaves = Object.keys(p.porDia || {}).sort();
+    var n = chaves.length;
+    if (!n) return null;
+    var anterior = mesAnteriorDe(mes);
+    var dadosAnt = estado.dados[anterior];
+    if (!dadosAnt || !dadosAnt.porDia) return { semDados:true, anterior:anterior, n:n };
+    var chavesAnt = Object.keys(dadosAnt.porDia).sort().slice(0, n);
+    var brutoAnt = 0, docsAnt = 0;
+    chavesAnt.forEach(function(d){
+      var v = dadosAnt.porDia[d] || {};
+      brutoAnt += Number(v.bruto) || 0;
+      docsAnt += Number(v.docs) || 0;
+    });
+    var bruto = 0, docs = 0;
+    chaves.forEach(function(d){
+      var v = p.porDia[d] || {};
+      bruto += Number(v.bruto) || 0;
+      docs += Number(v.docs) || 0;
+    });
+    return {
+      anterior:anterior, n:n, nAnt:chavesAnt.length,
+      bruto:bruto, docs:docs, ticket: docs ? bruto / docs : 0, mediaDia: bruto / n,
+      brutoAnt:brutoAnt, docsAnt:docsAnt, ticketAnt: docsAnt ? brutoAnt / docsAnt : 0,
+      mediaDiaAnt: chavesAnt.length ? brutoAnt / chavesAnt.length : 0
+    };
+  }
+
+  /* =========================================================
+     Peças de desenho
+     ========================================================= */
+
+  /* Barras verticais. itens: { eixo (html), valorTxt, valor, dica, cls }.
+     opts.sep = índice antes do qual vai a linha do 2.º turno. */
+  function barrasHTML(itens, opts){
+    opts = opts || {};
+    var max = 0;
+    itens.forEach(function(x){ max = Math.max(max, x.valor || 0); });
+    var cols = itens.map(function(x, i){
+      var h = max > 0 ? Math.max(0, (x.valor || 0) / max * 86) : 0;
+      var sep = (opts.sep === i && i > 0)
+        ? '<span class="v2-col-sep" style="left:-5px"><span>' + esc(opts.sepRotulo || '') + '</span></span>' : '';
+      return '<div class="v2-col ' + (x.cls || '') + '" tabindex="0" data-dica="' + attr(x.dica || '') + '">' + sep +
+        '<span class="v2-col-v">' + (x.valorTxt || '') + '</span>' +
+        '<span class="v2-col-b" style="height:' + h.toFixed(1) + '%"></span>' +
+        '</div>';
+    }).join('');
+    var eixo = itens.map(function(x){
+      return '<span class="' + ((x.cls || '').indexOf('destaque') >= 0 || (x.cls || '').indexOf('agora') >= 0 ? 'destaque' : '') + '">' + x.eixo + '</span>';
+    }).join('');
+    var minW = Math.max(520, itens.length * 38);
+    return '<div class="v2-graf-scroll"><div class="v2-barras" style="min-width:' + minW + 'px">' + cols + '</div>' +
+      '<div class="v2-eixo" style="min-width:' + minW + 'px">' + eixo + '</div></div>';
+  }
+
+  /* Linha num só eixo (nunca dois eixos). series: [{ nome, cor, valores[] }];
+     rotulos[]: eixo X; dicas[]: texto por ponto (crosshair por coluna). */
+  function linhaSVG(series, rotulos, dicas, opts){
+    opts = opts || {};
+    var W = 1000, H = 260, PE = 28, TOPO = 16, ESQ = 48, DIR = 56;
+    var n = rotulos.length;
+    var max = 0;
+    series.forEach(function(s){ s.valores.forEach(function(v){ max = Math.max(max, v || 0); }); });
+    if (!(max > 0)) max = 1;
+    function x(i){ return n === 1 ? W / 2 : ESQ + i * (W - ESQ - DIR) / (n - 1); }
+    function y(v){ return TOPO + (H - TOPO - PE) * (1 - (v || 0) / max); }
+    var grelha = '';
+    [0.25, 0.5, 0.75, 1].forEach(function(f){
+      var yy = y(max * f);
+      grelha += '<line x1="0" x2="' + W + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="var(--v2-grelha)" stroke-width="1"/>' +
+        '<text x="' + W + '" y="' + (yy - 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="var(--v2-apagado)">' + esc(decV(max * f, 0)) + '</text>';
+    });
+    grelha += '<line x1="0" x2="' + W + '" y1="' + (H - PE) + '" y2="' + (H - PE) + '" stroke="var(--v2-grelha)" stroke-width="1"/>';
+    var passo = Math.max(1, Math.ceil(n / 16));
+    var eixo = rotulos.map(function(r, i){
+      if (i % passo && i !== n - 1) return '';
+      return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="var(--v2-sec)">' + esc(r) + '</text>';
+    }).join('');
+    var linhas = series.map(function(s, si){
+      var d = s.valores.map(function(v, i){ return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+      var pontos = n <= 40 ? s.valores.map(function(v, i){
+        return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="4" fill="' + s.cor + '" stroke="var(--v2-cartao)" stroke-width="2"/>';
+      }).join('') : '';
+      return '<path d="' + d + '" fill="none" stroke="' + s.cor + '" stroke-width="2"' + (s.tracejado ? ' stroke-dasharray="5 4"' : '') + '/>' + pontos;
+    }).join('');
+    // Alvos de hover maiores do que a marca: uma faixa por coluna.
+    var larg = n > 1 ? (W - ESQ - DIR) / (n - 1) : W;
+    var alvos = rotulos.map(function(r, i){
+      return '<rect x="' + (x(i) - larg / 2).toFixed(1) + '" y="0" width="' + larg.toFixed(1) + '" height="' + (H - PE) + '" fill="transparent" data-dica="' + attr(dicas[i] || '') + '" tabindex="0"/>';
+    }).join('');
+    var leg = series.length > 1 ? '<div class="v2-serie-leg">' + series.map(function(s){
+      return '<span><i style="background:' + s.cor + '"></i>' + esc(s.nome) + '</span>';
+    }).join('') + '</div>' : '';
+    return '<div class="v2-graf-scroll"><svg class="v2-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + attr(opts.aria || 'Gráfico de linha') + '" style="min-width:520px">' +
+      grelha + linhas + eixo + alvos + '</svg></div>' + leg;
+  }
+
+  function tabelaHTML(cab, linhas, classesLinha){
+    return '<div class="v2-tabela-wrap"><table class="v2-tabela"><thead><tr>' +
+      cab.map(function(c){ return '<th' + (c.num ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      linhas.map(function(l, i){
+        return '<tr' + (classesLinha && classesLinha[i] ? ' class="' + classesLinha[i] + '"' : '') + '>' +
+          l.map(function(v, j){ return '<td' + (cab[j] && cab[j].num ? ' class="num"' : '') + '>' + v + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  /* Barra de proporção + linhas de legenda. fatias: { nome, valor, cor, pre } */
+  function shareHTML(fatias, total){
+    var barra = '<div class="v2-share" role="img" aria-label="' + attr(fatias.map(function(f){
+      return f.nome + ' ' + (total ? decV(f.valor / total * 100, 1) : '0') + '%';
+    }).join(', ')) + '">' + fatias.map(function(f){
+      return '<span style="flex:' + Math.max(f.valor, 0).toFixed(2) + ' 1 0;background:' + f.cor + '"></span>';
+    }).join('') + '</div>';
+    var leg = '<div>' + fatias.map(function(f){
+      return '<div class="v2-leg-linha"><span class="v2-ponto" style="background:' + f.cor + '"></span>' +
+        '<span class="v2-nome">' + (f.pre ? '<span style="color:var(--v2-apagado);margin-right:6px">' + esc(f.pre) + '</span>' : '') + esc(f.nome) + '</span>' +
+        '<span class="v2-pct">' + (total ? decV(f.valor / total * 100, 1) : '0') + '%</span>' +
+        '<span class="v2-val">' + eurV(f.valor) + '</span></div>';
+    }).join('') + '</div>';
+    return barra + leg;
+  }
+
+  /* Barras horizontais simples (para os painéis). */
+  function barrasH(fatias){
+    var max = 0;
+    fatias.forEach(function(f){ max = Math.max(max, f.valor); });
+    return '<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">' + fatias.map(function(f){
+      var w = max > 0 ? f.valor / max * 100 : 0;
+      return '<div data-dica="' + attr(f.nome + ' · ' + eurV(f.valor)) + '" tabindex="0">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>' + esc(f.nome) + '</span>' +
+        '<span class="v2-num" style="font-weight:600">' + eurV(f.valor) + '</span></div>' +
+        '<div style="height:10px;border-radius:0 6px 6px 0;background:' + f.cor + ';width:' + w.toFixed(1) + '%;min-width:2px"></div></div>';
+    }).join('') + '</div>';
+  }
+
+  /* Anel: um só nível, fatias com 2px de intervalo, total ao centro. */
+  function anelSVG(fatias, total, centro){
+    var R = 70, C = 2 * Math.PI * R, acum = 0;
+    var arcos = fatias.map(function(f){
+      var frac = total ? f.valor / total : 0;
+      var comp = Math.max(0, frac * C - (fatias.length > 1 ? 2 : 0));
+      var s = '<circle cx="100" cy="100" r="' + R + '" fill="none" stroke="' + f.cor + '" stroke-width="22"' +
+        ' stroke-dasharray="' + comp.toFixed(2) + ' ' + (C - comp).toFixed(2) + '" stroke-dashoffset="' + (-acum * C).toFixed(2) + '"' +
+        ' transform="rotate(-90 100 100)" data-dica="' + attr(f.nome + ' · ' + eurV(f.valor) + ' · ' + (total ? decV(frac * 100, 1) : '0') + '%') + '" tabindex="0"/>';
+      acum += frac;
+      return s;
+    }).join('');
+    return '<svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Anel" style="display:block;margin:8px auto 0">' + arcos +
+      '<text x="100" y="96" text-anchor="middle" font-size="12" fill="var(--v2-sec)" font-family="Inter,sans-serif">' + esc(centro || 'Total') + '</text>' +
+      '<text x="100" y="116" text-anchor="middle" font-size="15" font-weight="600" fill="var(--v2-texto)" font-family="Inter,sans-serif">' + esc(eurV(total)) + '</text></svg>';
+  }
+
+  function segHTML(grupo, opcoes, activa){
+    return '<div class="v2-seg" role="group">' + opcoes.map(function(o){
+      return '<button type="button" data-' + grupo + '="' + o[0] + '" aria-pressed="' + (o[0] === activa) + '">' + esc(o[1]) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function cartaoTitulo(titulo, gaveta, extra){
+    return '<div class="v2-cartao-cab"><button type="button" class="v2-titulo-btn" data-gaveta="' + gaveta + '">' +
+      esc(titulo) + ico('chevron-right') + '</button>' + (extra || '') + '</div>';
+  }
+
+  /* Cores categóricas por ENTIDADE (nunca por posição): a mesma categoria e o
+     mesmo meio têm sempre a mesma cor, qualquer que seja o período. */
+  var COR_CAT = { 'Comida':'var(--v2-s1)', 'Bebida':'var(--v2-s2)', 'Outro':'var(--v2-s3)' };
+  var ORDEM_MEIOS = ['CD','OU','NU','CC','MB','TR','TB','DE','CH','CS','LC','PR'];
+  var CORES_SERIE = ['var(--v2-s1)','var(--v2-s2)','var(--v2-s3)','var(--v2-s4)','var(--v2-s5)'];
+  function corCategoria(c, i){ return COR_CAT[c] || CORES_SERIE[Math.min(3 + i, 4)]; }
+  function corMeio(m){
+    var i = ORDEM_MEIOS.indexOf(m);
+    return CORES_SERIE[i < 0 ? 4 : Math.min(i, 4)];
+  }
+
+  /* =========================================================
+     Contexto das vistas por hora (mesma lógica da vistaHoras)
+     ========================================================= */
+  function contextoHoras(p){
+    var horas = p.porHora || {};
+    var ordemDia = horasOperacao();
+    var chaves = ordemDia.filter(function(h){ return !!horas[h]; });
+    var modoDow = !!estado.diaSemanaActivo;
+    var individual = !!estado.diaActivo;
+    var dias = individual ? 1 : (modoDow ? (p._diasAgregados || 0) : (Number(p.resumo && p.resumo.dias) || 0));
+    var temMedia = dias > 0;
+    var modo = estado.horasModo || (modoDow ? 'media' : 'total');
+    if (!temMedia || individual) modo = 'total';
+    var divisor = modo === 'media' ? dias : 1;
+    var acum = giocoAcumuladoHoras(horas, dias, agoraVendas());
+    var conjunto = modoDow
+      ? 'das ' + NOME_PLURAL_DIA[parseInt(estado.diaSemanaActivo, 10)]
+      : (estado.mesActivo === '__todos' ? 'de todos os meses' : 'de ' + nomeMes(estado.mesActivo));
+
+    var itens = [];
+    if (chaves.length){
+      var iMin = ordemDia.indexOf(chaves[0]);
+      var iFim = ordemDia.indexOf(chaves[chaves.length - 1]);
+      var anterior = null;
+      for (var i = iMin; i <= iFim; i++){
+        var h = ordemDia[i];
+        var v = (horas[h] ? (horas[h].bruto || 0) : 0) / divisor;
+        var docs = (horas[h] ? (horas[h].docs || 0) : 0) / divisor;
+        itens.push({ h:h, valor:v, docs:docs, anterior:anterior, acum: temMedia ? acum.acumulado[h] : null,
+                     t2: posOperacao(h) >= posOperacao(HORA_CORTE_TURNO) });
+        anterior = v;
+      }
+    }
+
+    // Texto completo da vendas.html — vai para "Como ler".
+    var nDias = intV(dias) + (dias === 1 ? ' dia' : ' dias');
+    var frase = 'a variação face à hora anterior mostra onde o serviço acelera e onde colapsa.';
+    var fraseAcum = ' O acumulado (coluna da tabela, linha tracejada no gráfico de linha e na dica de cada barra) é a soma das médias até cada hora';
+    var sub;
+    if (individual){
+      sub = 'Bruto e nº de documentos por hora desse dia; ' + frase + ' O acumulado é a soma ao longo do dia.';
+    } else if (modo === 'media'){
+      sub = (modoDow ? 'Média por ' + nomeDiaSemanaActivo() : 'Média por dia aberto') + ': bruto e nº de documentos de cada hora ÷ ' +
+        nDias + (modoDow ? ' agregados (um dia sem vendas numa hora conta como zero)' : ' abertos') + '; ' + frase + fraseAcum + '.';
+    } else {
+      sub = (modoDow ? 'Total ' + conjunto + ' agregadas' : 'Total ' + conjunto) + ', hora a hora; ' + frase +
+        (temMedia ? fraseAcum + ' — SEMPRE de médias (÷ ' + nDias + '), mesmo com o Total: somar totais de vários dias hora a hora não daria um número com significado.' : '');
+    }
+    sub += ' Os turnos cortam às ' + HORA_CORTE_TURNO + ':00, e a hora é a do fecho do documento ' +
+      '(SystemEntryDate): uma venda fechada logo a seguir às ' + HORA_CORTE_TURNO + 'h conta para o 2.º turno.' +
+      ' O dia começa às ' + CORTE_DIA_OPERACAO_H + 'h: as horas da madrugada estão no fim, a seguir às 23h,' +
+      ' porque pertencem ao serviço que abriu na véspera.';
+
+    return { horas:horas, chaves:chaves, dias:dias, temMedia:temMedia, individual:individual, modoDow:modoDow,
+             modo:modo, divisor:divisor, acum:acum, conjunto:conjunto, itens:itens, sub:sub };
+  }
+
+  /* =========================================================
+     Cartão do gráfico
+     ========================================================= */
+  var TABS = [['dia','Por dia'], ['hora','Por hora'], ['sem','Dia da semana'], ['semanas','Semanas']];
+  var LEITURA = {
+    dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. Na tabela e na dica de cada barra estão os talões e o ticket desse dia.',
+    sem: 'Média por dia aberto (não a soma) — para não penalizar semanas com feriados. "fechado" = nenhum dia aberto desse dia da semana no período. A barra de hoje fica em destaque.',
+    semanas: 'Bruto e nº de talões por semana (segunda a domingo). Semanas com menos de 7 dias abertos vêm assinaladas com (n/7) — não se inventam zeros que puxariam a barra para baixo sem razão.'
+  };
+
+  function tabsDisponiveis(){
+    return TABS.filter(function(t){
+      if (t[0] === 'sem' && estado.diaSemanaActivo) return false;
+      if (t[0] === 'semanas' && (estado.mesActivo === '__todos' || estado.diaActivo || estado.diaSemanaActivo)) return false;
+      return true;
+    });
+  }
+
+  function cartaoGrafico(p){
+    var tabs = tabsDisponiveis();
+    if (!tabs.some(function(t){ return t[0] === v2.tab; })) v2.tab = 'dia';
+    var tab = v2.tab;
+    var vista = v2.vista[tab] || 'barras';
+    var ctrl = '';
+    var legenda = '', corpo = '', pe = '';
+
+    if (tab === 'dia'){
+      var dias = p.porDia || {};
+      var ch = Object.keys(dias).sort();
+      var ultimo = ch[ch.length - 1];
+      var compacto = ch.length > 16;
+      var itens = ch.map(function(d){
+        var v = dias[d] || {};
+        var dow = DIAS_SEMANA[new Date(d + 'T12:00:00').getDay()].slice(0, 3);
+        var longo = d.slice(8) + '/' + d.slice(5, 7) + ' ' + dow;
+        var ticket = v.docs ? v.bruto / v.docs : 0;
+        return { d:d, longo:longo, valor:Number(v.bruto) || 0, docs:Number(v.docs) || 0, ticket:ticket,
+                 eixo: esc(d.slice(8)) + '<br>' + esc(dow), valorTxt: compacto ? decV(v.bruto, 0) : eurCurto(v.bruto),
+                 cls: d === ultimo ? 'destaque' : '',
+                 dica: longo + '\n' + eurV(v.bruto) + '\n' + intV(v.docs) + ' talões · ticket ' + eurV(ticket) };
+      });
+      legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') : 'Sem dias neste período.';
+      if (vista === 'tabela'){
+        corpo = tabelaHTML([{t:'Dia'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1}],
+          itens.map(function(x){ return [esc(x.longo), eurV(x.valor), intV(x.docs), eurV(x.ticket)]; }),
+          itens.map(function(x){ return x.cls; }));
+      } else if (vista === 'linha'){
+        corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:itens.map(function(x){ return x.valor; }) }],
+          itens.map(function(x){ return x.longo.slice(0, 2); }), itens.map(function(x){ return x.dica; }), { aria:'Vendas por dia' });
+      } else corpo = barrasHTML(itens);
+    }
+
+    else if (tab === 'hora'){
+      var c = contextoHoras(p);
+      if (c.temMedia && !c.individual){
+        ctrl += segHTML('horas-modo', [['media', c.modoDow ? 'Média por ' + nomeDiaSemanaActivo() : 'Média por dia'], ['total','Total']], c.modo);
+      }
+      var agora = agoraVendas();
+      var hAgora = agora.getHours();
+      var temAgora = c.itens.some(function(x){ return x.h === hAgora; });
+      var nomeModo = c.individual ? 'Esse dia hora a hora' :
+        (c.modo === 'media' ? (c.modoDow ? 'Média por ' + nomeDiaSemanaActivo() : 'Média por dia aberto') : 'Total ' + c.conjunto) + ', hora a hora';
+      legenda = !c.itens.length ? 'Sem hora nos documentos deste período.' :
+        nomeModo + '. 1.º turno até às ' + HORA_CORTE_TURNO + 'h, 2.º depois; o dia começa às ' + CORTE_DIA_OPERACAO_H + 'h.' +
+        (temAgora ? ' Hora atual (' + pad2(hAgora) + 'h) assinalada.' : '');
+      var sepIdx = -1;
+      var hItens = c.itens.map(function(x, i){
+        if (x.t2 && sepIdx < 0) sepIdx = i;
+        var delta = x.anterior === null ? '' : (x.anterior ? sinalPct((x.valor - x.anterior) / x.anterior, 0) + ' face à hora anterior' : '');
+        var rot = pad2(x.h) + 'h';
+        return {
+          valor:x.valor, rot:rot,
+          eixo: esc(rot) + (x.h === hAgora ? '<br><b>agora</b>' : ''),
+          valorTxt: c.itens.length > 16 ? decV(x.valor, 0) : eurCurto(x.valor),
+          cls: (x.t2 ? 't2' : 't1') + (x.h === hAgora ? ' agora' : ''),
+          dica: pad2(x.h) + ':00–' + pad2((x.h + 1) % 24) + ':00 · ' + (x.t2 ? '2.º' : '1.º') + ' turno\n' + eurV(x.valor) + ' · ' + intV(x.docs) + ' talões' +
+            (delta ? '\n' + delta : '') + (x.acum !== null ? '\nacumulado (média) ' + eurV(x.acum) : ''),
+          x:x, delta: x.anterior === null ? '—' : deltaCelula(x.valor, x.anterior)
+        };
+      });
+      if (vista === 'tabela'){
+        var cab = [{t:'Hora'},{t:'Turno'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Δ hora anterior',num:1}];
+        if (c.temMedia) cab.push({t:'Acumulado (média)',num:1});
+        corpo = tabelaHTML(cab, hItens.map(function(it){
+          var l = [esc(pad2(it.x.h) + ':00') + (it.x.h === hAgora ? ' · agora' : ''), it.x.t2 ? '2.º' : '1.º', eurV(it.valor), intV(it.x.docs), it.delta];
+          if (c.temMedia) l.push(eurV(it.x.acum));
+          return l;
+        }), hItens.map(function(it){ return it.x.h === hAgora ? 'destaque' : ''; }));
+      } else if (vista === 'linha'){
+        var series = [{ nome: c.modo === 'media' ? 'Por hora (média)' : 'Por hora', cor:'var(--v2-s1)', valores: hItens.map(function(x){ return x.valor; }) }];
+        if (c.temMedia) series.push({ nome:'Acumulado (média)', cor:'var(--v2-apagado)', tracejado:true, valores: hItens.map(function(x){ return x.x.acum; }) });
+        corpo = linhaSVG(series, hItens.map(function(x){ return x.rot; }), hItens.map(function(x){ return x.dica; }), { aria:'Vendas por hora' });
+      } else {
+        corpo = barrasHTML(hItens, { sep: sepIdx, sepRotulo: '2.º turno' });
+      }
+      var t = giocoTurnos(p.porHora, c.divisor);
+      if (t.total.bruto > 0){
+        var f1 = t.t1.bruto / t.total.bruto * 100;
+        var p1 = Math.round(f1);
+        pe = '<div class="v2-graf-pe">' +
+          '<span class="v2-chip info"><i style="background:var(--v2-s1)"></i>1.º turno · até ' + HORA_CORTE_TURNO + 'h: ' + eurV(t.t1.bruto) + ' · ' + p1 + '%</span>' +
+          '<span class="v2-chip"><i style="background:var(--v2-s2)"></i>2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho: ' + eurV(t.t2.bruto) + ' · ' + (100 - p1) + '%</span>' +
+          '</div>';
+      }
+      LEITURA.hora = c.sub;
+    }
+
+    else if (tab === 'sem'){
+      var ds = p.porDiaSemana || {};
+      var hoje = agoraVendas().getDay();
+      var sItens = ORDEM_DIAS_SEMANA.map(function(d){
+        var v = ds[d];
+        var media = (v && v.dias) ? v.bruto / v.dias : 0;
+        return { d:d, valor:media, nome:DIAS_SEMANA[d], diasN: v ? v.dias : 0,
+                 eixo: esc(DIAS_SEMANA[d].slice(0, 3)),
+                 valorTxt: (v && v.dias) ? eurCurto(media) : 'fechado',
+                 cls: d === hoje ? 'destaque' : '',
+                 dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') : 'fechado') };
+      });
+      legenda = 'Média por dia aberto, não a soma. ' + DIAS_SEMANA[hoje] + ' (hoje) em destaque.';
+      if (vista === 'tabela'){
+        corpo = tabelaHTML([{t:'Dia da semana'},{t:'Média por dia',num:1},{t:'Dias abertos',num:1}],
+          sItens.map(function(x){ return [esc(x.nome), x.diasN ? eurV(x.valor) : '<span style="color:var(--v2-apagado)">fechado</span>', intV(x.diasN)]; }),
+          sItens.map(function(x){ return x.cls; }));
+      } else if (vista === 'linha'){
+        corpo = linhaSVG([{ nome:'Média', cor:'var(--v2-s1)', valores:sItens.map(function(x){ return x.valor; }) }],
+          sItens.map(function(x){ return x.nome.slice(0, 3); }), sItens.map(function(x){ return x.dica; }), { aria:'Vendas por dia da semana' });
+      } else corpo = barrasHTML(sItens);
+    }
+
+    else if (tab === 'semanas'){
+      var porDia = p.porDia || {};
+      var semanas = {};
+      Object.keys(porDia).sort().forEach(function(d){
+        var seg = segundaDe(d);
+        if (!semanas[seg]) semanas[seg] = { dias:0, bruto:0, docs:0 };
+        semanas[seg].dias += 1;
+        semanas[seg].bruto += Number(porDia[d].bruto) || 0;
+        semanas[seg].docs += Number(porDia[d].docs) || 0;
+      });
+      var ordem = Object.keys(semanas).sort();
+      var wItens = ordem.map(function(seg, i){
+        var s = semanas[seg];
+        var nota = s.dias < 7 ? ' (' + s.dias + '/7)' : '';
+        return { valor:s.bruto, rot:rotuloSemana(seg) + nota, s:s,
+                 eixo: esc(rotuloSemana(seg)) + (nota ? '<br>' + esc(nota.trim()) : ''),
+                 valorTxt: eurCurto(s.bruto),
+                 cls: i === ordem.length - 1 ? 'destaque' : '',
+                 dica: rotuloSemana(seg) + (s.dias < 7 ? ' · ' + s.dias + '/7 dias abertos' : '') + '\n' + eurV(s.bruto) + ' · ' + intV(s.docs) + ' talões' };
+      });
+      legenda = 'Bruto por semana, de segunda a domingo; (n/7) = semana com menos de 7 dias abertos.';
+      if (vista === 'tabela'){
+        corpo = tabelaHTML([{t:'Semana'},{t:'Dias abertos',num:1},{t:'Bruto',num:1},{t:'Talões',num:1}],
+          wItens.map(function(x){ return [esc(x.rot), x.s.dias + '/7', eurV(x.valor), intV(x.s.docs)]; }),
+          wItens.map(function(x){ return x.cls; }));
+      } else if (vista === 'linha'){
+        corpo = linhaSVG([{ nome:'Bruto', cor:'var(--v2-s1)', valores:wItens.map(function(x){ return x.valor; }) }],
+          wItens.map(function(x){ return x.rot; }), wItens.map(function(x){ return x.dica; }), { aria:'Vendas por semana' });
+      } else corpo = barrasHTML(wItens);
+    }
+
+    ctrl += segHTML('vista', [['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
+
+    return '<section class="v2-cartao" aria-label="Faturação">' +
+      '<div class="v2-cartao-cab" style="padding-bottom:8px">' +
+        segHTML('tab', tabs, tab) +
+        '<div class="v2-ctrls">' + ctrl + '</div>' +
+      '</div>' +
+      '<div class="v2-legenda">' + esc(legenda) + ' <button type="button" class="v2-link" data-gaveta="ler">Como ler</button></div>' +
+      '<div class="v2-graf">' + corpo + pe + '</div>' +
+    '</section>';
+  }
+
+  /* =========================================================
+     KPIs e cartões
+     ========================================================= */
+  function kpiV2(label, valor, pe, direita){
+    return '<button type="button" class="v2-kpi" data-gaveta="fat">' +
+      '<span class="v2-kpi-label"><span>' + esc(label) + '</span>' + (direita ? '<small>' + esc(direita) + '</small>' : '') + '</span>' +
+      '<span class="v2-kpi-valor">' + valor + '</span>' +
+      '<span class="v2-kpi-pe">' + (pe || '&nbsp;') + '</span></button>';
+  }
+
+  function blocoKpis(p){
+    var r = p.resumo || {};
+    var hom = calcHomologa(p, estado.mesActivo);
+    var mediaDia = r.dias ? r.bruto / r.dias : 0;
+    var docsDia = r.dias ? r.docs / r.dias : 0;
+    var diasTxt = intV(r.dias) + (r.dias === 1 ? ' dia aberto' : ' dias abertos');
+    if (estado.diaSemanaActivo){
+      var nAgr = p._diasAgregados || 0;
+      diasTxt = nAgr + ' ' + (nAgr === 1 ? nomeDiaSemanaActivo() : NOME_PLURAL_DIA[parseInt(estado.diaSemanaActivo, 10)]);
+    }
+    var pe = ['', '', '', ''];
+    if (hom && !hom.semDados){
+      var mc = mesCurto(hom.anterior.slice(5, 7)) + ': ';
+      pe = [
+        chipDelta(hom.bruto, hom.brutoAnt) + '<span>' + mc + eurV(hom.brutoAnt) + '</span>',
+        chipDelta(hom.docs, hom.docsAnt) + '<span>' + mc + intV(hom.docsAnt) + '</span>',
+        chipDelta(hom.ticket, hom.ticketAnt) + '<span>' + mc + eurV(hom.ticketAnt) + '</span>',
+        chipDelta(hom.mediaDia, hom.mediaDiaAnt) + '<span>' + mc + eurV(hom.mediaDiaAnt) + '</span>'
+      ];
+    } else {
+      var semAnt = hom && hom.semDados ? '<span>Sem dados de ' + esc(nomeMes(hom.anterior)) + '</span>' : '';
+      pe = [
+        semAnt || '<span>Líquido ' + eurV(r.liquido) + '</span>',
+        '<span>' + intV(Math.round(docsDia)) + ' por dia aberto</span>',
+        semAnt, semAnt
+      ];
+    }
+    return '<div class="v2-kpis">' +
+      kpiV2('Faturação (c/ IVA)', eurV(r.bruto), pe[0]) +
+      kpiV2('Talões', intV(r.docs), pe[1]) +
+      kpiV2('Ticket médio', eurV(r.ticket), pe[2]) +
+      kpiV2('Média por dia', eurV(mediaDia), pe[3], diasTxt) +
+    '</div>';
+  }
+
+  function concentracao(p){
+    var prods = p.produtos || {};
+    var lista = Object.keys(prods).map(function(k){ return { desc:prods[k].desc, valor:Number(prods[k].valor) || 0 }; })
+      .filter(function(x){ return x.valor > 0; })
+      .sort(function(a, b){ return b.valor - a.valor; });
+    if (!lista.length) return null;
+    var total = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
+    var acumulado = 0, n80 = 0, n50 = 0, pontos = [];
+    for (var i = 0; i < lista.length; i++){
+      acumulado += lista[i].valor;
+      var fy = acumulado / total;
+      pontos.push([(i + 1) / lista.length, fy]);
+      if (!n50 && fy >= 0.5) n50 = i + 1;
+      if (!n80 && fy >= 0.8) n80 = i + 1;
+    }
+    if (!n80) n80 = lista.length;
+    return { n:lista.length, n80:n80, n50:n50 || 1, pontos:pontos };
+  }
+
+  function cartoesLinha3(p){
+    var t = giocoTurnos(p.porHora, 1);
+    var turnos;
+    if (t.total.bruto > 0){
+      var f1 = t.t1.bruto / t.total.bruto * 100, p1 = Math.round(f1);
+      turnos = '<div class="v2-share" role="img" aria-label="1.º turno ' + p1 + '%, 2.º turno ' + (100 - p1) + '%">' +
+          '<span style="flex:' + f1.toFixed(2) + ' 1 0;background:var(--v2-s1)"></span><span style="flex:' + (100 - f1).toFixed(2) + ' 1 0;background:var(--v2-s2)"></span></div>' +
+        '<div><div class="v2-leg-linha"><span class="v2-ponto" style="background:var(--v2-s1)"></span><span class="v2-nome">1.º turno · até ' + HORA_CORTE_TURNO + 'h</span><span class="v2-pct">' + p1 + '%</span><span class="v2-val">' + eurV(t.t1.bruto) + '</span></div>' +
+        '<div class="v2-leg-linha"><span class="v2-ponto" style="background:var(--v2-s2)"></span><span class="v2-nome">2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho</span><span class="v2-pct">' + (100 - p1) + '%</span><span class="v2-val">' + eurV(t.t2.bruto) + '</span></div></div>';
+    } else turnos = '<p class="v2-sub">Sem hora nos documentos deste período.</p>';
+
+    var a = p.attach || {};
+    var comF = Number(a.taloesComFocaccia) || 0, comFB = Number(a.taloesComFocacciaEBebida) || 0;
+    var attach = comF
+      ? '<div class="v2-grande">' + pctV(a.taxa, 1) + '</div>' +
+        '<div class="v2-sub">' + intV(comFB) + ' de ' + intV(comF) + ' talões com focaccia levam bebida ou café</div>' +
+        '<div><span class="v2-chip info">' + intV(comF - comFB) + ' focaccias sem bebida</span></div>'
+      : '<p class="v2-sub">Sem talões com focaccia neste período.</p>';
+
+    var cc = concentracao(p);
+    var conc = cc
+      ? '<div class="v2-grande">' + intV(cc.n80) + ' <small>produtos</small></div>' +
+        '<div class="v2-sub">fazem 80% da faturação · ' + decV(cc.n80 / cc.n * 100, 0) + '% da carta · ' + intV(cc.n) + ' com venda</div>'
+      : '<p class="v2-sub">Sem produtos com venda neste período.</p>';
+
+    return '<div class="v2-linha">' +
+      '<section class="v2-cartao">' + cartaoTitulo('Turnos', 'turnos') + '<div class="v2-cartao-corpo" style="gap:14px">' + turnos + '</div></section>' +
+      '<section class="v2-cartao">' + cartaoTitulo('Attach rate de bebida', 'att') + '<div class="v2-cartao-corpo" style="gap:10px">' + attach + '</div></section>' +
+      '<section class="v2-cartao">' + cartaoTitulo('Concentração', 'conc') + '<div class="v2-cartao-corpo" style="gap:10px">' + conc + '</div></section>' +
+    '</div>';
+  }
+
+  function listaCategorias(p){
+    var cats = p.porCategoria || {};
+    return Object.keys(cats).map(function(c){
+      return { cat:c, valor:Number(cats[c].valor) || 0, qtd:Number(cats[c].qtd) || 0 };
+    }).sort(function(a, b){ return b.valor - a.valor; });
+  }
+  function listaMeios(p){
+    var pag = p.porPagamento || {};
+    return Object.keys(pag).map(function(k){
+      return { mec:k, bruto:Number(pag[k].bruto) || 0, docs:Number(pag[k].docs) || 0 };
+    }).sort(function(a, b){ return b.bruto - a.bruto; });
+  }
+
+  function cartoesLinha2(p){
+    var cats = listaCategorias(p);
+    var totalC = cats.reduce(function(s, x){ return s + x.valor; }, 0);
+    var mix = cats.length ? shareHTML(cats.map(function(x, i){ return { nome:x.cat, valor:x.valor, cor:corCategoria(x.cat, i) }; }), totalC)
+      : '<p class="v2-sub">Sem categorias neste período.</p>';
+    var meios = listaMeios(p);
+    var totalM = meios.reduce(function(s, x){ return s + x.bruto; }, 0);
+    var pag = meios.length ? shareHTML(meios.map(function(x){ return { nome:MEIOS_PAGAMENTO[x.mec] || x.mec, pre:x.mec, valor:x.bruto, cor:corMeio(x.mec) }; }), totalM)
+      : '<p class="v2-sub">Sem meios de pagamento neste período.</p>';
+    return '<div class="v2-linha v2-larga">' +
+      '<section class="v2-cartao">' + cartaoTitulo('Mix por categoria', 'mix') + '<div class="v2-cartao-corpo" style="gap:14px;padding-bottom:16px">' + mix + '</div></section>' +
+      '<section class="v2-cartao">' + cartaoTitulo('Meios de pagamento', 'pag') + '<div class="v2-cartao-corpo" style="gap:14px;padding-bottom:16px">' + pag + '</div></section>' +
+    '</div>';
+  }
+
+  function nomeProduto(p, k){ var prods = p.produtos || {}; return (prods[k] && prods[k].desc) || k; }
+
+  function cartaoPares(p){
+    var pares = p.pares || [];
+    if (!pares.length) return '';
+    var n = Math.min(15, pares.length);
+    return '<section class="v2-cartao">' +
+      cartaoTitulo('Pares mais frequentes', 'pares', '<button type="button" class="v2-link" data-gaveta="pares">Ver todos (' + n + ')</button>') +
+      tabelaHTML([{t:'Produto A'},{t:'Produto B'},{t:'Talões',num:1}], pares.slice(0, 5).map(function(par){
+        return [esc(nomeProduto(p, par.a)), esc(nomeProduto(p, par.b)), intV(par.n)];
+      })) + '<div style="height:8px"></div></section>';
+  }
+
+  function rodapeMais(){
+    return '<nav class="v2-mais" aria-label="Mais análise"><span>Mais análise:</span>' +
+      '<button type="button" class="v2-link" data-gaveta="top">Top produtos</button>' +
+      '<button type="button" class="v2-link" data-gaveta="ticket">Ticket decomposto</button>' +
+      '<button type="button" class="v2-link" data-gaveta="fs">FS vs FR</button>' +
+      '<button type="button" class="v2-link" data-gaveta="ritmo">Ritmo do dia</button>' +
+      '<a class="v2-link" href="padroes.html">Padrões →</a></nav>';
+  }
+
+  function faixaDia(p){
+    if (!estado.diaActivo && !estado.diaSemanaActivo) return '';
+    var texto = estado.diaSemanaActivo ? descricaoDiaSemana(p) : dataExtenso(estado.diaActivo);
+    var mg = (!estado.diaSemanaActivo && p && p.madrugada) ? p.madrugada : null;
+    var nota = (mg && mg.docs)
+      ? '<span>inclui ' + eurV(mg.bruto) + ' fechados após a meia-noite' +
+        (mg.dataFiscal ? ' (data fiscal ' + esc(mg.dataFiscal.slice(8) + '/' + mg.dataFiscal.slice(5, 7)) + ')' : '') + '</span>'
+      : '';
+    return '<div class="v2-faixa"><span>A ver: <strong>' + esc(texto) + '</strong></span>' + nota +
+      '<button type="button" class="v2-link" data-voltar-mes="1">Voltar ao mês inteiro</button></div>';
+  }
+
+  /* =========================================================
+     Painéis laterais — o que a vendas.html mostrava, a um clique
+     ========================================================= */
+  function dl(rotulo, valor, sub){
+    return '<div class="v2-dl"><span>' + esc(rotulo) + '</span><span><strong>' + valor + '</strong>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></div>';
+  }
+  function secT(t){ return '<div class="v2-sec-titulo">' + esc(t) + '</div>'; }
+  function nota(t){ return '<p class="v2-nota">' + t + '</p>'; }
+
+  function nomePeriodo(){
+    if (estado.diaActivo) return rotuloDia(estado.diaActivo);
+    if (estado.diaSemanaActivo) return ROTULO_TODOS_V2[parseInt(estado.diaSemanaActivo, 10)];
+    if (estado.mesActivo === '__todos') return 'todos os meses';
+    return nomeMes(estado.mesActivo).split(' ')[0];
+  }
+
+  var GAVETAS = {
+    fat: function(p){
+      var r = p.resumo || {};
+      var mediaDia = r.dias ? r.bruto / r.dias : 0;
+      var docsDia = r.dias ? r.docs / r.dias : 0;
+      var h = secT(estado.diaActivo ? 'Dia' : (estado.diaSemanaActivo ? 'Soma dos dias' : 'Período')) +
+        dl('Bruto (c/ IVA)', eurV(r.bruto)) +
+        dl('Líquido', eurV(r.liquido)) +
+        dl('Talões', intV(r.docs), intV(Math.round(docsDia)) + ' por dia aberto') +
+        dl('Ticket médio', eurV(r.ticket)) +
+        dl('Dias abertos', intV(r.dias)) +
+        dl('Média por dia', eurV(mediaDia));
+      if (estado.diaSemanaActivo){
+        var nAgr = p._diasAgregados || 0;
+        h += nota('Soma de ' + nAgr + ' ' + (nAgr === 1 ? nomeDiaSemanaActivo() : NOME_PLURAL_DIA[parseInt(estado.diaSemanaActivo, 10)]) + ' — a média por dia é o último valor.');
+      }
+      if (estado.mesActivo === '__todos' && !estado.diaSemanaActivo) h += nota('Soma de todos os meses importados.');
+      var hom = calcHomologa(p, estado.mesActivo);
+      if (hom && hom.semDados){
+        h += secT('Homóloga') + nota('Sem dados de ' + esc(nomeMes(hom.anterior)) + '.');
+      } else if (hom){
+        var mA = nomeMes(hom.anterior).split(' ')[0];
+        h += secT('Homóloga · primeiros ' + hom.n + ' dias abertos') +
+          dl(mA + ' · bruto', eurV(hom.brutoAnt), deltaCelula(hom.bruto, hom.brutoAnt) + ' · agora ' + eurV(hom.bruto)) +
+          dl(mA + ' · talões', intV(hom.docsAnt), deltaCelula(hom.docs, hom.docsAnt) + ' · agora ' + intV(hom.docs)) +
+          dl(mA + ' · ticket', eurV(hom.ticketAnt), deltaCelula(hom.ticket, hom.ticketAnt) + ' · agora ' + eurV(hom.ticket)) +
+          dl(mA + ' · média/dia', eurV(hom.mediaDiaAnt), deltaCelula(hom.mediaDia, hom.mediaDiaAnt) + ' · agora ' + eurV(hom.mediaDia)) +
+          nota('Primeiros ' + intV(hom.n) + ' dias abertos de ' + esc(nomeMes(estado.mesActivo)) + ' contra os primeiros ' +
+            intV(hom.nAnt) + ' de ' + esc(nomeMes(hom.anterior)) + '.' +
+            (hom.nAnt < hom.n ? ' Comparação parcial — só ' + intV(hom.nAnt) + ' dias abertos em ' + esc(nomeMes(hom.anterior)) + '.' : ''));
+      }
+      if (estado.mesActivo !== '__todos' && !estado.diaSemanaActivo && r.importadoEm){
+        h += '<p class="v2-nota" style="margin-top:auto;padding-top:16px">Importado a ' + esc(dataHora(r.importadoEm)) +
+          (r.ficheiro ? ' · ' + esc(r.ficheiro) : '') + '</p>';
+      }
+      return { titulo: 'Faturação · ' + nomePeriodo(), corpo: h };
+    },
+
+    turnos: function(p){
+      var c = contextoHoras(p);
+      var t = giocoTurnos(p.porHora, 1);
+      var tm = c.temMedia && !c.individual && c.dias > 1 ? giocoTurnos(p.porHora, c.dias) : null;
+      var vazio = !(t.total.bruto > 0);
+      var p1 = vazio ? 0 : Math.round(t.t1.bruto / t.total.bruto * 100);
+      function bloco(nome, parte, pc, media){
+        return secT(nome) +
+          dl('Bruto', vazio ? '—' : eurV(parte.bruto), vazio ? '' : pc + '% do total') +
+          dl('Talões', intV(Math.round(parte.docs))) +
+          dl('Ticket médio', parte.ticket === null ? '—' : eurV(parte.ticket)) +
+          (media ? dl('Média por dia aberto', eurV(media.bruto), intV(Math.round(media.docs)) + ' talões por dia') : '');
+      }
+      return { titulo:'Turnos', corpo:
+        bloco('1.º turno · até ' + HORA_CORTE_TURNO + 'h', t.t1, p1, tm && tm.t1) +
+        bloco('2.º turno · ' + HORA_CORTE_TURNO + 'h–fecho', t.t2, 100 - p1, tm && tm.t2) +
+        nota('Os turnos cortam às ' + HORA_CORTE_TURNO + ':00. A hora é a do fecho do documento (SystemEntryDate): uma venda fechada logo a seguir às ' +
+          HORA_CORTE_TURNO + 'h conta para o 2.º turno. A madrugada (0h–4h) é o fim do 2.º turno, não o princípio do 1.º.') };
+    },
+
+    att: function(p){
+      var a = p.attach || {};
+      var semBebida = (a.taloesComFocaccia || 0) - (a.taloesComFocacciaEBebida || 0);
+      return { titulo:'Attach rate de bebida', corpo:
+        dl('Attach rate', pctV(a.taxa, 1), intV(a.taloesComFocacciaEBebida) + ' de ' + intV(a.taloesComFocaccia) + ' talões') +
+        dl('Talões com focaccia', intV(a.taloesComFocaccia)) +
+        dl('Focaccia sem bebida', intV(semBebida), 'oportunidade directa') +
+        nota('Percentagem de talões com focaccia que levam também bebida ou café.') };
+    },
+
+    conc: function(p){
+      var cc = concentracao(p);
+      if (!cc) return { titulo:'Concentração', corpo: nota('Sem produtos com venda neste período.') };
+      var W = 392, H = 220, PAD = 28;
+      var caminho = cc.pontos.map(function(pt, i){
+        var x = PAD + pt[0] * (W - PAD * 2), y = H - PAD - pt[1] * (H - PAD * 2);
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      var y80 = H - PAD - 0.8 * (H - PAD * 2);
+      var x80 = PAD + (cc.n80 / cc.n) * (W - PAD * 2);
+      var svg = '<svg class="v2-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Curva de concentração de vendas" style="margin-top:12px">' +
+        '<line x1="' + PAD + '" y1="' + (H - PAD) + '" x2="' + (W - PAD) + '" y2="' + (H - PAD) + '" stroke="var(--v2-grelha)" stroke-width="1"/>' +
+        '<line x1="' + PAD + '" y1="' + PAD + '" x2="' + PAD + '" y2="' + (H - PAD) + '" stroke="var(--v2-grelha)" stroke-width="1"/>' +
+        '<line x1="' + PAD + '" y1="' + y80.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + y80.toFixed(1) + '" stroke="var(--v2-apagado)" stroke-width="1" stroke-dasharray="4 4"/>' +
+        '<line x1="' + x80.toFixed(1) + '" y1="' + PAD + '" x2="' + x80.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="var(--v2-apagado)" stroke-width="1" stroke-dasharray="4 4"/>' +
+        '<path d="' + caminho + '" fill="none" stroke="var(--v2-s1)" stroke-width="2"/>' +
+        '<text x="' + (PAD + 6) + '" y="' + (y80 - 6).toFixed(1) + '" font-size="11" fill="var(--v2-sec)">80% da faturação</text>' +
+        '<text x="' + (x80 + 6).toFixed(1) + '" y="' + (PAD + 12) + '" font-size="11" fill="var(--v2-texto)">' + cc.n80 + ' produtos</text>' +
+        '<text x="' + PAD + '" y="' + (H - 8) + '" font-size="10" fill="var(--v2-sec)">produtos ordenados por valor →</text></svg>';
+      return { titulo:'Concentração', corpo:
+        dl('80% do valor', intV(cc.n80) + ' produtos', decV(cc.n80 / cc.n * 100, 0) + '% da carta') +
+        dl('50% do valor', intV(cc.n50) + ' produtos', decV(cc.n50 / cc.n * 100, 0) + '% da carta') +
+        dl('Produtos com venda', intV(cc.n), 'no período seleccionado') + svg +
+        nota('Quantos produtos fazem a faturação. Curva: % de produtos (eixo X) contra % acumulada do bruto (eixo Y).') };
+    },
+
+    mix: function(p){
+      var lista = listaCategorias(p);
+      if (!lista.length) return { titulo:'Mix por categoria', corpo: nota('Sem categorias neste período.') };
+      var subs = p.porSubcategoria || {};
+      var total = lista.reduce(function(s, x){ return s + x.valor; }, 0);
+      var fatias = lista.map(function(x, i){ return { nome:x.cat, valor:x.valor, cor:corCategoria(x.cat, i) }; });
+      var graf = v2.mix === 'anel' ? anelSVG(fatias, total) : barrasH(fatias);
+      var linhas = lista.map(function(x){
+        var mapaSub = subs[x.cat] || {};
+        var chaves = Object.keys(mapaSub).sort(function(a, b){ return (Number(mapaSub[b].valor) || 0) - (Number(mapaSub[a].valor) || 0); });
+        var lc = '<tr class="cat-linha' + (chaves.length ? ' cat-expansivel' : '') + '"' + (chaves.length ? ' data-cat="' + esc(x.cat) + '"' : '') + '>' +
+          '<td>' + (chaves.length ? '<span class="cat-seta">▸</span> ' : '') + '<strong>' + esc(x.cat) + '</strong></td>' +
+          '<td class="num">' + decV(x.qtd, 0) + '</td><td class="num">' + eurV(x.valor) + '</td>' +
+          '<td class="num">' + (total ? decV(x.valor / total * 100, 1) + '%' : '—') + '</td>' +
+          '<td class="num">' + (x.qtd ? eurV(x.valor / x.qtd) : '—') + '</td></tr>';
+        return lc + chaves.map(function(s){
+          var v = Number(mapaSub[s].valor) || 0, q = Number(mapaSub[s].qtd) || 0;
+          return '<tr class="cat-sub" data-cat="' + esc(x.cat) + '" hidden><td style="padding-left:22px">' + esc(s) + '</td>' +
+            '<td class="num">' + decV(q, 0) + '</td><td class="num">' + eurV(v) + '</td>' +
+            '<td class="num">' + (total ? decV(v / total * 100, 1) + '%' : '—') + '</td>' +
+            '<td class="num">' + (q ? eurV(v / q) : '—') + '</td></tr>';
+        }).join('');
+      }).join('');
+      return { titulo:'Mix por categoria', corpo:
+        segHTML('mix', [['barras','Barras'], ['anel','Anel']], v2.mix) + graf +
+        '<div class="v2-tabela-wrap" style="margin-top:16px"><table class="v2-tabela"><thead><tr><th>Categoria</th><th class="num">Qtd.</th><th class="num">Valor</th><th class="num">%</th><th class="num">PVP médio</th></tr></thead><tbody>' +
+        linhas + '</tbody></table></div>' +
+        nota('Classificação pelo catálogo de produtos, não pelo IVA (água e cafés estão a 13% tal como as focaccias). Toca numa categoria para abrir as subcategorias.') };
+    },
+
+    pag: function(p){
+      var lista = listaMeios(p);
+      if (!lista.length) return { titulo:'Meios de pagamento', corpo: nota('Sem meios de pagamento neste período.') };
+      var total = lista.reduce(function(s, x){ return s + x.bruto; }, 0);
+      var fatias = lista.map(function(x){ return { nome:(MEIOS_PAGAMENTO[x.mec] || x.mec), valor:x.bruto, cor:corMeio(x.mec) }; });
+      var graf = v2.pag === 'anel' ? anelSVG(fatias, total) : barrasH(fatias);
+      return { titulo:'Meios de pagamento', corpo:
+        segHTML('pag', [['barras','Barras'], ['anel','Anel']], v2.pag) + graf +
+        '<div style="margin-top:16px">' + tabelaHTML([{t:'Código'},{t:'Meio'},{t:'Talões',num:1},{t:'Valor',num:1},{t:'%',num:1}], lista.map(function(x){
+          return ['<span class="mono">' + esc(x.mec) + '</span>', esc(MEIOS_PAGAMENTO[x.mec] || '—'), intV(x.docs), eurV(x.bruto),
+                  total ? decV(x.bruto / total * 100, 1) + '%' : '—'];
+        })) + '</div>' +
+        dl('Total', eurV(total)) +
+        nota('Valor recebido por mecanismo. Um talão pode ter mais do que um meio.') };
+    },
+
+    pares: function(p){
+      var pares = (p.pares || []).slice(0, 15);
+      return { titulo:'Pares de produtos', corpo:
+        (pares.length ? tabelaHTML([{t:'#',num:1},{t:'Produto A'},{t:'Produto B'},{t:'Talões',num:1}], pares.map(function(par, i){
+          return ['<span style="color:var(--v2-apagado)">' + (i + 1) + '</span>', esc(nomeProduto(p, par.a)), esc(nomeProduto(p, par.b)), intV(par.n)];
+        })) : nota('Sem pares neste período.')) +
+        nota('Combinações que mais aparecem no mesmo talão (calculadas no import, a partir das linhas).') };
+    },
+
+    top: function(p){
+      var prods = p.produtos || {};
+      var nivel = vistaTopDe();
+      var lista;
+      if (nivel === 'produtos'){
+        lista = Object.keys(prods).map(function(k){
+          return { key:k, desc:prods[k].desc, categoria:prods[k].categoria, subcategoria:prods[k].subcategoria || null,
+                   qtd:Number(prods[k].qtd) || 0, valor:Number(prods[k].valor) || 0, pvpMedio:Number(prods[k].pvpMedio) || 0 };
+        });
+      } else lista = agregarTopProdutos(prods, nivel);
+      var campo = estado.ordemProdutos;
+      lista.sort(function(a, b){ return b[campo] - a[campo]; });
+      var totalValor = lista.reduce(function(acc, x){ return acc + x.valor; }, 0);
+      var linhas = lista.slice(0, 60).map(function(x, i){
+        var abre = nivel !== 'produtos' && x.itens && x.itens.length;
+        var seta = abre ? '<span class="cat-seta">▸</span> ' : '';
+        var chaveGrupo = 'top:' + x.key;
+        var cel = '<td class="num" style="color:var(--v2-apagado)">' + (i + 1) + '</td>';
+        if (nivel === 'produtos'){
+          cel += '<td>' + esc(x.desc) + '</td><td><span class="tag">' + esc(x.categoria || 'Outro') + '</span></td>' +
+            '<td style="font-size:12px;color:var(--v2-sec)">' + (x.subcategoria ? esc(x.subcategoria) : '—') + '</td>';
+        } else if (nivel === 'subcategorias'){
+          cel += '<td>' + seta + esc(x.desc) + '</td><td><span class="tag">' + esc(x.categoria) + '</span></td><td class="num">' + intV(x.produtos) + '</td>';
+        } else {
+          cel += '<td>' + seta + esc(x.desc) + '</td><td class="num">' + intV(x.produtos) + '</td>';
+        }
+        var linha = '<tr' + (abre ? ' class="cat-linha cat-expansivel" data-cat="' + esc(chaveGrupo) + '"' : '') + '>' + cel +
+          '<td class="num">' + decV(x.qtd, 0) + '</td><td class="num">' + eurV(x.valor) + '</td>' +
+          '<td class="num">' + (totalValor ? decV(x.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
+          '<td class="num">' + eurV(x.pvpMedio) + '</td></tr>';
+        if (!abre) return linha;
+        return linha + x.itens.slice().sort(function(a, b){ return b[campo] - a[campo]; }).map(function(it){
+          var vazias = nivel === 'subcategorias' ? '<td></td><td></td>' : '<td></td>';
+          return '<tr class="cat-sub" data-cat="' + esc(chaveGrupo) + '" hidden><td></td><td style="padding-left:22px">' + esc(it.desc) + '</td>' + vazias +
+            '<td class="num">' + decV(it.qtd, 0) + '</td><td class="num">' + eurV(it.valor) + '</td>' +
+            '<td class="num">' + (totalValor ? decV(it.valor / totalValor * 100, 1) + '%' : '—') + '</td>' +
+            '<td class="num">' + eurV(it.pvpMedio) + '</td></tr>';
+        }).join('');
+      }).join('');
+      var cab;
+      if (nivel === 'produtos') cab = '<th>Produto</th><th>Categoria</th><th>Subcategoria</th>';
+      else if (nivel === 'subcategorias') cab = '<th>Subcategoria</th><th>Categoria</th><th class="num">Produtos</th>';
+      else cab = '<th>Categoria</th><th class="num">Produtos</th>';
+      var sub;
+      if (nivel === 'produtos') sub = lista.length + ' produtos vendidos. Toca em Qtd. ou Valor para ordenar (mostra os 60 primeiros).';
+      else if (nivel === 'subcategorias') sub = lista.length + ' subcategorias com venda (toca numa linha para ver os produtos; sem subcategoria atribuída agrupa em "' + SEM_SUBCATEGORIA + '"). Toca em Qtd. ou Valor para ordenar (mostra as 60 primeiras).';
+      else sub = lista.length + ' categorias com venda (toca numa linha para ver os produtos; sem categoria atribuída agrupa em "' + SEM_CATEGORIA + '"). Toca em Qtd. ou Valor para ordenar (mostra as 60 primeiras).';
+      return { titulo:'Top produtos', larga:true, corpo:
+        segHTML('top', [['subcategorias','Subcategorias'], ['produtos','Produtos'], ['categorias','Categorias']], nivel) +
+        '<p class="v2-nota">' + esc(sub) + '</p>' +
+        '<div class="v2-tabela-wrap"><table class="v2-tabela"><thead><tr><th class="num">#</th>' + cab +
+        '<th class="num ordenavel' + (campo === 'qtd' ? ' ordenado' : '') + '" data-ordem="qtd">Qtd. ↓</th>' +
+        '<th class="num ordenavel' + (campo === 'valor' ? ' ordenado' : '') + '" data-ordem="valor">Valor ↓</th>' +
+        '<th class="num">% do total</th><th class="num">PVP médio</th></tr></thead><tbody>' + linhas + '</tbody></table></div>' };
+    },
+
+    ticket: function(p){
+      var r = p.resumo || {};
+      var meses = Object.keys(estado.dados).sort();
+      var linhas = meses.map(function(m, i){
+        var rr = estado.dados[m].resumo || {};
+        var ant = i > 0 ? (estado.dados[meses[i - 1]].resumo || {}) : null;
+        return [esc(nomeMes(m)), eurV(rr.ticket), deltaCelula(rr.ticket, ant ? ant.ticket : null),
+                decV(rr.artigosPorTalao, 2), deltaCelula(rr.artigosPorTalao, ant ? ant.artigosPorTalao : null),
+                eurV(rr.valorPorArtigo), deltaCelula(rr.valorPorArtigo, ant ? ant.valorPorArtigo : null)];
+      });
+      return { titulo:'Ticket decomposto', larga:true, corpo:
+        dl('Ticket médio', eurV(r.ticket)) + dl('Artigos por talão', decV(r.artigosPorTalao, 2)) + dl('Valor por artigo', eurV(r.valorPorArtigo)) +
+        nota('Ticket = artigos por talão × valor por artigo. É isto que distingue crescer por volume de crescer por preço.') +
+        secT('Mês a mês') +
+        tabelaHTML([{t:'Mês'},{t:'Ticket',num:1},{t:'Δ',num:1},{t:'Artigos/talão',num:1},{t:'Δ',num:1},{t:'Valor/artigo',num:1},{t:'Δ',num:1}], linhas) };
+    },
+
+    fs: function(p){
+      var tipos = p.porTipo || {};
+      var ch = Object.keys(tipos).sort();
+      var nomes = { FS:'Fatura simplificada', FR:'Fatura-recibo', FT:'Fatura', NC:'Nota de crédito', ND:'Nota de débito' };
+      return { titulo:'FS vs FR', corpo:
+        (ch.length ? tabelaHTML([{t:'Tipo'},{t:'Descrição'},{t:'Docs',num:1},{t:'Bruto',num:1},{t:'Ticket médio',num:1}], ch.map(function(t){
+          var v = tipos[t];
+          return ['<span class="mono">' + esc(t) + '</span>', esc(nomes[t] || '—'), intV(v.docs), eurV(v.bruto), eurV(v.ticket)];
+        })) : nota('Sem tipos de documento neste período.')) +
+        nota('Documentos, total e ticket médio por tipo de documento.') };
+    },
+
+    ritmo: function(p){
+      var c = contextoHoras(p);
+      if (!(c.dias > 0)) return { titulo:'Ritmo do dia', corpo: nota('Sem dias neste período.') };
+      var a = giocoAcumuladoHoras(p.porHora, c.dias, agoraVendas());
+      if (a.primeira === null) return { titulo:'Ritmo do dia', corpo: nota('Sem horas com dados neste período.') };
+      var individual = !!estado.diaActivo;
+      var hhmm = pad2(a.hora) + ':' + pad2(a.minuto);
+      var rot1 = a.completo ? 'Dia completo' : ('Até ' + hhmm + (individual ? ' nesse dia' : ''));
+      var sub1 = individual ? 'valor real de ' + esc(rotuloDia(estado.diaActivo))
+        : 'dia médio ' + esc(c.conjunto) + ': ' + intV(c.dias) + (c.dias === 1 ? ' dia' : ' dias');
+      var pctDia = a.total > 0 ? a.ateAgora / a.total * 100 : 0;
+      return { titulo:'Ritmo do dia', corpo:
+        dl(rot1, eurV(a.ateAgora), sub1) +
+        dl('Hora atual ' + pad2(a.hora) + 'h–' + pad2((a.hora + 1) % 24) + 'h', a.horaAtual === null ? '—' : eurV(a.horaAtual),
+           a.horaAtual === null ? 'fora do horário com vendas' : (individual ? 'nessa hora' : 'média nessa hora')) +
+        dl('% do dia', decV(pctDia, 0) + '%', individual ? 'do total desse dia' : 'do dia médio completo') +
+        nota('Actualiza-se sozinho a cada minuto, com os dados já em memória (sem nova leitura). Dentro da hora corrente a conta é linear: as vendas não são uniformes dentro da hora, mas os dados por hora não descem ao minuto. O dia começa às ' + CORTE_DIA_OPERACAO_H + 'h.') };
+    },
+
+    ler: function(p){
+      var t = tabsDisponiveis().filter(function(x){ return x[0] === v2.tab; })[0];
+      if (v2.tab === 'hora') LEITURA.hora = contextoHoras(p).sub;
+      return { titulo:'Como ler · ' + (t ? t[1] : ''), corpo: '<p class="v2-texto">' + esc(LEITURA[v2.tab] || '') + '</p>' };
+    }
+  };
+
+  function renderGaveta(p){
+    var g = el('gaveta'), ov = el('gavetaOv');
+    if (!v2.gaveta || !p || !GAVETAS[v2.gaveta]){
+      g.classList.add('hidden'); ov.classList.add('hidden'); g.innerHTML = '';
+      return;
+    }
+    var scroll = g.scrollTop;
+    var d = GAVETAS[v2.gaveta](p);
+    g.classList.toggle('v2-gaveta-larga', !!d.larga);
+    g.innerHTML = '<div class="v2-gaveta-cab"><h2 id="gavetaTitulo">' + esc(d.titulo) + '</h2>' +
+      '<button type="button" class="v2-fechar" data-fechar-gaveta="1" aria-label="Fechar">×</button></div>' + d.corpo;
+    g.classList.remove('hidden'); ov.classList.remove('hidden');
+    g.scrollTop = scroll;
+  }
+
+  function abrirGaveta(id, abridor){
+    v2.gaveta = id;
+    v2.abridor = abridor || null;
+    renderGaveta(payloadActivo());
+    var b = el('gaveta').querySelector('.v2-fechar');
+    if (b) b.focus();
+  }
+  function fecharGaveta(){
+    v2.gaveta = null;
+    renderGaveta(null);
+    if (v2.abridor && document.body.contains(v2.abridor)) v2.abridor.focus();
+    v2.abridor = null;
+  }
+
+  /* =========================================================
+     Render principal
+     ========================================================= */
+  function renderVistas(){
+    var p = payloadActivo();
+    var alvo = el('vistas');
+    if (!p){
+      if (estado.diaSemanaActivo){
+        alvo.innerHTML = faixaDia(null) + '<div class="v2-cartao v2-vazio">Ainda não há nenhum dia deste dia da semana com dados em vendasDiario/ ' +
+          (estado.mesActivo === '__todos' ? 'em nenhum mês.' : 'neste mês.') + '</div>';
+      } else {
+        alvo.innerHTML = estado.diaActivo
+          ? faixaDia(null) + '<div class="v2-cartao v2-vazio">Sem dados guardados em vendasDiario/ para este dia.</div>'
+          : '';
+      }
+      renderGaveta(null);
+      return;
+    }
+    alvo.style.display = 'flex';
+    alvo.style.flexDirection = 'column';
+    alvo.style.gap = '24px';
+    alvo.innerHTML =
+      faixaDia(p) +
+      blocoKpis(p) +
+      cartaoGrafico(p) +
+      cartoesLinha3(p) +
+      cartoesLinha2(p) +
+      cartaoPares(p) +
+      rodapeMais();
+    renderGaveta(p);
+  }
+
+  /* Um só relógio de 60 s, como na vendas.html: reescreve com os dados em
+     memória (nunca uma leitura nova) o que depende da hora — o "agora" no
+     gráfico por hora e o painel do ritmo. */
+  setInterval(function(){
+    if (!estado.dados || !Object.keys(estado.dados).length) return;
+    if (v2.tab === 'hora' || v2.gaveta === 'ritmo') renderVistas();
+  }, 60000);
+
+  /* =========================================================
+     Eventos da camada de desenho (delegação, um só ponto)
+     ========================================================= */
+  document.addEventListener('click', function(ev){
+    var t = ev.target;
+    var b;
+    if ((b = t.closest('[data-gaveta]'))){ abrirGaveta(b.getAttribute('data-gaveta'), b); return; }
+    if ((b = t.closest('[data-fechar-gaveta]')) || t.id === 'gavetaOv'){ fecharGaveta(); return; }
+    if ((b = t.closest('[data-voltar-mes]'))){ voltarAoMes(); return; }
+    if ((b = t.closest('button[data-tab]'))){ v2.tab = b.getAttribute('data-tab'); guardarV2(); renderVistas(); return; }
+    if ((b = t.closest('button[data-vista]'))){ v2.vista[v2.tab] = b.getAttribute('data-vista'); guardarV2(); renderVistas(); return; }
+    if ((b = t.closest('button[data-horas-modo]'))){ estado.horasModo = b.getAttribute('data-horas-modo'); renderVistas(); return; }
+    if ((b = t.closest('button[data-mix]'))){ v2.mix = b.getAttribute('data-mix'); guardarV2(); renderGaveta(payloadActivo()); return; }
+    if ((b = t.closest('button[data-pag]'))){ v2.pag = b.getAttribute('data-pag'); guardarV2(); renderGaveta(payloadActivo()); return; }
+    if ((b = t.closest('button[data-top]'))){
+      v2.top = b.getAttribute('data-top'); estado.vistasGrafico.topProdutos = v2.top; guardarV2(); renderGaveta(payloadActivo()); return;
+    }
+    if ((b = t.closest('th[data-ordem]'))){ estado.ordemProdutos = b.getAttribute('data-ordem'); renderGaveta(payloadActivo()); return; }
+    if ((b = t.closest('tr.cat-expansivel[data-cat]'))){
+      var caixa = b.closest('table');
+      var cat = b.getAttribute('data-cat');
+      var aberta = b.classList.toggle('cat-aberta');
+      var seta = b.querySelector('.cat-seta');
+      if (seta) seta.textContent = aberta ? '▾' : '▸';
+      var filhas = caixa.querySelectorAll('tr.cat-sub');
+      for (var n = 0; n < filhas.length; n++){
+        if (filhas[n].getAttribute('data-cat') === cat) filhas[n].hidden = !aberta;
+      }
+    }
+  });
+
+  document.addEventListener('keydown', function(ev){
+    if (ev.key !== 'Escape') return;
+    if (!el('importModal').classList.contains('hidden')){ fecharImport(); return; }
+    if (v2.gaveta) fecharGaveta();
+  });
+
+  /* ---------- Dica (tooltip) nas marcas dos gráficos ---------- */
+  (function(){
+    var dica = el('v2Dica');
+    function mostrar(alvo, x, y){
+      var txt = alvo.getAttribute('data-dica');
+      if (!txt){ dica.classList.remove('on'); return; }
+      dica.innerHTML = txt.split('\n').map(function(l, i){ return i ? esc(l) : '<b>' + esc(l) + '</b>'; }).join('<br>');
+      dica.classList.add('on');
+      var w = dica.offsetWidth, h = dica.offsetHeight;
+      var left = Math.min(window.innerWidth - w - 8, Math.max(8, x + 14));
+      var top = y - h - 12; if (top < 8) top = y + 18;
+      dica.style.left = left + 'px'; dica.style.top = top + 'px';
+    }
+    document.addEventListener('mousemove', function(ev){
+      var a = ev.target.closest && ev.target.closest('[data-dica]');
+      if (a) mostrar(a, ev.clientX, ev.clientY); else dica.classList.remove('on');
+    });
+    document.addEventListener('focusin', function(ev){
+      var a = ev.target.closest && ev.target.closest('[data-dica]');
+      if (!a){ dica.classList.remove('on'); return; }
+      var r = a.getBoundingClientRect();
+      mostrar(a, r.left + r.width / 2, r.top);
+    });
+    window.addEventListener('scroll', function(){ dica.classList.remove('on'); }, true);
+  })();
+
+  /* ---------- Modal de importação ---------- */
+  function abrirImport(){
+    el('importOv').classList.remove('hidden');
+    el('importModal').classList.remove('hidden');
+    el('btnFecharImport').focus();
+  }
+  function fecharImport(){
+    el('importOv').classList.add('hidden');
+    el('importModal').classList.add('hidden');
+    el('btnAbrirImport').focus();
+  }
+  el('btnAbrirImport').addEventListener('click', abrirImport);
+  el('btnFecharImport').addEventListener('click', fecharImport);
+  el('importOv').addEventListener('click', fecharImport);
+  /* Na vendas.html a migração do catálogo aparece sozinha no topo da página
+     quando o catálogo ainda está no esquema antigo. Aqui vive no modal — por
+     isso, se a verificação a mostrar, o modal abre-se. */
+  new MutationObserver(function(){
+    if (!el('migracaoCard').classList.contains('hidden')) abrirImport();
+  }).observe(el('migracaoCard'), { attributes:true, attributeFilter:['class'] });
+
+  /* ---------- Eventos de importação — cópia exacta da vendas.html ---------- */
+  /* =========================================================
+     Drag and drop
+     A zona é um <label for="fileInput">, por isso o clique abre o selector
+     nativo sem JS nenhum. Aqui só se trata do arrastar/largar, que acaba
+     sempre em tratarFicheiro() — o mesmo caminho do input.
+     ========================================================= */
+  function ligarDropzone(){
+    var zona = el('dropzone');
+    if (!zona) return;
+
+    // dragenter/dragleave disparam também ao passar sobre os <span> filhos;
+    // um contador evita que o destaque pisque a meio da zona.
+    var profundidade = 0;
+
+    function travar(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    function destacar(on){
+      zona.classList.toggle('arrasta', on);
+    }
+
+    zona.addEventListener('dragenter', function(ev){
+      travar(ev);
+      profundidade++;
+      destacar(true);
+    });
+
+    zona.addEventListener('dragover', function(ev){
+      travar(ev);
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+      destacar(true);
+    });
+
+    zona.addEventListener('dragleave', function(ev){
+      travar(ev);
+      profundidade--;
+      if (profundidade <= 0){
+        profundidade = 0;
+        destacar(false);
+      }
+    });
+
+    zona.addEventListener('drop', function(ev){
+      travar(ev);
+      profundidade = 0;
+      destacar(false);
+
+      var ficheiros = ev.dataTransfer ? ev.dataTransfer.files : null;
+      if (!ficheiros || !ficheiros.length) return;
+
+      tratarFicheiro(ficheiros[0]);
+
+      // Depois de tratarFicheiro(), que limpa as mensagens todas.
+      if (ficheiros.length > 1){
+        mostrarMsg('msgDrop',
+          'Largaste ' + ficheiros.length + ' ficheiros — só o primeiro (' +
+          ficheiros[0].name + ') foi processado.');
+      }
+    });
+  }
+
+  /* =========================================================
+     Pasta autorizada (File System Access API)
+     Só Chrome/Edge no computador. A referência da pasta fica em IndexedDB
+     para não pedir autorização em cada visita — o browser reautoriza em
+     silêncio enquanto a permissão for válida.
+     ========================================================= */
+  var PASTA_DB = 'gioco-vendas';
+  var PASTA_STORE = 'handles';
+  var PASTA_CHAVE = 'pastaSaft';
+
+  function temSuportePasta(){
+    return typeof window.showDirectoryPicker === 'function';
+  }
+
+  function idbAbrir(){
+    return new Promise(function(resolve, reject){
+      var pedido = indexedDB.open(PASTA_DB, 1);
+      pedido.onupgradeneeded = function(){
+        if (!pedido.result.objectStoreNames.contains(PASTA_STORE)){
+          pedido.result.createObjectStore(PASTA_STORE);
+        }
+      };
+      pedido.onsuccess = function(){ resolve(pedido.result); };
+      pedido.onerror = function(){ reject(pedido.error); };
+    });
+  }
+
+  function idbGuardar(handle){
+    return idbAbrir().then(function(bd){
+      return new Promise(function(resolve, reject){
+        var tx = bd.transaction(PASTA_STORE, 'readwrite');
+        tx.objectStore(PASTA_STORE).put(handle, PASTA_CHAVE);
+        tx.oncomplete = function(){ bd.close(); resolve(); };
+        tx.onerror = function(){ bd.close(); reject(tx.error); };
+      });
+    });
+  }
+
+  function idbLer(){
+    return idbAbrir().then(function(bd){
+      return new Promise(function(resolve, reject){
+        var tx = bd.transaction(PASTA_STORE, 'readonly');
+        var pedido = tx.objectStore(PASTA_STORE).get(PASTA_CHAVE);
+        pedido.onsuccess = function(){ bd.close(); resolve(pedido.result || null); };
+        pedido.onerror = function(){ bd.close(); reject(pedido.error); };
+      });
+    }).catch(function(){ return null; });
+  }
+
+  function mostrarPastaNome(handle){
+    el('pastaNome').textContent = handle ? 'Pasta: ' + handle.name : '';
+  }
+
+  // pedir=false só consulta (sem gesto do utilizador); pedir=true pode abrir o prompt.
+  function garantirPermissao(handle, pedir){
+    if (!handle || !handle.queryPermission) return Promise.resolve(true);
+    return handle.queryPermission({ mode:'read' }).then(function(estadoPerm){
+      if (estadoPerm === 'granted') return true;
+      if (!pedir) return false;
+      return handle.requestPermission({ mode:'read' }).then(function(res){
+        return res === 'granted';
+      });
+    });
+  }
+
+  function escolherPasta(){
+    return window.showDirectoryPicker({ id:'giocoSaft', mode:'read', startIn:'downloads' })
+      .then(function(handle){
+        // Guardar é só conveniência: se o IndexedDB falhar (modo privado, storage
+        // negado) a pasta escolhida agora continua a servir para este import.
+        return idbGuardar(handle).catch(function(){}).then(function(){
+          mostrarPastaNome(handle);
+          return handle;
+        });
+      });
+  }
+
+  // Mais recente por data de modificação, entre os ZIP que começam pelo NIF.
+  function saftMaisRecente(handle){
+    var candidatos = [];
+    var it = handle.values();
+
+    function passo(){
+      return it.next().then(function(r){
+        if (r.done) return null;
+        var entrada = r.value;
+        if (entrada.kind !== 'file' || !RE_SAFT_ZIP.test(entrada.name)) return passo();
+        return entrada.getFile().then(function(f){
+          candidatos.push(f);
+          return passo();
+        }, function(){ return passo(); });
+      });
+    }
+
+    return passo().then(function(){
+      if (!candidatos.length) return null;
+      candidatos.sort(function(a, b){ return b.lastModified - a.lastModified; });
+      return candidatos[0];
+    });
+  }
+
+  function importarDaPasta(){
+    limparMensagens();
+    el('btnPasta').disabled = true;
+
+    idbLer()
+      .then(function(handle){
+        if (!handle) return escolherPasta();
+        return garantirPermissao(handle, true).then(function(ok){
+          if (ok) return handle;
+          // permissão revogada ou negada — voltar a pedir a pasta
+          return escolherPasta();
+        });
+      })
+      .then(function(handle){
+        mostrarPastaNome(handle);
+        return saftMaisRecente(handle).then(function(file){
+          if (!file){
+            mostrarMsg('msgAviso',
+              'Não encontrei nenhum SAF-T na pasta «' + handle.name + '». ' +
+              'Os ficheiros do ZoneSoft começam por 518717186 e terminam em .zip — ' +
+              'confirma que é a pasta certa ou usa «mudar pasta».');
+            return;
+          }
+          tratarFicheiro(file);
+          // Em fileName e não numa msg: se o import seguir logo para a gravação,
+          // limparMensagens() apagaria a nota antes de alguém a ler.
+          el('fileName').textContent = file.name + ' — de «' + handle.name +
+            '», modificado em ' + dataHoraExtenso(file.lastModified);
+        });
+      })
+      .catch(function(err){
+        if (err && err.name === 'AbortError') return;   // o utilizador fechou o selector
+        mostrarMsg('msgErro', 'Não foi possível ler a pasta: ' +
+          (err && err.message ? err.message : String(err)));
+      })
+      .then(function(){ el('btnPasta').disabled = false; });
+  }
+
+  /* ---------- Atalho para a exportação SAF-T do ZoneSoft ----------
+     O ZoneSoft pede o intervalo em DD-MM-YYYY. O início é o próprio último
+     dia já carregado (inclusive) e não o seguinte: esse dia pode ter sido
+     importado a meio, e reimportá-lo por cima é inofensivo porque a gravação
+     é dia a dia. */
+  var ZONESOFT_URL = 'https://zsbmsv2.zonesoft.org/#!/docs-saft-exportacao';
+  var zsTimer = null;
+
+  // Maior chave de porDia em todos os meses já lidos. Só olha para
+  // estado.dados — nenhuma leitura nova ao Firebase.
+  function ultimoDiaCarregado(){
+    var maior = null;
+    Object.keys(estado.dados || {}).forEach(function(mes){
+      var p = estado.dados[mes];
+      if (!p || !p.porDia) return;
+      Object.keys(p.porDia).forEach(function(dia){
+        if (!maior || dia > maior) maior = dia;
+      });
+    });
+    return maior;
+  }
+
+  // '2026-08-27' -> '27-08-2026'
+  function ptDeIso(iso){
+    return iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4);
+  }
+
+  function textoIntervaloZoneSoft(){
+    var ultimo = ultimoDiaCarregado();
+    if (!ultimo) return 'Sem dias carregados — escolhe as datas à mão';
+    return 'Exporta de ' + ptDeIso(ultimo) + ' até ' + ptDeIso(isoDeData(new Date()));
+  }
+
+  function actualizarAtalhoZoneSoft(){
+    var alvo = el('zsIntervalo');
+    if (!alvo) return;
+    if (zsTimer){ clearTimeout(zsTimer); zsTimer = null; }
+    alvo.textContent = textoIntervaloZoneSoft();
+  }
+
+  function ligarZoneSoft(){
+    var btn = el('btnZoneSoft');
+    if (!btn) return;
+
+    btn.addEventListener('click', function(){
+      var ultimo = ultimoDiaCarregado();
+      var copiar = null;
+
+      // O botão abre sempre o ZoneSoft; a cópia é um extra que pode falhar
+      // (sem clipboard API, sem permissão, contexto não seguro).
+      if (ultimo && navigator.clipboard && navigator.clipboard.writeText){
+        try {
+          copiar = navigator.clipboard.writeText(ptDeIso(ultimo));
+        } catch (e) { copiar = null; }
+      }
+
+      if (copiar && copiar.then){
+        copiar.then(function(){
+          var alvo = el('zsIntervalo');
+          if (!alvo) return;
+          alvo.textContent = 'Data de início ' + ptDeIso(ultimo) + ' copiada';
+          if (zsTimer) clearTimeout(zsTimer);
+          zsTimer = setTimeout(function(){
+            zsTimer = null;
+            actualizarAtalhoZoneSoft();
+          }, 3000);
+        }).catch(function(){});
+      }
+
+      window.open(ZONESOFT_URL, '_blank', 'noopener');
+    });
+
+    actualizarAtalhoZoneSoft();
+  }
+
+  function ligarPasta(){
+    var btn = el('btnPasta');
+    var mudar = el('btnMudarPasta');
+
+    if (!temSuportePasta()){
+      btn.disabled = true;
+      mudar.disabled = true;
+      btn.title = 'Disponível em Chrome/Edge no computador';
+      mudar.title = 'Disponível em Chrome/Edge no computador';
+      return;
+    }
+
+    btn.addEventListener('click', importarDaPasta);
+
+    mudar.addEventListener('click', function(){
+      limparMensagens();
+      escolherPasta().then(function(handle){
+        mostrarMsg('msgOk', 'Pasta autorizada: ' + handle.name + '.');
+      }).catch(function(err){
+        if (err && err.name === 'AbortError') return;
+        mostrarMsg('msgErro', 'Não foi possível trocar de pasta: ' +
+          (err && err.message ? err.message : String(err)));
+      });
+    });
+
+    // Mostrar a pasta já autorizada, sem pedir nada ao utilizador.
+    idbLer().then(function(handle){
+      if (!handle) return;
+      return garantirPermissao(handle, false).then(function(ok){
+        if (ok) mostrarPastaNome(handle);
+      });
+    }).catch(function(){});
+  }
+
+  /* =========================================================
+     Eventos
+     ========================================================= */
+  el('fileInput').addEventListener('change', function(){
+    if (this.files && this.files[0]) tratarFicheiro(this.files[0]);
+    this.value = '';
+  });
+
+  ligarDropzone();
+  ligarPasta();
+  ligarZoneSoft();
+
+  el('btnGravar').addEventListener('click', gravar);
+  el('btnConfirmarImport').addEventListener('click', confirmarImport);
+  el('btnCancelarResumo').addEventListener('click', function(){
+    estado.planoImport = null;
+    esconderResumoImport();
+    esconderCatalogo();
+    estado.pendente = null;
+    limparMensagens();
+    mostrarMsg('msgAviso', 'Import cancelado — nada foi gravado.');
+  });
+  /* A verificação automática tranca o botão. O escape existe para o caso
+     legítimo de os valores terem mesmo mudado (ficheiro corrigido) e é sempre
+     um segundo gesto, deliberado. */
+  el('resumoForcarCheck').addEventListener('change', function(){
+    el('btnConfirmarImport').disabled = !this.checked;
+  });
+
+  el('btnMigrar').addEventListener('click', function(){
+    if (estado.planoMigracao) aplicarMigracao(estado.planoMigracao);
+  });
+
+  el('btnMigrarDepois').addEventListener('click', function(){
+    el('migracaoCard').classList.add('hidden');
+  });
+
+  el('btnCancelar').addEventListener('click', function(){
+    estado.pendente = null;
+    esconderRelatorio();
+    esconderCatalogo();
+    limparMensagens();
+    el('fileName').textContent = 'Nenhum ficheiro escolhido';
+  });
+
+  /* ---------- Período, recarregar e arranque ---------- */
+  el('periodoSel').addEventListener('change', function(){ aoMudarPeriodo(this.value); });
+
+  el('btnRecarregar').addEventListener('click', function(){
+    carregarDados(estado.mesActivo).catch(function(err){
+      mostrarMsg('msgErro', 'Não foi possível ler os dados do Firebase: ' + (err && err.message ? err.message : err));
+    });
+  });
+
+  carregarDados().catch(function(err){
+    mostrarMsg('msgErro', 'Não foi possível ler os dados do Firebase: ' + (err && err.message ? err.message : err));
+    abrirImport();
+  });
+
+  // Se o catálogo ainda estiver no esquema plano, mostrar o relatório de
+  // migração. Só lê — a escrita depende do botão.
+  verificarMigracao().catch(function(){});
+
+  // Exposto para testes automatizados (não usado pela página).
+  window.__vendasV2 = {
+    estado: estado, v2: v2, payloadActivo: payloadActivo, renderVistas: renderVistas,
+    calcHomologa: calcHomologa, contextoHoras: contextoHoras, giocoTurnos: giocoTurnos,
+    giocoAcumuladoHoras: giocoAcumuladoHoras, concentracao: concentracao,
+    abrirGaveta: abrirGaveta, aoMudarPeriodo: aoMudarPeriodo
+  };
+
+  }); // fim de autenticarEContinuar
+})();
+</script>
+<script>
+/* ---------- Moldura: sidebar, tema, pesquisa (sem Firebase) ----------
+   Fora do bloco da sessão: a navegação e o tema funcionam mesmo sem rede. */
+(function(){
+  'use strict';
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  var ICONES_GRUPO = {
+    geral:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+    analise:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    operacoes:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h8"/>',
+    produto:'<path d="M4 15c0-5 4-9 8-9s8 4 8 9H4zM3 18h18"/>',
+    marca:'<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>',
+    loja:'<path d="M4 9l2-5h12l2 5M4 9v11h16V9M4 9h16M10 20v-6h4v6"/>'
+  };
+  var ACTIVA = 'vendas.html';
+  var grupos = window.GIOCO_NAV_GRUPOS || [];
+  var home = window.GIOCO_NAV_HOME || { href:'index.html', label:'Home' };
+  var aberto = 'analise';
+  var nav = document.getElementById('v2Nav');
+
+  function desenhar(){
+    var h = '<a class="v2-nav-item" href="' + esc(home.href) + '"><svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>' + esc(home.label) + '</a>';
+    grupos.forEach(function(g){
+      var open = g.id === aberto;
+      h += '<button type="button" class="v2-nav-grupo" data-grupo="' + esc(g.id) + '" aria-expanded="' + open + '">' +
+        '<svg class="v2-ico" viewBox="0 0 24 24" aria-hidden="true">' + (ICONES_GRUPO[g.id] || '') + '</svg>' +
+        '<span>' + esc(g.label) + '</span>' +
+        '<svg class="v2-ico v2-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>';
+      if (open){
+        h += '<div class="v2-nav-sub">' + g.paginas.map(function(pg){
+          return '<a href="' + esc(pg.href) + '"' + (pg.href === ACTIVA ? ' aria-current="page"' : '') + '>' + esc(pg.label) + '</a>';
+        }).join('') + '</div>';
+      }
+    });
+    nav.innerHTML = h;
+  }
+  nav.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-grupo]');
+    if (!b) return;
+    var id = b.getAttribute('data-grupo');
+    aberto = aberto === id ? '' : id;   // acordeão estrito: abrir um fecha os outros
+    desenhar();
+    var novo = nav.querySelector('[data-grupo="' + id + '"]');
+    if (novo) novo.focus();
+  });
+  desenhar();
+
+  /* Pesquisa: atalho para as páginas do OS (a mesma lista da nav). */
+  var paginas = [home].concat.apply([home], grupos.map(function(g){ return g.paginas; })).filter(function(p, i, a){
+    return a.findIndex(function(q){ return q.href === p.href; }) === i;
+  });
+  document.getElementById('v2PesquisaLista').innerHTML = paginas.map(function(p){ return '<option value="' + esc(p.label) + '">'; }).join('');
+  var campo = document.getElementById('v2Pesquisa');
+  function ir(){
+    var q = campo.value.trim().toLowerCase();
+    if (!q) return;
+    var alvo = paginas.filter(function(p){ return p.label.toLowerCase() === q; })[0] ||
+               paginas.filter(function(p){ return p.label.toLowerCase().indexOf(q) === 0; })[0];
+    if (alvo) window.location.href = alvo.href;
+  }
+  campo.addEventListener('change', ir);
+  campo.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') ir(); });
+
+  /* Tema: o mesmo atributo e a mesma chave do gioco-shell.js
+     (body[data-theme], localStorage 'gioco-theme'). */
+  var btn = document.getElementById('v2Tema');
+  function sincronizar(){
+    var escuro = document.body.getAttribute('data-theme') === 'dark';
+    document.getElementById('v2TemaIco').innerHTML = '<use href="#i-' + (escuro ? 'moon' : 'sun') + '"/>';
+    btn.setAttribute('aria-label', escuro ? 'Mudar para tema claro' : 'Mudar para tema escuro');
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', escuro ? '#15202F' : '#D8E3F8');
+  }
+  btn.addEventListener('click', function(){
+    var novo = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', novo);
+    try { localStorage.setItem('gioco-theme', novo); } catch (e) {}
+    sincronizar();
+  });
+  if (!document.body.getAttribute('data-theme')) document.body.setAttribute('data-theme', 'light');
+  sincronizar();
+})();
+</script>
+</body>
+</html>
