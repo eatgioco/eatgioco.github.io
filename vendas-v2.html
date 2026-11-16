@@ -42,7 +42,12 @@
 <div class="v2-shell">
 
   <nav class="v2-side" aria-label="Navegação" id="v2Side">
-    <a class="v2-marca" href="index.html"><b>GIOCO</b><span>OS</span></a>
+    <div class="v2-marca-linha">
+      <a class="v2-marca" href="index.html"><b>GIOCO</b><span>OS</span></a>
+      <button type="button" class="v2-redondo v2-menu-btn" id="v2MenuBtn" aria-expanded="false" aria-controls="v2Nav" aria-label="Abrir o menu">
+        <svg class="v2-ico" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+    </div>
     <div id="v2Nav"></div>
     <div class="v2-side-pe">
       <span>Painel interno</span>
@@ -91,7 +96,12 @@
       </div>
     </div>
 
-    <div id="vistas"></div>
+    <div id="vistas" aria-live="polite">
+      <div class="v2-esq-grupo" role="status" aria-busy="true" aria-label="A carregar as vendas">
+        <div class="v2-kpis"><div class="v2-esq" style="height:128px"></div><div class="v2-esq" style="height:128px"></div><div class="v2-esq" style="height:128px"></div><div class="v2-esq" style="height:128px"></div></div>
+        <div class="v2-esq" style="height:380px"></div>
+      </div>
+    </div>
     <div class="v2-cartao v2-vazio hidden" id="semDados">Sem meses importados. Começa por importar um SAF-T.</div>
 
   </main>
@@ -1497,6 +1507,7 @@
         return;
       }
       el('semDados').classList.add('hidden');
+      if (!hashLido){ hashLido = true; if (!mesPreferido) aplicarHash(); }
       var alvo = mesPreferido && dados[mesPreferido] ? mesPreferido :
         (estado.mesActivo && (dados[estado.mesActivo] || estado.mesActivo === '__todos') ? estado.mesActivo : meses[meses.length - 1]);
       estado.mesActivo = alvo;
@@ -1562,7 +1573,7 @@
                          'todas as quartas', 'todas as quintas', 'todas as sextas', 'todos os sábados'];
 
   function aCarregar(texto){
-    el('vistas').innerHTML = '<div class="v2-cartao v2-vazio">' + esc(texto) + '</div>';
+    el('vistas').innerHTML = '<div class="v2-cartao v2-vazio" role="status">' + esc(texto) + '</div>';
   }
 
   function seleccionarDia(dia){
@@ -1615,7 +1626,7 @@
     var dow = parseInt(estado.diaSemanaActivo, 10);
     var datas = (p && p._datas) || [];
     var n = datas.length;
-    var texto = 'todas as ' + NOME_PLURAL_DIA[dow] + ' de ' +
+    var texto = ((dow === 0 || dow === 6) ? 'todos os ' : 'todas as ') + NOME_PLURAL_DIA[dow] + ' de ' +
       (estado.mesActivo === '__todos' ? 'todos os meses' : nomeMes(estado.mesActivo));
     if (!n) return texto;
     var detalhe = n + (n === 1 ? ' dia' : ' dias');
@@ -1906,6 +1917,23 @@
     };
   }
 
+  /* Dia individual: o mesmo dia da semana, uma semana antes. Sai do porDia
+     do mês já em memória (bruto e talões) — nenhuma leitura nova. null se
+     esse dia não existir (loja fechada ou mês não importado). */
+  function calcSemanaAnterior(p){
+    if (!estado.diaActivo || !p) return null;
+    var dt = new Date(estado.diaActivo + 'T12:00:00');
+    dt.setDate(dt.getDate() - 7);
+    var iso = isoDeData(dt);
+    var mes = estado.dados[iso.slice(0, 7)];
+    var v = mes && mes.porDia && mes.porDia[iso];
+    if (!v) return null;
+    var r = p.resumo || {};
+    var bruto = Number(v.bruto) || 0, docs = Number(v.docs) || 0;
+    return { dia:iso, rotulo:rotuloDia(iso), bruto:bruto, docs:docs, ticket: docs ? bruto / docs : 0,
+             brutoHoje:Number(r.bruto) || 0, docsHoje:Number(r.docs) || 0, ticketHoje:Number(r.ticket) || 0 };
+  }
+
   /* =========================================================
      Peças de desenho
      ========================================================= */
@@ -1920,10 +1948,15 @@
       var h = max > 0 ? Math.max(0, (x.valor || 0) / max * 86) : 0;
       var sep = (opts.sep === i && i > 0)
         ? '<span class="v2-col-sep" style="left:-5px"><span>' + esc(opts.sepRotulo || '') + '</span></span>' : '';
-      return '<div class="v2-col ' + (x.cls || '') + '" tabindex="0" data-dica="' + attr(x.dica || '') + '">' + sep +
-        '<span class="v2-col-v">' + (x.valorTxt || '') + '</span>' +
-        '<span class="v2-col-b" style="height:' + h.toFixed(1) + '%"></span>' +
-        '</div>';
+      var rotulo = attr(String(x.dica || '').replace(/\n/g, ', '));
+      var miolo = sep + '<span class="v2-col-v">' + (x.valorTxt || '') + '</span>' +
+        '<span class="v2-col-b" style="height:' + h.toFixed(1) + '%"></span>';
+      // Com `periodo`, a barra é um botão: abre esse dia (ou esse dia da semana).
+      if (x.periodo){
+        return '<button type="button" class="v2-col ' + (x.cls || '') + '" data-periodo="' + attr(x.periodo) + '"' +
+          ' data-dica="' + attr((x.dica || '') + '\n' + x.periodoDica) + '" aria-label="' + rotulo + '. ' + attr(x.periodoDica) + '">' + miolo + '</button>';
+      }
+      return '<div class="v2-col ' + (x.cls || '') + '" tabindex="0" role="img" aria-label="' + rotulo + '" data-dica="' + attr(x.dica || '') + '">' + miolo + '</div>';
     }).join('');
     var eixo = itens.map(function(x){
       return '<span class="' + ((x.cls || '').indexOf('destaque') >= 0 || (x.cls || '').indexOf('agora') >= 0 ? 'destaque' : '') + '">' + x.eixo + '</span>';
@@ -1977,7 +2010,7 @@
 
   function tabelaHTML(cab, linhas, classesLinha){
     return '<div class="v2-tabela-wrap"><table class="v2-tabela"><thead><tr>' +
-      cab.map(function(c){ return '<th' + (c.num ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') +
+      cab.map(function(c){ return '<th scope="col"' + (c.num ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') +
       '</tr></thead><tbody>' +
       linhas.map(function(l, i){
         return '<tr' + (classesLinha && classesLinha[i] ? ' class="' + classesLinha[i] + '"' : '') + '>' +
@@ -2038,8 +2071,9 @@
   }
 
   function cartaoTitulo(titulo, gaveta, extra){
-    return '<div class="v2-cartao-cab"><button type="button" class="v2-titulo-btn" data-gaveta="' + gaveta + '">' +
-      esc(titulo) + ico('chevron-right') + '</button>' + (extra || '') + '</div>';
+    return '<div class="v2-cartao-cab"><h2 class="v2-h2"><button type="button" class="v2-titulo-btn" data-gaveta="' + gaveta + '"' +
+      ' aria-label="' + attr(titulo + ' — ver detalhe') + '">' +
+      esc(titulo) + ico('chevron-right') + '</button></h2>' + (extra || '') + '</div>';
   }
 
   /* Cores categóricas por ENTIDADE (nunca por posição): a mesma categoria e o
@@ -2149,9 +2183,11 @@
         return { d:d, longo:longo, valor:Number(v.bruto) || 0, docs:Number(v.docs) || 0, ticket:ticket,
                  eixo: esc(d.slice(8)) + '<br>' + esc(dow), valorTxt: compacto ? decV(v.bruto, 0) : eurCurto(v.bruto),
                  cls: d === ultimo ? 'destaque' : '',
+                 periodo: (estado.mesActivo !== '__todos' && !estado.diaActivo && !estado.diaSemanaActivo) ? 'd:' + d : '',
+                 periodoDica: 'Clica para ver só este dia',
                  dica: longo + '\n' + eurV(v.bruto) + '\n' + intV(v.docs) + ' talões · ticket ' + eurV(ticket) };
       });
-      legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') : 'Sem dias neste período.';
+      legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') + (itens[0] && itens[0].periodo ? ' Clica numa barra para abrir esse dia.' : '') : 'Sem dias neste período.';
       if (vista === 'tabela'){
         corpo = tabelaHTML([{t:'Dia'},{t:'Bruto',num:1},{t:'Talões',num:1},{t:'Ticket médio',num:1}],
           itens.map(function(x){ return [esc(x.longo), eurV(x.valor), intV(x.docs), eurV(x.ticket)]; }),
@@ -2227,6 +2263,8 @@
                  eixo: esc(DIAS_SEMANA[d].slice(0, 3)),
                  valorTxt: (v && v.dias) ? eurCurto(media) : 'fechado',
                  cls: d === hoje ? 'destaque' : '',
+                 periodo: (v && v.dias && !estado.diaActivo) ? 'w:' + d : '',
+                 periodoDica: 'Clica para ver só ' + ROTULO_TODOS_V2[d],
                  dica: DIAS_SEMANA[d] + '\n' + ((v && v.dias) ? 'média ' + eurV(media) + ' · ' + v.dias + (v.dias === 1 ? ' dia aberto' : ' dias abertos') : 'fechado') };
       });
       legenda = 'Média por dia aberto, não a soma. ' + DIAS_SEMANA[hoje] + ' (hoje) em destaque.';
@@ -2274,6 +2312,7 @@
     ctrl += segHTML('vista', [['barras','Barras'], ['tabela','Tabela'], ['linha','Linha']], vista);
 
     return '<section class="v2-cartao" aria-label="Faturação">' +
+      '<h2 class="v2-sr">Faturação por período</h2>' +
       '<div class="v2-cartao-cab" style="padding-bottom:8px">' +
         segHTML('tab', tabs, tab) +
         '<div class="v2-ctrls">' + ctrl + '</div>' +
@@ -2311,6 +2350,15 @@
         chipDelta(hom.docs, hom.docsAnt) + '<span>' + mc + intV(hom.docsAnt) + '</span>',
         chipDelta(hom.ticket, hom.ticketAnt) + '<span>' + mc + eurV(hom.ticketAnt) + '</span>',
         chipDelta(hom.mediaDia, hom.mediaDiaAnt) + '<span>' + mc + eurV(hom.mediaDiaAnt) + '</span>'
+      ];
+    } else if (calcSemanaAnterior(p)){
+      var sa = calcSemanaAnterior(p);
+      var rs = esc(sa.rotulo.replace(/ \((.+)\)$/, '')) + ': ';
+      pe = [
+        chipDelta(sa.brutoHoje, sa.bruto) + '<span>' + rs + eurV(sa.bruto) + '</span>',
+        chipDelta(sa.docsHoje, sa.docs) + '<span>' + rs + intV(sa.docs) + '</span>',
+        chipDelta(sa.ticketHoje, sa.ticket) + '<span>' + rs + eurV(sa.ticket) + '</span>',
+        '<span>Líquido ' + eurV(r.liquido) + '</span>'
       ];
     } else {
       var semAnt = hom && hom.semDados ? '<span>Sem dados de ' + esc(nomeMes(hom.anterior)) + '</span>' : '';
@@ -2488,6 +2536,18 @@
             intV(hom.nAnt) + ' de ' + esc(nomeMes(hom.anterior)) + '.' +
             (hom.nAnt < hom.n ? ' Comparação parcial — só ' + intV(hom.nAnt) + ' dias abertos em ' + esc(nomeMes(hom.anterior)) + '.' : ''));
       }
+      var sa = calcSemanaAnterior(p);
+      if (sa){
+        h += secT('Mesmo dia da semana anterior · ' + sa.rotulo) +
+          dl('Bruto', eurV(sa.bruto), deltaCelula(sa.brutoHoje, sa.bruto) + ' · agora ' + eurV(sa.brutoHoje)) +
+          dl('Talões', intV(sa.docs), deltaCelula(sa.docsHoje, sa.docs) + ' · agora ' + intV(sa.docsHoje)) +
+          dl('Ticket', eurV(sa.ticket), deltaCelula(sa.ticketHoje, sa.ticket) + ' · agora ' + eurV(sa.ticketHoje));
+      }
+      // Como se calcula — a metodologia fica à vista, nunca escondida.
+      h += secT('Como se calcula') +
+        nota('Ticket médio = bruto ÷ talões. Média por dia = bruto ÷ dias abertos (dias sem vendas não contam). ' +
+          'Cada talão conta para o dia de operação: o que fecha antes das ' + CORTE_DIA_OPERACAO_H + 'h pertence ao dia anterior. ' +
+          'A variação em percentagem compara sempre períodos do mesmo tamanho.');
       if (estado.mesActivo !== '__todos' && !estado.diaSemanaActivo && r.importadoEm){
         h += '<p class="v2-nota" style="margin-top:auto;padding-top:16px">Importado a ' + esc(dataHora(r.importadoEm)) +
           (r.ficheiro ? ' · ' + esc(r.ficheiro) : '') + '</p>';
@@ -2721,6 +2781,7 @@
     var g = el('gaveta'), ov = el('gavetaOv');
     if (!v2.gaveta || !p || !GAVETAS[v2.gaveta]){
       g.classList.add('hidden'); ov.classList.add('hidden'); g.innerHTML = '';
+      sincronizarFundo();
       return;
     }
     var scroll = g.scrollTop;
@@ -2730,6 +2791,16 @@
       '<button type="button" class="v2-fechar" data-fechar-gaveta="1" aria-label="Fechar">×</button></div>' + d.corpo;
     g.classList.remove('hidden'); ov.classList.remove('hidden');
     g.scrollTop = scroll;
+    sincronizarFundo();
+  }
+
+  /* Com um painel ou o modal aberto, o resto da página fica inerte: o Tab
+     não foge para trás do overlay e o fundo não faz scroll. */
+  function sincronizarFundo(){
+    var aberto = !el('gaveta').classList.contains('hidden') || !el('importModal').classList.contains('hidden');
+    var shell = document.querySelector('.v2-shell');
+    if (shell) shell.inert = aberto;
+    document.body.style.overflow = aberto ? 'hidden' : '';
   }
 
   function abrirGaveta(id, abridor){
@@ -2749,7 +2820,39 @@
   /* =========================================================
      Render principal
      ========================================================= */
+  /* O período fica no endereço (#2026-11, #2026-11/d:2026-11-11, #2026-11/w:3):
+     recarregar ou guardar o link volta ao mesmo sítio. */
+  var hashLido = false;
+  function escreverHash(){
+    if (!estado.mesActivo) return;
+    var h = '#' + estado.mesActivo + (estado.diaActivo ? '/d:' + estado.diaActivo :
+      (estado.diaSemanaActivo ? '/w:' + estado.diaSemanaActivo : ''));
+    try { if (location.hash !== h) history.replaceState(null, '', h); } catch (e){}
+  }
+  function aplicarHash(){
+    var m = /^#(\d{4}-\d{2}|__todos)(?:\/(d:\d{4}-\d{2}-\d{2}|w:[0-6]))?$/.exec(location.hash || '');
+    if (!m) return;
+    if (m[1] !== '__todos' && !estado.dados[m[1]]) return;
+    estado.mesActivo = m[1];
+    estado.diaActivo = ''; estado.diaSemanaActivo = '';
+    if (m[2] && m[2].charAt(0) === 'd' && m[1] !== '__todos') estado.diaActivo = m[2].slice(2);
+    if (m[2] && m[2].charAt(0) === 'w') estado.diaSemanaActivo = m[2].slice(2);
+  }
+
+  // Mudar só o # (colar um link, botão de recuar) também muda o período.
+  window.addEventListener('hashchange', function(){
+    if (!Object.keys(estado.dados).length) return;
+    var antes = estado.mesActivo + '|' + estado.diaActivo + '|' + estado.diaSemanaActivo;
+    aplicarHash();
+    if (antes === estado.mesActivo + '|' + estado.diaActivo + '|' + estado.diaSemanaActivo) return;
+    popularPeriodo();
+    if (estado.diaActivo) seleccionarDia(estado.diaActivo);
+    else if (estado.diaSemanaActivo) seleccionarDiaSemana(estado.diaSemanaActivo);
+    else renderVistas();
+  });
+
   function renderVistas(){
+    escreverHash();
     var p = payloadActivo();
     var alvo = el('vistas');
     if (!p){
@@ -2795,6 +2898,15 @@
     if ((b = t.closest('[data-gaveta]'))){ abrirGaveta(b.getAttribute('data-gaveta'), b); return; }
     if ((b = t.closest('[data-fechar-gaveta]')) || t.id === 'gavetaOv'){ fecharGaveta(); return; }
     if ((b = t.closest('[data-voltar-mes]'))){ voltarAoMes(); return; }
+    if ((b = t.closest('[data-periodo]'))){
+      // Drilldown: o mesmo caminho do seletor (mesma leitura, mesma cache).
+      el('v2Dica').classList.remove('on');
+      aoMudarPeriodo(b.getAttribute('data-periodo'));
+      popularPeriodo();
+      el('periodoSel').focus();
+      return;
+    }
+    if ((b = t.closest('[data-recarregar]'))){ arrancar(); return; }
     if ((b = t.closest('button[data-tab]'))){ v2.tab = b.getAttribute('data-tab'); guardarV2(); renderVistas(); return; }
     if ((b = t.closest('button[data-vista]'))){ v2.vista[v2.tab] = b.getAttribute('data-vista'); guardarV2(); renderVistas(); return; }
     if ((b = t.closest('button[data-horas-modo]'))){ estado.horasModo = b.getAttribute('data-horas-modo'); renderVistas(); return; }
@@ -2853,11 +2965,13 @@
   function abrirImport(){
     el('importOv').classList.remove('hidden');
     el('importModal').classList.remove('hidden');
+    sincronizarFundo();
     el('btnFecharImport').focus();
   }
   function fecharImport(){
     el('importOv').classList.add('hidden');
     el('importModal').classList.add('hidden');
+    sincronizarFundo();
     el('btnAbrirImport').focus();
   }
   el('btnAbrirImport').addEventListener('click', abrirImport);
@@ -3236,10 +3350,14 @@
     });
   });
 
-  carregarDados().catch(function(err){
-    mostrarMsg('msgErro', 'Não foi possível ler os dados do Firebase: ' + (err && err.message ? err.message : err));
-    abrirImport();
-  });
+  function arrancar(){
+    carregarDados().catch(function(err){
+      var txt = err && err.message ? err.message : String(err);
+      el('vistas').innerHTML = '<div class="v2-faixa v2-faixa-erro" role="alert"><strong>Não foi possível ler as vendas.</strong>' +
+        '<span>' + esc(txt) + '</span><button type="button" class="v2-link" data-recarregar="1">Tentar de novo</button></div>';
+    });
+  }
+  arrancar();
 
   // Se o catálogo ainda estiver no esquema plano, mostrar o relatório de
   // migração. Só lê — a escrita depende do botão.
@@ -3302,6 +3420,15 @@
     if (novo) novo.focus();
   });
   desenhar();
+
+  /* Telemóvel: a sidebar empilha por cima do conteúdo, mas RECOLHIDA — sem
+     isto eram dois ecrãs de menu antes do primeiro número. */
+  var menuBtn = document.getElementById('v2MenuBtn');
+  menuBtn.addEventListener('click', function(){
+    var aberta = document.getElementById('v2Side').classList.toggle('aberta');
+    menuBtn.setAttribute('aria-expanded', aberta);
+    menuBtn.setAttribute('aria-label', aberta ? 'Fechar o menu' : 'Abrir o menu');
+  });
 
   /* Pesquisa: atalho para as páginas do OS (a mesma lista da nav). */
   var paginas = [home].concat.apply([home], grupos.map(function(g){ return g.paginas; })).filter(function(p, i, a){

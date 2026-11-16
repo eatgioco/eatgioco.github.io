@@ -409,3 +409,49 @@ a{ color:var(--v2-primaria); }
 @media (prefers-reduced-motion:reduce){
   *{ transition:none !important; }
 }
+
+/* =====================================================================
+   Melhorias de Nov/2026 (2.ª passagem): títulos, drilldown, esqueleto,
+   menu recolhido no telemóvel.
+   ===================================================================== */
+.v2-h2{ margin:0; font:inherit; display:flex; }
+/* Barra clicável (abre esse dia / esse dia da semana): mesmo desenho, é um botão. */
+button.v2-col{ border:0; background:transparent; padding:0; font:inherit; color:inherit; cursor:pointer; }
+button.v2-col:hover .v2-col-b{ background:var(--v2-barra-destaque); }
+button.v2-col:hover .v2-col-v{ color:var(--v2-texto); }
+
+/* Esqueleto enquanto a primeira leitura não chega. */
+.v2-esq-grupo{ display:flex; flex-direction:column; gap:24px; }
+.v2-esq{ border-radius:12px; border:1px solid var(--v2-contorno); background:var(--v2-cartao); position:relative; overflow:hidden; }
+.v2-esq::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--v2-texto) 5%, transparent), transparent);
+  animation:v2-esq 1.4s linear infinite;
+}
+@keyframes v2-esq{ from{ transform:translateX(-100%); } to{ transform:translateX(100%); } }
+@media (prefers-reduced-motion:reduce){ .v2-esq::after{ animation:none; } }
+
+/* Sidebar: no computador a marca ocupa a linha; no telemóvel ganha o botão do menu. */
+.v2-marca-linha{ display:flex; align-items:center; justify-content:space-between; }
+.v2-menu-btn{ display:none; color:var(--v2-texto); }
+@media (max-width:790px){
+  .v2-marca-linha .v2-marca{ padding-bottom:4px; }
+  .v2-menu-btn{ display:flex; width:44px; height:44px; }
+  .v2-side #v2Nav{ display:none; }
+  .v2-side.aberta #v2Nav{ display:block; padding-top:6px; }
+  .v2-kpis{ grid-template-columns:1fr 1fr; gap:12px; }
+  .v2-kpi{ padding:14px; gap:6px; }
+  .v2-kpi-valor{ font-size:22px; }
+  .v2-seg button, .v2-link, .v2-titulo-btn{ min-height:40px; }
+}
+@media (max-width:359px){
+  .v2-kpis{ grid-template-columns:1fr; }
+}
+@media (max-width:790px){
+  .v2-topo{ flex-wrap:nowrap; gap:8px; }
+  .v2-pesquisa{ flex:1 1 0; min-width:0; }
+  .v2-topo-dir{ gap:4px; }
+  .v2-kpi-label{ flex-wrap:wrap; gap:0 8px; }
+  .v2-cartao-cab .v2-seg{ flex-wrap:nowrap; max-width:100%; overflow-x:auto; scrollbar-width:none; }
+  .v2-cartao-cab .v2-seg button{ padding:6px 10px; white-space:nowrap; flex:none; }
+}
