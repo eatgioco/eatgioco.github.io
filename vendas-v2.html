@@ -1459,7 +1459,10 @@
      (pedido do Manel, 16 Nov/2026: tinha informação a mais). O resto
      (ticket, variação, acumulado, dias abertos) está na vista Tabela e no
      rótulo para leitores de ecrã. */
-  function dicaCurta(t){ return String(t || '').split('\n').slice(0, 2).join('\n'); }
+  function dicaCurta(t){
+    // Duas linhas, mais a do ticket médio quando existe (dica do dia — pedido do Manel).
+    return String(t || '').split('\n').filter(function(l, i){ return i < 2 || l.indexOf('ticket médio') === 0; }).join('\n');
+  }
 
   /* =========================================================
      Leitura dos dados gravados (mesma leitura da vendas.html)
@@ -2154,7 +2157,7 @@
      ========================================================= */
   var TABS = [['dia','Por dia'], ['hora','Por hora'], ['sem','Dia da semana'], ['semanas','Semanas'], ['meses','Por mês']];
   var LEITURA = {
-    dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. A dica de cada barra dá o valor e os talões; o ticket de cada dia está na vista Tabela.',
+    dia: 'Bruto e nº de talões em cada dia aberto. O dia mais recente fica em destaque. A dica de cada barra dá o valor, os talões e o ticket médio desse dia; a vista Tabela tem o mesmo, dia a dia.',
     sem: 'Média por dia aberto (não a soma) — para não penalizar semanas com feriados. "fechado" = nenhum dia aberto desse dia da semana no período. A barra de hoje fica em destaque.',
     meses: 'Bruto de cada mês importado, lado a lado. Não depende do período escolhido: mostra sempre todos os meses. O mês em curso ainda não está completo — compara-o pelos dias abertos e pela média por dia (na vista Tabela), não pelo total. Clica numa barra para abrir esse mês.',
     semanas: 'Bruto e nº de talões por semana (segunda a domingo). Semanas com menos de 7 dias abertos vêm assinaladas com (n/7) — não se inventam zeros que puxariam a barra para baixo sem razão.'
@@ -2191,7 +2194,7 @@
                  cls: d === ultimo ? 'destaque' : '',
                  periodo: (estado.mesActivo !== '__todos' && !estado.diaActivo && !estado.diaSemanaActivo) ? 'd:' + d : '',
                  periodoDica: 'Clica para ver só este dia',
-                 dica: longo + '\n' + eurV(v.bruto) + ' · ' + intV(v.docs) + ' talões\nticket ' + eurV(ticket) };
+                 dica: longo + '\n' + eurV(v.bruto) + ' · ' + intV(v.docs) + ' talões\nticket médio ' + eurV(ticket) };
       });
       legenda = ch.length ? 'Bruto em cada dia aberto. ' + (ultimo ? rotuloDia(ultimo) + ' em destaque.' : '') + (itens[0] && itens[0].periodo ? ' Clica numa barra para abrir esse dia.' : '') : 'Sem dias neste período.';
       if (vista === 'tabela'){
